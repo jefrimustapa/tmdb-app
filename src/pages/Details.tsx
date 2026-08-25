@@ -1,0 +1,304 @@
+import React, { useState, useEffect } from 'react';
+import { useParams, useNavigate, Link } from 'react-router-dom';
+import { Play, Heart, Bookmark, Star, ArrowLeft, Plus, Check } from 'lucide-react';
+import type { TMDBMovieDetails, TMDBTVDetails, TMDBMediaItem } from '../types/tmdb';
+import { tmdbApi, tmdbImages, extractContentRating } from '../services/tmdb';
+import { dbService } from '../services/db';
+import { MediaRow } from '../components/common/MediaRow';
+import { EpisodeGrid } from '../components/player/EpisodeGrid';
+
+export const Details: React.FC = () => {
+  const { type, id } = useParams<{ type: 'movie' | 'tv'; id: string }>();
+  const navigate = useNavigate();
+
+  const tmdbId = parseInt(id || '0', 10);
+  const mediaType: 'movie' | 'tv' = (type === 'tv' ? 'tv' : 'movie');
+
+  const [details, setDetails] = useState<TMDBMovieDetails | TMDBTVDetails | null>(null);
+  const [similar, setSimilar] = useState<TMDBMediaItem[]>([]);
+  const [isLiked, setIsLiked] = useState(false);
+  const [isWatchlist, setIsWatchlist] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    if (!tmdbId) return;
+
+    const fetchDetails = async () => {
+      setIsLoading(true);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      try {
+        let resData: TMDBMovieDetails | TMDBTVDetails;
+        if (mediaType === 'movie') {
+          resData = await tmdbApi.getMovieDetails(tmdbId);
+        } else {
+          resData = await tmdbApi.getTVDetails(tmdbId);
+        }
+        setDetails(resData);
+
+        const recItems = (resData.similar?.results || resData.recommendations?.results || []) as TMDBMediaItem[];
+        setSimilar(recItems);
+
+        const [liked, watchlisted] = await Promise.allSettled([
+          dbService.isLiked(tmdbId, mediaType),
+          dbService.isWatchlisted(tmdbId, mediaType)
+        ]);
+
+        if (liked.status === 'fulfilled') setIsLiked(liked.value);
+        if (watchlisted.status === 'fulfilled') setIsWatchlist(watchlisted.value);
+      } catch (err) {
+        console.error('Failed to load details:', err);
+      } finally {
+        setIsLoading(false);
+        // Automatically focus the primary action button (Watch Now or Back) once details finish loading
+        setTimeout(() => {
+          const mainContent = document.querySelector('main');
+          const primaryBtn = mainContent?.querySelector<HTMLElement>('[data-details-primary="true"]') ||
+                             mainContent?.querySelector<HTMLElement>('.tv-focus-target, a, button') ||
+                             document.querySelector<HTMLElement>('.tv-focus-target');
+          if (primaryBtn) {
+            primaryBtn.focus();
+            primaryBtn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+          }
+        }, 150);
+      }
+    };
+
+    fetchDetails();
+  }, [tmdbId, mediaType]);
+
+  const handleToggleLike = async () => {
+    if (!details) return;
+    const title = details.title || details.name || 'Untitled';
+    const status = await dbService.toggleLike({
+      tmdbId,
+      mediaType,
+      title,
+      posterPath: details.poster_path,
+      backdropPath: details.backdrop_path,
+      voteAverage: details.vote_average,
+      releaseDate: details.release_date || details.first_air_date
+    });
+    setIsLiked(status);
+  };
+
+  const handleToggleWatchlist = async () => {
+    if (!details) return;
+    const title = details.title || details.name || 'Untitled';
+    const status = await dbService.toggleWatchlist({
+      tmdbId,
+      mediaType,
+      title,
+      posterPath: details.poster_path,
+      backdropPath: details.backdrop_path,
+      voteAverage: details.vote_average,
+      releaseDate: details.release_date || details.first_air_date
+    });
+    setIsWatchlist(status);
+  };
+
+  if (isLoading || !details) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-hbo-dark">
+        <div className="w-12 h-12 border-4 border-hbo-purple border-t-hbo-cyan rounded-full animate-spin shadow-hbo-glow mb-4" />
+        <h2 className="text-sm font-bold font-display text-white tracking-widest">LOADING TITLE...</h2>
+      </div>
+    );
+  }
+
+  const title = details.title || details.name || 'Untitled';
+  const backdropUrl = tmdbImages.backdrop(details.backdrop_path, 'original');
+  const releaseYear = (details.release_date || details.first_air_date || '').split('-')[0];
+  const contentRating = extractContentRating(details);
+
+  return (
+    <div className="min-h-screen bg-hbo-dark text-white pb-20">
+      {/* Top Hero Backdrop & Vignette */}
+      <div className="relative w-full h-[65vh] sm:h-[75vh] overflow-hidden bg-gray-950">
+        <img
+          src={backdropUrl}
+          alt={title}
+          className="w-full h-full object-cover object-top opacity-60 sm:opacity-75 scale-105 transform transition-transform duration-1000"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-hbo-dark via-hbo-dark/60 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-r from-hbo-dark via-hbo-dark/80 to-transparent w-full md:w-3/4" />
+
+        {/* Back Navigation Bar (Top Left) */}
+        <div className="absolute top-4 sm:top-6 left-4 sm:left-8 z-30">
+          <button
+            onClick={() => {
+              if (window.history.length > 1) {
+                navigate(-1);
+              } else {
+                navigate('/');
+              }
+            }}
+            aria-label="Go Back"
+            className="flex items-center gap-2 px-3.5 py-2 rounded-full bg-black/80 hover:bg-black backdrop-blur-md border border-white/20 text-xs sm:text-sm font-bold text-gray-200 hover:text-white transition hover:scale-105 tv-focus-target shadow-xl"
+          >
+            <ArrowLeft className="w-4 h-4 text-hbo-cyan" />
+            <span>Back</span>
+          </button>
+        </div>
+
+        {/* Hero Title & Actions Overlay */}
+        <div className="absolute bottom-6 sm:bottom-10 left-4 sm:left-8 right-4 sm:right-8 max-w-4xl z-20 space-y-4">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="px-3 py-0.5 rounded-md bg-hbo-purple text-hbo-cyan border border-hbo-cyan/30 text-xs font-black uppercase tracking-wider">
+              {mediaType === 'movie' ? 'HBO Max Exclusive' : 'Max Original Series'}
+            </span>
+            {contentRating && (
+              <span className="px-2.5 py-0.5 rounded-md bg-white/15 text-white border border-white/25 text-xs font-black uppercase tracking-wider">
+                {contentRating}
+              </span>
+            )}
+            <span className="px-2.5 py-0.5 rounded-md bg-hbo-cyan/20 text-hbo-cyan border border-hbo-cyan/30 text-xs font-bold">
+              4K ULTRA HD
+            </span>
+          </div>
+
+          <h1 className="text-3xl sm:text-5xl md:text-6xl font-black font-display tracking-tight text-white leading-none drop-shadow-2xl">
+            {title}
+          </h1>
+
+          {/* Quick Meta Row */}
+          <div className="flex items-center gap-3 text-xs sm:text-sm text-gray-300 font-semibold flex-wrap">
+            <div className="flex items-center gap-1.5 font-bold text-yellow-400">
+              <Star className="w-4 h-4 fill-current" />
+              <span>{details.vote_average.toFixed(1)}</span>
+            </div>
+            <span>•</span>
+            <span>{releaseYear}</span>
+            {details && 'runtime' in details && details.runtime > 0 && (
+              <>
+                <span>•</span>
+                <span>{details.runtime} mins</span>
+              </>
+            )}
+            {details && 'number_of_seasons' in details && (
+              <>
+                <span>•</span>
+                <span>{details.number_of_seasons} Season{details.number_of_seasons > 1 ? 's' : ''}</span>
+              </>
+            )}
+            {details.genres && details.genres.length > 0 && (
+              <>
+                <span>•</span>
+                <span className="text-gray-300">{details.genres.map(g => g.name).join(', ')}</span>
+              </>
+            )}
+          </div>
+
+          {/* Primary Action Buttons */}
+          <div className="flex items-center gap-3 sm:gap-4 pt-2 flex-wrap">
+            <Link
+              to={`/watch/${mediaType}/${tmdbId}`}
+              data-details-primary="true"
+              className="flex items-center gap-2.5 px-8 py-3.5 rounded-xl bg-gradient-to-r from-hbo-purple to-hbo-cyan text-white font-bold text-sm sm:text-base shadow-hbo-glow hover:scale-105 transition-all tv-focus-target"
+            >
+              <Play className="w-5 h-5 fill-current" />
+              <span>Watch Now</span>
+            </Link>
+
+            <button
+              onClick={handleToggleWatchlist}
+              className={`flex items-center gap-2 px-5 py-3.5 rounded-xl backdrop-blur-md border font-semibold text-sm transition-all hover:scale-105 tv-focus-target ${
+                isWatchlist
+                  ? 'bg-hbo-purple-light/30 border-hbo-purple-light text-hbo-cyan'
+                  : 'bg-white/10 hover:bg-white/20 border-white/20 text-white'
+              }`}
+            >
+              {isWatchlist ? <Check className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+              <span>{isWatchlist ? 'In Watchlist' : 'Watchlist'}</span>
+            </button>
+
+            <button
+              onClick={handleToggleLike}
+              className={`p-3.5 rounded-full backdrop-blur-md border transition-all hover:scale-105 tv-focus-target ${
+                isLiked
+                  ? 'bg-red-500/30 border-red-500 text-red-400'
+                  : 'bg-white/10 hover:bg-white/20 border-white/20 text-white'
+              }`}
+              title={isLiked ? 'Liked' : 'Like'}
+            >
+              <Heart className="w-5 h-5 fill-current" />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Details & Overview Body */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-8 pt-8 space-y-10">
+        {/* Synopsis & Tagline */}
+        <div className="max-w-3xl space-y-3">
+          {'tagline' in details && details.tagline && (
+            <p className="text-base sm:text-lg font-semibold italic text-hbo-cyan/90">
+              &ldquo;{details.tagline}&rdquo;
+            </p>
+          )}
+          <h3 className="text-sm font-bold uppercase tracking-wider text-gray-400">Storyline</h3>
+          <p className="text-sm sm:text-base text-gray-200 leading-relaxed">
+            {details.overview || 'No synopsis provided for this title.'}
+          </p>
+        </div>
+
+        {/* Series Seasons & Episode Selector Grid (TV Series only) */}
+        {mediaType === 'tv' && details && 'seasons' in details && (
+          <div className="-mx-4 sm:-mx-8 px-4 sm:px-8">
+            <EpisodeGrid
+              tvDetails={details as TMDBTVDetails}
+              currentSeason={1}
+              currentEpisode={1}
+              onSelectEpisode={(s, e) => {
+                navigate(`/watch/tv/${tmdbId}?s=${s}&e=${e}`);
+              }}
+            />
+          </div>
+        )}
+
+        {/* Top Cast Section */}
+        {details.credits?.cast && details.credits.cast.length > 0 && (
+          <div>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg sm:text-xl font-bold font-display text-white flex items-center gap-2">
+                <span className="w-1.5 h-5 bg-gradient-to-b from-hbo-purple to-hbo-cyan rounded-full inline-block"></span>
+                Cast & Crew
+              </h3>
+              <span className="text-xs text-gray-400">Select actor to see filmography</span>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 sm:gap-4">
+              {details.credits.cast.slice(0, 12).map((actor) => (
+                <Link
+                  key={actor.id}
+                  to={`/search?personId=${actor.id}&personName=${encodeURIComponent(actor.name)}`}
+                  className="flex items-center gap-3 p-2.5 rounded-xl bg-hbo-card/80 border border-hbo-border/60 hover:border-hbo-cyan/50 hover:bg-hbo-hover transition hover:scale-105 group tv-focus-target"
+                >
+                  <img
+                    src={tmdbImages.profile(actor.profile_path, 'w185')}
+                    alt={actor.name}
+                    className="w-12 h-12 rounded-full object-cover border border-hbo-border group-hover:border-hbo-cyan flex-shrink-0"
+                  />
+                  <div className="min-w-0">
+                    <p className="text-xs sm:text-sm font-bold text-white truncate group-hover:text-hbo-cyan transition">{actor.name}</p>
+                    <p className="text-[11px] text-gray-400 truncate">{actor.character}</p>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Recommended / Similar Titles Rail */}
+        {similar.length > 0 && (
+          <div className="-mx-4 sm:-mx-8">
+            <MediaRow
+              title="More Like This"
+              subtitle="Titles you may also enjoy based on this selection"
+              items={similar}
+              type={mediaType}
+            />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};

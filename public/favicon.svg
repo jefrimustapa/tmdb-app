@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
+  <defs>
+    <linearGradient id="hboGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#673ab7" />
+      <stop offset="50%" stop-color="#9055ff" />
+      <stop offset="100%" stop-color="#00d2ff" />
+    </linearGradient>
+    <radialGradient id="ringGrad" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#00d2ff" />
+      <stop offset="100%" stop-color="#9055ff" />
+    </radialGradient>
+  </defs>
+  <circle cx="50" cy="50" r="48" fill="#0e0e17" stroke="#23233a" stroke-width="2" />
+  <circle cx="50" cy="50" r="42" fill="none" stroke="url(#hboGrad)" stroke-width="3" opacity="0.8" />
+  <!-- HBO-styled TMDB emblem with bullseye 'O' -->
+  <path d="M 22 34 L 38 34 M 30 34 L 30 66" stroke="#ffffff" stroke-width="7" stroke-linecap="round" />
+  <path d="M 44 34 L 44 66 L 52 48 L 60 66 L 60 34" fill="none" stroke="#ffffff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" />
+  <!-- Bullseye target circle in modern HBO style -->
+  <circle cx="75" cy="50" r="14" fill="none" stroke="url(#hboGrad)" stroke-width="5" />
+  <circle cx="75" cy="50" r="6" fill="url(#ringGrad)" />
+</svg>
