@@ -14,10 +14,15 @@ if (!fs.existsSync(distPath) || !fs.existsSync(path.resolve(distPath, 'index.htm
   process.exit(1);
 }
 
-// 2. Read package.json and commit increment only after 100% successful compile
+// 2. Add 404.html and .nojekyll for GitHub Pages SPA routing
+fs.copyFileSync(path.resolve(distPath, 'index.html'), path.resolve(distPath, '404.html'));
+fs.writeFileSync(path.resolve(distPath, '.nojekyll'), '', 'utf8');
+
+// 3. Read package.json and commit increment only after 100% successful compile
 const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
 const newBuild = (pkg.buildNumber || 0) + 1;
 pkg.buildNumber = newBuild;
 fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n', 'utf8');
 
 console.log(`\n[Version Tracker] ✅ Successfully committed Build #${newBuild} to package.json`);
+

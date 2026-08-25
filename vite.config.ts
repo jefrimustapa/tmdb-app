@@ -8,6 +8,7 @@ export default defineConfig(() => {
   const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
 
   return {
+    base: process.env.GITHUB_PAGES === 'true' ? '/tmdb-app/' : './',
     plugins: [react()],
     define: {
       __APP_VERSION__: JSON.stringify(pkg.version),
