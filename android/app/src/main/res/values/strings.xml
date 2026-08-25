@@ -1,0 +1,8 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">TMDB Streamer</string>
+    <string name="title_activity_main">TMDB Streamer</string>
+    <string name="package_name">com.tmdb.streamer</string>
+    <string name="custom_url_scheme">com.tmdb.streamer</string>
+    <string name="accessibility_service_desc">Enables hardware-level OS touch automation and media controls for streaming players.</string>
+</resources>

@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="320dp"
+    android:height="180dp"
+    android:viewportWidth="320"
+    android:viewportHeight="180">
+    
+    <!-- Dark Background -->
+    <path
+        android:pathData="M0,0h320v180h-320z"
+        android:fillColor="#090912" />
+
+    <!-- Subtle Background Glow -->
+    <path
+        android:pathData="M0,0h320v180h-320z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:centerX="160"
+                android:centerY="90"
+                android:gradientRadius="160"
+                android:type="radial">
+                <item android:offset="0.0" android:color="#339055FF" />
+                <item android:offset="1.0" android:color="#00000000" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Circular Badge Outer -->
+    <path
+        android:pathData="M160,70m-36,0a36,36 0 1,1 72,0a36,36 0 1,1 -72,0"
+        android:fillColor="#0f0f1b"
+        android:strokeWidth="3"
+        android:strokeColor="#2c2c48" />
+
+    <!-- Circular Gradient Ring -->
+    <path
+        android:pathData="M160,70m-31,0a31,31 0 1,1 62,0a31,31 0 1,1 -62,0"
+        android:strokeWidth="2.5">
+        <aapt:attr name="android:strokeColor">
+            <gradient
+                android:startX="129"
+                android:startY="39"
+                android:endX="191"
+                android:endY="101"
+                android:type="linear">
+                <item android:offset="0.0" android:color="#FF673AB7" />
+                <item android:offset="0.5" android:color="#FF9055FF" />
+                <item android:offset="1.0" android:color="#FF00D2FF" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- 'T' Emblem -->
+    <path
+        android:pathData="M138,60 L152,60 M145,60 L145,80"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="4"
+        android:strokeLineCap="round" />
+
+    <!-- 'M' Emblem -->
+    <path
+        android:pathData="M157,60 L157,80 L163,68 L169,80 L169,60"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="3"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+
+    <!-- Bullseye HBO Ring in 'O'/'D' -->
+    <path
+        android:pathData="M181,70m-8,0a8,8 0 1,1 16,0a8,8 0 1,1 -16,0"
+        android:strokeWidth="3">
+        <aapt:attr name="android:strokeColor">
+            <gradient
+                android:startX="173"
+                android:startY="62"
+                android:endX="189"
+                android:endY="78"
+                android:type="linear">
+                <item android:offset="0.0" android:color="#FF9055FF" />
+                <item android:offset="1.0" android:color="#FF00D2FF" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Bullseye Center Dot -->
+    <path
+        android:pathData="M181,70m-3,0a3,3.5 0 1,1 6,0a3,3.5 0 1,1 -6,0"
+        android:fillColor="#FF00D2FF" />
+
+    <!-- TMDB STREAMER Text Under Icon -->
+    <path
+        android:pathData="M120,126 L128,126 M124,126 L124,136"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2"
+        android:strokeLineCap="round" />
+    <path
+        android:pathData="M132,126 L132,136 L135.5,130 L139,136 L139,126"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="1.5"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+    <path
+        android:pathData="M143,126 L147.5,126 C149.5,126 150.5,127.5 150.5,129 C150.5,130.5 149.5,131 147.5,131 L143,131 L143,136 M143,131 L148,131 C150,131 151,132.5 151,134 C151,135.5 150,136 148,136 L143,136"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="1.5"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+    <path
+        android:pathData="M155,126 L159.5,126 C163,126 164.5,128.5 164.5,131 C164.5,133.5 163,136 159.5,136 L155,136 Z"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="1.5"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+
+    <!-- STREAMER Word Accent Gradient Line -->
+    <path
+        android:pathData="M172,131 L200,131"
+        android:strokeWidth="2.5"
+        android:strokeLineCap="round">
+        <aapt:attr name="android:strokeColor">
+            <gradient
+                android:startX="172"
+                android:startY="131"
+                android:endX="200"
+                android:endY="131"
+                android:type="linear">
+                <item android:offset="0.0" android:color="#FF9055FF" />
+                <item android:offset="1.0" android:color="#FF00D2FF" />
+            </gradient>
+        </aapt:attr>
+    </path>
+</vector>
