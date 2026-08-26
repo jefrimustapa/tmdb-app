@@ -2,8 +2,8 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = 223;
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.fix-series-padding.223';
+export const APP_BUILD_NUMBER = 224;
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.fix-myspace-padding.224';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
-export const APP_BRANCH = 'fix-series-padding';
+export const APP_BRANCH = 'fix-myspace-padding';

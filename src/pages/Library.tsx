@@ -4,8 +4,10 @@ import type { WatchHistoryItem, LikedItem, WatchlistItem } from '../types/db';
 import type { TMDBMediaItem } from '../types/tmdb';
 import { MediaCard } from '../components/common/MediaCard';
 import { History, Heart, Bookmark, Trash2 } from 'lucide-react';
+import { useDevice } from '../hooks/useDevice';
 
 export const Library: React.FC = () => {
+  const { isTV } = useDevice();
   const [activeTab, setActiveTab] = useState<'history' | 'likes' | 'watchlist'>('history');
   const [history, setHistory] = useState<WatchHistoryItem[]>([]);
   const [likes, setLikes] = useState<LikedItem[]>([]);
@@ -79,9 +81,9 @@ export const Library: React.FC = () => {
   });
 
   return (
-    <div className="min-h-screen pt-24 pb-16 px-4 sm:px-8 max-w-7xl mx-auto">
+    <div className={`min-h-screen ${isTV ? 'pt-6 sm:pt-8 pb-16 px-6 lg:px-8' : 'pt-20 sm:pt-24 pb-20 px-4 sm:px-6'} max-w-7xl mx-auto`}>
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-5">
         <div>
           <h1 className="text-2xl sm:text-4xl font-extrabold font-display text-white tracking-tight flex items-center gap-2">
             <span className="w-2 h-6 bg-hbo-purple-light rounded-full"></span>
@@ -104,10 +106,10 @@ export const Library: React.FC = () => {
       </div>
 
       {/* Tabs */}
-      <div className="flex items-center gap-3 border-b border-hbo-border/70 pb-4 mb-8 overflow-x-auto no-scrollbar">
+      <div className="flex items-center gap-2.5 sm:gap-3 border-b border-hbo-border/70 pb-4 mb-6 overflow-x-auto no-scrollbar py-3 px-3.5 sm:px-4 -mx-2 sm:-mx-3 scroll-pl-4 scroll-pr-4">
         <button
           onClick={() => setActiveTab('history')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition border whitespace-nowrap tv-focus-target ${
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition border whitespace-nowrap flex-shrink-0 tv-focus-target ${
             activeTab === 'history'
               ? 'bg-hbo-purple text-white border-hbo-purple-light shadow-hbo-glow'
               : 'bg-hbo-card text-gray-400 border-hbo-border hover:text-white'
@@ -119,7 +121,7 @@ export const Library: React.FC = () => {
 
         <button
           onClick={() => setActiveTab('likes')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition border whitespace-nowrap tv-focus-target ${
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition border whitespace-nowrap flex-shrink-0 tv-focus-target ${
             activeTab === 'likes'
               ? 'bg-hbo-purple text-white border-hbo-purple-light shadow-hbo-glow'
               : 'bg-hbo-card text-gray-400 border-hbo-border hover:text-white'
@@ -131,7 +133,7 @@ export const Library: React.FC = () => {
 
         <button
           onClick={() => setActiveTab('watchlist')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition border whitespace-nowrap tv-focus-target ${
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition border whitespace-nowrap flex-shrink-0 tv-focus-target ${
             activeTab === 'watchlist'
               ? 'bg-hbo-purple text-white border-hbo-purple-light shadow-hbo-glow'
               : 'bg-hbo-card text-gray-400 border-hbo-border hover:text-white'
@@ -146,7 +148,7 @@ export const Library: React.FC = () => {
       {activeTab === 'history' && (
         <div>
           {history.length > 0 ? (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 sm:gap-6 lg:gap-7 py-4 px-1">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3.5 sm:gap-5 lg:gap-6 py-2 px-1">
               {history.map((item) => (
                 <div key={`${item.tmdbId}-${item.mediaType}`} className="flex justify-center">
                   <MediaCard
@@ -174,7 +176,7 @@ export const Library: React.FC = () => {
       {activeTab === 'likes' && (
         <div>
           {likes.length > 0 ? (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 sm:gap-6 lg:gap-7 py-4 px-1">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3.5 sm:gap-5 lg:gap-6 py-2 px-1">
               {likes.map((item) => (
                 <div key={`${item.tmdbId}-${item.mediaType}`} className="flex justify-center">
                   <MediaCard
@@ -201,7 +203,7 @@ export const Library: React.FC = () => {
       {activeTab === 'watchlist' && (
         <div>
           {watchlist.length > 0 ? (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 sm:gap-6 lg:gap-7 py-4 px-1">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3.5 sm:gap-5 lg:gap-6 py-2 px-1">
               {watchlist.map((item) => (
                 <div key={`${item.tmdbId}-${item.mediaType}`} className="flex justify-center">
                   <MediaCard
