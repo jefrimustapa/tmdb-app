@@ -2,8 +2,8 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = 217;
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.main.217';
+export const APP_BUILD_NUMBER = 219;
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.fix-black-screen.219';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
-export const APP_BRANCH = 'main';
+export const APP_BRANCH = 'fix-black-screen';
