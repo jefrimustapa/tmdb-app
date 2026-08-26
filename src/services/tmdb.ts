@@ -15,15 +15,25 @@ export const TMDB_READ_TOKEN = 'eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiIxYzdiOTdkZDhiMTE
 
 const IMAGE_BASE_URL = 'https://image.tmdb.org/t/p';
 
+export const TMDB_FALLBACK_POSTER = '/placeholder-poster.svg';
+export const TMDB_FALLBACK_BACKDROP = '/placeholder-backdrop.svg';
+
 export const tmdbImages = {
   poster: (path: string | null, size: 'w342' | 'w500' | 'w780' | 'original' = 'w500') =>
-    path ? `${IMAGE_BASE_URL}/${size}${path}` : '/placeholder-poster.png',
+    path ? `${IMAGE_BASE_URL}/${size}${path}` : TMDB_FALLBACK_POSTER,
   backdrop: (path: string | null, size: 'w780' | 'w1280' | 'original' = 'w1280') =>
-    path ? `${IMAGE_BASE_URL}/${size}${path}` : '/placeholder-backdrop.png',
+    path ? `${IMAGE_BASE_URL}/${size}${path}` : TMDB_FALLBACK_BACKDROP,
   profile: (path: string | null, size: 'w185' | 'h632' | 'original' = 'w185') =>
-    path ? `${IMAGE_BASE_URL}/${size}${path}` : '/placeholder-profile.png',
+    path ? `${IMAGE_BASE_URL}/${size}${path}` : TMDB_FALLBACK_POSTER,
   still: (path: string | null, size: 'w300' | 'original' = 'w300') =>
-    path ? `${IMAGE_BASE_URL}/${size}${path}` : '/placeholder-backdrop.png',
+    path ? `${IMAGE_BASE_URL}/${size}${path}` : TMDB_FALLBACK_BACKDROP,
+  handleImgError: (e: React.SyntheticEvent<HTMLImageElement, Event>, isBackdrop = false) => {
+    const target = e.currentTarget;
+    const fallback = isBackdrop ? TMDB_FALLBACK_BACKDROP : TMDB_FALLBACK_POSTER;
+    if (!target.src.endsWith(fallback)) {
+      target.src = fallback;
+    }
+  }
 };
 
 const apiCache = new Map<string, { data: any; expiry: number }>();
