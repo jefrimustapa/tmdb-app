@@ -91,7 +91,12 @@ export const EpisodeGrid: React.FC<EpisodeGridProps> = ({
               >
                 {/* Episode Thumbnail */}
                 <div className="relative w-28 sm:w-36 aspect-video flex-shrink-0 rounded-lg overflow-hidden bg-gray-900">
-                  <img src={stillUrl} alt={ep.name} className="w-full h-full object-cover group-hover:scale-105 transition duration-300" />
+                  <img
+                    src={stillUrl}
+                    alt={ep.name}
+                    onError={(e) => tmdbImages.handleImgError(e, true)}
+                    className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+                  />
                   <div className={`absolute inset-0 flex items-center justify-center bg-black/40 ${isPlaying ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} transition`}>
                     <Play className="w-6 h-6 fill-current text-white" />
                   </div>
