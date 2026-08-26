@@ -1,26 +1,31 @@
 apply plugin: 'com.android.application'
 import groovy.json.JsonSlurper
 
-def getPackageJson() {
+def getBuildInfo() {
+    def buildInfoFile = new File("$projectDir/build-info.json")
+    if (buildInfoFile.exists()) {
+        return new JsonSlurper().parseText(buildInfoFile.text)
+    }
     def packageJsonFile = new File("$rootDir/../package.json")
-    def packageJson = new JsonSlurper().parseText(packageJsonFile.text)
-    return packageJson
+    if (packageJsonFile.exists()) {
+        return new JsonSlurper().parseText(packageJsonFile.text)
+    }
+    return [version: "1.2.0", buildNumber: 1]
 }
 
-def pkg = getPackageJson()
-def appVersion = pkg.version
-def appBuildNumber = pkg.buildNumber ?: 1
-def appVersionName = "${appVersion}.${appBuildNumber}"
-
 def getVersionCodeFromSemver(String version, int buildNum) {
-    def parts = version.tokenize('.')
+    def parts = version.tokenize('-')[0].tokenize('.')
     def major = parts.size() > 0 ? parts[0].toInteger() : 1
     def minor = parts.size() > 1 ? parts[1].toInteger() : 0
     def patch = parts.size() > 2 ? parts[2].toInteger() : 0
-    return major * 100000 + minor * 1000 + patch * 100 + buildNum
+    return major * 100000 + minor * 1000 + patch * 100 + (buildNum % 100)
 }
 
-def appVersionCode = getVersionCodeFromSemver(appVersion, appBuildNumber as int)
+def buildInfo = getBuildInfo()
+def appVersion = buildInfo.version ?: "1.2.0"
+def appBuildNumber = buildInfo.buildNumber ?: 1
+def appVersionName = buildInfo.versionName ?: "${appVersion}.${appBuildNumber}"
+def appVersionCode = buildInfo.versionCode ?: getVersionCodeFromSemver(appVersion, appBuildNumber as int)
 
 android {
     namespace = "com.tmdb.streamer"
@@ -42,6 +47,11 @@ android {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+        }
+    }
+    applicationVariants.all { variant ->
+        variant.outputs.all {
+            outputFileName = "tmdb-stream-v${appVersionName}-${variant.buildType.name}.apk"
         }
     }
 }

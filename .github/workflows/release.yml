@@ -1,0 +1,107 @@
+name: Release Pipeline (RC & Stable)
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Tag name (e.g. v1.3.0 or v1.3.0-rc.1)'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "release"
+  cancel-in-progress: false
+
+jobs:
+  build-and-release:
+    name: Build & Release Package
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Detect Release Type (RC vs Stable)
+        id: release_type
+        run: |
+          TAG="${{ github.event.inputs.tag_name || github.ref_name }}"
+          if [[ "$TAG" == *"-rc"* ]]; then
+            echo "is_rc=true" >> $GITHUB_OUTPUT
+            echo "channel=rc" >> $GITHUB_OUTPUT
+            echo "title=Release Candidate $TAG" >> $GITHUB_OUTPUT
+          else
+            echo "is_rc=false" >> $GITHUB_OUTPUT
+            echo "channel=stable" >> $GITHUB_OUTPUT
+            echo "title=Release $TAG" >> $GITHUB_OUTPUT
+          fi
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Web Application
+        env:
+          CI: 'true'
+          BUILD_CHANNEL: ${{ steps.release_type.outputs.channel }}
+          GITHUB_PAGES: 'true'
+        run: npm run build
+
+      - name: Sync Capacitor Android
+        run: npx cap sync android
+
+      - name: Assemble Android APK
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug --stacktrace
+
+      - name: Locate Generated APK
+        id: find_apk
+        run: |
+          APK_PATH=$(find android/app/build/outputs/apk/debug -name "*.apk" | head -n 1)
+          echo "apk_path=$APK_PATH" >> $GITHUB_OUTPUT
+          echo "apk_name=$(basename $APK_PATH)" >> $GITHUB_OUTPUT
+
+      - name: Deploy to GitHub Pages (Stable Only)
+        if: steps.release_type.outputs.is_rc == 'false'
+        uses: actions/configure-pages@v4
+      - if: steps.release_type.outputs.is_rc == 'false'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: './dist'
+      - if: steps.release_type.outputs.is_rc == 'false'
+        name: Deploy Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+      - name: Create GitHub Release with APK
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.release_type.outputs.tag }}
+          name: ${{ steps.release_type.outputs.title }}
+          prerelease: ${{ steps.release_type.outputs.is_rc == 'true' }}
+          draft: false
+          generate_release_notes: true
+          files: ${{ steps.find_apk.outputs.apk_path }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

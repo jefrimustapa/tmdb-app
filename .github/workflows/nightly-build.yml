@@ -1,0 +1,81 @@
+name: Nightly Build
+
+on:
+  schedule:
+    - cron: '0 18 * * *' # Daily at 02:00 UTC+8 (18:00 UTC)
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  nightly-release:
+    name: Build & Publish Nightly APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Set Nightly Tag & Date
+        id: meta
+        run: |
+          DATE_TAG="nightly-$(date +'%Y%m%d')"
+          echo "tag=$DATE_TAG" >> $GITHUB_OUTPUT
+          echo "date=$(date +'%Y-%m-%d')" >> $GITHUB_OUTPUT
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Web Application
+        env:
+          CI: 'true'
+          BUILD_CHANNEL: 'nightly'
+        run: npm run build
+
+      - name: Sync Capacitor Android
+        run: npx cap sync android
+
+      - name: Assemble Android APK
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug --stacktrace
+
+      - name: Locate Generated APK
+        id: find_apk
+        run: |
+          APK_PATH=$(find android/app/build/outputs/apk/debug -name "*.apk" | head -n 1)
+          echo "apk_path=$APK_PATH" >> $GITHUB_OUTPUT
+          echo "apk_name=$(basename $APK_PATH)" >> $GITHUB_OUTPUT
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-apk
+          path: ${{ steps.find_apk.outputs.apk_path }}
+
+      - name: Publish Nightly Pre-Release on GitHub
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.meta.outputs.tag }}
+          name: "Nightly Build ${{ steps.meta.outputs.date }}"
+          prerelease: true
+          draft: false
+          generate_release_notes: true
+          files: ${{ steps.find_apk.outputs.apk_path }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

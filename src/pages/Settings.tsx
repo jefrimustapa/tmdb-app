@@ -3,8 +3,8 @@ import { dbService } from '../services/db';
 import type { UserSettings } from '../types/db';
 import { STREAM_PROVIDERS } from '../services/streamProviders';
 import { useDevice } from '../hooks/useDevice';
-import { APP_VERSION, APP_BUILD_NUMBER } from '../version';
 import { Logo } from '../components/common/Logo';
+import { APP_VERSION, APP_BUILD_NUMBER, APP_VERSION_FULL, APP_BUILD_CHANNEL } from '../version';
 import { Settings as SettingsIcon, Tv2, Smartphone, Tablet, Monitor, ShieldCheck, Server, Database, Check, ShieldAlert, EyeOff, Lock, Zap, X } from 'lucide-react';
 
 export const Settings: React.FC = () => {
@@ -347,8 +347,15 @@ export const Settings: React.FC = () => {
         <div className="w-full bg-hbo-card/40 border border-hbo-border/60 rounded-2xl p-5 sm:p-6 text-xs text-gray-400 space-y-3 text-left">
           <div className="flex items-center justify-between flex-wrap gap-3">
             <div>
-              <p className="font-bold text-gray-200 text-sm">TMDB Streamer v{APP_VERSION}</p>
-              <p className="text-[11px] text-gray-400 mt-0.5">Community Streaming & Discovery Suite</p>
+              <p className="font-bold text-gray-200 text-sm flex items-center gap-2">
+                <span>TMDB Streamer v{APP_VERSION}</span>
+                {APP_BUILD_CHANNEL !== 'stable' && (
+                  <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded-full bg-hbo-cyan/20 text-hbo-cyan border border-hbo-cyan/40">
+                    {APP_BUILD_CHANNEL}
+                  </span>
+                )}
+              </p>
+              <p className="text-[11px] text-gray-400 mt-0.5">{APP_VERSION_FULL}</p>
             </div>
             
             {/* Build Number as a dedicated focusable / selectable button */}
