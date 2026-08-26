@@ -59,7 +59,20 @@ async function tmdbFetch<T>(endpoint: string, params: Record<string, string | nu
 
   Object.entries(params).forEach(([k, v]) => {
     if (v !== undefined && v !== null && v !== '') {
-      url.searchParams.set(k, String(v));
+      const strVal = String(v);
+      if (strVal.includes('&')) {
+        // Handle compound query strings like "vote_average.desc&vote_count.gte=200"
+        strVal.split('&').forEach((pair, index) => {
+          if (index === 0 && !pair.includes('=')) {
+            url.searchParams.set(k, pair);
+          } else if (pair.includes('=')) {
+            const [subKey, subVal] = pair.split('=');
+            url.searchParams.set(subKey, subVal);
+          }
+        });
+      } else {
+        url.searchParams.set(k, strVal);
+      }
     }
   });
 
