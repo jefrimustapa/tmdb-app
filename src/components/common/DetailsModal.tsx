@@ -121,7 +121,12 @@ export const DetailsModal: React.FC<DetailsModalProps> = ({ item, onClose }) => 
 
         {/* Hero Backdrop in Modal */}
         <div className="relative aspect-video sm:aspect-[21/9] w-full overflow-hidden bg-gray-950">
-          <img src={backdropUrl} alt={title} className="w-full h-full object-cover" />
+          <img
+            src={backdropUrl}
+            alt={title}
+            onError={(e) => tmdbImages.handleImgError(e, true)}
+            className="w-full h-full object-cover"
+          />
           <div className="absolute inset-0 bg-gradient-to-t from-hbo-card via-hbo-card/40 to-transparent" />
 
           {/* Modal Header Actions */}

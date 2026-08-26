@@ -59,6 +59,7 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ items }) => {
         <img
           src={backdropUrl}
           alt={title}
+          onError={(e) => tmdbImages.handleImgError(e, true)}
           className="w-full h-full object-cover object-center animate-fade-in transition-opacity duration-1000"
         />
         {/* Cinematic HBO Gradients */}
