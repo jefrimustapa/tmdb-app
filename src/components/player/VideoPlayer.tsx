@@ -4,6 +4,8 @@ import Hls from 'hls.js';
 import type { StreamProvider } from '../../types/stream';
 import { STREAM_PROVIDERS, getProviderById } from '../../services/streamProviders';
 import { dbService } from '../../services/db';
+import { Logo } from '../common/Logo';
+import { tmdbImages } from '../../services/tmdb';
 
 interface VideoPlayerProps {
   mediaType: 'movie' | 'tv';
@@ -551,26 +553,32 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
       {/* Fallback Error Overlay */}
       {hasError && (
-        <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-black/95 backdrop-blur-md p-6 text-center">
-          <AlertCircle className="w-12 h-12 text-red-400 mb-3" />
-          <h3 className="text-lg font-bold text-white mb-1">
-            {allFailed ? 'All Servers Attempted' : 'Server Unavailable'}
+        <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-black/95 backdrop-blur-md p-6 text-center animate-fade-in">
+          <div className="mb-4">
+            <Logo size="lg" showText={true} />
+          </div>
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-red-500/20 border border-red-500/40 text-red-400 text-xs font-bold mb-3">
+            <AlertCircle className="w-4 h-4" />
+            <span>{allFailed ? 'All Stream Servers Attempted' : 'Server Stream Unavailable'}</span>
+          </div>
+          <h3 className="text-lg sm:text-xl font-black font-display text-white mb-2 tracking-tight">
+            Unable to Load Video Stream
           </h3>
-          <p className="text-xs sm:text-sm text-gray-400 max-w-md mb-5 leading-relaxed">
+          <p className="text-xs sm:text-sm text-gray-400 max-w-md mb-6 leading-relaxed">
             {allFailed
-              ? `We automatically tested all ${STREAM_PROVIDERS.length} stream servers, but none responded with an active playback stream for this title.`
-              : `The current server (${provider.name}) could not stream this title.`}
+              ? `We tested all ${STREAM_PROVIDERS.length} streaming servers, but none responded with an active video feed for this title right now.`
+              : `The selected server (${provider.name}) could not stream "${title}". Please try switching to another server.`}
           </p>
           <div className="flex flex-wrap items-center justify-center gap-3">
             <button
               onClick={restartAutoCycle}
-              className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-hbo-purple to-hbo-cyan text-white font-bold text-xs sm:text-sm shadow-hbo-glow hover:scale-105 transition"
+              className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-hbo-purple to-hbo-cyan text-white font-bold text-xs sm:text-sm shadow-hbo-glow hover:scale-105 transition tv-focus-target"
             >
               Restart Auto-Cycle (All Servers)
             </button>
             <button
               onClick={cycleToNextProvider}
-              className="px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs sm:text-sm font-semibold border border-white/20 transition"
+              className="px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs sm:text-sm font-semibold border border-white/20 transition hover:scale-105 tv-focus-target"
             >
               Try Next Server
             </button>

@@ -175,6 +175,7 @@ export const MediaCard: React.FC<MediaCardProps> = ({ item, type, progress, onDe
           src={posterUrl}
           alt={title}
           loading="lazy"
+          onError={tmdbImages.handleImgError}
           className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
         />
 
