@@ -53,3 +53,6 @@ android/app/release/
 android/app/debug/
 
 attachment/
+
+.build-state.local.json
+android/app/build-info.json
