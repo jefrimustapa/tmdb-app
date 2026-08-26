@@ -3,9 +3,16 @@ import { tmdbApi } from '../services/tmdb';
 import type { TMDBMediaItem, TMDBGenre } from '../types/tmdb';
 import { MediaCard } from '../components/common/MediaCard';
 import { PLATFORMS } from '../components/common/PlatformHubs';
-import { Filter, SlidersHorizontal, ChevronDown } from 'lucide-react';
+import { SortDropdown, SortOption } from '../components/common/SortDropdown';
+import { Filter, SlidersHorizontal } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 import { useDevice } from '../hooks/useDevice';
+
+const TV_SORT_OPTIONS: SortOption[] = [
+  { value: 'popularity.desc', label: 'Most Popular' },
+  { value: 'vote_average.desc&vote_count.gte=200', label: 'Highest Rated' },
+  { value: 'first_air_date.desc', label: 'First Air Date (Newest)' }
+];
 
 export const Series: React.FC = () => {
   const { isTV } = useDevice();
@@ -154,18 +161,11 @@ export const Series: React.FC = () => {
 
         {/* Sorting Dropdown */}
         <div className="flex items-center gap-3">
-          <div className="relative">
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value)}
-              className="appearance-none bg-hbo-card border border-hbo-border rounded-xl px-4 py-2.5 pr-9 text-xs sm:text-sm font-semibold text-gray-200 focus:outline-none focus:border-hbo-purple tv-focus-target cursor-pointer"
-            >
-              <option value="popularity.desc">Most Popular</option>
-              <option value="vote_average.desc&vote_count.gte=200">Highest Rated</option>
-              <option value="first_air_date.desc">First Air Date (Newest)</option>
-            </select>
-            <ChevronDown className="w-4 h-4 text-gray-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-          </div>
+          <SortDropdown
+            value={sortBy}
+            onChange={(val) => setSortBy(val)}
+            options={TV_SORT_OPTIONS}
+          />
         </div>
       </div>
 
