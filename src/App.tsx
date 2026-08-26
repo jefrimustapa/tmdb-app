@@ -60,9 +60,17 @@ const AppContent: React.FC = () => {
   );
 };
 
+const getRouterBasename = () => {
+  const base = import.meta.env.BASE_URL;
+  if (!base || base === './' || base === '/./' || base === '.' || base === '/') {
+    return undefined;
+  }
+  return base;
+};
+
 export const App: React.FC = () => {
   return (
-    <Router basename={import.meta.env.BASE_URL}>
+    <Router basename={getRouterBasename()}>
       <AppContent />
     </Router>
   );
