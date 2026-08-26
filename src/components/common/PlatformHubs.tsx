@@ -98,11 +98,11 @@ export const PlatformHubs: React.FC = () => {
           <Link
             key={platform.id}
             to={`/movies?provider=${platform.id}`}
-            className="group flex flex-col items-center tv-focus-target cursor-pointer focus:outline-none transition-transform duration-300 hover:scale-105 active:scale-95"
+            className="group flex flex-col items-center tv-focus-target platform-hub-focus cursor-pointer focus:outline-none"
           >
             {/* Platform Tile Box */}
             <div
-              className={`w-full aspect-square relative flex items-center justify-center p-3 sm:p-4 rounded-2xl sm:rounded-3xl bg-gradient-to-b ${platform.bgGradient} border ${platform.borderColor} ${platform.glowColor} shadow-lg overflow-hidden transition-all duration-300 group-hover:border-hbo-cyan group-focus:border-hbo-cyan group-focus:ring-4 group-focus:ring-hbo-cyan/60`}
+              className={`w-full aspect-square relative flex items-center justify-center p-3 sm:p-4 rounded-2xl sm:rounded-3xl bg-gradient-to-b ${platform.bgGradient} border ${platform.borderColor} shadow-lg overflow-hidden transition-all duration-300 group-hover:scale-105 group-hover:border-hbo-purple-light group-hover:shadow-hbo-glow group-focus:scale-105 group-focus:border-white group-focus:ring-4 group-focus:ring-hbo-purple-light group-focus:shadow-[0_0_30px_rgba(144,85,255,0.85)]`}
             >
               {/* Glossy Reflection highlight */}
               <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/15 to-transparent pointer-events-none rounded-t-2xl sm:rounded-t-3xl" />
@@ -112,12 +112,12 @@ export const PlatformHubs: React.FC = () => {
                 src={tmdbImages.poster(platform.logoPath, 'w500')}
                 alt={platform.name}
                 loading="lazy"
-                className="w-14 h-14 sm:w-16 sm:h-16 md:w-20 md:h-20 max-w-full max-h-full rounded-2xl object-cover shadow-lg transition-transform duration-300 group-hover:scale-110"
+                className="w-14 h-14 sm:w-16 sm:h-16 md:w-20 md:h-20 max-w-full max-h-full rounded-2xl object-cover shadow-lg transition-transform duration-300 group-hover:scale-110 group-focus:scale-110"
               />
             </div>
 
-            {/* Platform Title Text - Positioned below tile, never truncated */}
-            <span className="text-[11px] sm:text-xs font-bold text-gray-300 text-center mt-2 px-1 tracking-tight line-clamp-1 group-hover:text-hbo-cyan group-focus:text-hbo-cyan transition-colors">
+            {/* Platform Title Text */}
+            <span className="text-[11px] sm:text-xs font-bold text-gray-400 text-center mt-2 px-1 tracking-tight line-clamp-1 group-hover:text-white group-focus:text-white transition-colors">
               {platform.name}
             </span>
           </Link>
