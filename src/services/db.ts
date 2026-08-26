@@ -28,6 +28,7 @@ export const DEFAULT_SETTINGS: UserSettings = {
   autoplayNext: true,
   adBlockShield: true,
   filterAdult: true,
+  filterUnreleased: true,
   maturityLevel: 'all',
   directStreamMode: false,
   streamHeaderTimeout: 5,
