@@ -23,6 +23,16 @@ import android.webkit.WebView;
 import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.core.view.WindowInsetsControllerCompat;
+import android.content.Intent;
+import android.net.Uri;
+import android.os.Environment;
+import androidx.core.content.FileProvider;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.InputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.util.concurrent.Executors;
 import com.getcapacitor.BridgeActivity;
 import com.getcapacitor.BridgeWebViewClient;
 
@@ -201,6 +211,101 @@ public class MainActivity extends BridgeActivity {
                 @JavascriptInterface
                 public boolean isTVDevice() {
                     return isTV();
+                }
+
+                @JavascriptInterface
+                public void downloadAndInstallApk(String downloadUrl, String apkFileName) {
+                    Executors.newSingleThreadExecutor().execute(() -> {
+                        try {
+                            Log.i("TMDB_APP", "[Update] Starting APK download from: " + downloadUrl);
+                            URL url = new URL(downloadUrl);
+                            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+                            connection.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android) TMDBStreamer");
+                            connection.setConnectTimeout(15000);
+                            connection.setReadTimeout(30000);
+                            connection.setInstanceFollowRedirects(true);
+                            connection.connect();
+
+                            int responseCode = connection.getResponseCode();
+                            if (responseCode == HttpURLConnection.HTTP_MOVED_TEMP || 
+                                responseCode == HttpURLConnection.HTTP_MOVED_PERM || 
+                                responseCode == HttpURLConnection.HTTP_SEE_OTHER ||
+                                responseCode == 307 || responseCode == 308) {
+                                String newUrl = connection.getHeaderField("Location");
+                                if (newUrl != null && !newUrl.isEmpty()) {
+                                    connection = (HttpURLConnection) new URL(newUrl).openConnection();
+                                    connection.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android) TMDBStreamer");
+                                    connection.connect();
+                                }
+                            }
+
+                            int fileLength = connection.getContentLength();
+                            File outputDir = getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS);
+                            if (outputDir == null) {
+                                outputDir = getFilesDir();
+                            }
+                            if (!outputDir.exists()) {
+                                outputDir.mkdirs();
+                            }
+
+                            String cleanFileName = (apkFileName != null && !apkFileName.isEmpty()) ? apkFileName : "tmdb-update.apk";
+                            File apkFile = new File(outputDir, cleanFileName);
+                            if (apkFile.exists()) {
+                                apkFile.delete();
+                            }
+
+                            InputStream input = connection.getInputStream();
+                            FileOutputStream output = new FileOutputStream(apkFile);
+
+                            byte[] data = new byte[8192];
+                            long total = 0;
+                            int count;
+                            int lastPercent = 0;
+
+                            while ((count = input.read(data)) != -1) {
+                                total += count;
+                                output.write(data, 0, count);
+
+                                if (fileLength > 0) {
+                                    int percent = (int) ((total * 100) / fileLength);
+                                    if (percent != lastPercent && (percent % 5 == 0 || percent == 100)) {
+                                        lastPercent = percent;
+                                        runOnUiThread(() -> {
+                                            WebView wv = bridge.getWebView();
+                                            if (wv != null) {
+                                                String js = String.format("window.dispatchEvent(new CustomEvent('tmdb_update_download_progress', { detail: { percent: %d, status: 'Downloading (%d%%)...' } }));", percent, percent);
+                                                wv.evaluateJavascript(js, null);
+                                            }
+                                        });
+                                    }
+                                }
+                            }
+
+                            output.flush();
+                            output.close();
+                            input.close();
+
+                            Log.i("TMDB_APP", "[Update] Download completed: " + apkFile.getAbsolutePath() + " (" + apkFile.length() + " bytes)");
+
+                            runOnUiThread(() -> {
+                                WebView wv = bridge.getWebView();
+                                if (wv != null) {
+                                    wv.evaluateJavascript("window.dispatchEvent(new CustomEvent('tmdb_update_download_progress', { detail: { percent: 100, status: 'Launching installer...' } }));", null);
+                                }
+                                promptInstallApk(apkFile);
+                            });
+
+                        } catch (Exception e) {
+                            Log.e("TMDB_APP", "[Update] Download failed: " + e.getMessage(), e);
+                            runOnUiThread(() -> {
+                                WebView wv = bridge.getWebView();
+                                if (wv != null) {
+                                    String js = String.format("window.dispatchEvent(new CustomEvent('tmdb_update_download_progress', { detail: { percent: 0, status: 'Download failed: %s' } }));", e.getMessage() != null ? e.getMessage().replace("'", "\\'") : "Network error");
+                                    wv.evaluateJavascript(js, null);
+                                }
+                            });
+                        }
+                    });
                 }
             }, "AndroidBridge");
 
@@ -450,6 +555,24 @@ public class MainActivity extends BridgeActivity {
             }
         }
         return super.dispatchKeyEvent(event);
+    }
+
+    private void promptInstallApk(File apkFile) {
+        try {
+            Uri apkUri = FileProvider.getUriForFile(
+                this,
+                getPackageName() + ".fileprovider",
+                apkFile
+            );
+
+            Intent intent = new Intent(Intent.ACTION_VIEW);
+            intent.setDataAndType(apkUri, "application/vnd.android.package-archive");
+            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            startActivity(intent);
+        } catch (Exception e) {
+            Log.e("TMDB_APP", "[Update] Failed to launch package installer: " + e.getMessage(), e);
+        }
     }
 
     @Override
