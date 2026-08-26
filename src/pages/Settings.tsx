@@ -5,7 +5,7 @@ import { STREAM_PROVIDERS } from '../services/streamProviders';
 import { useDevice } from '../hooks/useDevice';
 import { Logo } from '../components/common/Logo';
 import { APP_VERSION, APP_BUILD_NUMBER, APP_VERSION_FULL, APP_BUILD_CHANNEL } from '../version';
-import { Settings as SettingsIcon, Tv2, Smartphone, Tablet, Monitor, ShieldCheck, Server, Database, Check, ShieldAlert, EyeOff, Lock, Zap, X } from 'lucide-react';
+import { Settings as SettingsIcon, Tv2, Smartphone, Tablet, Monitor, ShieldCheck, Server, Database, Check, ShieldAlert, EyeOff, Lock, Zap, X, CalendarX } from 'lucide-react';
 
 export const Settings: React.FC = () => {
   const [settings, setSettings] = useState<UserSettings | null>(null);
@@ -208,8 +208,9 @@ export const Settings: React.FC = () => {
           </div>
         </div>
 
-        {/* Adult Content & Safe Mode */}
+        {/* Content Safety & Filtering */}
         <div className="bg-hbo-card border border-hbo-border rounded-2xl p-5 sm:p-6 space-y-5">
+          {/* Adult Content */}
           <div className="flex items-center justify-between gap-4">
             <div className="flex-1 min-w-0 pr-2">
               <h3 className="text-base sm:text-lg font-bold font-display text-white flex items-center gap-2 mb-1">
@@ -230,6 +231,32 @@ export const Settings: React.FC = () => {
               <div
                 className={`w-5 h-5 rounded-full bg-white transition-transform transform ${
                   settings.filterAdult !== false ? 'translate-x-6' : 'translate-x-0.5'
+                }`}
+              />
+            </button>
+          </div>
+
+          {/* Unreleased Content Filter */}
+          <div className="border-t border-hbo-border/60 pt-4 flex items-center justify-between gap-4">
+            <div className="flex-1 min-w-0 pr-2">
+              <h3 className="text-base sm:text-lg font-bold font-display text-white flex items-center gap-2 mb-1">
+                <CalendarX className="w-5 h-5 text-hbo-cyan flex-shrink-0" />
+                <span>Filter Out Unreleased Titles</span>
+              </h3>
+              <p className="text-xs text-gray-400">
+                Hide future and unreleased movies and TV series that have not yet premiered or released in theaters/streaming.
+              </p>
+            </div>
+
+            <button
+              onClick={() => handleUpdate({ filterUnreleased: settings.filterUnreleased === false ? true : false })}
+              className={`flex-shrink-0 w-12 h-6 rounded-full transition-colors relative tv-focus-target ${
+                settings.filterUnreleased !== false ? 'bg-hbo-cyan' : 'bg-gray-700'
+              }`}
+            >
+              <div
+                className={`w-5 h-5 rounded-full bg-white transition-transform transform ${
+                  settings.filterUnreleased !== false ? 'translate-x-6' : 'translate-x-0.5'
                 }`}
               />
             </button>
