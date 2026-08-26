@@ -176,10 +176,10 @@ export const Movies: React.FC = () => {
           <SlidersHorizontal className="w-3.5 h-3.5 text-hbo-cyan" />
           <span>Filter by Streaming Platform Hub</span>
         </div>
-        <div className="flex items-center gap-2.5 sm:gap-3 overflow-x-auto no-scrollbar py-2 px-1">
+        <div className="flex items-center gap-2.5 sm:gap-3 overflow-x-auto no-scrollbar py-3 px-3.5 sm:px-4 -mx-2 sm:-mx-3 scroll-pl-4 scroll-pr-4">
           <button
             onClick={() => updateFilters(selectedGenre, '')}
-            className={`px-4 py-2 rounded-xl text-xs font-extrabold whitespace-nowrap transition-all border flex items-center gap-1.5 flex-shrink-0 tv-focus-target ${
+            className={`px-4 py-2.5 rounded-xl text-xs font-extrabold whitespace-nowrap transition-all border flex items-center gap-1.5 flex-shrink-0 tv-focus-target ${
               !selectedProvider
                 ? 'bg-hbo-cyan text-black border-white shadow-[0_0_20px_rgba(0,210,255,0.7)] ring-2 ring-hbo-cyan/50 font-black'
                 : 'bg-hbo-card text-gray-400 border-hbo-border hover:text-white hover:bg-hbo-hover'
@@ -194,7 +194,7 @@ export const Movies: React.FC = () => {
               <button
                 key={platform.id}
                 onClick={() => updateFilters(selectedGenre, isSelected ? '' : platform.id)}
-                className={`px-4 py-2 rounded-xl text-xs font-extrabold whitespace-nowrap transition-all border flex items-center gap-2 flex-shrink-0 tv-focus-target ${
+                className={`px-4 py-2.5 rounded-xl text-xs font-extrabold whitespace-nowrap transition-all border flex items-center gap-2 flex-shrink-0 tv-focus-target ${
                   isSelected
                     ? 'bg-hbo-cyan text-black border-white shadow-[0_0_20px_rgba(0,210,255,0.7)] ring-2 ring-hbo-cyan/50 font-black'
                     : 'bg-hbo-card text-gray-400 border-hbo-border hover:text-white hover:bg-hbo-hover'
@@ -214,10 +214,10 @@ export const Movies: React.FC = () => {
           <Filter className="w-3.5 h-3.5 text-hbo-purple-light" />
           <span>Filter by Genre</span>
         </div>
-        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-2 px-1">
+        <div className="flex items-center gap-2.5 overflow-x-auto no-scrollbar py-3 px-3.5 sm:px-4 -mx-2 sm:-mx-3 scroll-pl-4 scroll-pr-4">
           <button
             onClick={() => updateFilters('', selectedProvider)}
-            className={`px-3.5 py-1.5 rounded-full text-xs font-extrabold whitespace-nowrap transition-all border flex items-center gap-1.5 flex-shrink-0 tv-focus-target ${
+            className={`px-4 py-2 rounded-full text-xs font-extrabold whitespace-nowrap transition-all border flex items-center gap-1.5 flex-shrink-0 tv-focus-target ${
               !selectedGenre
                 ? 'bg-hbo-purple-light text-white border-white shadow-[0_0_20px_rgba(144,85,255,0.8)] ring-2 ring-hbo-purple-light/60 font-black'
                 : 'bg-hbo-card text-gray-400 border-hbo-border hover:text-white hover:bg-hbo-hover'
@@ -232,7 +232,7 @@ export const Movies: React.FC = () => {
               <button
                 key={g.id}
                 onClick={() => updateFilters(isSelected ? '' : String(g.id), selectedProvider)}
-                className={`px-3.5 py-1.5 rounded-full text-xs font-extrabold whitespace-nowrap transition-all border flex items-center gap-1.5 flex-shrink-0 tv-focus-target ${
+                className={`px-4 py-2 rounded-full text-xs font-extrabold whitespace-nowrap transition-all border flex items-center gap-1.5 flex-shrink-0 tv-focus-target ${
                   isSelected
                     ? 'bg-hbo-purple-light text-white border-white shadow-[0_0_20px_rgba(144,85,255,0.8)] ring-2 ring-hbo-purple-light/60 font-black'
                     : 'bg-hbo-card text-gray-400 border-hbo-border hover:text-white hover:bg-hbo-hover'
