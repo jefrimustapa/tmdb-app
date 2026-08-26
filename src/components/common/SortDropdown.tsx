@@ -23,7 +23,17 @@ export const SortDropdown: React.FC<SortDropdownProps> = ({
   const dropdownRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
 
+  const [alignRight, setAlignRight] = useState(true);
   const selectedOption = options.find((o) => o.value === value) || options[0];
+
+  // Dynamically compute alignment based on trigger screen position
+  useEffect(() => {
+    if (isOpen && triggerRef.current) {
+      const rect = triggerRef.current.getBoundingClientRect();
+      // If trigger is within 220px of the left screen edge, expand to the right (left-0)
+      setAlignRight(rect.left > 220);
+    }
+  }, [isOpen]);
 
   // Close when clicking outside or pressing Escape
   useEffect(() => {
@@ -76,7 +86,9 @@ export const SortDropdown: React.FC<SortDropdownProps> = ({
       {isOpen && (
         <div
           role="listbox"
-          className="absolute right-0 top-full mt-2 w-56 sm:w-64 bg-[#0e0e17]/95 backdrop-blur-xl border border-hbo-border rounded-2xl shadow-2xl z-50 p-1.5 space-y-1 animate-in fade-in zoom-in-95 duration-150"
+          className={`absolute top-full mt-2 w-56 sm:w-64 max-w-[calc(100vw-2rem)] ${
+            alignRight ? 'right-0' : 'left-0'
+          } bg-[#0e0e17]/95 backdrop-blur-xl border border-hbo-border rounded-2xl shadow-2xl z-50 p-1.5 space-y-1 animate-in fade-in zoom-in-95 duration-150`}
         >
           <div className="px-3 py-1.5 text-[10px] sm:text-xs font-bold text-gray-400 uppercase tracking-wider border-b border-hbo-border/40 mb-1">
             Sort Order
