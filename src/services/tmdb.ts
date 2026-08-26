@@ -32,7 +32,9 @@ const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes in-memory cache
 async function tmdbFetch<T>(endpoint: string, params: Record<string, string | number> = {}): Promise<T> {
   const settings = await dbService.getSettings();
   const filterAdult = settings.filterAdult !== false; // Default true
+  const filterUnreleased = settings.filterUnreleased !== false; // Default true
   const maturityLevel = settings.maturityLevel || 'all';
+  const todayStr = new Date().toISOString().split('T')[0];
 
   const url = new URL(`${TMDB_BASE_URL}${endpoint}`);
   url.searchParams.set('api_key', TMDB_API_KEY);
@@ -40,6 +42,9 @@ async function tmdbFetch<T>(endpoint: string, params: Record<string, string | nu
   url.searchParams.set('include_adult', filterAdult ? 'false' : 'true');
 
   if (endpoint.includes('/discover/movie')) {
+    if (filterUnreleased && !params['primary_release_date.lte']) {
+      url.searchParams.set('primary_release_date.lte', todayStr);
+    }
     if (maturityLevel === 'pg13') {
       url.searchParams.set('certification_country', 'US');
       url.searchParams.set('certification.lte', 'PG-13');
@@ -48,6 +53,9 @@ async function tmdbFetch<T>(endpoint: string, params: Record<string, string | nu
       url.searchParams.set('certification.lte', 'PG');
     }
   } else if (endpoint.includes('/discover/tv')) {
+    if (filterUnreleased && !params['first_air_date.lte']) {
+      url.searchParams.set('first_air_date.lte', todayStr);
+    }
     if (maturityLevel === 'pg13') {
       url.searchParams.set('certification_country', 'US');
       url.searchParams.set('certification.lte', 'TV-14');
@@ -95,9 +103,19 @@ async function tmdbFetch<T>(endpoint: string, params: Record<string, string | nu
 
   const data = await res.json();
 
-  // If response has results list and filterAdult is on, filter any adult: true items
+  // Filter adult items if filterAdult is active
   if (filterAdult && data && Array.isArray(data.results)) {
     data.results = data.results.filter((item: any) => !item.adult);
+  }
+
+  // Filter unreleased/future items if filterUnreleased is active (except explicit upcoming endpoints)
+  if (filterUnreleased && !endpoint.includes('/upcoming') && data && Array.isArray(data.results)) {
+    data.results = data.results.filter((item: any) => {
+      if (item.release_date && item.release_date > todayStr) return false;
+      if (item.first_air_date && item.first_air_date > todayStr) return false;
+      if (item.status === 'Planned' || item.status === 'In Production' || item.status === 'Post Production') return false;
+      return true;
+    });
   }
 
   apiCache.set(cacheKey, { data, expiry: Date.now() + CACHE_TTL_MS });
