@@ -6,10 +6,12 @@ import { tmdbApi, tmdbImages, extractContentRating } from '../services/tmdb';
 import { dbService } from '../services/db';
 import { MediaRow } from '../components/common/MediaRow';
 import { EpisodeGrid } from '../components/player/EpisodeGrid';
+import { useDevice } from '../hooks/useDevice';
 
 export const Details: React.FC = () => {
   const { type, id } = useParams<{ type: 'movie' | 'tv'; id: string }>();
   const navigate = useNavigate();
+  const { isTV } = useDevice();
 
   const tmdbId = parseInt(id || '0', 10);
   const mediaType: 'movie' | 'tv' = (type === 'tv' ? 'tv' : 'movie');
@@ -124,7 +126,13 @@ export const Details: React.FC = () => {
         <div className="absolute inset-0 bg-gradient-to-r from-hbo-dark via-hbo-dark/80 to-transparent w-full md:w-3/4" />
 
         {/* Back Navigation Bar (Top Left) */}
-        <div className="absolute top-[max(1rem,env(safe-area-inset-top,1.25rem))] left-4 sm:left-8 z-30">
+        <div
+          className={`absolute z-30 left-4 sm:left-8 ${
+            isTV
+              ? 'top-6 sm:top-8'
+              : 'top-[max(4.25rem,calc(env(safe-area-inset-top,0px)+3.75rem))]'
+          }`}
+        >
           <button
             onClick={() => {
               if (window.history.state && window.history.state.idx > 0) {
