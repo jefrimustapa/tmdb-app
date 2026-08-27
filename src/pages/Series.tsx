@@ -3,10 +3,19 @@ import { tmdbApi } from '../services/tmdb';
 import type { TMDBMediaItem, TMDBGenre } from '../types/tmdb';
 import { MediaCard } from '../components/common/MediaCard';
 import { PLATFORMS } from '../components/common/PlatformHubs';
-import { Filter, SlidersHorizontal, ChevronDown } from 'lucide-react';
+import { SortDropdown, SortOption } from '../components/common/SortDropdown';
+import { Filter, SlidersHorizontal } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
+import { useDevice } from '../hooks/useDevice';
+
+const TV_SORT_OPTIONS: SortOption[] = [
+  { value: 'popularity.desc', label: 'Most Popular' },
+  { value: 'vote_average.desc&vote_count.gte=200', label: 'Highest Rated' },
+  { value: 'first_air_date.desc', label: 'First Air Date (Newest)' }
+];
 
 export const Series: React.FC = () => {
+  const { isTV } = useDevice();
   const [searchParams, setSearchParams] = useSearchParams();
   const genreParam = searchParams.get('genre') || '';
   const providerParam = searchParams.get('provider') || '';
@@ -132,9 +141,9 @@ export const Series: React.FC = () => {
   const activePlatform = PLATFORMS.find((p) => p.id === selectedProvider);
 
   return (
-    <div className="min-h-screen pt-24 pb-16 px-4 sm:px-8 max-w-7xl mx-auto">
+    <div className={`min-h-screen ${isTV ? 'pt-6 sm:pt-8 pb-16 px-6 lg:px-8' : 'pt-20 sm:pt-24 pb-20 px-4 sm:px-6'} max-w-7xl mx-auto`}>
       {/* Header & Filter Bar */}
-      <div data-tv-filter-section="true" className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+      <div data-tv-filter-section="true" className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-5">
         <div>
           <h1 className="text-2xl sm:text-4xl font-extrabold font-display text-white tracking-tight flex items-center gap-2">
             <span className="w-2 h-6 bg-hbo-cyan rounded-full"></span>
@@ -152,31 +161,24 @@ export const Series: React.FC = () => {
 
         {/* Sorting Dropdown */}
         <div className="flex items-center gap-3">
-          <div className="relative">
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value)}
-              className="appearance-none bg-hbo-card border border-hbo-border rounded-xl px-4 py-2.5 pr-9 text-xs sm:text-sm font-semibold text-gray-200 focus:outline-none focus:border-hbo-purple tv-focus-target cursor-pointer"
-            >
-              <option value="popularity.desc">Most Popular</option>
-              <option value="vote_average.desc&vote_count.gte=200">Highest Rated</option>
-              <option value="first_air_date.desc">First Air Date (Newest)</option>
-            </select>
-            <ChevronDown className="w-4 h-4 text-gray-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-          </div>
+          <SortDropdown
+            value={sortBy}
+            onChange={(val) => setSortBy(val)}
+            options={TV_SORT_OPTIONS}
+          />
         </div>
       </div>
 
       {/* Streaming Hub Filters */}
-      <div data-tv-filter-section="true" className="mb-6">
-        <div className="flex items-center gap-2 text-xs font-bold text-gray-400 uppercase tracking-wider mb-2.5">
+      <div data-tv-filter-section="true" className="mb-5">
+        <div className="flex items-center gap-2 text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">
           <SlidersHorizontal className="w-3.5 h-3.5 text-hbo-cyan" />
           <span>Filter by Streaming Platform Hub</span>
         </div>
-        <div className="flex items-center gap-2.5 overflow-x-auto no-scrollbar py-1">
+        <div className="flex items-center gap-2.5 sm:gap-3 overflow-x-auto no-scrollbar py-3 px-3.5 sm:px-4 -mx-2 sm:-mx-3 scroll-pl-4 scroll-pr-4">
           <button
             onClick={() => updateFilters(selectedGenre, '')}
-            className={`px-4 py-2 rounded-xl text-xs font-extrabold whitespace-nowrap transition-all border flex items-center gap-1.5 tv-focus-target ${
+            className={`px-4 py-2.5 rounded-xl text-xs font-extrabold whitespace-nowrap transition-all border flex items-center gap-1.5 flex-shrink-0 tv-focus-target ${
               !selectedProvider
                 ? 'bg-hbo-cyan text-black border-white shadow-[0_0_20px_rgba(0,210,255,0.7)] ring-2 ring-hbo-cyan/50 font-black'
                 : 'bg-hbo-card text-gray-400 border-hbo-border hover:text-white hover:bg-hbo-hover'
@@ -191,7 +193,7 @@ export const Series: React.FC = () => {
               <button
                 key={platform.id}
                 onClick={() => updateFilters(selectedGenre, isSelected ? '' : platform.id)}
-                className={`px-4 py-2 rounded-xl text-xs font-extrabold whitespace-nowrap transition-all border flex items-center gap-2 tv-focus-target ${
+                className={`px-4 py-2.5 rounded-xl text-xs font-extrabold whitespace-nowrap transition-all border flex items-center gap-2 flex-shrink-0 tv-focus-target ${
                   isSelected
                     ? 'bg-hbo-cyan text-black border-white shadow-[0_0_20px_rgba(0,210,255,0.7)] ring-2 ring-hbo-cyan/50 font-black'
                     : 'bg-hbo-card text-gray-400 border-hbo-border hover:text-white hover:bg-hbo-hover'
@@ -206,15 +208,15 @@ export const Series: React.FC = () => {
       </div>
 
       {/* Genre Pills */}
-      <div data-tv-filter-section="true" className="mb-8">
-        <div className="flex items-center gap-2 text-xs font-bold text-gray-400 uppercase tracking-wider mb-2.5">
+      <div data-tv-filter-section="true" className="mb-6">
+        <div className="flex items-center gap-2 text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">
           <Filter className="w-3.5 h-3.5 text-hbo-purple-light" />
           <span>Filter by Genre</span>
         </div>
-        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1">
+        <div className="flex items-center gap-2.5 overflow-x-auto no-scrollbar py-3 px-3.5 sm:px-4 -mx-2 sm:-mx-3 scroll-pl-4 scroll-pr-4">
           <button
             onClick={() => updateFilters('', selectedProvider)}
-            className={`px-3.5 py-1.5 rounded-full text-xs font-extrabold whitespace-nowrap transition-all border flex items-center gap-1.5 tv-focus-target ${
+            className={`px-4 py-2 rounded-full text-xs font-extrabold whitespace-nowrap transition-all border flex items-center gap-1.5 flex-shrink-0 tv-focus-target ${
               !selectedGenre
                 ? 'bg-hbo-purple-light text-white border-white shadow-[0_0_20px_rgba(144,85,255,0.8)] ring-2 ring-hbo-purple-light/60 font-black'
                 : 'bg-hbo-card text-gray-400 border-hbo-border hover:text-white hover:bg-hbo-hover'
@@ -229,7 +231,7 @@ export const Series: React.FC = () => {
               <button
                 key={g.id}
                 onClick={() => updateFilters(isSelected ? '' : String(g.id), selectedProvider)}
-                className={`px-3.5 py-1.5 rounded-full text-xs font-extrabold whitespace-nowrap transition-all border flex items-center gap-1.5 tv-focus-target ${
+                className={`px-4 py-2 rounded-full text-xs font-extrabold whitespace-nowrap transition-all border flex items-center gap-1.5 flex-shrink-0 tv-focus-target ${
                   isSelected
                     ? 'bg-hbo-purple-light text-white border-white shadow-[0_0_20px_rgba(144,85,255,0.8)] ring-2 ring-hbo-purple-light/60 font-black'
                     : 'bg-hbo-card text-gray-400 border-hbo-border hover:text-white hover:bg-hbo-hover'
@@ -245,12 +247,12 @@ export const Series: React.FC = () => {
 
       {/* Grid of Series Cards */}
       {isLoading ? (
-        <div className="py-24 flex justify-center">
+        <div className="py-20 flex justify-center">
           <div className="w-12 h-12 border-4 border-hbo-purple border-t-hbo-cyan rounded-full animate-spin shadow-hbo-glow" />
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 sm:gap-6 lg:gap-7 py-4 px-1">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3.5 sm:gap-5 lg:gap-6 py-2 px-1">
             {series.map((item) => (
               <div key={item.id} className="flex justify-center">
                 <MediaCard item={item} type="tv" />

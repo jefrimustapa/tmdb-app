@@ -46,6 +46,7 @@ export interface UserSettings {
   autoplayNext: boolean;
   adBlockShield: boolean;
   filterAdult: boolean;
+  filterUnreleased?: boolean;
   maturityLevel: 'all' | 'pg13' | 'family';
   directStreamMode: boolean; // Option A: Direct Stream Extractor
   streamHeaderTimeout: number; // in seconds, e.g. 3, 5, 8, or 0 for always visible
