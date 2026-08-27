@@ -99,8 +99,14 @@ export const Details: React.FC = () => {
   };
 
   const handleBack = () => {
-    if (window.history.length > 1) {
+    const currentPath = window.location.pathname;
+    if (window.history.state && typeof window.history.state.idx === 'number' && window.history.state.idx > 0) {
       navigate(-1);
+      setTimeout(() => {
+        if (window.location.pathname === currentPath) {
+          navigate('/');
+        }
+      }, 150);
     } else {
       navigate('/');
     }
@@ -109,7 +115,7 @@ export const Details: React.FC = () => {
   // Failsafe keydown listener for TV remote back button & keyboard Escape/Backspace
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' || e.keyCode === 4) {
+      if (e.key === 'Escape' || e.keyCode === 4 || e.key === 'BrowserBack') {
         // If a modal is open, let modal handle it
         const modalCloseBtn = document.querySelector('[data-modal-close]') as HTMLButtonElement | null;
         if (!modalCloseBtn) {
@@ -160,6 +166,13 @@ export const Details: React.FC = () => {
           <button
             type="button"
             onClick={handleBack}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ' || e.keyCode === 13 || e.keyCode === 23 || e.keyCode === 66) {
+                e.preventDefault();
+                e.stopPropagation();
+                handleBack();
+              }
+            }}
             data-details-back="true"
             aria-label="Go Back"
             className="flex items-center gap-2 px-4 py-2 rounded-full bg-black/75 hover:bg-black backdrop-blur-md border border-white/20 hover:border-hbo-cyan text-xs sm:text-sm font-bold text-gray-200 hover:text-white transition hover:scale-105 tv-focus-target shadow-2xl cursor-pointer focus:outline-none focus:ring-2 focus:ring-hbo-cyan"
