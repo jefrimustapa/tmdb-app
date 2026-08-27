@@ -124,17 +124,17 @@ export const Details: React.FC = () => {
         <div className="absolute inset-0 bg-gradient-to-r from-hbo-dark via-hbo-dark/80 to-transparent w-full md:w-3/4" />
 
         {/* Back Navigation Bar (Top Left) */}
-        <div className="absolute top-4 sm:top-6 left-4 sm:left-8 z-30">
+        <div className="absolute top-[max(1rem,env(safe-area-inset-top,1.25rem))] left-4 sm:left-8 z-30">
           <button
             onClick={() => {
-              if (window.history.length > 1) {
+              if (window.history.state && window.history.state.idx > 0) {
                 navigate(-1);
               } else {
                 navigate('/');
               }
             }}
             aria-label="Go Back"
-            className="flex items-center gap-2 px-3.5 py-2 rounded-full bg-black/80 hover:bg-black backdrop-blur-md border border-white/20 text-xs sm:text-sm font-bold text-gray-200 hover:text-white transition hover:scale-105 tv-focus-target shadow-xl"
+            className="flex items-center gap-2 px-4 py-2 rounded-full bg-black/75 hover:bg-black backdrop-blur-md border border-white/20 hover:border-hbo-cyan text-xs sm:text-sm font-bold text-gray-200 hover:text-white transition hover:scale-105 tv-focus-target shadow-2xl cursor-pointer"
           >
             <ArrowLeft className="w-4 h-4 text-hbo-cyan" />
             <span>Back</span>
@@ -145,16 +145,13 @@ export const Details: React.FC = () => {
         <div className="absolute bottom-6 sm:bottom-10 left-4 sm:left-8 right-4 sm:right-8 max-w-4xl z-20 space-y-4">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="px-3 py-0.5 rounded-md bg-hbo-purple text-hbo-cyan border border-hbo-cyan/30 text-xs font-black uppercase tracking-wider">
-              {mediaType === 'movie' ? 'HBO Max Exclusive' : 'Max Original Series'}
+              {mediaType === 'movie' ? 'FILM' : 'SERIES'}
             </span>
             {contentRating && (
               <span className="px-2.5 py-0.5 rounded-md bg-white/15 text-white border border-white/25 text-xs font-black uppercase tracking-wider">
                 {contentRating}
               </span>
             )}
-            <span className="px-2.5 py-0.5 rounded-md bg-hbo-cyan/20 text-hbo-cyan border border-hbo-cyan/30 text-xs font-bold">
-              4K ULTRA HD
-            </span>
           </div>
 
           <h1 className="text-3xl sm:text-5xl md:text-6xl font-black font-display tracking-tight text-white leading-none drop-shadow-2xl">
