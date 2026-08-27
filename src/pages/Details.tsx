@@ -117,6 +117,7 @@ export const Details: React.FC = () => {
         <img
           src={backdropUrl}
           alt={title}
+          onError={(e) => tmdbImages.handleImgError(e, true)}
           className="w-full h-full object-cover object-top opacity-60 sm:opacity-75 scale-105 transform transition-transform duration-1000"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-hbo-dark via-hbo-dark/60 to-transparent" />
@@ -275,6 +276,7 @@ export const Details: React.FC = () => {
                   <img
                     src={tmdbImages.profile(actor.profile_path, 'w185')}
                     alt={actor.name}
+                    onError={tmdbImages.handleImgError}
                     className="w-12 h-12 rounded-full object-cover border border-hbo-border group-hover:border-hbo-cyan flex-shrink-0"
                   />
                   <div className="min-w-0">

@@ -15,15 +15,25 @@ export const TMDB_READ_TOKEN = 'eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiIxYzdiOTdkZDhiMTE
 
 const IMAGE_BASE_URL = 'https://image.tmdb.org/t/p';
 
+export const TMDB_FALLBACK_POSTER = '/placeholder-poster.svg';
+export const TMDB_FALLBACK_BACKDROP = '/placeholder-backdrop.svg';
+
 export const tmdbImages = {
   poster: (path: string | null, size: 'w342' | 'w500' | 'w780' | 'original' = 'w500') =>
-    path ? `${IMAGE_BASE_URL}/${size}${path}` : '/placeholder-poster.png',
+    path ? `${IMAGE_BASE_URL}/${size}${path}` : TMDB_FALLBACK_POSTER,
   backdrop: (path: string | null, size: 'w780' | 'w1280' | 'original' = 'w1280') =>
-    path ? `${IMAGE_BASE_URL}/${size}${path}` : '/placeholder-backdrop.png',
+    path ? `${IMAGE_BASE_URL}/${size}${path}` : TMDB_FALLBACK_BACKDROP,
   profile: (path: string | null, size: 'w185' | 'h632' | 'original' = 'w185') =>
-    path ? `${IMAGE_BASE_URL}/${size}${path}` : '/placeholder-profile.png',
+    path ? `${IMAGE_BASE_URL}/${size}${path}` : TMDB_FALLBACK_POSTER,
   still: (path: string | null, size: 'w300' | 'original' = 'w300') =>
-    path ? `${IMAGE_BASE_URL}/${size}${path}` : '/placeholder-backdrop.png',
+    path ? `${IMAGE_BASE_URL}/${size}${path}` : TMDB_FALLBACK_BACKDROP,
+  handleImgError: (e: React.SyntheticEvent<HTMLImageElement, Event>, isBackdrop = false) => {
+    const target = e.currentTarget;
+    const fallback = isBackdrop ? TMDB_FALLBACK_BACKDROP : TMDB_FALLBACK_POSTER;
+    if (!target.src.endsWith(fallback)) {
+      target.src = fallback;
+    }
+  }
 };
 
 const apiCache = new Map<string, { data: any; expiry: number }>();
@@ -32,7 +42,9 @@ const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes in-memory cache
 async function tmdbFetch<T>(endpoint: string, params: Record<string, string | number> = {}): Promise<T> {
   const settings = await dbService.getSettings();
   const filterAdult = settings.filterAdult !== false; // Default true
+  const filterUnreleased = settings.filterUnreleased !== false; // Default true
   const maturityLevel = settings.maturityLevel || 'all';
+  const todayStr = new Date().toISOString().split('T')[0];
 
   const url = new URL(`${TMDB_BASE_URL}${endpoint}`);
   url.searchParams.set('api_key', TMDB_API_KEY);
@@ -40,6 +52,9 @@ async function tmdbFetch<T>(endpoint: string, params: Record<string, string | nu
   url.searchParams.set('include_adult', filterAdult ? 'false' : 'true');
 
   if (endpoint.includes('/discover/movie')) {
+    if (filterUnreleased && !params['primary_release_date.lte']) {
+      url.searchParams.set('primary_release_date.lte', todayStr);
+    }
     if (maturityLevel === 'pg13') {
       url.searchParams.set('certification_country', 'US');
       url.searchParams.set('certification.lte', 'PG-13');
@@ -48,6 +63,9 @@ async function tmdbFetch<T>(endpoint: string, params: Record<string, string | nu
       url.searchParams.set('certification.lte', 'PG');
     }
   } else if (endpoint.includes('/discover/tv')) {
+    if (filterUnreleased && !params['first_air_date.lte']) {
+      url.searchParams.set('first_air_date.lte', todayStr);
+    }
     if (maturityLevel === 'pg13') {
       url.searchParams.set('certification_country', 'US');
       url.searchParams.set('certification.lte', 'TV-14');
@@ -59,7 +77,20 @@ async function tmdbFetch<T>(endpoint: string, params: Record<string, string | nu
 
   Object.entries(params).forEach(([k, v]) => {
     if (v !== undefined && v !== null && v !== '') {
-      url.searchParams.set(k, String(v));
+      const strVal = String(v);
+      if (strVal.includes('&')) {
+        // Handle compound query strings like "vote_average.desc&vote_count.gte=200"
+        strVal.split('&').forEach((pair, index) => {
+          if (index === 0 && !pair.includes('=')) {
+            url.searchParams.set(k, pair);
+          } else if (pair.includes('=')) {
+            const [subKey, subVal] = pair.split('=');
+            url.searchParams.set(subKey, subVal);
+          }
+        });
+      } else {
+        url.searchParams.set(k, strVal);
+      }
     }
   });
 
@@ -82,9 +113,19 @@ async function tmdbFetch<T>(endpoint: string, params: Record<string, string | nu
 
   const data = await res.json();
 
-  // If response has results list and filterAdult is on, filter any adult: true items
+  // Filter adult items if filterAdult is active
   if (filterAdult && data && Array.isArray(data.results)) {
     data.results = data.results.filter((item: any) => !item.adult);
+  }
+
+  // Filter unreleased/future items if filterUnreleased is active (except explicit upcoming endpoints)
+  if (filterUnreleased && !endpoint.includes('/upcoming') && data && Array.isArray(data.results)) {
+    data.results = data.results.filter((item: any) => {
+      if (item.release_date && item.release_date > todayStr) return false;
+      if (item.first_air_date && item.first_air_date > todayStr) return false;
+      if (item.status === 'Planned' || item.status === 'In Production' || item.status === 'Post Production') return false;
+      return true;
+    });
   }
 
   apiCache.set(cacheKey, { data, expiry: Date.now() + CACHE_TTL_MS });
