@@ -98,6 +98,30 @@ export const Details: React.FC = () => {
     setIsWatchlist(status);
   };
 
+  const handleBack = () => {
+    if (window.history.length > 1) {
+      navigate(-1);
+    } else {
+      navigate('/');
+    }
+  };
+
+  // Failsafe keydown listener for TV remote back button & keyboard Escape/Backspace
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' || e.keyCode === 4) {
+        // If a modal is open, let modal handle it
+        const modalCloseBtn = document.querySelector('[data-modal-close]') as HTMLButtonElement | null;
+        if (!modalCloseBtn) {
+          e.preventDefault();
+          handleBack();
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   if (isLoading || !details) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-hbo-dark">
@@ -134,15 +158,11 @@ export const Details: React.FC = () => {
           }`}
         >
           <button
-            onClick={() => {
-              if (window.history.state && window.history.state.idx > 0) {
-                navigate(-1);
-              } else {
-                navigate('/');
-              }
-            }}
+            type="button"
+            onClick={handleBack}
+            data-details-back="true"
             aria-label="Go Back"
-            className="flex items-center gap-2 px-4 py-2 rounded-full bg-black/75 hover:bg-black backdrop-blur-md border border-white/20 hover:border-hbo-cyan text-xs sm:text-sm font-bold text-gray-200 hover:text-white transition hover:scale-105 tv-focus-target shadow-2xl cursor-pointer"
+            className="flex items-center gap-2 px-4 py-2 rounded-full bg-black/75 hover:bg-black backdrop-blur-md border border-white/20 hover:border-hbo-cyan text-xs sm:text-sm font-bold text-gray-200 hover:text-white transition hover:scale-105 tv-focus-target shadow-2xl cursor-pointer focus:outline-none focus:ring-2 focus:ring-hbo-cyan"
           >
             <ArrowLeft className="w-4 h-4 text-hbo-cyan" />
             <span>Back</span>
