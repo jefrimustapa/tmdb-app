@@ -32,6 +32,7 @@ export const DEFAULT_SETTINGS: UserSettings = {
   maturityLevel: 'all',
   directStreamMode: false,
   streamHeaderTimeout: 5,
+  includeNightlyUpdates: false,
   updatedAt: Date.now()
 };
 

@@ -5,11 +5,34 @@ import { STREAM_PROVIDERS } from '../services/streamProviders';
 import { useDevice } from '../hooks/useDevice';
 import { Logo } from '../components/common/Logo';
 import { APP_VERSION, APP_BUILD_NUMBER, APP_VERSION_FULL, APP_BUILD_CHANNEL } from '../version';
-import { Settings as SettingsIcon, Tv2, Smartphone, Tablet, Monitor, ShieldCheck, Server, Database, Check, ShieldAlert, EyeOff, Lock, Zap, X, CalendarX } from 'lucide-react';
+import { updateService, type UpdateInfo } from '../services/updateService';
+import { UpdateModal } from '../components/common/UpdateModal';
+import { Settings as SettingsIcon, Tv2, Smartphone, Tablet, Monitor, ShieldCheck, Server, Database, Check, ShieldAlert, EyeOff, Lock, Zap, X, ArrowUpCircle, RefreshCw, Moon, Sparkles, AlertCircle, CalendarX } from 'lucide-react';
 
 export const Settings: React.FC = () => {
   const [settings, setSettings] = useState<UserSettings | null>(null);
   const [savedMessage, setSavedMessage] = useState(false);
+  const [checkingUpdate, setCheckingUpdate] = useState(false);
+  const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
+  const [showUpdateModal, setShowUpdateModal] = useState(false);
+  const [updateError, setUpdateError] = useState<string | null>(null);
+
+  const handleCheckForUpdates = async () => {
+    setCheckingUpdate(true);
+    setUpdateError(null);
+    try {
+      const info = await updateService.checkForUpdates(settings?.includeNightlyUpdates ?? false);
+      setUpdateInfo(info);
+      if (info.hasUpdate) {
+        setShowUpdateModal(true);
+      }
+    } catch (e: any) {
+      setUpdateError(e.message || 'Failed to check for updates');
+    } finally {
+      setCheckingUpdate(false);
+    }
+  };
+
   const [showEasterEgg, setShowEasterEgg] = useState(false);
   const clickCountRef = useRef(0);
   const clickTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -370,6 +393,91 @@ export const Settings: React.FC = () => {
           </button>
         </div>
 
+        {/* Software Updates & Release Channel */}
+        <div className="bg-hbo-card border border-hbo-border rounded-2xl p-5 sm:p-6 space-y-5">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex-1 min-w-0 pr-2">
+              <h3 className="text-base sm:text-lg font-bold font-display text-white flex items-center gap-2 mb-1">
+                <ArrowUpCircle className="w-5 h-5 text-hbo-cyan flex-shrink-0" />
+                <span>Software Update</span>
+              </h3>
+              <p className="text-xs text-gray-400">
+                Check for new versions, bug fixes, and feature updates directly from GitHub Releases.
+              </p>
+            </div>
+
+            <button
+              onClick={handleCheckForUpdates}
+              disabled={checkingUpdate}
+              className="flex-shrink-0 px-4 py-2.5 rounded-xl bg-gradient-to-r from-hbo-purple to-hbo-cyan hover:opacity-90 active:scale-95 text-white font-bold text-xs flex items-center gap-2 shadow-lg shadow-hbo-purple/30 tv-focus-target transition-all"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${checkingUpdate ? 'animate-spin' : ''}`} />
+              <span>{checkingUpdate ? 'Checking...' : 'Check for Updates'}</span>
+            </button>
+          </div>
+
+          {/* Update Status Banner if already checked */}
+          {updateInfo && (
+            <div className={`p-3.5 rounded-xl border flex items-center justify-between gap-3 text-xs ${
+              updateInfo.hasUpdate 
+                ? 'bg-hbo-purple/20 border-hbo-purple-light text-white' 
+                : 'bg-white/5 border-white/10 text-gray-300'
+            }`}>
+              <div className="flex items-center gap-2.5 min-w-0">
+                {updateInfo.hasUpdate ? (
+                  <Sparkles className="w-4 h-4 text-hbo-cyan flex-shrink-0" />
+                ) : (
+                  <Check className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                )}
+                <span className="truncate">
+                  {updateInfo.hasUpdate ? `Update Available: v${updateInfo.latestVersion}` : 'You are on the latest build'}
+                </span>
+              </div>
+              {updateInfo.hasUpdate && (
+                <button
+                  onClick={() => setShowUpdateModal(true)}
+                  className="px-3 py-1 bg-hbo-cyan text-black font-bold rounded-lg hover:bg-hbo-cyan/90 text-xs tv-focus-target"
+                >
+                  View Update
+                </button>
+              )}
+            </div>
+          )}
+
+          {updateError && (
+            <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 flex-shrink-0" />
+              <span>{updateError}</span>
+            </div>
+          )}
+
+          {/* Nightly Channel Toggle */}
+          <div className="border-t border-hbo-border/60 pt-4 flex items-center justify-between gap-4">
+            <div className="flex-1 min-w-0 pr-2">
+              <h4 className="text-xs font-bold text-gray-200 flex items-center gap-2 mb-0.5">
+                <Moon className="w-3.5 h-3.5 text-amber-400" />
+                <span>Include Nightly Builds</span>
+              </h4>
+              <p className="text-[11px] text-gray-400">
+                Receive bleeding-edge automated daily builds before official stable releases.
+              </p>
+            </div>
+
+            <button
+              onClick={() => handleUpdate({ includeNightlyUpdates: !settings.includeNightlyUpdates })}
+              className={`flex-shrink-0 w-12 h-6 rounded-full transition-colors relative tv-focus-target ${
+                settings.includeNightlyUpdates ? 'bg-hbo-cyan' : 'bg-gray-700'
+              }`}
+            >
+              <div
+                className={`w-5 h-5 rounded-full bg-white transition-transform transform ${
+                  settings.includeNightlyUpdates ? 'translate-x-6' : 'translate-x-0.5'
+                }`}
+              />
+            </button>
+          </div>
+        </div>
+
         {/* About & Metadata Card */}
         <div className="w-full bg-hbo-card/40 border border-hbo-border/60 rounded-2xl p-5 sm:p-6 text-xs text-gray-400 space-y-3 text-left">
           <div className="flex items-center justify-between flex-wrap gap-3">
@@ -433,6 +541,14 @@ export const Settings: React.FC = () => {
             </p>
           </div>
         </div>
+      )}
+
+      {/* Software Update Modal Dialog */}
+      {showUpdateModal && updateInfo && (
+        <UpdateModal
+          updateInfo={updateInfo}
+          onClose={() => setShowUpdateModal(false)}
+        />
       )}
     </div>
   );
