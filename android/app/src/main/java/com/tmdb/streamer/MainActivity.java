@@ -71,6 +71,9 @@ public class MainActivity extends BridgeActivity {
             getWindow().getAttributes().layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
         }
 
+        // Set immediate dark neon window and root background to prevent white screen flash
+        getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(android.graphics.Color.parseColor("#050508")));
+
         // On TV, lock orientation to landscape. On mobile phone, lock to portrait. On tablet, allow unspecified.
         if (isTV()) {
             setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
@@ -80,6 +83,7 @@ public class MainActivity extends BridgeActivity {
 
         WebView webView = this.bridge.getWebView();
         if (webView != null) {
+            webView.setBackgroundColor(android.graphics.Color.parseColor("#050508"));
             WebSettings settings = webView.getSettings();
             // Block multi-window creation and automated popup opening
             settings.setSupportMultipleWindows(false);
