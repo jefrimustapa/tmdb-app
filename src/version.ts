@@ -2,8 +2,8 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = 267;
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.fix-watch-headerbar-.267';
+export const APP_BUILD_NUMBER = 268;
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.fix-watch-headerbar-.268';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
 export const APP_BRANCH = 'fix-watch-headerbar-';

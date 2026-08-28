@@ -40,10 +40,13 @@ const AppContent: React.FC = () => {
           <Route path="/movies" element={<Movies />} />
           <Route path="/tv" element={<Series />} />
           <Route path="/details/:type/:id" element={<Details />} />
+          <Route path="/movie/:id" element={<Details />} />
+          <Route path="/tv/:id" element={<Details />} />
           <Route path="/watch/:type/:id" element={<Watch />} />
           <Route path="/search" element={<Search />} />
           <Route path="/library" element={<Library />} />
           <Route path="/settings" element={<Settings />} />
+          <Route path="*" element={<Home />} />
         </Routes>
       </main>
 
