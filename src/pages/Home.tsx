@@ -10,19 +10,53 @@ import { PlatformHubs } from '../components/common/PlatformHubs';
 import { Play, Sparkles, Flame, Trophy, Film, Tv, Compass } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
+interface HomeFeedCache {
+  trending: TMDBMediaItem[];
+  popularMovies: TMDBMediaItem[];
+  popularTV: TMDBMediaItem[];
+  topRated: TMDBMediaItem[];
+  actionMovies: TMDBMediaItem[];
+  sciFiMovies: TMDBMediaItem[];
+  history: WatchHistoryItem[];
+  timestamp: number;
+}
+
+let homeFeedCache: HomeFeedCache | null = null;
+
 export const Home: React.FC = () => {
-  const [trending, setTrending] = useState<TMDBMediaItem[]>([]);
-  const [popularMovies, setPopularMovies] = useState<TMDBMediaItem[]>([]);
-  const [popularTV, setPopularTV] = useState<TMDBMediaItem[]>([]);
-  const [topRated, setTopRated] = useState<TMDBMediaItem[]>([]);
-  const [history, setHistory] = useState<WatchHistoryItem[]>([]);
-  const [actionMovies, setActionMovies] = useState<TMDBMediaItem[]>([]);
-  const [sciFiMovies, setSciFiMovies] = useState<TMDBMediaItem[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [trending, setTrending] = useState<TMDBMediaItem[]>(() => homeFeedCache?.trending || []);
+  const [popularMovies, setPopularMovies] = useState<TMDBMediaItem[]>(() => homeFeedCache?.popularMovies || []);
+  const [popularTV, setPopularTV] = useState<TMDBMediaItem[]>(() => homeFeedCache?.popularTV || []);
+  const [topRated, setTopRated] = useState<TMDBMediaItem[]>(() => homeFeedCache?.topRated || []);
+  const [history, setHistory] = useState<WatchHistoryItem[]>(() => homeFeedCache?.history || []);
+  const [actionMovies, setActionMovies] = useState<TMDBMediaItem[]>(() => homeFeedCache?.actionMovies || []);
+  const [sciFiMovies, setSciFiMovies] = useState<TMDBMediaItem[]>(() => homeFeedCache?.sciFiMovies || []);
+  const [isLoading, setIsLoading] = useState(() => !homeFeedCache);
 
   useEffect(() => {
-    const loadHomeData = async () => {
-      setIsLoading(true);
+    let isMounted = true;
+
+    const loadHomeData = async (forceRefresh = false) => {
+      // 1. Immediately refresh watch history from IndexedDB so "Continue Watching" is always 100% fresh
+      dbService.getHistory(10).then((hist) => {
+        if (isMounted) {
+          setHistory(hist || []);
+          if (homeFeedCache) homeFeedCache.history = hist || [];
+        }
+      });
+
+      // 2. If we already have fresh cached data (< 5 minutes old) and not forced, no need to re-fetch all 6 TMDB rows
+      const isCacheFresh = homeFeedCache && (Date.now() - homeFeedCache.timestamp < 5 * 60 * 1000);
+      if (isCacheFresh && !forceRefresh) {
+        if (isLoading) setIsLoading(false);
+        return;
+      }
+
+      // If no cache at all, show the loading spinner during initial cold load
+      if (!homeFeedCache) {
+        setIsLoading(true);
+      }
+
       try {
         const [trendRes, popMRes, popTVRes, topRes, actRes, sciRes, histRes] = await Promise.all([
           tmdbApi.getTrending('all', 'day'),
@@ -34,39 +68,69 @@ export const Home: React.FC = () => {
           dbService.getHistory(10)
         ]);
 
-        setTrending(trendRes.results || []);
-        setPopularMovies(popMRes.results || []);
-        setPopularTV(popTVRes.results || []);
-        setTopRated(topRes.results || []);
-        setActionMovies(actRes.results || []);
-        setSciFiMovies(sciRes.results || []);
-        setHistory(histRes || []);
+        if (!isMounted) return;
+
+        const newCache: HomeFeedCache = {
+          trending: trendRes.results || [],
+          popularMovies: popMRes.results || [],
+          popularTV: popTVRes.results || [],
+          topRated: topRes.results || [],
+          actionMovies: actRes.results || [],
+          sciFiMovies: sciRes.results || [],
+          history: histRes || [],
+          timestamp: Date.now()
+        };
+
+        homeFeedCache = newCache;
+
+        setTrending(newCache.trending);
+        setPopularMovies(newCache.popularMovies);
+        setPopularTV(newCache.popularTV);
+        setTopRated(newCache.topRated);
+        setActionMovies(newCache.actionMovies);
+        setSciFiMovies(newCache.sciFiMovies);
+        setHistory(newCache.history);
       } catch (err) {
         console.error('Failed to load home feed:', err);
       } finally {
-        setIsLoading(false);
+        if (isMounted) {
+          setIsLoading(false);
+        }
       }
     };
 
     loadHomeData();
+
+    // Listen for settings changes (e.g. maturity filter, unreleased filter) to invalidate cache
+    const handleSettingsChanged = () => {
+      homeFeedCache = null;
+      loadHomeData(true);
+    };
+
+    window.addEventListener('tmdb_settings_changed', handleSettingsChanged);
+    return () => {
+      isMounted = false;
+      window.removeEventListener('tmdb_settings_changed', handleSettingsChanged);
+    };
   }, []);
 
   // When data loading is finished and DOM mounts, move focus immediately to Billboard "Watch Now" button
   useEffect(() => {
     if (!isLoading && trending.length > 0) {
       const focusWatchNow = () => {
-        const watchNowBtn = document.querySelector<HTMLElement>('[data-hero-watch-now="true"]') ||
-                            Array.from(document.querySelectorAll<HTMLElement>('.tv-focus-target')).find(
-                              el => el.textContent?.trim().toLowerCase().includes('watch now')
-                            );
-        if (watchNowBtn) {
-          watchNowBtn.focus();
-          window.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
+        if (!document.activeElement || document.activeElement === document.body || document.activeElement === document.documentElement) {
+          const watchNowBtn = document.querySelector<HTMLElement>('[data-hero-watch-now="true"]') ||
+                              Array.from(document.querySelectorAll<HTMLElement>('.tv-focus-target')).find(
+                                el => el.textContent?.trim().toLowerCase().includes('watch now')
+                              );
+          if (watchNowBtn) {
+            watchNowBtn.focus();
+          }
         }
       };
 
       const t1 = setTimeout(focusWatchNow, 50);
-      const t2 = setTimeout(focusWatchNow, 300);
+      const t2 = setTimeout(focusWatchNow, 250);
       return () => {
         clearTimeout(t1);
         clearTimeout(t2);

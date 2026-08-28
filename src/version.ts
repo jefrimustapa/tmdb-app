@@ -2,8 +2,8 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = 244;
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-save-last-watch.244';
+export const APP_BUILD_NUMBER = 245;
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.fix-tv-home-page-slo.245';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
-export const APP_BRANCH = 'feat-save-last-watch';
+export const APP_BRANCH = 'fix-tv-home-page-slo';
