@@ -545,26 +545,23 @@ public class MainActivity extends BridgeActivity {
                 }
             } else if (keyCode == KeyEvent.KEYCODE_BACK) {
                 if (webView != null) {
-                    // Check if header is already focused; if not, reveal header & focus back button; if already focused, exit watch page
                     webView.evaluateJavascript(
                         "(function() {" +
-                        "  var header = document.querySelector('[data-watch-header=\"true\"]');" +
-                        "  var isHeaderFocused = header && header.contains(document.activeElement);" +
-                        "  var backBtn = header ? header.querySelector('button[aria-label=\"Back\"], .tv-focus-target') : null;" +
-                        "  if (!isHeaderFocused) {" +
-                        "    window.dispatchEvent(new CustomEvent('tmdb_screen_touched'));" +
-                        "    if (backBtn) {" +
-                        "      backBtn.focus();" +
-                        "    }" +
-                        "    return 'FOCUSED_HEADER';" +
-                        "  } else {" +
-                        "    if (backBtn && typeof backBtn.click === 'function') {" +
-                        "      backBtn.click();" +
-                        "    } else {" +
-                        "      window.history.back();" +
-                        "    }" +
-                        "    return 'EXITED_WATCH';" +
+                        "  var dropdown = document.querySelector('[data-provider-dropdown-open=\"true\"]');" +
+                        "  if (dropdown) {" +
+                        "    window.dispatchEvent(new CustomEvent('tmdb_close_dropdowns'));" +
+                        "    var trigger = dropdown.querySelector('[data-provider-trigger=\"true\"]');" +
+                        "    if (trigger) { trigger.focus(); }" +
+                        "    return 'CLOSED_DROPDOWN';" +
                         "  }" +
+                        "  if (typeof window.tmdbExitWatch === 'function') {" +
+                        "    window.tmdbExitWatch();" +
+                        "  } else {" +
+                        "    window.dispatchEvent(new CustomEvent('tmdb_exit_watch'));" +
+                        "    var backBtn = document.querySelector('[data-watch-header=\"true\"] button[aria-label=\"Back\"], [data-watch-header=\"true\"] button');" +
+                        "    if (backBtn && typeof backBtn.click === 'function') { backBtn.click(); }" +
+                        "  }" +
+                        "  return 'EXITED_WATCH';" +
                         "})();",
                         null
                     );
