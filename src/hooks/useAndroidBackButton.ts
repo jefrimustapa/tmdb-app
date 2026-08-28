@@ -29,7 +29,17 @@ export const useAndroidBackButton = () => {
 
       // 2. If not on home page, navigate back
       if (location.pathname !== '/') {
-        navigate(-1);
+        const currentPath = location.pathname;
+        if (window.history.state && typeof window.history.state.idx === 'number' && window.history.state.idx > 0) {
+          navigate(-1);
+          setTimeout(() => {
+            if (window.location.pathname === currentPath) {
+              navigate('/');
+            }
+          }, 150);
+        } else {
+          navigate('/');
+        }
         return;
       }
 
