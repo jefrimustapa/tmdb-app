@@ -102,7 +102,10 @@ export const Watch: React.FC = () => {
         setHeaderVisible(false);
         window.dispatchEvent(new CustomEvent('tmdb_close_dropdowns'));
 
-        // Once header auto-hides after inactivity, safely return focus to player iframe
+        // Blur any focused element in the header and return focus to player iframe
+        if (document.activeElement instanceof HTMLElement) {
+          document.activeElement.blur();
+        }
         const iframe = document.querySelector<HTMLIFrameElement>('iframe');
         if (iframe) {
           try {

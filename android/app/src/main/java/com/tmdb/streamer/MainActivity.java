@@ -561,11 +561,12 @@ public class MainActivity extends BridgeActivity {
                         "    if (trigger) { trigger.focus(); }" +
                         "    return 'CLOSED_DROPDOWN';" +
                         "  }" +
+                        "  var header = document.querySelector('[data-watch-header=\"true\"]');" +
+                        "  var isHeaderVisible = header && !header.classList.contains('pointer-events-none') && window.getComputedStyle(header).opacity !== '0';" +
                         "  var backBtn = document.querySelector('[data-watch-header=\"true\"] button[aria-label=\"Back\"], [data-watch-header=\"true\"] [data-watch-header-item=\"true\"]:first-child');" +
-                        "  var isBackBtnFocused = backBtn && document.activeElement === backBtn;" +
-                        "  if (!isBackBtnFocused) {" +
+                        "  if (!isHeaderVisible) {" +
                         "    window.dispatchEvent(new CustomEvent('tmdb_user_action'));" +
-                        "    if (backBtn) { backBtn.focus(); }" +
+                        "    setTimeout(function() { if (backBtn) { backBtn.focus(); } }, 50);" +
                         "    return 'FOCUSED_BACK_BTN';" +
                         "  } else {" +
                         "    if (typeof window.tmdbExitWatch === 'function') {" +

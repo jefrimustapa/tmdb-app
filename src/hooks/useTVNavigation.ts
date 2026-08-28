@@ -72,6 +72,35 @@ export function useTVNavigation(isEnabled = true) {
       // On Watch page (/watch), handle header navigation
       if (window.location.pathname.startsWith('/watch')) {
         const header = document.querySelector('[data-watch-header="true"]');
+
+        // Handle Back/Escape keys on Watch page (regardless of whether focus is in header or iframe)
+        if (e.key === 'Escape' || e.keyCode === 27 || e.keyCode === 4 || e.key === 'BrowserBack' || e.key === 'GoBack') {
+          e.preventDefault();
+          const openDropdown = header?.querySelector('[data-provider-dropdown-open="true"]');
+          if (openDropdown) {
+            window.dispatchEvent(new CustomEvent('tmdb_close_dropdowns'));
+            const trigger = header?.querySelector<HTMLElement>('[data-provider-trigger="true"]');
+            if (trigger) { trigger.focus(); }
+            return;
+          }
+          const backBtn = header?.querySelector<HTMLElement>('button[aria-label="Back"], [data-watch-header-item="true"]');
+          const isHeaderVisible = header && !header.classList.contains('pointer-events-none') && window.getComputedStyle(header).opacity !== '0';
+          if (!isHeaderVisible) {
+            window.dispatchEvent(new CustomEvent('tmdb_user_action'));
+            setTimeout(() => { if (backBtn) { backBtn.focus(); } }, 50);
+            return;
+          }
+          if (typeof (window as any).tmdbExitWatch === 'function') {
+            (window as any).tmdbExitWatch();
+          } else {
+            window.dispatchEvent(new CustomEvent('tmdb_exit_watch'));
+            if (backBtn && typeof backBtn.click === 'function') {
+              backBtn.click();
+            }
+          }
+          return;
+        }
+
         const isHeaderFocused = header && header.contains(document.activeElement);
 
         // If not in header and user presses ArrowUp, move focus to header and reveal it
@@ -88,7 +117,7 @@ export function useTVNavigation(isEnabled = true) {
         }
 
         // Check if provider dropdown is currently open
-        const openDropdown = header.querySelector('[data-provider-dropdown-open="true"]');
+        const openDropdown = header?.querySelector('[data-provider-dropdown-open="true"]');
         if (openDropdown) {
           const dropdownOptions = Array.from(openDropdown.querySelectorAll<HTMLElement>('.tv-focus-target, button'))
             .filter(el => {
@@ -123,33 +152,6 @@ export function useTVNavigation(isEnabled = true) {
             try {
               iframe.focus();
             } catch {}
-          }
-          return;
-        }
-
-        // Handle Back/Escape keys on Watch page
-        if (e.key === 'Escape' || e.keyCode === 27 || e.keyCode === 4 || e.key === 'BrowserBack' || e.key === 'GoBack') {
-          e.preventDefault();
-          if (openDropdown) {
-            window.dispatchEvent(new CustomEvent('tmdb_close_dropdowns'));
-            const trigger = header?.querySelector<HTMLElement>('[data-provider-trigger="true"]');
-            if (trigger) { trigger.focus(); }
-            return;
-          }
-          const backBtn = header?.querySelector<HTMLElement>('button[aria-label="Back"], [data-watch-header-item="true"]');
-          const isBackBtnFocused = backBtn && document.activeElement === backBtn;
-          if (!isBackBtnFocused) {
-            window.dispatchEvent(new CustomEvent('tmdb_user_action'));
-            if (backBtn) { backBtn.focus(); }
-            return;
-          }
-          if (typeof (window as any).tmdbExitWatch === 'function') {
-            (window as any).tmdbExitWatch();
-          } else {
-            window.dispatchEvent(new CustomEvent('tmdb_exit_watch'));
-            if (backBtn && typeof backBtn.click === 'function') {
-              backBtn.click();
-            }
           }
           return;
         }
