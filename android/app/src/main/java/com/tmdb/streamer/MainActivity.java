@@ -554,14 +554,21 @@ public class MainActivity extends BridgeActivity {
                         "    if (trigger) { trigger.focus(); }" +
                         "    return 'CLOSED_DROPDOWN';" +
                         "  }" +
-                        "  if (typeof window.tmdbExitWatch === 'function') {" +
-                        "    window.tmdbExitWatch();" +
+                        "  var backBtn = document.querySelector('[data-watch-header=\"true\"] button[aria-label=\"Back\"], [data-watch-header=\"true\"] [data-watch-header-item=\"true\"]:first-child');" +
+                        "  var isBackBtnFocused = backBtn && document.activeElement === backBtn;" +
+                        "  if (!isBackBtnFocused) {" +
+                        "    window.dispatchEvent(new CustomEvent('tmdb_user_action'));" +
+                        "    if (backBtn) { backBtn.focus(); }" +
+                        "    return 'FOCUSED_BACK_BTN';" +
                         "  } else {" +
-                        "    window.dispatchEvent(new CustomEvent('tmdb_exit_watch'));" +
-                        "    var backBtn = document.querySelector('[data-watch-header=\"true\"] button[aria-label=\"Back\"], [data-watch-header=\"true\"] button');" +
-                        "    if (backBtn && typeof backBtn.click === 'function') { backBtn.click(); }" +
+                        "    if (typeof window.tmdbExitWatch === 'function') {" +
+                        "      window.tmdbExitWatch();" +
+                        "    } else {" +
+                        "      window.dispatchEvent(new CustomEvent('tmdb_exit_watch'));" +
+                        "      if (backBtn && typeof backBtn.click === 'function') { backBtn.click(); }" +
+                        "    }" +
+                        "    return 'EXITED_WATCH';" +
                         "  }" +
-                        "  return 'EXITED_WATCH';" +
                         "})();",
                         null
                     );
