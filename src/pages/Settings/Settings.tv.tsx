@@ -7,7 +7,7 @@ import { Logo } from '../../components/common/Logo';
 import { APP_VERSION, APP_BUILD_NUMBER, APP_VERSION_FULL, APP_BUILD_CHANNEL } from '../../version';
 import { updateService, type UpdateInfo } from '../../services/updateService';
 import { UpdateModal } from '../../components/common/UpdateModal';
-import { Settings as SettingsIcon, Tv2, Smartphone, Tablet, Monitor, ShieldCheck, Server, Database, Check, ShieldAlert, EyeOff, Lock, Zap, X, ArrowUpCircle, RefreshCw, Moon, Sparkles, AlertCircle, CalendarX, ChevronDown } from 'lucide-react';
+import { Settings as SettingsIcon, Tv2, Smartphone, Tablet, Monitor, ShieldCheck, Server, Database, Check, ShieldAlert, EyeOff, Lock, Zap, X, ArrowUpCircle, RefreshCw, Moon, Sparkles, AlertCircle, CalendarX, ChevronDown, MousePointer } from 'lucide-react';
 
 export const Settings: React.FC = () => {
   const [settings, setSettings] = useState<UserSettings | null>(null);
@@ -296,6 +296,126 @@ export const Settings: React.FC = () => {
               );
             })}
           </div>
+        </div>
+
+        {/* TV Mode: On-Demand Virtual Cursor */}
+        <div className="bg-hbo-card border border-hbo-border rounded-2xl p-5 sm:p-6 space-y-5">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h3 className="text-base sm:text-lg font-bold font-display text-white flex items-center gap-2 mb-1">
+                <MousePointer className="w-5 h-5 text-hbo-cyan" />
+                <span>On-Demand Virtual Cursor (TV Player)</span>
+              </h3>
+              <p className="text-xs text-gray-400">
+                Enables a remote-controlled cursor overlay on the Watch page. Allows seamless interaction with embedded player controls (scrub bar, audio/subtitle tracks, resolution menu) using your remote D-Pad and OK button.
+              </p>
+            </div>
+            <button
+              onClick={() => handleUpdate({ virtualCursorEnabled: !(settings.virtualCursorEnabled ?? true) })}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all tv-focus-target flex items-center gap-2 ${
+                (settings.virtualCursorEnabled ?? true)
+                  ? 'bg-hbo-cyan text-black shadow-hbo-glow'
+                  : 'bg-hbo-dark border border-hbo-border text-gray-400'
+              }`}
+            >
+              {(settings.virtualCursorEnabled ?? true) ? 'Enabled' : 'Disabled'}
+            </button>
+          </div>
+
+          {(settings.virtualCursorEnabled ?? true) && (
+            <div className="space-y-4 pt-2 border-t border-hbo-border/60">
+              {/* Activation Trigger */}
+              <div>
+                <p className="text-xs font-semibold text-gray-300 mb-2">Activation Trigger (When Watching)</p>
+                <div className="grid grid-cols-2 gap-3">
+                  {[
+                    { clicks: 2 as const, label: 'Double Press OK (Default)', desc: 'Press OK 2 times rapidly' },
+                    { clicks: 3 as const, label: 'Triple Press OK', desc: 'Press OK 3 times rapidly' }
+                  ].map((opt) => {
+                    const isSelected = (settings.virtualCursorClicks ?? 2) === opt.clicks;
+                    return (
+                      <button
+                        key={opt.clicks}
+                        onClick={() => handleUpdate({ virtualCursorClicks: opt.clicks })}
+                        className={`p-3 rounded-xl border text-left transition-all tv-focus-target ${
+                          isSelected
+                            ? 'bg-hbo-cyan/20 border-hbo-cyan text-white shadow-hbo-glow'
+                            : 'bg-hbo-dark/60 border-hbo-border text-gray-400 hover:text-gray-200'
+                        }`}
+                      >
+                        <p className={`text-xs font-bold ${isSelected ? 'text-hbo-cyan' : 'text-white'}`}>
+                          {opt.label}
+                        </p>
+                        <p className="text-[11px] text-gray-400 mt-0.5">{opt.desc}</p>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Inactivity Auto-Hide Timeout */}
+              <div>
+                <p className="text-xs font-semibold text-gray-300 mb-2">Inactivity Auto-Hide Duration</p>
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
+                  {[
+                    { seconds: 5, label: '5 Seconds', desc: 'Quick dismiss' },
+                    { seconds: 10, label: '10s (Default)', desc: 'Standard timeout' },
+                    { seconds: 15, label: '15 Seconds', desc: 'Extended' },
+                    { seconds: 30, label: '30 Seconds', desc: 'Long duration' },
+                    { seconds: 0, label: 'Never', desc: 'Manual dismiss' }
+                  ].map((opt) => {
+                    const isSelected = (settings.virtualCursorTimeout ?? 10) === opt.seconds;
+                    return (
+                      <button
+                        key={opt.seconds}
+                        onClick={() => handleUpdate({ virtualCursorTimeout: opt.seconds })}
+                        className={`p-3 rounded-xl border text-left transition-all tv-focus-target ${
+                          isSelected
+                            ? 'bg-hbo-cyan/20 border-hbo-cyan text-white shadow-hbo-glow'
+                            : 'bg-hbo-dark/60 border-hbo-border text-gray-400 hover:text-gray-200'
+                        }`}
+                      >
+                        <p className={`text-xs font-bold ${isSelected ? 'text-hbo-cyan' : 'text-white'}`}>
+                          {opt.label}
+                        </p>
+                        <p className="text-[11px] text-gray-400 mt-0.5">{opt.desc}</p>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Cursor Movement Speed */}
+              <div>
+                <p className="text-xs font-semibold text-gray-300 mb-2">Cursor Movement Speed</p>
+                <div className="grid grid-cols-3 gap-3">
+                  {[
+                    { speed: 'slow' as const, label: 'Slow', desc: 'High precision for small icons' },
+                    { speed: 'normal' as const, label: 'Normal (Default)', desc: 'Balanced response' },
+                    { speed: 'fast' as const, label: 'Fast', desc: 'Quick panning across large screens' }
+                  ].map((opt) => {
+                    const isSelected = (settings.virtualCursorSpeed ?? 'normal') === opt.speed;
+                    return (
+                      <button
+                        key={opt.speed}
+                        onClick={() => handleUpdate({ virtualCursorSpeed: opt.speed })}
+                        className={`p-3 rounded-xl border text-left transition-all tv-focus-target ${
+                          isSelected
+                            ? 'bg-hbo-cyan/20 border-hbo-cyan text-white shadow-hbo-glow'
+                            : 'bg-hbo-dark/60 border-hbo-border text-gray-400 hover:text-gray-200'
+                        }`}
+                      >
+                        <p className={`text-xs font-bold ${isSelected ? 'text-hbo-cyan' : 'text-white'}`}>
+                          {opt.label}
+                        </p>
+                        <p className="text-[11px] text-gray-400 mt-0.5">{opt.desc}</p>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Top 3 Priority Stream Resolvers */}

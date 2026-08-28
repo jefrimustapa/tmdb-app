@@ -4,6 +4,7 @@ import { tmdbApi } from '../../services/tmdb';
 import type { TMDBMovieDetails, TMDBTVDetails } from '../../types/tmdb';
 import { VideoPlayer } from '../../components/player/VideoPlayer';
 import { ProviderPickerTV } from '../../components/player/ProviderPickerTV';
+import { TVVirtualCursor } from '../../components/player/TVVirtualCursor';
 import { dbService } from '../../services/db';
 import { ArrowLeft } from 'lucide-react';
 
@@ -19,13 +20,35 @@ export const Watch: React.FC = () => {
   const [providerId, setProviderId] = useState('vidlink');
   const [isLoading, setIsLoading] = useState(true);
 
+  const [cursorActive, setCursorActive] = useState(false);
+  const [cursorSettings, setCursorSettings] = useState<{
+    enabled: boolean;
+    clicks: 2 | 3;
+    timeout: number;
+    speed: 'slow' | 'normal' | 'fast';
+  }>({
+    enabled: true,
+    clicks: 2,
+    timeout: 10,
+    speed: 'normal'
+  });
+
   const tmdbId = parseInt(id || '0', 10);
   const mediaType = (type === 'tv' ? 'tv' : 'movie') as 'movie' | 'tv';
 
-  // Load default user settings for preferred provider
+  // Load default user settings for preferred provider and virtual cursor
   useEffect(() => {
     dbService.getSettings().then((s) => {
-      if (s?.preferredProvider) setProviderId(s.preferredProvider);
+      if (s) {
+        if (s.preferredProvider) setProviderId(s.preferredProvider);
+        if (s.streamHeaderTimeout !== undefined) setHeaderTimeoutSeconds(s.streamHeaderTimeout);
+        setCursorSettings({
+          enabled: s.virtualCursorEnabled ?? true,
+          clicks: s.virtualCursorClicks ?? 2,
+          timeout: s.virtualCursorTimeout ?? 10,
+          speed: s.virtualCursorSpeed ?? 'normal'
+        });
+      }
     });
   }, []);
 
@@ -174,6 +197,57 @@ export const Watch: React.FC = () => {
     window.addEventListener('keydown', handleTVHeaderNav, true);
     return () => window.removeEventListener('keydown', handleTVHeaderNav, true);
   }, []);
+
+  // Multi-press OK listener for TV Virtual Cursor activation/toggle
+  const okPressCountRef = React.useRef(0);
+  const okPressTimerRef = React.useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    const handleGlobalOkPress = (e: KeyboardEvent) => {
+      if (!cursorSettings.enabled) return;
+      if (e.key === 'Enter' || e.key === 'Select') {
+        const header = document.querySelector('[data-watch-header="true"]');
+        const isHeaderFocused = !!(window as any).__tmdbHeaderFocused || (header && header.contains(document.activeElement));
+        
+        // Only detect multi-press OK when focus is on player area / iframe
+        if (!isHeaderFocused) {
+          okPressCountRef.current += 1;
+          if (okPressTimerRef.current) clearTimeout(okPressTimerRef.current);
+          okPressTimerRef.current = setTimeout(() => {
+            okPressCountRef.current = 0;
+          }, 450);
+
+          if (okPressCountRef.current >= cursorSettings.clicks) {
+            okPressCountRef.current = 0;
+            if (okPressTimerRef.current) clearTimeout(okPressTimerRef.current);
+            setCursorActive((prev) => !prev);
+          }
+        }
+      }
+    };
+
+    const handleCloseCursor = () => {
+      console.log('[TMDB Streamer] tmdb_close_cursor received');
+      setCursorActive(false);
+    };
+    const handleToggleCursor = () => {
+      console.log('[TMDB Streamer] tmdb_toggle_cursor received, enabled:', cursorSettings.enabled);
+      if (cursorSettings.enabled) {
+        setCursorActive((prev) => !prev);
+      }
+    };
+
+    window.addEventListener('keydown', handleGlobalOkPress, true);
+    window.addEventListener('tmdb_close_cursor', handleCloseCursor);
+    window.addEventListener('tmdb_toggle_cursor', handleToggleCursor);
+
+    return () => {
+      window.removeEventListener('keydown', handleGlobalOkPress, true);
+      window.removeEventListener('tmdb_close_cursor', handleCloseCursor);
+      window.removeEventListener('tmdb_toggle_cursor', handleToggleCursor);
+      if (okPressTimerRef.current) clearTimeout(okPressTimerRef.current);
+    };
+  }, [cursorSettings]);
 
   // Notify native Android bridge that Watch page is active
   useEffect(() => {
@@ -338,6 +412,14 @@ export const Watch: React.FC = () => {
             }}
           />
         </div>
+
+        {/* TV Virtual On-Demand Cursor */}
+        <TVVirtualCursor
+          active={cursorActive}
+          onClose={() => setCursorActive(false)}
+          speed={cursorSettings.speed}
+          timeoutSeconds={cursorSettings.timeout}
+        />
       </div>
     </div>
   );
