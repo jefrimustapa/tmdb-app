@@ -127,6 +127,24 @@ export function useTVNavigation(isEnabled = true) {
           return;
         }
 
+        // Handle Back/Escape keys on Watch page
+        if (e.key === 'Escape' || e.keyCode === 27 || e.keyCode === 4 || e.key === 'BrowserBack' || e.key === 'GoBack') {
+          e.preventDefault();
+          if (openDropdown) {
+            window.dispatchEvent(new CustomEvent('tmdb_close_dropdowns'));
+            const trigger = header?.querySelector<HTMLElement>('[data-provider-trigger="true"]');
+            if (trigger) { trigger.focus(); }
+            return;
+          }
+          const backBtn = header?.querySelector<HTMLElement>('button[aria-label="Back"], [data-watch-header-item="true"]');
+          if (backBtn && typeof backBtn.click === 'function') {
+            backBtn.click();
+          } else {
+            window.history.back();
+          }
+          return;
+        }
+
         // When dropdown is closed, navigate horizontally between header elements (Back Button <-> Provider Picker Trigger)
         const headerFocusables = Array.from(header.querySelectorAll<HTMLElement>('[data-watch-header-item="true"], .tv-focus-target, button'))
           .filter(el => {
