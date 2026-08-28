@@ -59,20 +59,21 @@ export const Details: React.FC = () => {
         console.error('Failed to load details:', err);
       } finally {
         setIsLoading(false);
-        // Automatically focus the primary action button (Watch Now or Back) once details finish loading
+        // Automatically focus the primary action button (Watch Now) once details finish loading without scrolling jump
         setTimeout(() => {
+          window.scrollTo(0, 0);
           const mainContent = document.querySelector('main');
           const primaryBtn = mainContent?.querySelector<HTMLElement>('[data-details-primary="true"]') ||
                              mainContent?.querySelector<HTMLElement>('.tv-focus-target, a, button') ||
                              document.querySelector<HTMLElement>('.tv-focus-target');
           if (primaryBtn) {
-            primaryBtn.focus();
-            primaryBtn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+            primaryBtn.focus({ preventScroll: true });
           }
-        }, 150);
+        }, 100);
       }
     };
 
+    window.scrollTo(0, 0);
     fetchDetails();
   }, [tmdbId, mediaType]);
 
@@ -172,28 +173,34 @@ export const Details: React.FC = () => {
 
   const title = details.title || details.name || 'Untitled';
   const backdropUrl = tmdbImages.backdrop(details.backdrop_path, 'original');
+  const posterUrl = tmdbImages.poster(details.poster_path, 'w500');
   const releaseYear = (details.release_date || details.first_air_date || '').split('-')[0];
   const contentRating = extractContentRating(details);
 
   return (
-    <div className="min-h-screen bg-hbo-dark text-white pb-28 sm:pb-36">
-      {/* Top Hero Backdrop & Vignette */}
-      <div className="relative w-full h-[65vh] sm:h-[75vh] overflow-hidden bg-gray-950">
+    <div className="relative min-h-screen bg-hbo-dark text-white pb-28 sm:pb-36 overflow-x-hidden">
+      {/* Top Hero Ambient Backdrop */}
+      <div className="absolute top-0 left-0 right-0 h-[65vh] sm:h-[80vh] lg:h-[90vh] overflow-hidden pointer-events-none z-0">
         <img
           src={backdropUrl}
           alt={title}
           onError={(e) => tmdbImages.handleImgError(e, true)}
-          className="w-full h-full object-cover object-top opacity-60 sm:opacity-75 scale-105 transform transition-transform duration-1000"
+          className="w-full h-full object-cover object-top opacity-45 sm:opacity-55 scale-105 transform"
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-hbo-dark via-hbo-dark/60 to-transparent" />
-        <div className="absolute inset-0 bg-gradient-to-r from-hbo-dark via-hbo-dark/80 to-transparent w-full md:w-3/4" />
+        {/* Full-bleed gradient blending smoothly into bg-hbo-dark with zero cutoff seam */}
+        <div className="absolute inset-0 bg-gradient-to-t from-hbo-dark via-hbo-dark/85 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-r from-hbo-dark via-hbo-dark/85 to-transparent/30" />
+        <div className="absolute inset-0 bg-gradient-to-b from-hbo-dark/60 via-transparent to-hbo-dark" />
+      </div>
 
-        {/* Back Navigation Bar (Top Left) */}
+      {/* Main Content Area */}
+      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-8 lg:px-12 pt-6 sm:pt-8 space-y-8 sm:space-y-10">
+        {/* Back Navigation Button */}
         <div
-          className={`absolute z-30 left-4 sm:left-8 lg:left-12 ${
+          className={`${
             isTV
-              ? 'top-6 sm:top-8'
-              : 'top-[max(4.25rem,calc(env(safe-area-inset-top,0px)+3.75rem))]'
+              ? 'pt-2'
+              : 'pt-[max(3.75rem,calc(env(safe-area-inset-top,0px)+3.25rem))]'
           }`}
         >
           <button
@@ -208,108 +215,120 @@ export const Details: React.FC = () => {
             }}
             data-details-back="true"
             aria-label="Go Back"
-            className="flex items-center gap-2 px-4 py-2 rounded-full bg-black/75 hover:bg-black backdrop-blur-md border border-white/20 hover:border-hbo-cyan text-xs sm:text-sm font-bold text-gray-200 hover:text-white transition hover:scale-105 tv-focus-target shadow-2xl cursor-pointer focus:outline-none focus:ring-2 focus:ring-hbo-cyan"
+            className="flex items-center gap-2 px-4 py-2 rounded-full bg-black/75 hover:bg-black backdrop-blur-md border border-white/20 hover:border-hbo-cyan text-xs sm:text-sm font-bold text-gray-200 hover:text-white transition hover:scale-105 tv-focus-target shadow-2xl cursor-pointer focus:outline-none focus:ring-2 focus:ring-hbo-cyan w-max"
           >
             <ArrowLeft className="w-4 h-4 text-hbo-cyan" />
             <span>Back</span>
           </button>
         </div>
 
-        {/* Hero Title & Actions Overlay */}
-        <div className="absolute bottom-6 sm:bottom-10 lg:bottom-12 left-4 sm:left-8 lg:left-12 right-4 sm:right-8 lg:right-12 max-w-4xl z-20 space-y-4 sm:space-y-5">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="px-3 py-0.5 rounded-md bg-hbo-purple text-hbo-cyan border border-hbo-cyan/30 text-xs font-black uppercase tracking-wider">
-              {mediaType === 'movie' ? 'FILM' : 'SERIES'}
-            </span>
-            {contentRating && (
-              <span className="px-2.5 py-0.5 rounded-md bg-white/15 text-white border border-white/25 text-xs font-black uppercase tracking-wider">
-                {contentRating}
-              </span>
-            )}
+        {/* Hero Title & Poster Card Header */}
+        <div className="flex flex-col sm:flex-row items-center sm:items-end gap-6 sm:gap-8 lg:gap-10 pt-2">
+          {/* Title Poster Card */}
+          <div className="w-36 sm:w-48 md:w-56 lg:w-64 aspect-[2/3] rounded-2xl overflow-hidden border border-white/20 shadow-2xl shadow-black/90 flex-shrink-0 bg-gray-900 group">
+            <img
+              src={posterUrl}
+              alt={title}
+              onError={(e) => tmdbImages.handleImgError(e, false)}
+              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+            />
           </div>
 
-          <h1 className="text-3xl sm:text-5xl md:text-6xl font-black font-display tracking-tight text-white leading-none drop-shadow-2xl">
-            {title}
-          </h1>
-
-          {/* Quick Meta Row */}
-          <div className="flex items-center gap-3 text-xs sm:text-sm text-gray-300 font-semibold flex-wrap">
-            <div className="flex items-center gap-1.5 font-bold text-yellow-400">
-              <Star className="w-4 h-4 fill-current" />
-              <span>{details.vote_average.toFixed(1)}</span>
+          {/* Title & Metadata & Action Buttons */}
+          <div className="flex-1 min-w-0 space-y-3.5 sm:space-y-4.5 text-center sm:text-left">
+            <div className="flex items-center justify-center sm:justify-start gap-2 flex-wrap">
+              <span className="px-3 py-0.5 rounded-full bg-hbo-purple/70 text-white border border-hbo-purple-light text-xs font-black uppercase tracking-wider backdrop-blur-md">
+                {mediaType === 'movie' ? 'FILM' : 'SERIES'}
+              </span>
+              {contentRating && (
+                <span className="px-2.5 py-0.5 rounded-full bg-white/15 text-white border border-white/25 text-xs font-black uppercase tracking-wider backdrop-blur-md">
+                  {contentRating}
+                </span>
+              )}
             </div>
-            <span>•</span>
-            <span>{releaseYear}</span>
-            {details && 'runtime' in details && details.runtime > 0 && (
-              <>
-                <span>•</span>
-                <span>{details.runtime} mins</span>
-              </>
-            )}
-            {details && 'number_of_seasons' in details && (
-              <>
-                <span>•</span>
-                <span>{details.number_of_seasons} Season{details.number_of_seasons > 1 ? 's' : ''}</span>
-              </>
-            )}
-            {details.genres && details.genres.length > 0 && (
-              <>
-                <span>•</span>
-                <span className="text-gray-300">{details.genres.map(g => g.name).join(', ')}</span>
-              </>
-            )}
-          </div>
 
-          {/* Primary Action Buttons */}
-          <div className="flex items-center gap-3 sm:gap-4 pt-2.5 flex-wrap p-1">
-            <Link
-              to={
-                mediaType === 'tv'
-                  ? `/watch/tv/${tmdbId}?s=${lastWatched?.season || 1}&e=${lastWatched?.episode || 1}`
-                  : `/watch/movie/${tmdbId}`
-              }
-              data-details-primary="true"
-              className="flex items-center gap-2.5 px-8 py-3.5 rounded-xl bg-gradient-to-r from-hbo-purple to-hbo-cyan text-white font-bold text-sm sm:text-base shadow-hbo-glow hover:scale-105 transition-all tv-focus-target"
-            >
-              <Play className="w-5 h-5 fill-current" />
-              <span>
-                {mediaType === 'tv' && lastWatched
-                  ? `Resume S${lastWatched.season} E${lastWatched.episode}`
-                  : 'Watch Now'}
-              </span>
-            </Link>
+            <h1 className="text-2xl sm:text-4xl md:text-5xl lg:text-6xl font-black font-display tracking-tight text-white leading-tight drop-shadow-2xl">
+              {title}
+            </h1>
 
-            <button
-              onClick={handleToggleWatchlist}
-              className={`flex items-center gap-2 px-5 py-3.5 rounded-xl backdrop-blur-md border font-semibold text-sm transition-all hover:scale-105 tv-focus-target ${
-                isWatchlist
-                  ? 'bg-hbo-purple-light/30 border-hbo-purple-light text-hbo-cyan'
-                  : 'bg-white/10 hover:bg-white/20 border-white/20 text-white'
-              }`}
-            >
-              {isWatchlist ? <Check className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
-              <span>{isWatchlist ? 'In Watchlist' : 'Watchlist'}</span>
-            </button>
+            {/* Quick Meta Row */}
+            <div className="flex items-center justify-center sm:justify-start gap-3 text-xs sm:text-sm text-gray-300 font-semibold flex-wrap">
+              <div className="flex items-center gap-1.5 font-bold text-yellow-400">
+                <Star className="w-4 h-4 fill-current" />
+                <span>{details.vote_average.toFixed(1)}</span>
+              </div>
+              <span>•</span>
+              <span>{releaseYear}</span>
+              {details && 'runtime' in details && details.runtime > 0 && (
+                <>
+                  <span>•</span>
+                  <span>{details.runtime} mins</span>
+                </>
+              )}
+              {details && 'number_of_seasons' in details && (
+                <>
+                  <span>•</span>
+                  <span>{details.number_of_seasons} Season{details.number_of_seasons > 1 ? 's' : ''}</span>
+                </>
+              )}
+              {details.genres && details.genres.length > 0 && (
+                <>
+                  <span>•</span>
+                  <span className="text-gray-300">{details.genres.map(g => g.name).join(', ')}</span>
+                </>
+              )}
+            </div>
 
-            <button
-              onClick={handleToggleLike}
-              className={`p-3.5 rounded-full backdrop-blur-md border transition-all hover:scale-105 tv-focus-target ${
-                isLiked
-                  ? 'bg-red-500/30 border-red-500 text-red-400'
-                  : 'bg-white/10 hover:bg-white/20 border-white/20 text-white'
-              }`}
-              title={isLiked ? 'Liked' : 'Like'}
-            >
-              <Heart className="w-5 h-5 fill-current" />
-            </button>
+            {/* Primary Action Buttons */}
+            <div className="flex items-center justify-center sm:justify-start gap-3 sm:gap-4 pt-2 flex-wrap p-1">
+              <Link
+                to={
+                  mediaType === 'tv'
+                    ? `/watch/tv/${tmdbId}?s=${lastWatched?.season || 1}&e=${lastWatched?.episode || 1}`
+                    : `/watch/movie/${tmdbId}`
+                }
+                data-details-primary="true"
+                className="flex items-center gap-2.5 px-8 py-3.5 rounded-xl bg-gradient-to-r from-hbo-purple to-hbo-cyan text-white font-bold text-sm sm:text-base shadow-hbo-glow hover:scale-105 transition-all tv-focus-target"
+              >
+                <Play className="w-5 h-5 fill-current" />
+                <span>
+                  {mediaType === 'tv' && lastWatched
+                    ? `Resume S${lastWatched.season} E${lastWatched.episode}`
+                    : 'Watch Now'}
+                </span>
+              </Link>
+
+              <button
+                onClick={handleToggleWatchlist}
+                className={`p-3.5 rounded-full backdrop-blur-md border transition-all hover:scale-105 tv-focus-target ${
+                  isWatchlist
+                    ? 'bg-hbo-purple-light/30 border-hbo-purple-light text-hbo-cyan'
+                    : 'bg-white/10 hover:bg-white/20 border-white/20 text-white'
+                }`}
+                title={isWatchlist ? 'In Watchlist' : 'Add to Watchlist'}
+                aria-label={isWatchlist ? 'In Watchlist' : 'Add to Watchlist'}
+              >
+                <Bookmark className={`w-5 h-5 ${isWatchlist ? 'fill-current' : ''}`} />
+              </button>
+
+              <button
+                onClick={handleToggleLike}
+                className={`p-3.5 rounded-full backdrop-blur-md border transition-all hover:scale-105 tv-focus-target ${
+                  isLiked
+                    ? 'bg-red-500/30 border-red-500 text-red-400'
+                    : 'bg-white/10 hover:bg-white/20 border-white/20 text-white'
+                }`}
+                title={isLiked ? 'Liked' : 'Like'}
+                aria-label={isLiked ? 'Liked' : 'Like'}
+              >
+                <Heart className={`w-5 h-5 ${isLiked ? 'fill-current' : ''}`} />
+              </button>
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Details & Overview Body */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-8 lg:px-12 pt-8 sm:pt-10 space-y-10 sm:space-y-12">
         {/* Synopsis & Tagline */}
-        <div className="max-w-3xl space-y-3">
+        <div className="max-w-3xl space-y-3 pt-2">
           {'tagline' in details && details.tagline && (
             <p className="text-base sm:text-lg font-semibold italic text-hbo-cyan/90">
               &ldquo;{details.tagline}&rdquo;
