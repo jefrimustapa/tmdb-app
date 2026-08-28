@@ -34,6 +34,7 @@ export const DEFAULT_SETTINGS: UserSettings = {
   filterUnreleased: true,
   maturityLevel: 'all',
   directStreamMode: false,
+  directStreamApiUrl: 'https://tmdb-api-yfbu.onrender.com',
   streamHeaderTimeout: 5,
   includeNightlyUpdates: false,
   virtualCursorEnabled: true,
