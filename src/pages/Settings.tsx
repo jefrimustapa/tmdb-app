@@ -40,6 +40,10 @@ export const Settings: React.FC = () => {
   const { deviceMode, setDeviceMode, detectedPlatform, activeLayout } = useDevice();
 
   useEffect(() => {
+    try {
+      (window as any).AndroidBridge?.setDropdownOpen?.(openDropdownSlot !== null);
+    } catch {}
+
     if (openDropdownSlot !== null) {
       setTimeout(() => {
         const activeEl = document.querySelector<HTMLElement>('[data-priority-dropdown-container="true"] [data-provider-selected="true"]') ||
@@ -49,11 +53,33 @@ export const Settings: React.FC = () => {
         }
       }, 50);
     }
+
+    return () => {
+      try {
+        (window as any).AndroidBridge?.setDropdownOpen?.(false);
+      } catch {}
+    };
   }, [openDropdownSlot]);
 
   // Handle remote Back button, Escape, and Left/Right arrow dismissal for priority dropdowns
   useEffect(() => {
-    if (openDropdownSlot === null) return;
+    const handleCloseFromEvent = () => {
+      const slot = openDropdownSlot;
+      setOpenDropdownSlot(null);
+      if (slot !== null) {
+        setTimeout(() => {
+          document.getElementById(`priority-server-btn-${slot}`)?.focus();
+        }, 50);
+      }
+    };
+
+    window.addEventListener('tmdb_close_dropdowns', handleCloseFromEvent);
+
+    if (openDropdownSlot === null) {
+      return () => {
+        window.removeEventListener('tmdb_close_dropdowns', handleCloseFromEvent);
+      };
+    }
 
     const handleKeyDown = (e: KeyboardEvent) => {
       // Remote Back button or Escape key
@@ -111,6 +137,7 @@ export const Settings: React.FC = () => {
     document.addEventListener('mousedown', handleDocumentClick);
 
     return () => {
+      window.removeEventListener('tmdb_close_dropdowns', handleCloseFromEvent);
       window.removeEventListener('keydown', handleKeyDown, { capture: true });
       document.removeEventListener('mousedown', handleDocumentClick);
     };
