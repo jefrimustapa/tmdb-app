@@ -6,10 +6,12 @@ import { tmdbApi, tmdbImages, extractContentRating } from '../services/tmdb';
 import { dbService } from '../services/db';
 import { MediaRow } from '../components/common/MediaRow';
 import { EpisodeGrid } from '../components/player/EpisodeGrid';
+import { useDevice } from '../hooks/useDevice';
 
 export const Details: React.FC = () => {
   const { type, id } = useParams<{ type: 'movie' | 'tv'; id: string }>();
   const navigate = useNavigate();
+  const { isTV } = useDevice();
 
   const tmdbId = parseInt(id || '0', 10);
   const mediaType: 'movie' | 'tv' = (type === 'tv' ? 'tv' : 'movie');
@@ -96,6 +98,36 @@ export const Details: React.FC = () => {
     setIsWatchlist(status);
   };
 
+  const handleBack = () => {
+    const currentPath = window.location.pathname;
+    if (window.history.state && typeof window.history.state.idx === 'number' && window.history.state.idx > 0) {
+      navigate(-1);
+      setTimeout(() => {
+        if (window.location.pathname === currentPath) {
+          navigate('/');
+        }
+      }, 150);
+    } else {
+      navigate('/');
+    }
+  };
+
+  // Failsafe keydown listener for TV remote back button & keyboard Escape/Backspace
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' || e.keyCode === 4 || e.key === 'BrowserBack') {
+        // If a modal is open, let modal handle it
+        const modalCloseBtn = document.querySelector('[data-modal-close]') as HTMLButtonElement | null;
+        if (!modalCloseBtn) {
+          e.preventDefault();
+          handleBack();
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   if (isLoading || !details) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-hbo-dark">
@@ -124,17 +156,26 @@ export const Details: React.FC = () => {
         <div className="absolute inset-0 bg-gradient-to-r from-hbo-dark via-hbo-dark/80 to-transparent w-full md:w-3/4" />
 
         {/* Back Navigation Bar (Top Left) */}
-        <div className="absolute top-4 sm:top-6 left-4 sm:left-8 z-30">
+        <div
+          className={`absolute z-30 left-4 sm:left-8 ${
+            isTV
+              ? 'top-6 sm:top-8'
+              : 'top-[max(4.25rem,calc(env(safe-area-inset-top,0px)+3.75rem))]'
+          }`}
+        >
           <button
-            onClick={() => {
-              if (window.history.length > 1) {
-                navigate(-1);
-              } else {
-                navigate('/');
+            type="button"
+            onClick={handleBack}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ' || e.keyCode === 13 || e.keyCode === 23 || e.keyCode === 66) {
+                e.preventDefault();
+                e.stopPropagation();
+                handleBack();
               }
             }}
+            data-details-back="true"
             aria-label="Go Back"
-            className="flex items-center gap-2 px-3.5 py-2 rounded-full bg-black/80 hover:bg-black backdrop-blur-md border border-white/20 text-xs sm:text-sm font-bold text-gray-200 hover:text-white transition hover:scale-105 tv-focus-target shadow-xl"
+            className="flex items-center gap-2 px-4 py-2 rounded-full bg-black/75 hover:bg-black backdrop-blur-md border border-white/20 hover:border-hbo-cyan text-xs sm:text-sm font-bold text-gray-200 hover:text-white transition hover:scale-105 tv-focus-target shadow-2xl cursor-pointer focus:outline-none focus:ring-2 focus:ring-hbo-cyan"
           >
             <ArrowLeft className="w-4 h-4 text-hbo-cyan" />
             <span>Back</span>
@@ -145,16 +186,13 @@ export const Details: React.FC = () => {
         <div className="absolute bottom-6 sm:bottom-10 left-4 sm:left-8 right-4 sm:right-8 max-w-4xl z-20 space-y-4">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="px-3 py-0.5 rounded-md bg-hbo-purple text-hbo-cyan border border-hbo-cyan/30 text-xs font-black uppercase tracking-wider">
-              {mediaType === 'movie' ? 'HBO Max Exclusive' : 'Max Original Series'}
+              {mediaType === 'movie' ? 'FILM' : 'SERIES'}
             </span>
             {contentRating && (
               <span className="px-2.5 py-0.5 rounded-md bg-white/15 text-white border border-white/25 text-xs font-black uppercase tracking-wider">
                 {contentRating}
               </span>
             )}
-            <span className="px-2.5 py-0.5 rounded-md bg-hbo-cyan/20 text-hbo-cyan border border-hbo-cyan/30 text-xs font-bold">
-              4K ULTRA HD
-            </span>
           </div>
 
           <h1 className="text-3xl sm:text-5xl md:text-6xl font-black font-display tracking-tight text-white leading-none drop-shadow-2xl">
