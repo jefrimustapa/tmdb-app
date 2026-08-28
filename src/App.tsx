@@ -3,14 +3,15 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { Navbar } from './components/layout/Navbar';
 import { Sidebar } from './components/layout/Sidebar';
 import { MobileBottomNav } from './components/layout/MobileBottomNav';
-import { Home } from './pages/Home';
-import { Movies } from './pages/Movies';
-import { Series } from './pages/Series';
-import { Details } from './pages/Details';
-import { Watch } from './pages/Watch';
-import { Search } from './pages/Search';
-import { Library } from './pages/Library';
-import { Settings } from './pages/Settings';
+import { PlatformRoute } from './components/common/PlatformRoute';
+import { HomeTV, HomeMobile } from './pages/Home';
+import { MoviesTV, MoviesMobile } from './pages/Movies';
+import { SeriesTV, SeriesMobile } from './pages/Series';
+import { DetailsTV, DetailsMobile } from './pages/Details';
+import { WatchTV, WatchMobile } from './pages/Watch';
+import { SearchTV, SearchMobile } from './pages/Search';
+import { LibraryTV, LibraryMobile } from './pages/Library';
+import { SettingsTV, SettingsMobile } from './pages/Settings';
 import { useDevice } from './hooks/useDevice';
 import { useTVNavigation } from './hooks/useTVNavigation';
 import { useAndroidBackButton } from './hooks/useAndroidBackButton';
@@ -36,17 +37,17 @@ const AppContent: React.FC = () => {
       {/* Main Content Viewport */}
       <main className={`flex-1 ${isWatchPage ? 'p-0 pb-0 m-0' : `pb-24 md:pb-0 ${isTV ? 'pl-20 lg:pl-64' : ''}`}`}>
         <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/movies" element={<Movies />} />
-          <Route path="/tv" element={<Series />} />
-          <Route path="/details/:type/:id" element={<Details />} />
-          <Route path="/movie/:id" element={<Details />} />
-          <Route path="/tv/:id" element={<Details />} />
-          <Route path="/watch/:type/:id" element={<Watch />} />
-          <Route path="/search" element={<Search />} />
-          <Route path="/library" element={<Library />} />
-          <Route path="/settings" element={<Settings />} />
-          <Route path="*" element={<Home />} />
+          <Route path="/" element={<PlatformRoute tv={HomeTV} mobile={HomeMobile} />} />
+          <Route path="/movies" element={<PlatformRoute tv={MoviesTV} mobile={MoviesMobile} />} />
+          <Route path="/tv" element={<PlatformRoute tv={SeriesTV} mobile={SeriesMobile} />} />
+          <Route path="/details/:type/:id" element={<PlatformRoute tv={DetailsTV} mobile={DetailsMobile} />} />
+          <Route path="/movie/:id" element={<PlatformRoute tv={DetailsTV} mobile={DetailsMobile} />} />
+          <Route path="/tv/:id" element={<PlatformRoute tv={DetailsTV} mobile={DetailsMobile} />} />
+          <Route path="/watch/:type/:id" element={<PlatformRoute tv={WatchTV} mobile={WatchMobile} />} />
+          <Route path="/search" element={<PlatformRoute tv={SearchTV} mobile={SearchMobile} />} />
+          <Route path="/library" element={<PlatformRoute tv={LibraryTV} mobile={LibraryMobile} />} />
+          <Route path="/settings" element={<PlatformRoute tv={SettingsTV} mobile={SettingsMobile} />} />
+          <Route path="*" element={<PlatformRoute tv={HomeTV} mobile={HomeMobile} />} />
         </Routes>
       </main>
 

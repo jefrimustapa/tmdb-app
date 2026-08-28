@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
-import { tmdbApi } from '../services/tmdb';
-import type { TMDBMovieDetails, TMDBTVDetails } from '../types/tmdb';
-import { VideoPlayer } from '../components/player/VideoPlayer';
-import { ProviderPicker } from '../components/player/ProviderPicker';
-import { dbService } from '../services/db';
+import { tmdbApi } from '../../services/tmdb';
+import type { TMDBMovieDetails, TMDBTVDetails } from '../../types/tmdb';
+import { VideoPlayer } from '../../components/player/VideoPlayer';
+import { ProviderPickerTV } from '../../components/player/ProviderPickerTV';
+import { dbService } from '../../services/db';
 import { ArrowLeft } from 'lucide-react';
 
 export const Watch: React.FC = () => {
@@ -287,7 +287,7 @@ export const Watch: React.FC = () => {
 
           {/* Right: Quick Provider Switcher Dropdown & In-Header Probing HUD */}
           <div className="flex-shrink-0">
-            <ProviderPicker
+            <ProviderPickerTV
               currentProviderId={providerId}
               onSelect={(p) => setProviderId(p.id)}
               compact={true}
@@ -320,3 +320,4 @@ export const Watch: React.FC = () => {
     </div>
   );
 };
+
