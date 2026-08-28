@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Play, Heart, Bookmark, Star, ArrowLeft, Plus, Check } from 'lucide-react';
-import type { TMDBMovieDetails, TMDBTVDetails, TMDBMediaItem } from '../types/tmdb';
-import { tmdbApi, tmdbImages, extractContentRating } from '../services/tmdb';
-import { dbService } from '../services/db';
-import { MediaRow } from '../components/common/MediaRow';
-import { EpisodeGrid } from '../components/player/EpisodeGrid';
-import { useDevice } from '../hooks/useDevice';
+import type { TMDBMovieDetails, TMDBTVDetails, TMDBMediaItem } from '../../types/tmdb';
+import { tmdbApi, tmdbImages, extractContentRating } from '../../services/tmdb';
+import { dbService } from '../../services/db';
+import { MediaRow } from '../../components/common/MediaRow';
+import { EpisodeGrid } from '../../components/player/EpisodeGrid';
+import { useDevice } from '../../hooks/useDevice';
 
 export const Details: React.FC = () => {
   const { type, id } = useParams<{ type: 'movie' | 'tv'; id: string }>();
