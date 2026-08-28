@@ -22,10 +22,15 @@ export const Watch: React.FC = () => {
   const tmdbId = parseInt(id || '0', 10);
   const mediaType = (type === 'tv' ? 'tv' : 'movie') as 'movie' | 'tv';
 
+  const [enabledResolvers, setEnabledResolvers] = useState<('embed' | 'private_extractor' | 'torbox')[]>(['torbox', 'private_extractor', 'embed']);
+
   // Load default user settings for preferred provider
   useEffect(() => {
     dbService.getSettings().then((s) => {
-      if (s?.preferredProvider) setProviderId(s.preferredProvider);
+      if (s) {
+        if (s.preferredProvider) setProviderId(s.preferredProvider);
+        if (s.enabledResolvers && s.enabledResolvers.length > 0) setEnabledResolvers(s.enabledResolvers);
+      }
     });
   }, []);
 
@@ -285,15 +290,31 @@ export const Watch: React.FC = () => {
             </div>
           </div>
 
-          {/* Right: Quick Provider Switcher Dropdown & In-Header Probing HUD */}
+          {/* Right: Quick Provider Switcher Dropdown (ONLY if Embed Resolver is enabled) */}
           <div className="flex-shrink-0">
-            <ProviderPickerMobile
-              currentProviderId={providerId}
-              onSelect={(p) => setProviderId(p.id)}
-              compact={true}
-              isProbing={isProbing}
-              serverIndex={serverIndex}
-            />
+            {enabledResolvers.includes('embed') ? (
+              <ProviderPickerMobile
+                currentProviderId={providerId}
+                onSelect={(p) => setProviderId(p.id)}
+                compact={true}
+                isProbing={isProbing}
+                serverIndex={serverIndex}
+              />
+            ) : (
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-hbo-card/90 border border-hbo-border text-xs font-bold shadow-md">
+                {enabledResolvers.includes('torbox') ? (
+                  <span className="text-emerald-400 font-mono flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                    <span>TorBox 4K Cloud</span>
+                  </span>
+                ) : (
+                  <span className="text-hbo-cyan font-mono flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-hbo-cyan animate-pulse" />
+                    <span>Private Extractor</span>
+                  </span>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
