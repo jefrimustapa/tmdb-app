@@ -331,10 +331,15 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     const sendUnmuteMessages = () => {
       const iframe = playerContainerRef.current?.querySelector('iframe');
       if (iframe) {
-        // Move focus directly into the media player iframe so D-Pad and Center Play button are immediately active
-        try {
-          iframe.focus();
-        } catch {}
+        // Move focus into the iframe ONLY if the user is not actively navigating the header or provider picker
+        const header = document.querySelector('[data-watch-header="true"]');
+        const isHeaderFocused = Boolean(header && header.contains(document.activeElement));
+        const isDropdownOpen = Boolean(document.querySelector('[data-provider-dropdown-open="true"]'));
+        if (!isHeaderFocused && !isDropdownOpen) {
+          try {
+            iframe.focus();
+          } catch {}
+        }
 
         if (iframe.contentWindow) {
           try {

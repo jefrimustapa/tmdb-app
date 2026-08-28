@@ -89,20 +89,45 @@ export const Watch: React.FC = () => {
     });
   }, []);
 
+  // Helper to check if user focus or interaction is currently active inside the header or dropdown
+  const isHeaderOrDropdownActive = () => {
+    const header = document.querySelector('[data-watch-header="true"]');
+    const dropdown = document.querySelector('[data-provider-dropdown-open="true"]');
+    const hasFocusInHeader = Boolean(header && header.contains(document.activeElement));
+    return hasFocusInHeader || Boolean(dropdown);
+  };
+
   const resetHeaderTimer = React.useCallback(() => {
     setHeaderVisible(true);
     if (hideTimerRef.current) {
       clearTimeout(hideTimerRef.current);
+      hideTimerRef.current = null;
     }
+
+    // Never auto-hide or steal focus if user is actively focused on the header bar or provider picker!
+    if (isHeaderOrDropdownActive()) {
+      return;
+    }
+
     if (headerTimeoutSeconds > 0) {
       hideTimerRef.current = setTimeout(() => {
+        // Double-check before hiding
+        if (isHeaderOrDropdownActive()) {
+          return;
+        }
+
         setHeaderVisible(false);
-        // Once header hides, move focus back to media player iframe
-        const iframe = document.querySelector<HTMLIFrameElement>('iframe');
-        if (iframe) {
-          try {
-            iframe.focus();
-          } catch {}
+
+        // Move focus back to iframe ONLY if user is not focused on an interactive element
+        const active = document.activeElement;
+        const isInteractingWithUI = active && active !== document.body && active !== document.documentElement;
+        if (!isInteractingWithUI) {
+          const iframe = document.querySelector<HTMLIFrameElement>('iframe');
+          if (iframe) {
+            try {
+              iframe.focus();
+            } catch {}
+          }
         }
       }, headerTimeoutSeconds * 1000);
     }
@@ -125,23 +150,31 @@ export const Watch: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    resetHeaderTimer();
-    const handleNativeTouch = () => {
-      resetHeaderTimer();
-    };
-    const handleWindowBlur = () => {
+    const handleInteraction = () => {
       resetHeaderTimer();
     };
 
-    window.addEventListener('tmdb_screen_touched', handleNativeTouch);
-    window.addEventListener('blur', handleWindowBlur);
+    window.addEventListener('focusin', handleInteraction);
+    window.addEventListener('focusout', handleInteraction);
+    window.addEventListener('keydown', handleInteraction);
+    window.addEventListener('keyup', handleInteraction);
+    window.addEventListener('mousemove', handleInteraction);
+    window.addEventListener('touchstart', handleInteraction);
+    window.addEventListener('tmdb_screen_touched', handleInteraction);
+
+    resetHeaderTimer();
 
     return () => {
       if (hideTimerRef.current) {
         clearTimeout(hideTimerRef.current);
       }
-      window.removeEventListener('tmdb_screen_touched', handleNativeTouch);
-      window.removeEventListener('blur', handleWindowBlur);
+      window.removeEventListener('focusin', handleInteraction);
+      window.removeEventListener('focusout', handleInteraction);
+      window.removeEventListener('keydown', handleInteraction);
+      window.removeEventListener('keyup', handleInteraction);
+      window.removeEventListener('mousemove', handleInteraction);
+      window.removeEventListener('touchstart', handleInteraction);
+      window.removeEventListener('tmdb_screen_touched', handleInteraction);
     };
   }, [resetHeaderTimer]);
 
@@ -178,6 +211,7 @@ export const Watch: React.FC = () => {
           <div className="flex items-center gap-3 min-w-0 flex-1 mr-2">
             <button
               onClick={() => navigate(-1)}
+              data-watch-header-item="true"
               aria-label="Back"
               className="p-2.5 rounded-full bg-black/70 hover:bg-black text-white border border-white/20 backdrop-blur-md transition hover:scale-110 flex-shrink-0 tv-focus-target"
               title="Go Back"

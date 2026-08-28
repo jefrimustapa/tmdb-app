@@ -27,6 +27,17 @@ export const ProviderPicker: React.FC<ProviderPickerProps> = ({
   // Simplified base provider name (e.g. "VidLink", "Embed.su", "VidSrc CC")
   const shortServerName = selectedProvider.name.replace(/\s*\([^)]*\)/g, '').trim();
 
+  // When dropdown opens, automatically focus the selected or first provider
+  useEffect(() => {
+    if (isOpen && dropdownRef.current) {
+      const activeBtn = dropdownRef.current.querySelector<HTMLElement>('[data-provider-selected="true"]') ||
+                        dropdownRef.current.querySelector<HTMLElement>('.tv-focus-target');
+      if (activeBtn) {
+        activeBtn.focus();
+      }
+    }
+  }, [isOpen]);
+
   // Close dropdown on click outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -41,10 +52,36 @@ export const ProviderPicker: React.FC<ProviderPickerProps> = ({
   const handleSelect = (provider: StreamProvider) => {
     onSelect(provider);
     setIsOpen(false);
+    // Return focus to trigger button
+    setTimeout(() => {
+      const triggerBtn = dropdownRef.current?.querySelector<HTMLElement>('[data-provider-trigger="true"]');
+      if (triggerBtn) {
+        triggerBtn.focus();
+      }
+    }, 50);
+  };
+
+  const handleDropdownKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Escape' || e.keyCode === 27 || e.keyCode === 4 || e.key === 'BrowserBack') {
+      if (isOpen) {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsOpen(false);
+        const triggerBtn = dropdownRef.current?.querySelector<HTMLElement>('[data-provider-trigger="true"]');
+        if (triggerBtn) {
+          triggerBtn.focus();
+        }
+      }
+    }
   };
 
   return (
-    <div className={`relative flex items-center gap-2 ${compact ? 'justify-end' : 'flex-col sm:flex-row sm:items-center justify-between gap-3'}`} ref={dropdownRef}>
+    <div
+      className={`relative flex items-center gap-2 ${compact ? 'justify-end' : 'flex-col sm:flex-row sm:items-center justify-between gap-3'}`}
+      ref={dropdownRef}
+      data-provider-dropdown-open={isOpen ? 'true' : undefined}
+      onKeyDown={handleDropdownKeyDown}
+    >
       {/* Auto-Probing HUD Pill in Header Bar */}
       {compact && isProbing && (
         <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-hbo-purple/40 border border-hbo-cyan/40 backdrop-blur-md text-[10px] font-bold text-hbo-cyan animate-pulse">
@@ -79,6 +116,8 @@ export const ProviderPicker: React.FC<ProviderPickerProps> = ({
         <button
           type="button"
           onClick={() => setIsOpen(!isOpen)}
+          data-provider-trigger="true"
+          data-watch-header-item="true"
           className={`flex items-center justify-between gap-2 bg-black/70 hover:bg-black/90 backdrop-blur-md border border-white/20 rounded-full text-left text-xs font-semibold text-white transition-all shadow-md focus:outline-none focus:border-hbo-cyan tv-focus-target ${
             compact ? 'px-3 py-1.5' : 'w-full px-4 py-2.5 rounded-xl'
           }`}
@@ -106,6 +145,7 @@ export const ProviderPicker: React.FC<ProviderPickerProps> = ({
                   <button
                     key={provider.id}
                     onClick={() => handleSelect(provider)}
+                    data-provider-selected={isSelected ? 'true' : undefined}
                     className={`w-full flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl text-left transition-all tv-focus-target ${
                       isSelected
                         ? 'bg-gradient-to-r from-hbo-purple/40 to-hbo-cyan/20 border border-hbo-cyan text-white shadow-hbo-glow'
