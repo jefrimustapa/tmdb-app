@@ -39,6 +39,7 @@ import com.getcapacitor.BridgeWebViewClient;
 public class MainActivity extends BridgeActivity {
     private boolean isCurrentlyFullscreen = false;
     private boolean isWatchPageActive = false;
+    private volatile boolean isSimulatingTouch = false;
     private OrientationEventListener orientationListener;
 
     private boolean isTV() {
@@ -171,6 +172,7 @@ public class MainActivity extends BridgeActivity {
                                 properties, coords, 0, 0, 1.0f, 1.0f, 0, 0,
                                 android.view.InputDevice.SOURCE_TOUCHSCREEN, 0
                             );
+                            isSimulatingTouch = true;
                             wv.dispatchTouchEvent(downEvent);
 
                             wv.postDelayed(() -> {
@@ -182,6 +184,7 @@ public class MainActivity extends BridgeActivity {
                                 wv.dispatchTouchEvent(upEvent);
                                 downEvent.recycle();
                                 upEvent.recycle();
+                                isSimulatingTouch = false;
                             }, 80);
                         }
                     });
@@ -482,7 +485,7 @@ public class MainActivity extends BridgeActivity {
 
     @Override
     public boolean dispatchTouchEvent(MotionEvent ev) {
-        if (ev.getAction() == MotionEvent.ACTION_DOWN && isWatchPageActive) {
+        if (!isSimulatingTouch && !isTV() && ev.getAction() == MotionEvent.ACTION_DOWN && isWatchPageActive) {
             WebView webView = bridge.getWebView();
             if (webView != null) {
                 webView.evaluateJavascript("window.dispatchEvent(new CustomEvent('tmdb_screen_touched'));", null);
@@ -493,25 +496,39 @@ public class MainActivity extends BridgeActivity {
 
 
 
+    private long lastDpadCenterTime = 0;
+
     @Override
     public boolean dispatchKeyEvent(KeyEvent event) {
         if (isTV() && isWatchPageActive && event.getAction() == KeyEvent.ACTION_DOWN) {
             int keyCode = event.getKeyCode();
+
+            // Allow repeated presses for Left & Right (and media scrub) keys on remote so user can scrub the timeline
+            if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT || keyCode == KeyEvent.KEYCODE_DPAD_RIGHT ||
+                keyCode == KeyEvent.KEYCODE_MEDIA_FAST_FORWARD || keyCode == KeyEvent.KEYCODE_MEDIA_REWIND ||
+                keyCode == KeyEvent.KEYCODE_MEDIA_STEP_FORWARD || keyCode == KeyEvent.KEYCODE_MEDIA_STEP_BACKWARD) {
+                return super.dispatchKeyEvent(event);
+            }
+
+            // Drop auto-repeated key events only for single-action triggers like OK/Center and Back
+            if (event.getRepeatCount() > 0) {
+                return true;
+            }
             WebView webView = bridge.getWebView();
 
             if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER || keyCode == KeyEvent.KEYCODE_NUMPAD_ENTER) {
+                long now = SystemClock.uptimeMillis();
+                if (now - lastDpadCenterTime < 500) {
+                    return true; // Debounce rapid key bounces
+                }
+                lastDpadCenterTime = now;
+
                 if (webView != null) {
                     webView.evaluateJavascript(
                         "(function() {" +
                         "  var header = document.querySelector('[data-watch-header=\"true\"]');" +
                         "  var isHeaderFocused = header && header.contains(document.activeElement);" +
                         "  if (!isHeaderFocused) {" +
-                        "    var iframe = document.querySelector('iframe');" +
-                        "    if (iframe && iframe.contentWindow) {" +
-                        "      try { iframe.contentWindow.postMessage({ type: 'play' }, '*'); } catch(e){}" +
-                        "      try { iframe.contentWindow.postMessage({ action: 'play' }, '*'); } catch(e){}" +
-                        "      try { iframe.contentWindow.postMessage({ event: 'command', func: 'playVideo' }, '*'); } catch(e){}" +
-                        "    }" +
                         "    if (typeof window.AndroidBridge !== 'undefined' && typeof window.AndroidBridge.simulateTouchAt === 'function') {" +
                         "      window.AndroidBridge.simulateTouchAt(window.innerWidth / 2, window.innerHeight / 2);" +
                         "    }" +
@@ -525,25 +542,57 @@ public class MainActivity extends BridgeActivity {
                     );
                     return true;
                 }
-            } else if (keyCode == KeyEvent.KEYCODE_BACK) {
+            } else if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
                 if (webView != null) {
-                    // Check if header is already focused; if not, reveal header & focus back button; if already focused, exit watch page
                     webView.evaluateJavascript(
                         "(function() {" +
                         "  var header = document.querySelector('[data-watch-header=\"true\"]');" +
-                        "  var isHeaderFocused = header && header.contains(document.activeElement);" +
-                        "  var backBtn = header ? header.querySelector('button[aria-label=\"Back\"], .tv-focus-target') : null;" +
-                        "  if (!isHeaderFocused) {" +
-                        "    window.dispatchEvent(new CustomEvent('tmdb_screen_touched'));" +
-                        "    if (backBtn) {" +
-                        "      backBtn.focus();" +
+                        "  var openDropdown = header ? header.querySelector('[data-provider-dropdown-open=\"true\"]') : null;" +
+                        "  var isHeaderFocused = !!window.__tmdbHeaderFocused || (header && header.contains(document.activeElement));" +
+                        "  if (isHeaderFocused && !openDropdown) {" +
+                        "    window.__tmdbHeaderFocused = false;" +
+                        "    if (document.activeElement && typeof document.activeElement.blur === 'function') {" +
+                        "      document.activeElement.blur();" +
                         "    }" +
-                        "    return 'FOCUSED_HEADER';" +
+                        "    var iframe = document.querySelector('iframe');" +
+                        "    if (iframe && typeof iframe.focus === 'function') {" +
+                        "      iframe.focus();" +
+                        "    }" +
+                        "    return true;" +
+                        "  }" +
+                        "  return false;" +
+                        "})();",
+                        null
+                    );
+                }
+            } else if (keyCode == KeyEvent.KEYCODE_BACK) {
+                if (webView != null) {
+                    webView.evaluateJavascript(
+                        "(function() {" +
+                        "  var header = document.querySelector('[data-watch-header=\"true\"]');" +
+                        "  var dropdown = header ? header.querySelector('[data-provider-dropdown-open=\"true\"]') : null;" +
+                        "  if (dropdown) {" +
+                        "    window.dispatchEvent(new CustomEvent('tmdb_close_dropdowns'));" +
+                        "    var trigger = dropdown.querySelector('[data-provider-trigger=\"true\"]');" +
+                        "    if (trigger) { trigger.focus(); }" +
+                        "    return 'CLOSED_DROPDOWN';" +
+                        "  }" +
+                        "  var isHeaderFocused = !!window.__tmdbHeaderFocused || (header && header.contains(document.activeElement));" +
+                        "  var backBtn = header ? header.querySelector('button[aria-label=\"Back\"], [data-watch-header-item=\"true\"]:first-child') : null;" +
+                        "  if (!isHeaderFocused) {" +
+                        "    window.__tmdbHeaderFocused = true;" +
+                        "    window.dispatchEvent(new CustomEvent('tmdb_user_action'));" +
+                        "    window.focus();" +
+                        "    if (backBtn) { backBtn.focus(); }" +
+                        "    setTimeout(function() { if (backBtn) { backBtn.focus(); } }, 50);" +
+                        "    return 'FOCUSED_BACK_BTN';" +
                         "  } else {" +
-                        "    if (backBtn && typeof backBtn.click === 'function') {" +
-                        "      backBtn.click();" +
+                        "    window.__tmdbHeaderFocused = false;" +
+                        "    if (typeof window.tmdbExitWatch === 'function') {" +
+                        "      window.tmdbExitWatch();" +
                         "    } else {" +
-                        "      window.history.back();" +
+                        "      window.dispatchEvent(new CustomEvent('tmdb_exit_watch'));" +
+                        "      if (backBtn && typeof backBtn.click === 'function') { backBtn.click(); }" +
                         "    }" +
                         "    return 'EXITED_WATCH';" +
                         "  }" +

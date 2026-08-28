@@ -17,7 +17,14 @@ export function useTVNavigation(isEnabled = true) {
       let target: HTMLElement | null = null;
 
       if (mainContent) {
-        if (pathname === '/') {
+        if (pathname.startsWith('/watch')) {
+          // On Watch page: the ONLY way to move focus to header is by pressing Back on remote
+          const iframe = document.querySelector<HTMLIFrameElement>('iframe');
+          if (iframe) {
+            try { iframe.focus(); } catch {}
+          }
+          return;
+        } else if (pathname === '/') {
           // On Home page: focus the Billboard "Watch Now" button
           target = mainContent.querySelector<HTMLElement>('[data-hero-watch-now="true"]') ||
                    Array.from(mainContent.querySelectorAll<HTMLElement>('.tv-focus-target, a, button')).find(
@@ -72,18 +79,97 @@ export function useTVNavigation(isEnabled = true) {
       // On Watch page (/watch), handle header navigation
       if (window.location.pathname.startsWith('/watch')) {
         const header = document.querySelector('[data-watch-header="true"]');
-        const isHeaderFocused = header && header.contains(document.activeElement);
+
+        // Handle Back/Escape keys on Watch page (regardless of whether focus is in header or iframe)
+        if (e.key === 'Escape' || e.keyCode === 27 || e.keyCode === 4 || e.key === 'BrowserBack' || e.key === 'GoBack') {
+          e.preventDefault();
+          const openDropdown = header?.querySelector('[data-provider-dropdown-open="true"]');
+          if (openDropdown) {
+            window.dispatchEvent(new CustomEvent('tmdb_close_dropdowns'));
+            const trigger = header?.querySelector<HTMLElement>('[data-provider-trigger="true"]');
+            if (trigger) { trigger.focus(); }
+            return;
+          }
+          const isHeaderFocused = !!(window as any).__tmdbHeaderFocused || (header && header.contains(document.activeElement));
+          const backBtn = header?.querySelector<HTMLElement>('button[aria-label="Back"], [data-watch-header-item="true"]');
+          if (!isHeaderFocused) {
+            (window as any).__tmdbHeaderFocused = true;
+            window.dispatchEvent(new CustomEvent('tmdb_user_action'));
+            window.focus();
+            if (backBtn) { backBtn.focus(); }
+            setTimeout(() => { if (backBtn) { backBtn.focus(); } }, 50);
+            return;
+          }
+          (window as any).__tmdbHeaderFocused = false;
+          if (typeof (window as any).tmdbExitWatch === 'function') {
+            (window as any).tmdbExitWatch();
+          } else {
+            window.dispatchEvent(new CustomEvent('tmdb_exit_watch'));
+            if (backBtn && typeof backBtn.click === 'function') {
+              backBtn.click();
+            }
+          }
+          return;
+        }
+
+        const isHeaderFocused = !!(window as any).__tmdbHeaderFocused || (header && header.contains(document.activeElement));
+
+        // If not in header, allow default behavior (iframe / player control)
         if (!isHeaderFocused) {
           return;
         }
 
-        // When in watch header, navigate between header elements (Back Button <-> Provider Picker)
-        const headerFocusables = Array.from(header.querySelectorAll<HTMLElement>('.tv-focus-target, button, [tabindex="0"]'))
+        // Check if provider dropdown is currently open
+        const openDropdown = header?.querySelector('[data-provider-dropdown-open="true"]');
+        if (openDropdown) {
+          const dropdownOptions = Array.from(openDropdown.querySelectorAll<HTMLElement>('.tv-focus-target, button'))
+            .filter(el => {
+              const style = window.getComputedStyle(el);
+              const rect = el.getBoundingClientRect();
+              return style.display !== 'none' && style.visibility !== 'hidden' && !el.hasAttribute('disabled') && (rect.width > 0 || rect.height > 0);
+            });
+
+          if (dropdownOptions.length > 0) {
+            const currentIdx = dropdownOptions.indexOf(document.activeElement as HTMLElement);
+            if (e.key === 'ArrowDown' || e.keyCode === 20) {
+              e.preventDefault();
+              const nextIdx = (currentIdx + 1) % dropdownOptions.length;
+              dropdownOptions[nextIdx].focus();
+              dropdownOptions[nextIdx].scrollIntoView({ block: 'nearest' });
+              return;
+            } else if (e.key === 'ArrowUp' || e.keyCode === 19) {
+              e.preventDefault();
+              const prevIdx = (currentIdx - 1 + dropdownOptions.length) % dropdownOptions.length;
+              dropdownOptions[prevIdx].focus();
+              dropdownOptions[prevIdx].scrollIntoView({ block: 'nearest' });
+              return;
+            }
+          }
+        }
+
+        // If dropdown is NOT open and user presses ArrowDown, return focus down to player iframe
+        if (!openDropdown && (e.key === 'ArrowDown' || e.keyCode === 20)) {
+          e.preventDefault();
+          (window as any).__tmdbHeaderFocused = false;
+          if (document.activeElement && typeof (document.activeElement as HTMLElement).blur === 'function') {
+            (document.activeElement as HTMLElement).blur();
+          }
+          const iframe = document.querySelector<HTMLIFrameElement>('iframe');
+          if (iframe) {
+            try {
+              iframe.focus();
+            } catch {}
+          }
+          return;
+        }
+
+        // When dropdown is closed, navigate horizontally between header elements (Back Button <-> Provider Picker Trigger)
+        const headerFocusables = header ? Array.from(header.querySelectorAll<HTMLElement>('[data-watch-header-item="true"], .tv-focus-target, button'))
           .filter(el => {
             const style = window.getComputedStyle(el);
             const rect = el.getBoundingClientRect();
             return style.display !== 'none' && style.visibility !== 'hidden' && !el.hasAttribute('disabled') && (rect.width > 0 || rect.height > 0);
-          });
+          }) : [];
 
         if (headerFocusables.length > 1) {
           const currentIdx = headerFocusables.indexOf(document.activeElement as HTMLElement);

@@ -91,13 +91,21 @@ export const Watch: React.FC = () => {
 
   const resetHeaderTimer = React.useCallback(() => {
     setHeaderVisible(true);
+
     if (hideTimerRef.current) {
       clearTimeout(hideTimerRef.current);
+      hideTimerRef.current = null;
     }
+
     if (headerTimeoutSeconds > 0) {
       hideTimerRef.current = setTimeout(() => {
         setHeaderVisible(false);
-        // Once header hides, move focus back to media player iframe
+        window.dispatchEvent(new CustomEvent('tmdb_close_dropdowns'));
+
+        (window as any).__tmdbHeaderFocused = false;
+        if (document.activeElement && (document.activeElement.tagName === 'BUTTON' || (document.activeElement as HTMLElement).dataset?.watchHeaderItem === 'true')) {
+          (document.activeElement as HTMLElement).blur();
+        }
         const iframe = document.querySelector<HTMLIFrameElement>('iframe');
         if (iframe) {
           try {
@@ -107,6 +115,28 @@ export const Watch: React.FC = () => {
       }, headerTimeoutSeconds * 1000);
     }
   }, [headerTimeoutSeconds]);
+
+  // Robust exit watch navigation that cannot be trapped by iframe history
+  const handleExitWatch = React.useCallback(() => {
+    const targetId = id || details?.id;
+    if (mediaType && targetId) {
+      navigate(`/details/${mediaType}/${targetId}`, { replace: true });
+    } else {
+      navigate('/', { replace: true });
+    }
+  }, [navigate, mediaType, id, details?.id]);
+
+  useEffect(() => {
+    const onExitWatch = () => handleExitWatch();
+    window.addEventListener('tmdb_exit_watch', onExitWatch);
+    (window as any).tmdbExitWatch = handleExitWatch;
+    (window as any).__tmdbHeaderFocused = false;
+    return () => {
+      window.removeEventListener('tmdb_exit_watch', onExitWatch);
+      delete (window as any).tmdbExitWatch;
+      delete (window as any).__tmdbHeaderFocused;
+    };
+  }, [handleExitWatch]);
 
   // Notify native Android bridge that Watch page is active
   useEffect(() => {
@@ -124,24 +154,45 @@ export const Watch: React.FC = () => {
     };
   }, []);
 
+  const lastMousePosRef = React.useRef({ x: -1, y: -1 });
+
   useEffect(() => {
-    resetHeaderTimer();
-    const handleNativeTouch = () => {
-      resetHeaderTimer();
-    };
-    const handleWindowBlur = () => {
+    const handleKeyOrTouch = () => {
       resetHeaderTimer();
     };
 
-    window.addEventListener('tmdb_screen_touched', handleNativeTouch);
-    window.addEventListener('blur', handleWindowBlur);
+    const handleMouseMove = (e: MouseEvent) => {
+      if (
+        lastMousePosRef.current.x === -1 ||
+        Math.abs(e.clientX - lastMousePosRef.current.x) > 3 ||
+        Math.abs(e.clientY - lastMousePosRef.current.y) > 3
+      ) {
+        lastMousePosRef.current = { x: e.clientX, y: e.clientY };
+        resetHeaderTimer();
+      }
+    };
+
+    // Genuine user input listeners
+    window.addEventListener('keydown', handleKeyOrTouch, true);
+    window.addEventListener('touchstart', handleKeyOrTouch, true);
+    window.addEventListener('click', handleKeyOrTouch, true);
+    window.addEventListener('mousemove', handleMouseMove, true);
+    window.addEventListener('tmdb_screen_touched', handleKeyOrTouch);
+    window.addEventListener('tmdb_user_action', handleKeyOrTouch);
+
+    resetHeaderTimer();
 
     return () => {
       if (hideTimerRef.current) {
         clearTimeout(hideTimerRef.current);
+        hideTimerRef.current = null;
       }
-      window.removeEventListener('tmdb_screen_touched', handleNativeTouch);
-      window.removeEventListener('blur', handleWindowBlur);
+      window.removeEventListener('keydown', handleKeyOrTouch, true);
+      window.removeEventListener('touchstart', handleKeyOrTouch, true);
+      window.removeEventListener('click', handleKeyOrTouch, true);
+      window.removeEventListener('mousemove', handleMouseMove, true);
+      window.removeEventListener('tmdb_screen_touched', handleKeyOrTouch);
+      window.removeEventListener('tmdb_user_action', handleKeyOrTouch);
     };
   }, [resetHeaderTimer]);
 
@@ -177,7 +228,8 @@ export const Watch: React.FC = () => {
           {/* Left: Back Button Icon Only + Title with [S1E1] underneath */}
           <div className="flex items-center gap-3 min-w-0 flex-1 mr-2">
             <button
-              onClick={() => navigate(-1)}
+              onClick={handleExitWatch}
+              data-watch-header-item="true"
               aria-label="Back"
               className="p-2.5 rounded-full bg-black/70 hover:bg-black text-white border border-white/20 backdrop-blur-md transition hover:scale-110 flex-shrink-0 tv-focus-target"
               title="Go Back"
