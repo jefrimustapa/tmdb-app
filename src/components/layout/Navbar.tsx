@@ -9,7 +9,7 @@ export const Navbar: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const location = useLocation();
   const navigate = useNavigate();
-  const { isTV, isMobile, isTablet, deviceMode, setDeviceMode, activeLayout, detectedPlatform } = useDevice();
+  const { isTV, isMobile, isTablet, deviceMode, activeLayout, detectedPlatform } = useDevice();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -24,13 +24,6 @@ export const Navbar: React.FC = () => {
     if (searchQuery.trim()) {
       navigate(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
     }
-  };
-
-  const cycleDeviceMode = () => {
-    const modes: ('auto' | 'mobile' | 'tablet' | 'tv' | 'desktop')[] = ['auto', 'mobile', 'tablet', 'tv', 'desktop'];
-    const currentIndex = modes.indexOf(deviceMode as any);
-    const nextMode = modes[(currentIndex + 1) % modes.length];
-    setDeviceMode(nextMode);
   };
 
   const navLinks = [
@@ -109,19 +102,14 @@ export const Navbar: React.FC = () => {
             <Search className="w-5 h-5" />
           </Link>
 
-          {/* Device Mode Indicator / Switcher button (Icon Only) */}
-          <button
-            onClick={cycleDeviceMode}
-            className={`p-2 rounded-full border flex items-center justify-center transition-all tv-focus-target ${
-              deviceMode !== 'auto'
-                ? 'bg-hbo-purple/40 border-hbo-purple-light text-hbo-cyan shadow-hbo-glow'
-                : 'bg-white/5 border-white/10 text-gray-300 hover:text-white'
-            }`}
-            title={`Mode: ${getModeLabel()} - Click to cycle layout`}
-            aria-label={`Mode: ${getModeLabel()}`}
+          {/* Device Mode Indicator (View Only, Non-clickable, Non-focusable) */}
+          <div
+            className="p-2 rounded-full border border-white/10 bg-white/5 flex items-center justify-center text-gray-300 pointer-events-none select-none"
+            title={`Platform: ${getModeLabel()}`}
+            aria-label={`Platform: ${getModeLabel()}`}
           >
             {getModeIcon()}
-          </button>
+          </div>
 
           {/* Settings Link */}
           <Link
