@@ -120,7 +120,7 @@ export const Watch: React.FC = () => {
   const handleExitWatch = React.useCallback(() => {
     const targetId = id || details?.id;
     if (mediaType && targetId) {
-      navigate(`/${mediaType}/${targetId}`, { replace: true });
+      navigate(`/details/${mediaType}/${targetId}`, { replace: true });
     } else {
       navigate('/', { replace: true });
     }
