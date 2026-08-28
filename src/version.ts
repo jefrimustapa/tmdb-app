@@ -2,8 +2,8 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20260828-2248';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-dark-neon-splas.20260828-2248';
+export const APP_BUILD_NUMBER = '20260828-2319';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.fix-settings-padding.20260828-2319';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
-export const APP_BRANCH = 'feat-dark-neon-splas';
+export const APP_BRANCH = 'fix-settings-padding';
