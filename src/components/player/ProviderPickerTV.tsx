@@ -133,28 +133,11 @@ export const ProviderPickerTV: React.FC<ProviderPickerTVProps> = ({
                   onClick={() => handleSelect(provider)}
                   data-provider-selected={isSelected ? 'true' : undefined}
                   data-provider-item="true"
-                  tabIndex={0}
+                  onFocus={(e) => {
+                    e.currentTarget.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                  }}
                   onKeyDown={(e) => {
-                    if (e.key === 'ArrowDown') {
-                      e.preventDefault();
-                      const nextBtn = dropdownRef.current?.querySelectorAll<HTMLElement>('[data-provider-item="true"]')[idx + 1];
-                      if (nextBtn) {
-                        nextBtn.focus();
-                        nextBtn.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-                      }
-                    } else if (e.key === 'ArrowUp') {
-                      e.preventDefault();
-                      if (idx === 0) {
-                        const trigger = document.getElementById('watch-provider-trigger');
-                        if (trigger) trigger.focus();
-                      } else {
-                        const prevBtn = dropdownRef.current?.querySelectorAll<HTMLElement>('[data-provider-item="true"]')[idx - 1];
-                        if (prevBtn) {
-                          prevBtn.focus();
-                          prevBtn.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-                        }
-                      }
-                    } else if (e.key === 'ArrowLeft') {
+                    if (e.key === 'ArrowLeft' || e.key === 'Escape') {
                       e.preventDefault();
                       setIsOpen(false);
                       const trigger = document.getElementById('watch-provider-trigger');

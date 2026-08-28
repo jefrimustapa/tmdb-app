@@ -40,6 +40,7 @@ public class MainActivity extends BridgeActivity {
     private boolean isCurrentlyFullscreen = false;
     private boolean isWatchPageActive = false;
     private volatile boolean isDropdownOpen = false;
+    private volatile boolean isVirtualCursorActive = false;
     private volatile boolean isSimulatingTouch = false;
     private OrientationEventListener orientationListener;
 
@@ -220,6 +221,13 @@ public class MainActivity extends BridgeActivity {
                 @JavascriptInterface
                 public void setDropdownOpen(boolean open) {
                     isDropdownOpen = open;
+                    Log.i("TMDB_APP", "[AndroidBridge] setDropdownOpen: " + open);
+                }
+
+                @JavascriptInterface
+                public void setVirtualCursorActive(boolean active) {
+                    isVirtualCursorActive = active;
+                    Log.i("TMDB_APP", "[AndroidBridge] setVirtualCursorActive: " + active);
                 }
 
                 @JavascriptInterface
@@ -503,14 +511,17 @@ public class MainActivity extends BridgeActivity {
 
 
     private long lastDpadCenterTime = 0;
+    private long lastOkPressTime = 0;
 
     @Override
     public boolean dispatchKeyEvent(KeyEvent event) {
         if (event.getAction() == KeyEvent.ACTION_DOWN) {
             int keyCode = event.getKeyCode();
+            Log.i("TMDB_APP", "[Native Key] keyCode=" + keyCode + " isTV=" + isTV() + " isWatchPageActive=" + isWatchPageActive);
 
             // Synchronously consume Back key if any dropdown is open anywhere in the app
             if (keyCode == KeyEvent.KEYCODE_BACK && isDropdownOpen) {
+                Log.i("TMDB_APP", "[Native Key] Back key consumed by open dropdown");
                 isDropdownOpen = false;
                 WebView webView = bridge.getWebView();
                 if (webView != null) {
@@ -522,10 +533,52 @@ public class MainActivity extends BridgeActivity {
             if (isTV() && isWatchPageActive) {
                 WebView webView = bridge.getWebView();
 
+                // If Virtual Cursor is active, completely intercept D-Pad movement, OK clicks, and Back key
+                if (isVirtualCursorActive) {
+                    if (keyCode == KeyEvent.KEYCODE_DPAD_UP || keyCode == KeyEvent.KEYCODE_DPAD_DOWN ||
+                        keyCode == KeyEvent.KEYCODE_DPAD_LEFT || keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) {
+                        if (webView != null) {
+                            String dir = keyCode == KeyEvent.KEYCODE_DPAD_UP ? "Up" :
+                                         keyCode == KeyEvent.KEYCODE_DPAD_DOWN ? "Down" :
+                                         keyCode == KeyEvent.KEYCODE_DPAD_LEFT ? "Left" : "Right";
+                            webView.evaluateJavascript(
+                                String.format("window.dispatchEvent(new CustomEvent('tmdb_cursor_move', { detail: { direction: '%s' } }));", dir),
+                                null
+                            );
+                        }
+                        return true; // CONSUMED: Prevents WebView and iframe from moving native focus!
+                    }
+
+                    if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER || keyCode == KeyEvent.KEYCODE_NUMPAD_ENTER) {
+                        long now = SystemClock.uptimeMillis();
+                        boolean isDoublePress = (now - lastOkPressTime < 650);
+                        lastOkPressTime = now;
+
+                        if (webView != null) {
+                            if (isDoublePress) {
+                                isVirtualCursorActive = false;
+                                webView.evaluateJavascript("window.dispatchEvent(new CustomEvent('tmdb_close_cursor'));", null);
+                            } else {
+                                webView.evaluateJavascript("window.dispatchEvent(new CustomEvent('tmdb_cursor_click'));", null);
+                            }
+                        }
+                        return true; // CONSUMED: Prevents direct player click toggling
+                    }
+
+                    if (keyCode == KeyEvent.KEYCODE_BACK) {
+                        isVirtualCursorActive = false;
+                        if (webView != null) {
+                            webView.evaluateJavascript("window.dispatchEvent(new CustomEvent('tmdb_close_cursor'));", null);
+                        }
+                        return true; // CONSUMED: Dismiss cursor without leaving Watch page
+                    }
+                }
+
                 if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) {
                     if (webView != null) {
                         webView.evaluateJavascript(
                             "(function() {" +
+                            "  if (window.__tmdbVirtualCursorActive) return false;" +
                             "  var header = document.querySelector('[data-watch-header=\"true\"]');" +
                             "  var isHeaderFocused = !!window.__tmdbHeaderFocused || (header && header.contains(document.activeElement));" +
                             "  if (isHeaderFocused) {" +
@@ -545,6 +598,7 @@ public class MainActivity extends BridgeActivity {
                     if (webView != null) {
                         webView.evaluateJavascript(
                             "(function() {" +
+                            "  if (window.__tmdbVirtualCursorActive) return false;" +
                             "  var header = document.querySelector('[data-watch-header=\"true\"]');" +
                             "  var openDropdown = header ? header.querySelector('[data-provider-dropdown-open=\"true\"]') : null;" +
                             "  if (openDropdown) {" +
@@ -582,34 +636,47 @@ public class MainActivity extends BridgeActivity {
 
                 if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER || keyCode == KeyEvent.KEYCODE_NUMPAD_ENTER) {
                     long now = SystemClock.uptimeMillis();
-                    if (now - lastDpadCenterTime < 400) {
-                        return true; // Debounce rapid key bounces
-                    }
-                    lastDpadCenterTime = now;
+                    boolean isDoublePress = (now - lastOkPressTime < 650);
+                    lastOkPressTime = now;
 
                     if (webView != null) {
                         webView.evaluateJavascript(
-                            "(function() {" +
-                            "  var header = document.querySelector('[data-watch-header=\"true\"]');" +
-                            "  var isHeaderFocused = !!window.__tmdbHeaderFocused || (header && header.contains(document.activeElement));" +
-                            "  if (!isHeaderFocused) {" +
-                            "    if (typeof window.AndroidBridge !== 'undefined' && typeof window.AndroidBridge.simulateTouchAt === 'function') {" +
-                            "      window.AndroidBridge.simulateTouchAt(window.innerWidth / 2, window.innerHeight / 2);" +
-                            "    }" +
-                            "  } else {" +
-                            "    if (document.activeElement && typeof document.activeElement.click === 'function') {" +
-                            "      document.activeElement.click();" +
-                            "    }" +
-                            "  }" +
-                            "})();",
+                            String.format(
+                                "(function() {" +
+                                "  if (window.__tmdbVirtualCursorActive) {" +
+                                "    if (%b) {" +
+                                "      window.dispatchEvent(new CustomEvent('tmdb_close_cursor'));" +
+                                "    } else {" +
+                                "      window.dispatchEvent(new CustomEvent('tmdb_cursor_click'));" +
+                                "    }" +
+                                "    return true;" +
+                                "  }" +
+                                "  var isHeaderFocused = !!window.__tmdbHeaderFocused;" +
+                                "  if (!isHeaderFocused) {" +
+                                "    if (%b) {" +
+                                "      window.dispatchEvent(new CustomEvent('tmdb_toggle_cursor'));" +
+                                "    } else {" +
+                                "      if (typeof window.AndroidBridge !== 'undefined' && typeof window.AndroidBridge.simulateTouchAt === 'function') {" +
+                                "        window.AndroidBridge.simulateTouchAt(window.innerWidth / 2, window.innerHeight / 2);" +
+                                "      }" +
+                                "    }" +
+                                "  } else {" +
+                                "    if (document.activeElement && typeof document.activeElement.click === 'function') {" +
+                                "      document.activeElement.click();" +
+                                "    }" +
+                                "  }" +
+                                "  return false;" +
+                                "})()", isDoublePress, isDoublePress),
                             null
                         );
                         return true;
                     }
+                    return super.dispatchKeyEvent(event);
                 } else if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
                     if (webView != null) {
                         webView.evaluateJavascript(
                             "(function() {" +
+                            "  if (window.__tmdbVirtualCursorActive) return false;" +
                             "  var header = document.querySelector('[data-watch-header=\"true\"]');" +
                             "  var openDropdown = header ? header.querySelector('[data-provider-dropdown-open=\"true\"]') : null;" +
                             "  var isTrigger = document.activeElement && document.activeElement.id === 'watch-provider-trigger';" +
@@ -636,10 +703,16 @@ public class MainActivity extends BridgeActivity {
                             null
                         );
                     }
+                    return super.dispatchKeyEvent(event);
                 } else if (keyCode == KeyEvent.KEYCODE_BACK) {
                     if (webView != null) {
                         webView.evaluateJavascript(
                             "(function() {" +
+                            "  if (window.__tmdbVirtualCursorActive) {" +
+                            "    window.__tmdbVirtualCursorActive = false;" +
+                            "    window.dispatchEvent(new CustomEvent('tmdb_close_cursor'));" +
+                            "    return 'CLOSED_CURSOR';" +
+                            "  }" +
                             "  var header = document.querySelector('[data-watch-header=\"true\"]');" +
                             "  var dropdown = header ? header.querySelector('[data-provider-dropdown-open=\"true\"]') : null;" +
                             "  if (dropdown) {" +
