@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { ShieldCheck, RefreshCw, AlertCircle, Maximize2, Minimize2, Zap, Tv, ArrowLeft, Play, ExternalLink, SkipForward, Radio } from 'lucide-react';
 import Hls from 'hls.js';
 import type { StreamProvider } from '../../types/stream';
-import { STREAM_PROVIDERS, getProviderById } from '../../services/streamProviders';
+import { STREAM_PROVIDERS, getProviderById, getOrderedProviders } from '../../services/streamProviders';
 import { dbService } from '../../services/db';
 import { Logo } from '../common/Logo';
 import { tmdbImages } from '../../services/tmdb';
@@ -47,6 +47,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const [extractionFailed, setExtractionFailed] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showControls, setShowControls] = useState(true);
+  const [topProviders, setTopProviders] = useState<string[]>(['vidlink', 'moviesapi', 'cinesrc']);
 
   // Auto-Cycle Provider until first working stream state
   const [autoCycle, setAutoCycle] = useState(true);
@@ -103,6 +104,9 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       if (s) {
         setAdShieldEnabled(s.adBlockShield);
         setDirectStreamMode(s.directStreamMode || false);
+        if (s.topProviders && s.topProviders.length >= 3) {
+          setTopProviders(s.topProviders);
+        }
       }
     });
   }, []);
@@ -268,15 +272,17 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     saveProgress();
   }, [tmdbId, mediaType, season, episode, voteAverage]);
 
+  const orderedProviders = React.useMemo(() => getOrderedProviders(topProviders), [topProviders]);
+
   const cycleToNextProvider = useCallback(() => {
     resetControlsTimer();
-    const currentIndex = STREAM_PROVIDERS.findIndex((p) => p.id === providerId);
-    const nextIndex = (currentIndex + 1) % STREAM_PROVIDERS.length;
-    const nextProvider = STREAM_PROVIDERS[nextIndex];
+    const currentIndex = orderedProviders.findIndex((p) => p.id === providerId);
+    const nextIndex = (currentIndex + 1) % orderedProviders.length;
+    const nextProvider = orderedProviders[nextIndex];
 
     setTriedProviders((prev) => {
       const updated = Array.from(new Set([...prev, providerId]));
-      if (updated.length >= STREAM_PROVIDERS.length) {
+      if (updated.length >= orderedProviders.length) {
         setAllFailed(true);
         setIsProbing(false);
         setIsLoading(false);
@@ -288,7 +294,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       }
       return updated;
     });
-  }, [providerId, onProviderChange, resetControlsTimer]);
+  }, [providerId, onProviderChange, resetControlsTimer, orderedProviders]);
 
   const restartAutoCycle = () => {
     setTriedProviders([]);
@@ -296,7 +302,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     setIsProbing(true);
     setIsLoading(true);
     setHasError(false);
-    onProviderChange(STREAM_PROVIDERS[0]);
+    onProviderChange(orderedProviders[0] || STREAM_PROVIDERS[0]);
   };
 
   // Failover watchdog timer: gives current provider 8s to establish playback, otherwise auto-cycles

@@ -7,7 +7,7 @@ import { Logo } from '../components/common/Logo';
 import { APP_VERSION, APP_BUILD_NUMBER, APP_VERSION_FULL, APP_BUILD_CHANNEL } from '../version';
 import { updateService, type UpdateInfo } from '../services/updateService';
 import { UpdateModal } from '../components/common/UpdateModal';
-import { Settings as SettingsIcon, Tv2, Smartphone, Tablet, Monitor, ShieldCheck, Server, Database, Check, ShieldAlert, EyeOff, Lock, Zap, X, ArrowUpCircle, RefreshCw, Moon, Sparkles, AlertCircle, CalendarX } from 'lucide-react';
+import { Settings as SettingsIcon, Tv2, Smartphone, Tablet, Monitor, ShieldCheck, Server, Database, Check, ShieldAlert, EyeOff, Lock, Zap, X, ArrowUpCircle, RefreshCw, Moon, Sparkles, AlertCircle, CalendarX, ChevronDown } from 'lucide-react';
 
 export const Settings: React.FC = () => {
   const [settings, setSettings] = useState<UserSettings | null>(null);
@@ -193,39 +193,97 @@ export const Settings: React.FC = () => {
           </div>
         </div>
 
-        {/* Preferred Stream Provider */}
-        <div className="bg-hbo-card border border-hbo-border rounded-2xl p-5 sm:p-6">
-          <h3 className="text-base sm:text-lg font-bold font-display text-white flex items-center gap-2 mb-2">
-            <Server className="w-5 h-5 text-hbo-purple-light" />
-            <span>Default Streaming Resolver</span>
-          </h3>
-          <p className="text-xs text-gray-400 mb-4">
-            Choose which provider automatically loads when clicking Play.
-          </p>
+        {/* Top 3 Priority Stream Resolvers */}
+        <div className="bg-hbo-card border border-hbo-border rounded-2xl p-5 sm:p-6 space-y-4">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h3 className="text-base sm:text-lg font-bold font-display text-white flex items-center gap-2 mb-1">
+                <Server className="w-5 h-5 text-hbo-cyan" />
+                <span>Top 3 Priority Stream Resolvers</span>
+              </h3>
+              <p className="text-xs text-gray-400">
+                Choose the 3 primary servers the app will use first in order to resolve streams. If the 1st server fails or buffers, the app automatically fails over to the 2nd and 3rd servers.
+              </p>
+            </div>
+            <span className="text-xs px-2.5 py-1 rounded-full bg-hbo-purple/30 border border-hbo-purple/50 text-hbo-cyan font-bold whitespace-nowrap hidden sm:inline-block">
+              {STREAM_PROVIDERS.length} Servers Available
+            </span>
+          </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {STREAM_PROVIDERS.map((provider) => {
-              const isSelected = settings.preferredProvider === provider.id;
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
+            {[
+              {
+                index: 0,
+                priorityLabel: 'Priority #1 Server (Primary Initial)',
+                badgeClass: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40',
+                defaultId: 'vidlink'
+              },
+              {
+                index: 1,
+                priorityLabel: 'Priority #2 Server (First Failover)',
+                badgeClass: 'bg-hbo-purple/30 text-hbo-purple-light border-hbo-purple/40',
+                defaultId: 'moviesapi'
+              },
+              {
+                index: 2,
+                priorityLabel: 'Priority #3 Server (Second Failover)',
+                badgeClass: 'bg-hbo-cyan/20 text-hbo-cyan border-hbo-cyan/40',
+                defaultId: 'cinesrc'
+              }
+            ].map(({ index, priorityLabel, badgeClass, defaultId }) => {
+              const currentTop = settings.topProviders && settings.topProviders.length >= 3
+                ? settings.topProviders
+                : ['vidlink', 'moviesapi', 'cinesrc'];
+              const selectedId = currentTop[index] || defaultId;
+              const selectedProviderObj = STREAM_PROVIDERS.find(p => p.id === selectedId) || STREAM_PROVIDERS[0];
+
               return (
-                <button
-                  key={provider.id}
-                  onClick={() => handleUpdate({ preferredProvider: provider.id })}
-                  className={`flex items-center justify-between p-4 rounded-xl border text-left transition-all tv-focus-target ${
-                    isSelected
-                      ? 'bg-hbo-purple/30 border-hbo-purple-light shadow-hbo-glow'
-                      : 'bg-hbo-dark/60 border-hbo-border hover:bg-hbo-hover'
-                  }`}
+                <div
+                  key={index}
+                  className="bg-hbo-dark/70 border border-hbo-border/90 rounded-xl p-4 flex flex-col justify-between gap-3 shadow-inner"
                 >
-                  <div className="flex-1 min-w-0 pr-2">
-                    <p className="text-sm font-bold text-white">{provider.name}</p>
-                    <p className="text-xs text-gray-400 mt-0.5 truncate">{provider.tagline}</p>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className={`text-[11px] font-bold px-2 py-0.5 rounded-md border ${badgeClass}`}>
+                      #{index + 1} Priority
+                    </span>
+                    <span className="text-[10px] px-1.5 py-0.2 rounded bg-white/10 text-gray-300 font-bold truncate max-w-[120px]">
+                      {selectedProviderObj.badge}
+                    </span>
                   </div>
-                  <span className={`flex-shrink-0 text-xs px-2 py-0.5 rounded font-bold ${
-                    isSelected ? 'bg-hbo-cyan text-black' : 'bg-white/10 text-gray-300'
-                  }`}>
-                    {provider.badge}
-                  </span>
-                </button>
+
+                  <div>
+                    <label htmlFor={`top-provider-${index}`} className="block text-xs font-semibold text-gray-300 mb-1.5">
+                      {priorityLabel}
+                    </label>
+                    <div className="relative">
+                      <select
+                        id={`top-provider-${index}`}
+                        value={selectedId}
+                        onChange={(e) => {
+                          const newId = e.target.value;
+                          const updated = [...currentTop] as [string, string, string];
+                          updated[index] = newId;
+                          handleUpdate({
+                            topProviders: updated,
+                            preferredProvider: updated[0]
+                          });
+                        }}
+                        className="w-full bg-hbo-card/90 border border-hbo-border text-white text-xs font-bold rounded-lg pl-3 pr-8 py-2.5 appearance-none focus:outline-none focus:border-hbo-cyan focus:ring-1 focus:ring-hbo-cyan transition-all tv-focus-target cursor-pointer"
+                      >
+                        {STREAM_PROVIDERS.map((provider) => (
+                          <option key={provider.id} value={provider.id} className="bg-hbo-dark text-white text-xs py-1">
+                            {provider.name} ({provider.badge})
+                          </option>
+                        ))}
+                      </select>
+                      <ChevronDown className="w-4 h-4 text-gray-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    </div>
+                  </div>
+
+                  <p className="text-[11px] text-gray-400 line-clamp-2 min-h-[32px] leading-snug">
+                    {selectedProviderObj.tagline}
+                  </p>
+                </div>
               );
             })}
           </div>

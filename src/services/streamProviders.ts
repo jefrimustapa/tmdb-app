@@ -238,3 +238,12 @@ export const STREAM_PROVIDERS: StreamProvider[] = [
 export function getProviderById(id: string): StreamProvider {
   return STREAM_PROVIDERS.find(p => p.id === id) || STREAM_PROVIDERS[0];
 }
+
+export function getOrderedProviders(topProviders?: string[]): StreamProvider[] {
+  if (!topProviders || topProviders.length === 0) return STREAM_PROVIDERS;
+  const topList = topProviders
+    .map(id => STREAM_PROVIDERS.find(p => p.id === id))
+    .filter((p): p is StreamProvider => Boolean(p));
+  const restList = STREAM_PROVIDERS.filter(p => !topProviders.includes(p.id));
+  return [...topList, ...restList];
+}
