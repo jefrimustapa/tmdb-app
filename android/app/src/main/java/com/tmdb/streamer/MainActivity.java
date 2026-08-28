@@ -39,6 +39,7 @@ import com.getcapacitor.BridgeWebViewClient;
 public class MainActivity extends BridgeActivity {
     private boolean isCurrentlyFullscreen = false;
     private boolean isWatchPageActive = false;
+    private volatile boolean isSimulatingTouch = false;
     private OrientationEventListener orientationListener;
 
     private boolean isTV() {
@@ -171,6 +172,7 @@ public class MainActivity extends BridgeActivity {
                                 properties, coords, 0, 0, 1.0f, 1.0f, 0, 0,
                                 android.view.InputDevice.SOURCE_TOUCHSCREEN, 0
                             );
+                            isSimulatingTouch = true;
                             wv.dispatchTouchEvent(downEvent);
 
                             wv.postDelayed(() -> {
@@ -182,6 +184,7 @@ public class MainActivity extends BridgeActivity {
                                 wv.dispatchTouchEvent(upEvent);
                                 downEvent.recycle();
                                 upEvent.recycle();
+                                isSimulatingTouch = false;
                             }, 80);
                         }
                     });
@@ -482,7 +485,7 @@ public class MainActivity extends BridgeActivity {
 
     @Override
     public boolean dispatchTouchEvent(MotionEvent ev) {
-        if (ev.getAction() == MotionEvent.ACTION_DOWN && isWatchPageActive) {
+        if (!isSimulatingTouch && !isTV() && ev.getAction() == MotionEvent.ACTION_DOWN && isWatchPageActive) {
             WebView webView = bridge.getWebView();
             if (webView != null) {
                 webView.evaluateJavascript("window.dispatchEvent(new CustomEvent('tmdb_screen_touched'));", null);
@@ -524,6 +527,21 @@ public class MainActivity extends BridgeActivity {
                         null
                     );
                     return true;
+                }
+            } else if (keyCode == KeyEvent.KEYCODE_DPAD_UP) {
+                if (webView != null) {
+                    webView.evaluateJavascript(
+                        "(function() {" +
+                        "  var header = document.querySelector('[data-watch-header=\"true\"]');" +
+                        "  var isHeaderFocused = header && header.contains(document.activeElement);" +
+                        "  if (!isHeaderFocused) {" +
+                        "    window.dispatchEvent(new CustomEvent('tmdb_user_action'));" +
+                        "    var target = header ? header.querySelector('[data-watch-header-item=\"true\"], .tv-focus-target') : null;" +
+                        "    if (target) { target.focus(); }" +
+                        "  }" +
+                        "})();",
+                        null
+                    );
                 }
             } else if (keyCode == KeyEvent.KEYCODE_BACK) {
                 if (webView != null) {
