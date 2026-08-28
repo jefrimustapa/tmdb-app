@@ -12,15 +12,16 @@ export interface CursorStyleOption {
 
 export const CURSOR_STYLES_LIST: CursorStyleOption[] = [
   {
-    id: 'cyan_glow',
-    name: 'HBO Cyan Glow',
-    badge: 'Default',
+    id: 'hbo_max',
+    name: 'HBO Max',
+    badge: 'Max',
     color: '#00E5FF',
-    desc: 'High-contrast cyan arrow with signature neon glow',
+    desc: 'Signature HBO neon cyan arrow with purple aura',
     renderSvg: (isClicking) => (
       <div className="relative">
-        <svg className="w-7 h-7 drop-shadow-[0_2px_8px_rgba(0,229,255,0.8)] filter" viewBox="0 0 24 24" fill="none">
-          <path d="M4 2L18.5 16.5L12 17.5L9.5 22L4 2Z" fill="#00E5FF" stroke="#000000" strokeWidth="1.5" strokeLinejoin="round" />
+        <svg className="w-7 h-7 drop-shadow-[0_2px_8px_rgba(0,229,255,0.85)] filter" viewBox="0 0 24 24" fill="none">
+          <path d="M4 2L18.5 16.5L12 17.5L9.5 22L4 2Z" fill="#00E5FF" stroke="#5800FF" strokeWidth="1.5" strokeLinejoin="round" />
+          <circle cx="10" cy="11" r="1.5" fill="#FFFFFF" />
         </svg>
         {isClicking && (
           <div className="absolute top-0 left-0 w-8 h-8 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-[#00E5FF] bg-[#00E5FF]/30 animate-ping" />
@@ -29,15 +30,33 @@ export const CURSOR_STYLES_LIST: CursorStyleOption[] = [
     )
   },
   {
-    id: 'classic_white',
-    name: 'Classic White Arrow',
-    badge: 'Classic',
+    id: 'netflix',
+    name: 'Netflix',
+    badge: 'Netflix',
+    color: '#E50914',
+    desc: 'Cinematic Netflix crimson red pointer with dark shadow',
+    renderSvg: (isClicking) => (
+      <div className="relative">
+        <svg className="w-7 h-7 drop-shadow-[0_2px_10px_rgba(229,9,20,0.9)] filter" viewBox="0 0 24 24" fill="none">
+          <path d="M4 2L18.5 16.5L12 17.5L9.5 22L4 2Z" fill="#E50914" stroke="#000000" strokeWidth="1.5" strokeLinejoin="round" />
+          <path d="M6 5L14 14" stroke="#FFFFFF" strokeWidth="1.2" strokeLinecap="round" opacity="0.8" />
+        </svg>
+        {isClicking && (
+          <div className="absolute top-0 left-0 w-8 h-8 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-[#E50914] bg-[#E50914]/30 animate-ping" />
+        )}
+      </div>
+    )
+  },
+  {
+    id: 'apple_tv',
+    name: 'Apple TV+',
+    badge: 'Apple TV+',
     color: '#FFFFFF',
-    desc: 'Iconic clean white mouse pointer with crisp dark border',
+    desc: 'Sleek Apple minimalist white pointer with silver glow',
     renderSvg: (isClicking) => (
       <div className="relative">
         <svg className="w-7 h-7 drop-shadow-[0_2px_8px_rgba(0,0,0,0.9)] filter" viewBox="0 0 24 24" fill="none">
-          <path d="M4 2L18.5 16.5L12 17.5L9.5 22L4 2Z" fill="#FFFFFF" stroke="#000000" strokeWidth="1.6" strokeLinejoin="round" />
+          <path d="M4 2L18.5 16.5L12 17.5L9.5 22L4 2Z" fill="#FFFFFF" stroke="#1D1D1F" strokeWidth="1.6" strokeLinejoin="round" />
         </svg>
         {isClicking && (
           <div className="absolute top-0 left-0 w-8 h-8 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-white/40 animate-ping" />
@@ -46,148 +65,125 @@ export const CURSOR_STYLES_LIST: CursorStyleOption[] = [
     )
   },
   {
-    id: 'neon_yellow',
-    name: 'Neon Yellow Precision',
-    badge: 'Hi-Vis',
-    color: '#FFE600',
-    desc: 'Maximum visibility electric yellow for dark cinema scenes',
+    id: 'prime_video',
+    name: 'Prime Video',
+    badge: 'Prime',
+    color: '#00A8E1',
+    desc: 'Amazon Prime electric blue arrow with gold smile accent',
     renderSvg: (isClicking) => (
       <div className="relative">
-        <svg className="w-7 h-7 drop-shadow-[0_2px_10px_rgba(255,230,0,0.85)] filter" viewBox="0 0 24 24" fill="none">
-          <path d="M4 2L18.5 16.5L12 17.5L9.5 22L4 2Z" fill="#FFE600" stroke="#000000" strokeWidth="1.5" strokeLinejoin="round" />
+        <svg className="w-7 h-7 drop-shadow-[0_2px_10px_rgba(0,168,225,0.85)] filter" viewBox="0 0 24 24" fill="none">
+          <path d="M4 2L18.5 16.5L12 17.5L9.5 22L4 2Z" fill="#00A8E1" stroke="#000000" strokeWidth="1.5" strokeLinejoin="round" />
+          <path d="M6 14C8 16 11 16 13 14" stroke="#FF9900" strokeWidth="1.8" strokeLinecap="round" />
         </svg>
         {isClicking && (
-          <div className="absolute top-0 left-0 w-8 h-8 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-[#FFE600] bg-[#FFE600]/30 animate-ping" />
+          <div className="absolute top-0 left-0 w-8 h-8 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-[#00A8E1] bg-[#00A8E1]/30 animate-ping" />
         )}
       </div>
     )
   },
   {
-    id: 'laser_red',
-    name: 'Laser Red Pointer',
-    badge: 'Vibrant',
-    color: '#FF1744',
-    desc: 'Sharp laser crimson pointer with intense edge illumination',
+    id: 'disney_plus',
+    name: 'Disney+',
+    badge: 'Disney+',
+    color: '#00D2FF',
+    desc: 'Disney magic ice blue pointer with star sparkle aura',
     renderSvg: (isClicking) => (
       <div className="relative">
-        <svg className="w-7 h-7 drop-shadow-[0_2px_10px_rgba(255,23,68,0.9)] filter" viewBox="0 0 24 24" fill="none">
-          <path d="M4 2L18.5 16.5L12 17.5L9.5 22L4 2Z" fill="#FF1744" stroke="#000000" strokeWidth="1.5" strokeLinejoin="round" />
+        <svg className="w-7 h-7 drop-shadow-[0_2px_10px_rgba(0,210,255,0.9)] filter" viewBox="0 0 24 24" fill="none">
+          <path d="M4 2L18.5 16.5L12 17.5L9.5 22L4 2Z" fill="#00D2FF" stroke="#0B0B45" strokeWidth="1.5" strokeLinejoin="round" />
+          <path d="M9 6L10 8L12 9L10 10L9 12L8 10L6 9L8 8Z" fill="#FFFFFF" />
         </svg>
         {isClicking && (
-          <div className="absolute top-0 left-0 w-8 h-8 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-[#FF1744] bg-[#FF1744]/30 animate-ping" />
+          <div className="absolute top-0 left-0 w-8 h-8 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-[#00D2FF] bg-[#00D2FF]/30 animate-ping" />
         )}
       </div>
     )
   },
   {
-    id: 'emerald_green',
-    name: 'Emerald Green Sci-Fi',
-    badge: 'Sci-Fi',
-    color: '#00E676',
-    desc: 'Futuristic geometric diamond pointer with emerald aura',
+    id: 'viu',
+    name: 'Viu',
+    badge: 'Viu',
+    color: '#FFCC00',
+    desc: 'High-visibility Viu electric yellow pointer with bold stroke',
     renderSvg: (isClicking) => (
       <div className="relative">
-        <svg className="w-7 h-7 drop-shadow-[0_2px_10px_rgba(0,230,118,0.85)] filter" viewBox="0 0 24 24" fill="none">
-          <path d="M12 2L20 12L12 22L4 12Z" fill="#00E676" stroke="#000000" strokeWidth="1.5" strokeLinejoin="round" />
-          <circle cx="12" cy="12" r="2.5" fill="#000000" />
+        <svg className="w-7 h-7 drop-shadow-[0_2px_10px_rgba(255,204,0,0.85)] filter" viewBox="0 0 24 24" fill="none">
+          <path d="M4 2L18.5 16.5L12 17.5L9.5 22L4 2Z" fill="#FFCC00" stroke="#000000" strokeWidth="1.8" strokeLinejoin="round" />
         </svg>
         {isClicking && (
-          <div className="absolute top-1/2 left-1/2 w-8 h-8 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-[#00E676] bg-[#00E676]/30 animate-ping" />
+          <div className="absolute top-0 left-0 w-8 h-8 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-[#FFCC00] bg-[#FFCC00]/30 animate-ping" />
         )}
       </div>
     )
   },
   {
-    id: 'magenta_pulse',
-    name: 'Cyberpunk Magenta',
-    badge: 'Cyberpunk',
-    color: '#F50057',
-    desc: 'Vivid magenta neon arrow with ultraviolet aura',
+    id: 'hulu',
+    name: 'Hulu',
+    badge: 'Hulu',
+    color: '#1CE783',
+    desc: 'Futuristic Hulu vibrant neon green arrow',
     renderSvg: (isClicking) => (
       <div className="relative">
-        <svg className="w-7 h-7 drop-shadow-[0_2px_10px_rgba(245,0,87,0.9)] filter" viewBox="0 0 24 24" fill="none">
-          <path d="M4 2L18.5 16.5L12 17.5L9.5 22L4 2Z" fill="#F50057" stroke="#000000" strokeWidth="1.5" strokeLinejoin="round" />
+        <svg className="w-7 h-7 drop-shadow-[0_2px_10px_rgba(28,231,131,0.85)] filter" viewBox="0 0 24 24" fill="none">
+          <path d="M4 2L18.5 16.5L12 17.5L9.5 22L4 2Z" fill="#1CE783" stroke="#000000" strokeWidth="1.5" strokeLinejoin="round" />
         </svg>
         {isClicking && (
-          <div className="absolute top-0 left-0 w-8 h-8 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-[#F50057] bg-[#F50057]/30 animate-ping" />
+          <div className="absolute top-0 left-0 w-8 h-8 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-[#1CE783] bg-[#1CE783]/30 animate-ping" />
         )}
       </div>
     )
   },
   {
-    id: 'amber_gold',
-    name: 'Amber Gold Arrow',
-    badge: 'Warm',
-    color: '#FFB300',
-    desc: 'Warm sunset amber gold pointer with golden backlight',
+    id: 'paramount',
+    name: 'Paramount+',
+    badge: 'Paramount+',
+    color: '#0064FF',
+    desc: 'Paramount mountain sky blue pointer with star emblem',
     renderSvg: (isClicking) => (
       <div className="relative">
-        <svg className="w-7 h-7 drop-shadow-[0_2px_10px_rgba(255,179,0,0.85)] filter" viewBox="0 0 24 24" fill="none">
-          <path d="M4 2L18.5 16.5L12 17.5L9.5 22L4 2Z" fill="#FFB300" stroke="#000000" strokeWidth="1.5" strokeLinejoin="round" />
+        <svg className="w-7 h-7 drop-shadow-[0_2px_10px_rgba(0,100,255,0.85)] filter" viewBox="0 0 24 24" fill="none">
+          <path d="M4 2L18.5 16.5L12 17.5L9.5 22L4 2Z" fill="#0064FF" stroke="#000000" strokeWidth="1.5" strokeLinejoin="round" />
+          <circle cx="9.5" cy="10.5" r="2" fill="#FFFFFF" />
         </svg>
         {isClicking && (
-          <div className="absolute top-0 left-0 w-8 h-8 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-[#FFB300] bg-[#FFB300]/30 animate-ping" />
+          <div className="absolute top-0 left-0 w-8 h-8 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-[#0064FF] bg-[#0064FF]/30 animate-ping" />
         )}
       </div>
     )
   },
   {
-    id: 'crosshair_target',
-    name: 'Tactical Crosshair',
-    badge: 'Tactical',
-    color: '#00E5FF',
-    desc: 'Precision target crosshair with center reticle for small icons',
+    id: 'crunchyroll',
+    name: 'Crunchyroll',
+    badge: 'Crunchyroll',
+    color: '#FF6600',
+    desc: 'Bright Crunchyroll anime orange arrow with warm glow',
     renderSvg: (isClicking) => (
       <div className="relative">
-        <svg className="w-7 h-7 drop-shadow-[0_2px_8px_rgba(0,0,0,0.9)] filter" viewBox="0 0 24 24" fill="none">
-          <circle cx="12" cy="12" r="8" stroke="#00E5FF" strokeWidth="1.5" strokeDasharray="3 2" />
-          <path d="M12 2V6M12 18V22M2 12H6M18 12H22" stroke="#00E5FF" strokeWidth="2" strokeLinecap="round" />
-          <circle cx="12" cy="12" r="2" fill="#FFFFFF" stroke="#000000" strokeWidth="0.8" />
+        <svg className="w-7 h-7 drop-shadow-[0_2px_10px_rgba(255,102,0,0.85)] filter" viewBox="0 0 24 24" fill="none">
+          <path d="M4 2L18.5 16.5L12 17.5L9.5 22L4 2Z" fill="#FF6600" stroke="#000000" strokeWidth="1.5" strokeLinejoin="round" />
+          <circle cx="9" cy="9.5" r="1.8" fill="#FFFFFF" />
         </svg>
         {isClicking && (
-          <div className="absolute top-1/2 left-1/2 w-9 h-9 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-[#00E5FF] bg-[#00E5FF]/40 animate-ping" />
+          <div className="absolute top-0 left-0 w-8 h-8 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-[#FF6600] bg-[#FF6600]/30 animate-ping" />
         )}
       </div>
     )
   },
   {
-    id: 'minimal_dot',
-    name: 'Minimal Ring & Dot',
-    badge: 'Minimal',
-    color: '#FFFFFF',
-    desc: 'Unobtrusive glowing outer ring with solid white center dot',
+    id: 'peacock',
+    name: 'Peacock',
+    badge: 'Peacock',
+    color: '#9D00FF',
+    desc: 'Peacock royal violet pointer with aurora feather glow',
     renderSvg: (isClicking) => (
       <div className="relative">
-        <svg className="w-6 h-6 drop-shadow-[0_2px_8px_rgba(0,0,0,0.9)] filter" viewBox="0 0 24 24" fill="none">
-          <circle cx="12" cy="12" r="9" stroke="#00E5FF" strokeWidth="1.8" />
-          <circle cx="12" cy="12" r="3.5" fill="#FFFFFF" stroke="#000000" strokeWidth="1" />
+        <svg className="w-7 h-7 drop-shadow-[0_2px_10px_rgba(157,0,255,0.85)] filter" viewBox="0 0 24 24" fill="none">
+          <path d="M4 2L18.5 16.5L12 17.5L9.5 22L4 2Z" fill="#9D00FF" stroke="#000000" strokeWidth="1.5" strokeLinejoin="round" />
+          <path d="M6 7L13 14" stroke="#00E5FF" strokeWidth="1.5" strokeLinecap="round" />
         </svg>
         {isClicking && (
-          <div className="absolute top-1/2 left-1/2 w-8 h-8 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-white/40 animate-ping" />
-        )}
-      </div>
-    )
-  },
-  {
-    id: 'classic_hand',
-    name: 'Interactive Hand',
-    badge: 'Touch',
-    color: '#FFFFFF',
-    desc: 'Classic pointing index finger with cyan cuff highlight',
-    renderSvg: (isClicking) => (
-      <div className="relative">
-        <svg className="w-7 h-7 drop-shadow-[0_2px_8px_rgba(0,0,0,0.9)] filter" viewBox="0 0 24 24" fill="none">
-          <path
-            d="M9 11V4.5C9 3.67 9.67 3 10.5 3C11.33 3 12 3.67 12 4.5V10.5M12 8.5C12 7.67 12.67 7 13.5 7C14.33 7 15 7.67 15 8.5V11M15 9.5C15 8.67 15.67 8 16.5 8C17.33 8 18 8.67 18 9.5V13C18 16.87 14.87 20 11 20H10C7.24 20 5 17.76 5 15V13.5C5 12.67 5.67 12 6.5 12C7.33 12 8 12.67 8 13.5V14"
-            fill="#FFFFFF"
-            stroke="#000000"
-            strokeWidth="1.5"
-            strokeLinejoin="round"
-          />
-          <path d="M8 20H14" stroke="#00E5FF" strokeWidth="2.5" strokeLinecap="round" />
-        </svg>
-        {isClicking && (
-          <div className="absolute top-1 left-2.5 w-6 h-6 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-[#00E5FF] bg-[#00E5FF]/40 animate-ping" />
+          <div className="absolute top-0 left-0 w-8 h-8 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-[#9D00FF] bg-[#9D00FF]/30 animate-ping" />
         )}
       </div>
     )
@@ -207,7 +203,7 @@ export const TVVirtualCursor: React.FC<TVVirtualCursorProps> = ({
   onClose,
   speed = 'normal',
   timeoutSeconds = 10,
-  cursorStyle = 'cyan_glow'
+  cursorStyle = 'hbo_max'
 }) => {
   const [position, setPosition] = useState<{ x: number; y: number }>(() => ({
     x: typeof window !== 'undefined' ? window.innerWidth / 2 : 960,
