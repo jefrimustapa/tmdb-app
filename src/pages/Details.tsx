@@ -20,6 +20,7 @@ export const Details: React.FC = () => {
   const [similar, setSimilar] = useState<TMDBMediaItem[]>([]);
   const [isLiked, setIsLiked] = useState(false);
   const [isWatchlist, setIsWatchlist] = useState(false);
+  const [lastWatched, setLastWatched] = useState<{ season: number; episode: number } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -40,13 +41,20 @@ export const Details: React.FC = () => {
         const recItems = (resData.similar?.results || resData.recommendations?.results || []) as TMDBMediaItem[];
         setSimilar(recItems);
 
-        const [liked, watchlisted] = await Promise.allSettled([
+        const [liked, watchlisted, historyItem] = await Promise.allSettled([
           dbService.isLiked(tmdbId, mediaType),
-          dbService.isWatchlisted(tmdbId, mediaType)
+          dbService.isWatchlisted(tmdbId, mediaType),
+          mediaType === 'tv' ? dbService.getHistoryItem(tmdbId, 'tv') : Promise.resolve(undefined)
         ]);
 
         if (liked.status === 'fulfilled') setIsLiked(liked.value);
         if (watchlisted.status === 'fulfilled') setIsWatchlist(watchlisted.value);
+        if (historyItem.status === 'fulfilled' && historyItem.value) {
+          const item = historyItem.value;
+          if (item.season && item.episode) {
+            setLastWatched({ season: item.season, episode: item.episode });
+          }
+        }
       } catch (err) {
         console.error('Failed to load details:', err);
       } finally {
@@ -66,6 +74,31 @@ export const Details: React.FC = () => {
     };
 
     fetchDetails();
+  }, [tmdbId, mediaType]);
+
+  // Keep last watched season & episode synchronized when returning to Details
+  useEffect(() => {
+    const updateLastWatched = async () => {
+      if (mediaType === 'tv' && tmdbId) {
+        const historyItem = await dbService.getHistoryItem(tmdbId, 'tv');
+        if (historyItem?.season && historyItem?.episode) {
+          setLastWatched({ season: historyItem.season, episode: historyItem.episode });
+        }
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        updateLastWatched();
+      }
+    };
+
+    window.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', updateLastWatched);
+    return () => {
+      window.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', updateLastWatched);
+    };
   }, [tmdbId, mediaType]);
 
   const handleToggleLike = async () => {
@@ -230,12 +263,20 @@ export const Details: React.FC = () => {
           {/* Primary Action Buttons */}
           <div className="flex items-center gap-3 sm:gap-4 pt-2.5 flex-wrap p-1">
             <Link
-              to={`/watch/${mediaType}/${tmdbId}`}
+              to={
+                mediaType === 'tv'
+                  ? `/watch/tv/${tmdbId}?s=${lastWatched?.season || 1}&e=${lastWatched?.episode || 1}`
+                  : `/watch/movie/${tmdbId}`
+              }
               data-details-primary="true"
               className="flex items-center gap-2.5 px-8 py-3.5 rounded-xl bg-gradient-to-r from-hbo-purple to-hbo-cyan text-white font-bold text-sm sm:text-base shadow-hbo-glow hover:scale-105 transition-all tv-focus-target"
             >
               <Play className="w-5 h-5 fill-current" />
-              <span>Watch Now</span>
+              <span>
+                {mediaType === 'tv' && lastWatched
+                  ? `Resume S${lastWatched.season} E${lastWatched.episode}`
+                  : 'Watch Now'}
+              </span>
             </Link>
 
             <button
@@ -285,9 +326,11 @@ export const Details: React.FC = () => {
           <div className="-mx-4 sm:-mx-8 lg:-mx-12 px-4 sm:px-8 lg:px-12">
             <EpisodeGrid
               tvDetails={details as TMDBTVDetails}
-              currentSeason={1}
-              currentEpisode={1}
+              currentSeason={lastWatched?.season || 1}
+              currentEpisode={lastWatched?.episode || 1}
+              hasWatchedHistory={Boolean(lastWatched)}
               onSelectEpisode={(s, e) => {
+                setLastWatched({ season: s, episode: e });
                 navigate(`/watch/tv/${tmdbId}?s=${s}&e=${e}`);
               }}
             />
