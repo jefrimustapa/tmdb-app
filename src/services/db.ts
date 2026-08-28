@@ -20,6 +20,8 @@ export class TMDBStreamerDB extends Dexie {
 
 export const db = new TMDBStreamerDB();
 
+let cachedSettings: UserSettings | null = null;
+
 // Defaults for Settings
 export const DEFAULT_SETTINGS: UserSettings = {
   id: 'current_settings',
@@ -148,11 +150,16 @@ export const dbService = {
 
   // Settings
   async getSettings(): Promise<UserSettings> {
+    if (cachedSettings) {
+      return cachedSettings;
+    }
     const settings = await db.settings.get('current_settings');
     if (!settings) {
       await db.settings.put(DEFAULT_SETTINGS);
+      cachedSettings = DEFAULT_SETTINGS;
       return DEFAULT_SETTINGS;
     }
+    cachedSettings = settings;
     return settings;
   },
 
@@ -163,6 +170,7 @@ export const dbService = {
       ...partial,
       updatedAt: Date.now()
     };
+    cachedSettings = updated;
     await db.settings.put(updated);
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('tmdb_settings_changed', { detail: updated }));
