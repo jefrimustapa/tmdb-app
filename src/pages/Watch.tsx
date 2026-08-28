@@ -82,7 +82,8 @@ export const Watch: React.FC = () => {
   // Load user settings for preferred provider and header auto-hide timeout
   useEffect(() => {
     dbService.getSettings().then((s) => {
-      if (s?.preferredProvider) setProviderId(s.preferredProvider);
+      const initialProvider = s?.topProviders?.[0] || s?.preferredProvider;
+      if (initialProvider) setProviderId(initialProvider);
       if (s?.streamHeaderTimeout !== undefined) {
         setHeaderTimeoutSeconds(s.streamHeaderTimeout);
       }
