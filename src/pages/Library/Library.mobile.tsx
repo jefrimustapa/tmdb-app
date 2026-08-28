@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { dbService } from '../services/db';
-import type { WatchHistoryItem, LikedItem, WatchlistItem } from '../types/db';
-import type { TMDBMediaItem } from '../types/tmdb';
-import { MediaCard } from '../components/common/MediaCard';
+import { dbService } from '../../services/db';
+import type { WatchHistoryItem, LikedItem, WatchlistItem } from '../../types/db';
+import type { TMDBMediaItem } from '../../types/tmdb';
+import { MediaCard } from '../../components/common/MediaCard';
 import { History, Heart, Bookmark, Trash2 } from 'lucide-react';
-import { useDevice } from '../hooks/useDevice';
+import { useDevice } from '../../hooks/useDevice';
 
 export const Library: React.FC = () => {
   const { isTV } = useDevice();
@@ -229,3 +229,4 @@ export const Library: React.FC = () => {
     </div>
   );
 };
+

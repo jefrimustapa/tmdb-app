@@ -1,27 +1,26 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { tmdbApi } from '../services/tmdb';
-import type { TMDBMediaItem, TMDBGenre } from '../types/tmdb';
-import { MediaCard } from '../components/common/MediaCard';
-import { PLATFORMS } from '../components/common/PlatformHubs';
-import { SortDropdown, SortOption } from '../components/common/SortDropdown';
+import { tmdbApi } from '../../services/tmdb';
+import type { TMDBMediaItem, TMDBGenre } from '../../types/tmdb';
+import { MediaCard } from '../../components/common/MediaCard';
+import { PLATFORMS } from '../../components/common/PlatformHubs';
+import { SortDropdown, SortOption } from '../../components/common/SortDropdown';
 import { Filter, SlidersHorizontal } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
-import { useDevice } from '../hooks/useDevice';
+import { useDevice } from '../../hooks/useDevice';
 
-const MOVIE_SORT_OPTIONS: SortOption[] = [
+const TV_SORT_OPTIONS: SortOption[] = [
   { value: 'popularity.desc', label: 'Most Popular' },
-  { value: 'vote_average.desc&vote_count.gte=300', label: 'Highest Rated' },
-  { value: 'primary_release_date.desc', label: 'Release Date (Newest)' },
-  { value: 'revenue.desc', label: 'Top Box Office' }
+  { value: 'vote_average.desc&vote_count.gte=200', label: 'Highest Rated' },
+  { value: 'first_air_date.desc', label: 'First Air Date (Newest)' }
 ];
 
-export const Movies: React.FC = () => {
+export const Series: React.FC = () => {
   const { isTV } = useDevice();
   const [searchParams, setSearchParams] = useSearchParams();
   const genreParam = searchParams.get('genre') || '';
   const providerParam = searchParams.get('provider') || '';
 
-  const [movies, setMovies] = useState<TMDBMediaItem[]>([]);
+  const [series, setSeries] = useState<TMDBMediaItem[]>([]);
   const [genres, setGenres] = useState<TMDBGenre[]>([]);
   const [selectedGenre, setSelectedGenre] = useState<string>(genreParam);
   const [selectedProvider, setSelectedProvider] = useState<string>(providerParam);
@@ -34,7 +33,7 @@ export const Movies: React.FC = () => {
   const observerTarget = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    tmdbApi.getMovieGenres().then((res) => setGenres(res.genres || []));
+    tmdbApi.getTVGenres().then((res) => setGenres(res.genres || []));
   }, []);
 
   useEffect(() => {
@@ -44,14 +43,14 @@ export const Movies: React.FC = () => {
 
   // Initial fetch or filter changes
   useEffect(() => {
-    const fetchInitialMovies = async () => {
+    const fetchInitialSeries = async () => {
       setIsLoading(true);
       setPage(1);
       try {
         const platformObj = PLATFORMS.find((p) => p.id === selectedProvider);
         const combinedGenres = [selectedGenre, platformObj?.genres].filter(Boolean).join(',');
 
-        const res = await tmdbApi.discoverMovies({
+        const res = await tmdbApi.discoverTV({
           with_genres: combinedGenres || undefined,
           with_watch_providers: platformObj?.providerId,
           watch_region: platformObj?.region || 'US',
@@ -59,19 +58,19 @@ export const Movies: React.FC = () => {
           sort_by: sortBy,
           page: 1
         });
-        setMovies(res.results || []);
+        setSeries(res.results || []);
         setHasMore((res.page || 1) < (res.total_pages || 1));
       } catch (err) {
-        console.error('Failed to discover movies:', err);
+        console.error('Failed to discover series:', err);
       } finally {
         setIsLoading(false);
       }
     };
-    fetchInitialMovies();
+    fetchInitialSeries();
   }, [selectedGenre, selectedProvider, sortBy]);
 
   // Load more function for infinite scroll
-  const loadMoreMovies = useCallback(async () => {
+  const loadMoreSeries = useCallback(async () => {
     if (isLoadingMore || !hasMore || isLoading) return;
     setIsLoadingMore(true);
     const nextPage = page + 1;
@@ -79,7 +78,7 @@ export const Movies: React.FC = () => {
       const platformObj = PLATFORMS.find((p) => p.id === selectedProvider);
       const combinedGenres = [selectedGenre, platformObj?.genres].filter(Boolean).join(',');
 
-      const res = await tmdbApi.discoverMovies({
+      const res = await tmdbApi.discoverTV({
         with_genres: combinedGenres || undefined,
         with_watch_providers: platformObj?.providerId,
         watch_region: platformObj?.region || 'US',
@@ -89,7 +88,7 @@ export const Movies: React.FC = () => {
       });
 
       if (res.results && res.results.length > 0) {
-        setMovies((prev) => {
+        setSeries((prev) => {
           const existingIds = new Set(prev.map((m) => m.id));
           const newItems = res.results.filter((m) => !existingIds.has(m.id));
           return [...prev, ...newItems];
@@ -100,7 +99,7 @@ export const Movies: React.FC = () => {
         setHasMore(false);
       }
     } catch (err) {
-      console.error('Failed to load more movies:', err);
+      console.error('Failed to load more series:', err);
     } finally {
       setIsLoadingMore(false);
     }
@@ -111,7 +110,7 @@ export const Movies: React.FC = () => {
     const observer = new IntersectionObserver(
       (entries) => {
         if (entries[0].isIntersecting && hasMore && !isLoading && !isLoadingMore) {
-          loadMoreMovies();
+          loadMoreSeries();
         }
       },
       { threshold: 0.1, rootMargin: '400px' }
@@ -127,7 +126,7 @@ export const Movies: React.FC = () => {
         observer.unobserve(currentTarget);
       }
     };
-  }, [loadMoreMovies, hasMore, isLoading, isLoadingMore]);
+  }, [loadMoreSeries, hasMore, isLoading, isLoadingMore]);
 
   const updateFilters = (newGenre: string, newProvider: string) => {
     setSelectedGenre(newGenre);
@@ -147,16 +146,16 @@ export const Movies: React.FC = () => {
       <div data-tv-filter-section="true" className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-5">
         <div>
           <h1 className="text-2xl sm:text-4xl font-extrabold font-display text-white tracking-tight flex items-center gap-2">
-            <span className="w-2 h-6 bg-hbo-purple-light rounded-full"></span>
-            Movies Catalog
+            <span className="w-2 h-6 bg-hbo-cyan rounded-full"></span>
+            TV Series Catalog
             {activePlatform && (
-              <span className="text-base sm:text-xl font-bold text-hbo-cyan ml-2">
+              <span className="text-base sm:text-xl font-bold text-hbo-purple-light ml-2">
                 ({activePlatform.name})
               </span>
             )}
           </h1>
           <p className="text-xs sm:text-sm text-gray-400 mt-1">
-            Over 1.1 million feature films, documentaries, and cinema releases
+            Over 180,000 seasons, reality programs, drama series, and animated serials
           </p>
         </div>
 
@@ -165,7 +164,7 @@ export const Movies: React.FC = () => {
           <SortDropdown
             value={sortBy}
             onChange={(val) => setSortBy(val)}
-            options={MOVIE_SORT_OPTIONS}
+            options={TV_SORT_OPTIONS}
           />
         </div>
       </div>
@@ -246,7 +245,7 @@ export const Movies: React.FC = () => {
         </div>
       </div>
 
-      {/* Grid of Movie Cards */}
+      {/* Grid of Series Cards */}
       {isLoading ? (
         <div className="py-20 flex justify-center">
           <div className="w-12 h-12 border-4 border-hbo-purple border-t-hbo-cyan rounded-full animate-spin shadow-hbo-glow" />
@@ -254,9 +253,9 @@ export const Movies: React.FC = () => {
       ) : (
         <>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3.5 sm:gap-5 lg:gap-6 py-2 px-1">
-            {movies.map((movie) => (
-              <div key={movie.id} className="flex justify-center">
-                <MediaCard item={movie} type="movie" />
+            {series.map((item) => (
+              <div key={item.id} className="flex justify-center">
+                <MediaCard item={item} type="tv" />
               </div>
             ))}
           </div>
@@ -266,10 +265,10 @@ export const Movies: React.FC = () => {
             {isLoadingMore && (
               <div className="flex items-center gap-3 px-4 py-2 rounded-full bg-hbo-card/80 border border-hbo-border">
                 <div className="w-5 h-5 border-2 border-hbo-cyan border-t-transparent rounded-full animate-spin" />
-                <span className="text-xs font-semibold text-gray-300">Loading more movies...</span>
+                <span className="text-xs font-semibold text-gray-300">Loading more series...</span>
               </div>
             )}
-            {!hasMore && movies.length > 0 && (
+            {!hasMore && series.length > 0 && (
               <p className="text-xs text-gray-500 font-medium tracking-wide">
                 You've reached the end of the catalog
               </p>
@@ -280,3 +279,4 @@ export const Movies: React.FC = () => {
     </div>
   );
 };
+

@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { tmdbApi } from '../services/tmdb';
-import type { TMDBMediaItem } from '../types/tmdb';
-import type { WatchHistoryItem } from '../types/db';
-import { dbService } from '../services/db';
-import { HeroBanner } from '../components/common/HeroBanner';
-import { MediaRow } from '../components/common/MediaRow';
-import { MediaCard } from '../components/common/MediaCard';
-import { PlatformHubs } from '../components/common/PlatformHubs';
+import { tmdbApi } from '../../services/tmdb';
+import type { TMDBMediaItem } from '../../types/tmdb';
+import type { WatchHistoryItem } from '../../types/db';
+import { dbService } from '../../services/db';
+import { HeroBanner } from '../../components/common/HeroBanner';
+import { MediaRow } from '../../components/common/MediaRow';
+import { MediaCard } from '../../components/common/MediaCard';
+import { PlatformHubs } from '../../components/common/PlatformHubs';
 import { Play, Sparkles, Flame, Trophy, Film, Tv, Compass } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
@@ -229,3 +229,4 @@ export const Home: React.FC = () => {
     </div>
   );
 };
+
