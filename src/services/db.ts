@@ -36,6 +36,11 @@ export const DEFAULT_SETTINGS: UserSettings = {
   directStreamMode: false,
   streamHeaderTimeout: 5,
   includeNightlyUpdates: false,
+  virtualCursorEnabled: true,
+  virtualCursorClicks: 2,
+  virtualCursorTimeout: 10,
+  virtualCursorSpeed: 'normal',
+  virtualCursorStyle: 'hbo_max',
   updatedAt: Date.now()
 };
 
