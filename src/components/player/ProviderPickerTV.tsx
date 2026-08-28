@@ -117,14 +117,14 @@ export const ProviderPickerTV: React.FC<ProviderPickerTVProps> = ({
       {isOpen && (
         <div
           data-provider-dropdown-open="true"
-          className="absolute right-0 mt-2 w-72 sm:w-84 max-h-[60vh] overflow-y-auto rounded-2xl bg-hbo-card/98 border border-white/20 shadow-2xl backdrop-blur-2xl p-2 z-50 focus:outline-none scrollbar-thin scrollbar-thumb-white/20 animate-fade-in"
+          className="absolute right-0 mt-2 w-84 sm:w-96 min-w-[340px] sm:min-w-[380px] max-h-[65vh] overflow-y-auto rounded-2xl bg-hbo-card/98 border border-white/20 shadow-2xl backdrop-blur-2xl p-2.5 z-50 focus:outline-none scrollbar-thin scrollbar-thumb-white/20 animate-fade-in"
         >
-          <div className="px-2 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider flex items-center justify-between sticky top-0 bg-hbo-card/95 backdrop-blur-md z-10">
+          <div className="px-3 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider flex items-center justify-between sticky top-0 bg-hbo-card/95 backdrop-blur-md z-10 border-b border-white/10 mb-1">
             <span>Select Stream Server</span>
             <ShieldCheck className="w-3.5 h-3.5 text-green-400" />
           </div>
 
-          <div className="space-y-1.5 pt-2 px-0.5 pb-1">
+          <div className="space-y-2 pt-1 px-1 pb-1">
             {STREAM_PROVIDERS.map((provider, idx) => {
               const isSelected = provider.id === currentProviderId;
               return (
@@ -144,14 +144,14 @@ export const ProviderPickerTV: React.FC<ProviderPickerTVProps> = ({
                       if (trigger) trigger.focus();
                     }
                   }}
-                  className={`w-full flex items-center justify-between gap-3 px-3.5 py-2.5 sm:px-4 sm:py-3 rounded-xl text-left transition-all tv-focus-target focus:outline-none focus:border-hbo-cyan focus:ring-2 focus:ring-hbo-cyan ${
+                  className={`w-full flex items-center justify-between gap-3.5 px-4 py-3 sm:px-4.5 sm:py-3.5 rounded-xl text-left transition-all tv-focus-target focus:outline-none focus:border-hbo-cyan focus:ring-2 focus:ring-hbo-cyan ${
                     isSelected
                       ? 'bg-gradient-to-r from-hbo-purple/40 to-hbo-cyan/20 border border-hbo-cyan text-white shadow-hbo-glow'
                       : 'text-gray-300 hover:text-white hover:bg-white/5 border border-transparent'
                   }`}
                 >
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
+                  <div className="min-w-0 flex-1 pr-1">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <p className={`text-xs sm:text-sm font-bold ${isSelected ? 'text-hbo-cyan' : 'text-white'}`}>
                         {provider.name}
                       </p>
@@ -159,11 +159,11 @@ export const ProviderPickerTV: React.FC<ProviderPickerTVProps> = ({
                         {provider.badge}
                       </span>
                     </div>
-                    <p className="text-[11px] text-gray-400 mt-0.5 leading-snug">
+                    <p className="text-[11px] text-gray-400 mt-1 leading-snug whitespace-normal break-words">
                       {provider.tagline}
                     </p>
                   </div>
-                  {isSelected && <Check className="w-4 h-4 text-hbo-cyan flex-shrink-0 ml-1" />}
+                  {isSelected && <Check className="w-4 h-4 text-hbo-cyan flex-shrink-0 ml-2" />}
                 </button>
               );
             })}

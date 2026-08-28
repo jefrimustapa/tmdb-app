@@ -182,44 +182,44 @@ export const Settings: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen pt-24 pb-40 px-4 sm:px-8 max-w-4xl mx-auto">
+    <div className="min-h-screen pt-20 sm:pt-24 pb-36 px-4 sm:px-8 lg:px-10 max-w-5xl mx-auto">
       {/* Header */}
       <div className="flex items-center justify-between mb-8 pb-4 border-b border-hbo-border">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-hbo-purple/20 border border-hbo-purple/40 flex items-center justify-center">
+        <div className="flex items-center gap-3.5">
+          <div className="w-11 h-11 rounded-2xl bg-hbo-purple/20 border border-hbo-purple/40 flex items-center justify-center flex-shrink-0 shadow-inner">
             <SettingsIcon className="w-5 h-5 text-hbo-purple-light" />
           </div>
           <div>
-            <h1 className="text-2xl sm:text-3xl font-black font-display text-white">System Settings</h1>
-            <p className="text-xs sm:text-sm text-gray-400">Manage device mode, ad shields, and streaming resolvers</p>
+            <h1 className="text-2xl sm:text-3xl font-black font-display text-white tracking-tight">System Settings</h1>
+            <p className="text-xs sm:text-sm text-gray-400 mt-0.5">Manage device mode, ad shields, and streaming resolvers</p>
           </div>
         </div>
 
         {savedMessage && (
-          <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 rounded-full text-xs font-semibold animate-fade-in">
+          <div className="flex items-center gap-2 px-3.5 py-1.5 bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 rounded-full text-xs font-semibold animate-fade-in flex-shrink-0">
             <Check className="w-4 h-4" />
             <span>Saved</span>
           </div>
         )}
       </div>
 
-      <div className="space-y-6">
+      <div className="space-y-6 sm:space-y-7">
         {/* Device Profile Mode */}
-        <div className="bg-hbo-card border border-hbo-border rounded-2xl p-5 sm:p-6">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-base sm:text-lg font-bold font-display text-white flex items-center gap-2">
-              <Tv2 className="w-5 h-5 text-hbo-cyan" />
+        <div className="bg-hbo-card border border-hbo-border rounded-2xl p-5 sm:p-7 shadow-lg">
+          <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+            <h3 className="text-base sm:text-lg font-bold font-display text-white flex items-center gap-2.5">
+              <Tv2 className="w-5 h-5 text-hbo-cyan flex-shrink-0" />
               <span>Device Experience Mode</span>
             </h3>
-            <span className="text-xs px-2.5 py-1 rounded-full bg-hbo-dark/80 border border-hbo-border text-hbo-cyan font-semibold">
+            <span className="text-xs px-3 py-1 rounded-full bg-hbo-dark/90 border border-hbo-border text-hbo-cyan font-semibold">
               Active: {activeLayout.toUpperCase()} ({settings.deviceMode === 'auto' ? 'Auto-Detected' : 'Manual Override'})
             </span>
           </div>
-          <p className="text-xs text-gray-400 mb-4">
+          <p className="text-xs text-gray-400 mb-4 leading-relaxed">
             Select your preferred display format or keep Auto-Detect for responsive switching.
           </p>
 
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 sm:gap-3.5">
             {[
               {
                 id: 'auto',
@@ -238,17 +238,19 @@ export const Settings: React.FC = () => {
                 <button
                   key={mode.id}
                   onClick={() => handleUpdate({ deviceMode: mode.id as any })}
-                  className={`p-3.5 rounded-xl border text-left transition-all tv-focus-target ${
+                  className={`p-4 rounded-xl border text-left transition-all tv-focus-target flex flex-col justify-between min-h-[96px] ${
                     isSelected
                       ? 'bg-gradient-to-r from-hbo-purple/40 to-hbo-cyan/20 border-hbo-cyan shadow-hbo-glow'
-                      : 'bg-hbo-dark/60 border-hbo-border hover:bg-hbo-hover'
+                      : 'bg-hbo-dark/60 border-hbo-border hover:bg-hbo-hover hover:border-white/20'
                   }`}
                 >
-                  <Icon className={`w-5 h-5 mb-2 ${isSelected ? 'text-hbo-cyan' : 'text-gray-400'}`} />
-                  <p className="text-sm font-bold text-white">{mode.label}</p>
-                  <p className={`text-[11px] mt-0.5 ${isSelected ? 'text-hbo-cyan font-semibold' : 'text-gray-400'}`}>
-                    {mode.desc}
-                  </p>
+                  <Icon className={`w-5 h-5 mb-2 flex-shrink-0 ${isSelected ? 'text-hbo-cyan' : 'text-gray-400'}`} />
+                  <div>
+                    <p className="text-xs sm:text-sm font-bold text-white leading-tight">{mode.label}</p>
+                    <p className={`text-[11px] mt-1 leading-snug ${isSelected ? 'text-hbo-cyan font-semibold' : 'text-gray-400'}`}>
+                      {mode.desc}
+                    </p>
+                  </div>
                 </button>
               );
             })}
@@ -256,21 +258,21 @@ export const Settings: React.FC = () => {
         </div>
 
         {/* Stream Header Overlay Auto-Hide */}
-        <div className="bg-hbo-card border border-hbo-border rounded-2xl p-5 sm:p-6">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-base sm:text-lg font-bold font-display text-white flex items-center gap-2">
-              <EyeOff className="w-5 h-5 text-hbo-cyan" />
+        <div className="bg-hbo-card border border-hbo-border rounded-2xl p-5 sm:p-7 shadow-lg">
+          <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+            <h3 className="text-base sm:text-lg font-bold font-display text-white flex items-center gap-2.5">
+              <EyeOff className="w-5 h-5 text-hbo-cyan flex-shrink-0" />
               <span>Stream Header Auto-Hide Timeout</span>
             </h3>
-            <span className="text-xs px-2.5 py-1 rounded-full bg-hbo-dark/80 border border-hbo-border text-hbo-cyan font-semibold">
+            <span className="text-xs px-3 py-1 rounded-full bg-hbo-dark/90 border border-hbo-border text-hbo-cyan font-semibold">
               {(settings.streamHeaderTimeout || 5) === 0 ? 'Always Visible' : `${settings.streamHeaderTimeout || 5} Seconds`}
             </span>
           </div>
-          <p className="text-xs text-gray-400 mb-4">
+          <p className="text-xs text-gray-400 mb-4 leading-relaxed">
             Automatically fade out the top overlay header (back button, title, server picker) while streaming. Tap screen to reveal anytime.
           </p>
 
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {[
               { seconds: 3, label: '3 Seconds', desc: 'Quick fade out' },
               { seconds: 5, label: '5 Seconds (Default)', desc: 'Standard cinema mode' },
@@ -282,16 +284,16 @@ export const Settings: React.FC = () => {
                 <button
                   key={opt.seconds}
                   onClick={() => handleUpdate({ streamHeaderTimeout: opt.seconds })}
-                  className={`p-3 rounded-xl border text-left transition-all tv-focus-target ${
+                  className={`p-3.5 sm:p-4 rounded-xl border text-left transition-all tv-focus-target min-h-[76px] flex flex-col justify-between ${
                     isSelected
                       ? 'bg-hbo-cyan/20 border-hbo-cyan text-white shadow-hbo-glow'
-                      : 'bg-hbo-dark/60 border-hbo-border text-gray-400 hover:text-gray-200'
+                      : 'bg-hbo-dark/60 border-hbo-border text-gray-400 hover:text-gray-200 hover:border-white/20'
                   }`}
                 >
-                  <p className={`text-xs font-bold ${isSelected ? 'text-hbo-cyan' : 'text-white'}`}>
+                  <p className={`text-xs sm:text-sm font-bold ${isSelected ? 'text-hbo-cyan' : 'text-white'}`}>
                     {opt.label}
                   </p>
-                  <p className="text-[11px] text-gray-400 mt-0.5">{opt.desc}</p>
+                  <p className="text-[11px] text-gray-400 mt-1 leading-snug">{opt.desc}</p>
                 </button>
               );
             })}
@@ -299,39 +301,39 @@ export const Settings: React.FC = () => {
         </div>
 
         {/* Top 3 Priority Stream Resolvers */}
-        <div className="bg-hbo-card border border-hbo-border rounded-2xl p-5 sm:p-6 space-y-4">
-          <div className="flex items-start justify-between gap-4">
+        <div className="bg-hbo-card border border-hbo-border rounded-2xl p-5 sm:p-7 shadow-lg space-y-5">
+          <div className="flex items-start justify-between gap-4 flex-wrap sm:flex-nowrap">
             <div>
-              <h3 className="text-base sm:text-lg font-bold font-display text-white flex items-center gap-2 mb-1">
-                <Server className="w-5 h-5 text-hbo-cyan" />
+              <h3 className="text-base sm:text-lg font-bold font-display text-white flex items-center gap-2.5 mb-1.5">
+                <Server className="w-5 h-5 text-hbo-cyan flex-shrink-0" />
                 <span>Top 3 Priority Stream Resolvers</span>
               </h3>
-              <p className="text-xs text-gray-400">
+              <p className="text-xs text-gray-400 leading-relaxed">
                 Choose the 3 primary servers the app will use first in order to resolve streams. If the 1st server fails or buffers, the app automatically fails over to the 2nd and 3rd servers.
               </p>
             </div>
-            <span className="text-xs px-2.5 py-1 rounded-full bg-hbo-purple/30 border border-hbo-purple/50 text-hbo-cyan font-bold whitespace-nowrap hidden sm:inline-block">
+            <span className="text-xs px-3 py-1 rounded-full bg-hbo-purple/30 border border-hbo-purple/50 text-hbo-cyan font-bold whitespace-nowrap hidden sm:inline-block flex-shrink-0">
               {STREAM_PROVIDERS.length} Servers Available
             </span>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-5 pt-1">
             {[
               {
                 index: 0,
-                priorityLabel: 'Priority #1 Server (Primary Initial)',
+                priorityLabel: 'Priority #1 Server (Primary)',
                 badgeClass: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40',
                 defaultId: 'vidlink'
               },
               {
                 index: 1,
-                priorityLabel: 'Priority #2 Server (First Failover)',
+                priorityLabel: 'Priority #2 Server (Failover 1)',
                 badgeClass: 'bg-hbo-purple/30 text-hbo-purple-light border-hbo-purple/40',
                 defaultId: 'moviesapi'
               },
               {
                 index: 2,
-                priorityLabel: 'Priority #3 Server (Second Failover)',
+                priorityLabel: 'Priority #3 Server (Failover 2)',
                 badgeClass: 'bg-hbo-cyan/20 text-hbo-cyan border-hbo-cyan/40',
                 defaultId: 'cinesrc'
               }
@@ -345,13 +347,13 @@ export const Settings: React.FC = () => {
               return (
                 <div
                   key={index}
-                  className="bg-hbo-dark/70 border border-hbo-border/90 rounded-xl p-4 flex flex-col justify-between gap-3 shadow-inner"
+                  className="bg-hbo-dark/70 border border-hbo-border/90 rounded-2xl p-4 sm:p-5 flex flex-col justify-between gap-3.5 shadow-inner"
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <span className={`text-[11px] font-bold px-2 py-0.5 rounded-md border ${badgeClass}`}>
+                    <span className={`text-[11px] font-bold px-2.5 py-1 rounded-md border ${badgeClass}`}>
                       #{index + 1} Priority
                     </span>
-                    <span className="text-[10px] px-1.5 py-0.2 rounded bg-white/10 text-gray-300 font-bold truncate max-w-[120px]">
+                    <span className="text-[10px] px-2 py-0.5 rounded bg-white/10 text-gray-300 font-bold flex-shrink-0">
                       {selectedProviderObj.badge}
                     </span>
                   </div>
@@ -364,16 +366,16 @@ export const Settings: React.FC = () => {
                       type="button"
                       id={`priority-server-btn-${index}`}
                       onClick={() => setOpenDropdownSlot(openDropdownSlot === index ? null : index)}
-                      className="w-full flex items-center justify-between bg-hbo-card/90 border border-hbo-border text-white text-xs font-bold rounded-lg px-3 py-2.5 hover:bg-hbo-hover hover:border-hbo-cyan focus:outline-none focus:border-hbo-cyan focus:ring-2 focus:ring-hbo-cyan transition-all tv-focus-target"
+                      className="w-full flex items-center justify-between bg-hbo-card/90 border border-hbo-border text-white text-xs font-bold rounded-xl px-3.5 py-3 min-h-[52px] hover:bg-hbo-hover hover:border-hbo-cyan focus:outline-none focus:border-hbo-cyan focus:ring-2 focus:ring-hbo-cyan transition-all tv-focus-target"
                     >
-                      <span className="truncate pr-2">{selectedProviderObj.name}</span>
+                      <span className="truncate pr-2 text-xs sm:text-sm">{selectedProviderObj.name}</span>
                       <ChevronDown className={`w-4 h-4 text-gray-400 flex-shrink-0 transition-transform ${openDropdownSlot === index ? 'rotate-180 text-hbo-cyan' : ''}`} />
                     </button>
 
                     {/* Inline Dropdown Menu */}
                     {openDropdownSlot === index && (
                       <div
-                        className="absolute left-0 right-0 top-full mt-2 z-50 bg-hbo-card/95 border border-hbo-border rounded-xl shadow-2xl p-1.5 max-h-60 overflow-y-auto space-y-1 focus-scroll-container backdrop-blur-xl animate-fade-in"
+                        className={`absolute ${index === 2 ? 'right-0' : 'left-0'} w-[340px] sm:w-[400px] md:w-[440px] top-full mt-2 z-50 bg-hbo-card/98 border border-hbo-border rounded-2xl shadow-2xl p-3.5 sm:p-4 max-h-72 overflow-y-auto space-y-2.5 focus-scroll-container backdrop-blur-2xl animate-fade-in`}
                       >
                         {STREAM_PROVIDERS.map((provider) => {
                           const isSelected = selectedId === provider.id;
@@ -393,14 +395,17 @@ export const Settings: React.FC = () => {
                                   document.getElementById(`priority-server-btn-${index}`)?.focus();
                                 }, 50);
                               }}
-                              className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-left text-xs transition-all tv-focus-target ${
+                              className={`w-full flex items-center justify-between gap-4 px-5 sm:px-6 py-3.5 sm:py-4 rounded-2xl text-left text-xs transition-all tv-focus-target ${
                                 isSelected
-                                  ? 'bg-hbo-purple/40 border border-hbo-cyan text-white font-bold'
-                                  : 'text-gray-300 hover:bg-hbo-hover hover:text-white'
+                                  ? 'bg-hbo-purple/40 border border-hbo-cyan text-white font-bold shadow-hbo-glow'
+                                  : 'text-gray-300 hover:bg-hbo-hover hover:text-white border border-transparent'
                               }`}
                             >
-                              <span className="truncate pr-2">{provider.name}</span>
-                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/10 text-gray-300 flex-shrink-0">
+                              <div className="min-w-0 flex-1 pr-3 pl-1">
+                                <span className="font-bold text-white block text-xs sm:text-sm leading-snug whitespace-normal break-words">{provider.name}</span>
+                                <span className="text-[11px] text-gray-400 block leading-normal mt-0.5 whitespace-normal break-words">{provider.tagline}</span>
+                              </div>
+                              <span className="text-[10px] px-3 py-1 rounded-md bg-white/10 text-gray-300 font-bold flex-shrink-0 ml-3 whitespace-nowrap">
                                 {provider.badge}
                               </span>
                             </button>
