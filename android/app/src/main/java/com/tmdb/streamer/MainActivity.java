@@ -501,12 +501,19 @@ public class MainActivity extends BridgeActivity {
     @Override
     public boolean dispatchKeyEvent(KeyEvent event) {
         if (isTV() && isWatchPageActive && event.getAction() == KeyEvent.ACTION_DOWN) {
-            // Drop auto-repeated key events to prevent rapid multi-firing
+            int keyCode = event.getKeyCode();
+
+            // Allow repeated presses for Left & Right (and media scrub) keys on remote so user can scrub the timeline
+            if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT || keyCode == KeyEvent.KEYCODE_DPAD_RIGHT ||
+                keyCode == KeyEvent.KEYCODE_MEDIA_FAST_FORWARD || keyCode == KeyEvent.KEYCODE_MEDIA_REWIND ||
+                keyCode == KeyEvent.KEYCODE_MEDIA_STEP_FORWARD || keyCode == KeyEvent.KEYCODE_MEDIA_STEP_BACKWARD) {
+                return super.dispatchKeyEvent(event);
+            }
+
+            // Drop auto-repeated key events only for single-action triggers like OK/Center and Back
             if (event.getRepeatCount() > 0) {
                 return true;
             }
-
-            int keyCode = event.getKeyCode();
             WebView webView = bridge.getWebView();
 
             if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER || keyCode == KeyEvent.KEYCODE_NUMPAD_ENTER) {
