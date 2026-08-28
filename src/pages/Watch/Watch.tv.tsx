@@ -8,6 +8,8 @@ import { TVVirtualCursor } from '../../components/player/TVVirtualCursor';
 import { dbService } from '../../services/db';
 import { ArrowLeft } from 'lucide-react';
 
+import type { VirtualCursorStyle } from '../../types/db';
+
 export const Watch: React.FC = () => {
   const { type, id } = useParams<{ type: 'movie' | 'tv'; id: string }>();
   const [searchParams] = useSearchParams();
@@ -26,11 +28,13 @@ export const Watch: React.FC = () => {
     clicks: 2 | 3;
     timeout: number;
     speed: 'slow' | 'normal' | 'fast';
+    style: VirtualCursorStyle;
   }>({
     enabled: true,
     clicks: 2,
     timeout: 10,
-    speed: 'normal'
+    speed: 'normal',
+    style: 'cyan_glow'
   });
 
   const tmdbId = parseInt(id || '0', 10);
@@ -46,7 +50,8 @@ export const Watch: React.FC = () => {
           enabled: s.virtualCursorEnabled ?? true,
           clicks: s.virtualCursorClicks ?? 2,
           timeout: s.virtualCursorTimeout ?? 10,
-          speed: s.virtualCursorSpeed ?? 'normal'
+          speed: s.virtualCursorSpeed ?? 'normal',
+          style: s.virtualCursorStyle ?? 'cyan_glow'
         });
       }
     });
@@ -419,6 +424,7 @@ export const Watch: React.FC = () => {
           onClose={() => setCursorActive(false)}
           speed={cursorSettings.speed}
           timeoutSeconds={cursorSettings.timeout}
+          cursorStyle={cursorSettings.style}
         />
       </div>
     </div>

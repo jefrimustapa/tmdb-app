@@ -39,6 +39,18 @@ export interface WatchlistItem {
   addedAt: number;
 }
 
+export type VirtualCursorStyle =
+  | 'cyan_glow'
+  | 'classic_white'
+  | 'neon_yellow'
+  | 'laser_red'
+  | 'emerald_green'
+  | 'magenta_pulse'
+  | 'amber_gold'
+  | 'crosshair_target'
+  | 'minimal_dot'
+  | 'classic_hand';
+
 export interface UserSettings {
   id: string; // 'current_settings'
   preferredProvider: string;
@@ -56,5 +68,6 @@ export interface UserSettings {
   virtualCursorClicks?: 2 | 3; // Number of repeated OK clicks to activate (2 or 3)
   virtualCursorTimeout?: number; // Inactivity auto-hide in seconds (5, 10, 15, 30, 0 for never)
   virtualCursorSpeed?: 'slow' | 'normal' | 'fast'; // Cursor movement speed
+  virtualCursorStyle?: VirtualCursorStyle; // Cursor style/appearance (10 options)
   updatedAt: number;
 }

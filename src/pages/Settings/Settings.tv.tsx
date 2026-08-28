@@ -9,6 +9,8 @@ import { updateService, type UpdateInfo } from '../../services/updateService';
 import { UpdateModal } from '../../components/common/UpdateModal';
 import { Settings as SettingsIcon, Tv2, Smartphone, Tablet, Monitor, ShieldCheck, Server, Database, Check, ShieldAlert, EyeOff, Lock, Zap, X, ArrowUpCircle, RefreshCw, Moon, Sparkles, AlertCircle, CalendarX, ChevronDown, MousePointer } from 'lucide-react';
 
+import { CURSOR_STYLES_LIST } from '../../components/player/TVVirtualCursor';
+
 export const Settings: React.FC = () => {
   const [settings, setSettings] = useState<UserSettings | null>(null);
   const [savedMessage, setSavedMessage] = useState(false);
@@ -35,19 +37,30 @@ export const Settings: React.FC = () => {
 
   const [showEasterEgg, setShowEasterEgg] = useState(false);
   const [openDropdownSlot, setOpenDropdownSlot] = useState<number | null>(null);
+  const [openCursorDropdown, setOpenCursorDropdown] = useState<'trigger' | 'timeout' | 'speed' | 'style' | null>(null);
   const clickCountRef = useRef(0);
   const clickTimerRef = useRef<NodeJS.Timeout | null>(null);
   const { deviceMode, setDeviceMode, detectedPlatform, activeLayout } = useDevice();
 
+  const isAnyDropdownOpen = openDropdownSlot !== null || openCursorDropdown !== null;
+
   useEffect(() => {
     try {
-      (window as any).AndroidBridge?.setDropdownOpen?.(openDropdownSlot !== null);
+      (window as any).AndroidBridge?.setDropdownOpen?.(isAnyDropdownOpen);
     } catch {}
 
     if (openDropdownSlot !== null) {
       setTimeout(() => {
         const activeEl = document.querySelector<HTMLElement>('[data-priority-dropdown-container="true"] [data-provider-selected="true"]') ||
                          document.querySelector<HTMLElement>('[data-priority-dropdown-container="true"] .tv-focus-target');
+        if (activeEl) {
+          activeEl.focus();
+        }
+      }, 50);
+    } else if (openCursorDropdown !== null) {
+      setTimeout(() => {
+        const activeEl = document.querySelector<HTMLElement>('[data-cursor-dropdown-container="true"] [data-cursor-selected="true"]') ||
+                         document.querySelector<HTMLElement>('[data-cursor-dropdown-container="true"] .tv-focus-target');
         if (activeEl) {
           activeEl.focus();
         }
@@ -59,23 +72,29 @@ export const Settings: React.FC = () => {
         (window as any).AndroidBridge?.setDropdownOpen?.(false);
       } catch {}
     };
-  }, [openDropdownSlot]);
+  }, [openDropdownSlot, openCursorDropdown, isAnyDropdownOpen]);
 
-  // Handle remote Back button, Escape, and Left/Right arrow dismissal for priority dropdowns
+  // Handle remote Back button, Escape, and Left/Right arrow dismissal for priority dropdowns & cursor dropdowns
   useEffect(() => {
     const handleCloseFromEvent = () => {
       const slot = openDropdownSlot;
+      const cursorDropdown = openCursorDropdown;
       setOpenDropdownSlot(null);
+      setOpenCursorDropdown(null);
       if (slot !== null) {
         setTimeout(() => {
           document.getElementById(`priority-server-btn-${slot}`)?.focus();
+        }, 50);
+      } else if (cursorDropdown !== null) {
+        setTimeout(() => {
+          document.getElementById(`cursor-${cursorDropdown}-btn`)?.focus();
         }, 50);
       }
     };
 
     window.addEventListener('tmdb_close_dropdowns', handleCloseFromEvent);
 
-    if (openDropdownSlot === null) {
+    if (!isAnyDropdownOpen) {
       return () => {
         window.removeEventListener('tmdb_close_dropdowns', handleCloseFromEvent);
       };
@@ -94,15 +113,23 @@ export const Settings: React.FC = () => {
         e.preventDefault();
         e.stopPropagation();
         const slot = openDropdownSlot;
+        const cursorDropdown = openCursorDropdown;
         setOpenDropdownSlot(null);
-        setTimeout(() => {
-          document.getElementById(`priority-server-btn-${slot}`)?.focus();
-        }, 50);
+        setOpenCursorDropdown(null);
+        if (slot !== null) {
+          setTimeout(() => {
+            document.getElementById(`priority-server-btn-${slot}`)?.focus();
+          }, 50);
+        } else if (cursorDropdown !== null) {
+          setTimeout(() => {
+            document.getElementById(`cursor-${cursorDropdown}-btn`)?.focus();
+          }, 50);
+        }
         return;
       }
 
-      // Arrow Right from inside dropdown closes and moves to next priority slot
-      if (e.key === 'ArrowRight' && openDropdownSlot < 2) {
+      // Arrow Right from inside priority dropdown closes and moves to next priority slot
+      if (e.key === 'ArrowRight' && openDropdownSlot !== null && openDropdownSlot < 2) {
         e.preventDefault();
         e.stopPropagation();
         const nextSlot = openDropdownSlot + 1;
@@ -113,8 +140,8 @@ export const Settings: React.FC = () => {
         return;
       }
 
-      // Arrow Left from inside dropdown closes and moves to previous priority slot
-      if (e.key === 'ArrowLeft' && openDropdownSlot > 0) {
+      // Arrow Left from inside priority dropdown closes and moves to previous priority slot
+      if (e.key === 'ArrowLeft' && openDropdownSlot !== null && openDropdownSlot > 0) {
         e.preventDefault();
         e.stopPropagation();
         const prevSlot = openDropdownSlot - 1;
@@ -128,8 +155,9 @@ export const Settings: React.FC = () => {
 
     const handleDocumentClick = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
-      if (!target.closest('[data-priority-dropdown-container="true"]')) {
+      if (!target.closest('[data-priority-dropdown-container="true"]') && !target.closest('[data-cursor-dropdown-container="true"]')) {
         setOpenDropdownSlot(null);
+        setOpenCursorDropdown(null);
       }
     };
 
@@ -141,7 +169,7 @@ export const Settings: React.FC = () => {
       window.removeEventListener('keydown', handleKeyDown, { capture: true });
       document.removeEventListener('mousedown', handleDocumentClick);
     };
-  }, [openDropdownSlot]);
+  }, [openDropdownSlot, openCursorDropdown, isAnyDropdownOpen]);
 
   const handleBuildNumberClick = () => {
     clickCountRef.current += 1;
@@ -322,100 +350,282 @@ export const Settings: React.FC = () => {
             </button>
           </div>
 
-          {(settings.virtualCursorEnabled ?? true) && (
-            <div className="space-y-4 pt-2 border-t border-hbo-border/60">
-              {/* Activation Trigger */}
-              <div>
-                <p className="text-xs font-semibold text-gray-300 mb-2">Activation Trigger (When Watching)</p>
-                <div className="grid grid-cols-2 gap-3">
-                  {[
-                    { clicks: 2 as const, label: 'Double Press OK (Default)', desc: 'Press OK 2 times rapidly' },
-                    { clicks: 3 as const, label: 'Triple Press OK', desc: 'Press OK 3 times rapidly' }
-                  ].map((opt) => {
-                    const isSelected = (settings.virtualCursorClicks ?? 2) === opt.clicks;
-                    return (
-                      <button
-                        key={opt.clicks}
-                        onClick={() => handleUpdate({ virtualCursorClicks: opt.clicks })}
-                        className={`p-3 rounded-xl border text-left transition-all tv-focus-target ${
-                          isSelected
-                            ? 'bg-hbo-cyan/20 border-hbo-cyan text-white shadow-hbo-glow'
-                            : 'bg-hbo-dark/60 border-hbo-border text-gray-400 hover:text-gray-200'
-                        }`}
-                      >
-                        <p className={`text-xs font-bold ${isSelected ? 'text-hbo-cyan' : 'text-white'}`}>
-                          {opt.label}
-                        </p>
-                        <p className="text-[11px] text-gray-400 mt-0.5">{opt.desc}</p>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
+          {(settings.virtualCursorEnabled ?? true) && (() => {
+            const currentStyleId = settings.virtualCursorStyle ?? 'cyan_glow';
+            const currentStyleObj = CURSOR_STYLES_LIST.find((c) => c.id === currentStyleId) || CURSOR_STYLES_LIST[0];
 
-              {/* Inactivity Auto-Hide Timeout */}
-              <div>
-                <p className="text-xs font-semibold text-gray-300 mb-2">Inactivity Auto-Hide Duration</p>
-                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
-                  {[
-                    { seconds: 5, label: '5 Seconds', desc: 'Quick dismiss' },
-                    { seconds: 10, label: '10s (Default)', desc: 'Standard timeout' },
-                    { seconds: 15, label: '15 Seconds', desc: 'Extended' },
-                    { seconds: 30, label: '30 Seconds', desc: 'Long duration' },
-                    { seconds: 0, label: 'Never', desc: 'Manual dismiss' }
-                  ].map((opt) => {
-                    const isSelected = (settings.virtualCursorTimeout ?? 10) === opt.seconds;
-                    return (
-                      <button
-                        key={opt.seconds}
-                        onClick={() => handleUpdate({ virtualCursorTimeout: opt.seconds })}
-                        className={`p-3 rounded-xl border text-left transition-all tv-focus-target ${
-                          isSelected
-                            ? 'bg-hbo-cyan/20 border-hbo-cyan text-white shadow-hbo-glow'
-                            : 'bg-hbo-dark/60 border-hbo-border text-gray-400 hover:text-gray-200'
-                        }`}
-                      >
-                        <p className={`text-xs font-bold ${isSelected ? 'text-hbo-cyan' : 'text-white'}`}>
-                          {opt.label}
-                        </p>
-                        <p className="text-[11px] text-gray-400 mt-0.5">{opt.desc}</p>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
+            const currentTimeoutSec = settings.virtualCursorTimeout ?? 10;
+            const timeoutOpts = [
+              { seconds: 5, label: '5 Seconds', desc: 'Quick fade out after 5s idle' },
+              { seconds: 10, label: '10 Seconds (Default)', desc: 'Standard cinema idle timeout' },
+              { seconds: 15, label: '15 Seconds', desc: 'Extended duration before hiding' },
+              { seconds: 30, label: '30 Seconds', desc: 'Long duration for browsing tracks' },
+              { seconds: 0, label: 'Never (Manual Dismiss)', desc: 'Stays visible until closed with Back key' }
+            ];
+            const currentTimeoutObj = timeoutOpts.find((t) => t.seconds === currentTimeoutSec) || timeoutOpts[1];
 
-              {/* Cursor Movement Speed */}
-              <div>
-                <p className="text-xs font-semibold text-gray-300 mb-2">Cursor Movement Speed</p>
-                <div className="grid grid-cols-3 gap-3">
-                  {[
-                    { speed: 'slow' as const, label: 'Slow', desc: 'High precision for small icons' },
-                    { speed: 'normal' as const, label: 'Normal (Default)', desc: 'Balanced response' },
-                    { speed: 'fast' as const, label: 'Fast', desc: 'Quick panning across large screens' }
-                  ].map((opt) => {
-                    const isSelected = (settings.virtualCursorSpeed ?? 'normal') === opt.speed;
-                    return (
-                      <button
-                        key={opt.speed}
-                        onClick={() => handleUpdate({ virtualCursorSpeed: opt.speed })}
-                        className={`p-3 rounded-xl border text-left transition-all tv-focus-target ${
-                          isSelected
-                            ? 'bg-hbo-cyan/20 border-hbo-cyan text-white shadow-hbo-glow'
-                            : 'bg-hbo-dark/60 border-hbo-border text-gray-400 hover:text-gray-200'
-                        }`}
-                      >
-                        <p className={`text-xs font-bold ${isSelected ? 'text-hbo-cyan' : 'text-white'}`}>
-                          {opt.label}
-                        </p>
-                        <p className="text-[11px] text-gray-400 mt-0.5">{opt.desc}</p>
-                      </button>
-                    );
-                  })}
+            const currentSpd = settings.virtualCursorSpeed ?? 'normal';
+            const speedOpts = [
+              { speed: 'slow' as const, label: 'Slow (16px)', desc: 'High precision for small icons & scrubber' },
+              { speed: 'normal' as const, label: 'Normal (28px - Default)', desc: 'Balanced response for standard TV remotes' },
+              { speed: 'fast' as const, label: 'Fast (48px)', desc: 'Quick panning across large TV displays' }
+            ];
+            const currentSpeedObj = speedOpts.find((s) => s.speed === currentSpd) || speedOpts[1];
+
+            const currentClk = settings.virtualCursorClicks ?? 2;
+            const clickOpts = [
+              { clicks: 2 as const, label: 'Double Press OK (Default)', desc: 'Press remote OK button 2 times rapidly' },
+              { clicks: 3 as const, label: 'Triple Press OK', desc: 'Press remote OK button 3 times rapidly' }
+            ];
+            const currentClickObj = clickOpts.find((c) => c.clicks === currentClk) || clickOpts[0];
+
+            return (
+              <div className="space-y-4 pt-2 border-t border-hbo-border/60">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* 1. Cursor Style & Appearance Dropdown (10 Options) */}
+                  <div className="relative" data-cursor-dropdown-container="true">
+                    <span className="block text-xs font-semibold text-gray-300 mb-1.5">
+                      Cursor Style & Appearance (10 Styles)
+                    </span>
+                    <button
+                      type="button"
+                      id="cursor-style-btn"
+                      onClick={() => {
+                        setOpenDropdownSlot(null);
+                        setOpenCursorDropdown(openCursorDropdown === 'style' ? null : 'style');
+                      }}
+                      className="w-full flex items-center justify-between bg-hbo-dark/80 border border-hbo-border text-white text-xs font-bold rounded-xl px-3.5 py-3 hover:bg-hbo-hover hover:border-hbo-cyan focus:outline-none focus:border-hbo-cyan focus:ring-2 focus:ring-hbo-cyan transition-all tv-focus-target"
+                    >
+                      <div className="flex items-center gap-3 truncate">
+                        <div className="w-6 h-6 flex items-center justify-center flex-shrink-0">
+                          {currentStyleObj.renderSvg(false)}
+                        </div>
+                        <div className="text-left truncate">
+                          <span className="font-bold text-white block truncate">{currentStyleObj.name}</span>
+                          <span className="text-[10px] text-gray-400 block truncate">{currentStyleObj.desc}</span>
+                        </div>
+                      </div>
+                      <ChevronDown className={`w-4 h-4 text-gray-400 flex-shrink-0 transition-transform ${openCursorDropdown === 'style' ? 'rotate-180 text-hbo-cyan' : ''}`} />
+                    </button>
+
+                    {/* Styles Dropdown Menu */}
+                    {openCursorDropdown === 'style' && (
+                      <div className="absolute left-0 right-0 top-full mt-2 z-50 bg-hbo-card/95 border border-hbo-border rounded-xl shadow-2xl p-1.5 max-h-64 overflow-y-auto space-y-1 focus-scroll-container backdrop-blur-xl animate-fade-in">
+                        {CURSOR_STYLES_LIST.map((styleOpt) => {
+                          const isSelected = currentStyleId === styleOpt.id;
+                          return (
+                            <button
+                              key={styleOpt.id}
+                              data-cursor-selected={isSelected ? 'true' : 'false'}
+                              onClick={() => {
+                                handleUpdate({ virtualCursorStyle: styleOpt.id });
+                                setOpenCursorDropdown(null);
+                                setTimeout(() => {
+                                  document.getElementById('cursor-style-btn')?.focus();
+                                }, 50);
+                              }}
+                              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-left text-xs transition-all tv-focus-target ${
+                                isSelected
+                                  ? 'bg-hbo-purple/40 border border-hbo-cyan text-white font-bold'
+                                  : 'text-gray-300 hover:bg-hbo-hover hover:text-white'
+                              }`}
+                            >
+                              <div className="flex items-center gap-3 truncate">
+                                <div className="w-6 h-6 flex items-center justify-center flex-shrink-0">
+                                  {styleOpt.renderSvg(false)}
+                                </div>
+                                <div className="truncate">
+                                  <span className="font-semibold text-white block truncate">{styleOpt.name}</span>
+                                  <span className="text-[10px] text-gray-400 block truncate">{styleOpt.desc}</span>
+                                </div>
+                              </div>
+                              <span className="text-[10px] px-2 py-0.5 rounded font-bold border border-white/20 bg-white/10 text-gray-300 ml-2 whitespace-nowrap">
+                                {styleOpt.badge}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 2. Activation Trigger Dropdown */}
+                  <div className="relative" data-cursor-dropdown-container="true">
+                    <span className="block text-xs font-semibold text-gray-300 mb-1.5">
+                      Activation Trigger (When Watching)
+                    </span>
+                    <button
+                      type="button"
+                      id="cursor-trigger-btn"
+                      onClick={() => {
+                        setOpenDropdownSlot(null);
+                        setOpenCursorDropdown(openCursorDropdown === 'trigger' ? null : 'trigger');
+                      }}
+                      className="w-full flex items-center justify-between bg-hbo-dark/80 border border-hbo-border text-white text-xs font-bold rounded-xl px-3.5 py-3 hover:bg-hbo-hover hover:border-hbo-cyan focus:outline-none focus:border-hbo-cyan focus:ring-2 focus:ring-hbo-cyan transition-all tv-focus-target"
+                    >
+                      <div className="text-left truncate">
+                        <span className="font-bold text-white block truncate">
+                          {currentClickObj.label}
+                        </span>
+                        <span className="text-[10px] text-gray-400 block truncate">
+                          {currentClickObj.desc}
+                        </span>
+                      </div>
+                      <ChevronDown className={`w-4 h-4 text-gray-400 flex-shrink-0 transition-transform ${openCursorDropdown === 'trigger' ? 'rotate-180 text-hbo-cyan' : ''}`} />
+                    </button>
+
+                    {openCursorDropdown === 'trigger' && (
+                      <div className="absolute left-0 right-0 top-full mt-2 z-50 bg-hbo-card/95 border border-hbo-border rounded-xl shadow-2xl p-1.5 max-h-60 overflow-y-auto space-y-1 focus-scroll-container backdrop-blur-xl animate-fade-in">
+                        {clickOpts.map((opt) => {
+                          const isSelected = currentClk === opt.clicks;
+                          return (
+                            <button
+                              key={opt.clicks}
+                              data-cursor-selected={isSelected ? 'true' : 'false'}
+                              onClick={() => {
+                                handleUpdate({ virtualCursorClicks: opt.clicks });
+                                setOpenCursorDropdown(null);
+                                setTimeout(() => {
+                                  document.getElementById('cursor-trigger-btn')?.focus();
+                                }, 50);
+                              }}
+                              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-left text-xs transition-all tv-focus-target ${
+                                isSelected
+                                  ? 'bg-hbo-purple/40 border border-hbo-cyan text-white font-bold'
+                                  : 'text-gray-300 hover:bg-hbo-hover hover:text-white'
+                              }`}
+                            >
+                              <div>
+                                <span className="font-semibold text-white block">{opt.label}</span>
+                                <span className="text-[10px] text-gray-400 block">{opt.desc}</span>
+                              </div>
+                              {isSelected && <Check className="w-4 h-4 text-hbo-cyan" />}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 3. Inactivity Auto-Hide Duration Dropdown */}
+                  <div className="relative" data-cursor-dropdown-container="true">
+                    <span className="block text-xs font-semibold text-gray-300 mb-1.5">
+                      Inactivity Auto-Hide Duration
+                    </span>
+                    <button
+                      type="button"
+                      id="cursor-timeout-btn"
+                      onClick={() => {
+                        setOpenDropdownSlot(null);
+                        setOpenCursorDropdown(openCursorDropdown === 'timeout' ? null : 'timeout');
+                      }}
+                      className="w-full flex items-center justify-between bg-hbo-dark/80 border border-hbo-border text-white text-xs font-bold rounded-xl px-3.5 py-3 hover:bg-hbo-hover hover:border-hbo-cyan focus:outline-none focus:border-hbo-cyan focus:ring-2 focus:ring-hbo-cyan transition-all tv-focus-target"
+                    >
+                      <div className="text-left truncate">
+                        <span className="font-bold text-white block truncate">
+                          {currentTimeoutObj.label}
+                        </span>
+                        <span className="text-[10px] text-gray-400 block truncate">
+                          {currentTimeoutObj.desc}
+                        </span>
+                      </div>
+                      <ChevronDown className={`w-4 h-4 text-gray-400 flex-shrink-0 transition-transform ${openCursorDropdown === 'timeout' ? 'rotate-180 text-hbo-cyan' : ''}`} />
+                    </button>
+
+                    {openCursorDropdown === 'timeout' && (
+                      <div className="absolute left-0 right-0 top-full mt-2 z-50 bg-hbo-card/95 border border-hbo-border rounded-xl shadow-2xl p-1.5 max-h-60 overflow-y-auto space-y-1 focus-scroll-container backdrop-blur-xl animate-fade-in">
+                        {timeoutOpts.map((opt) => {
+                          const isSelected = currentTimeoutSec === opt.seconds;
+                          return (
+                            <button
+                              key={opt.seconds}
+                              data-cursor-selected={isSelected ? 'true' : 'false'}
+                              onClick={() => {
+                                handleUpdate({ virtualCursorTimeout: opt.seconds });
+                                setOpenCursorDropdown(null);
+                                setTimeout(() => {
+                                  document.getElementById('cursor-timeout-btn')?.focus();
+                                }, 50);
+                              }}
+                              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-left text-xs transition-all tv-focus-target ${
+                                isSelected
+                                  ? 'bg-hbo-purple/40 border border-hbo-cyan text-white font-bold'
+                                  : 'text-gray-300 hover:bg-hbo-hover hover:text-white'
+                              }`}
+                            >
+                              <div>
+                                <span className="font-semibold text-white block">{opt.label}</span>
+                                <span className="text-[10px] text-gray-400 block">{opt.desc}</span>
+                              </div>
+                              {isSelected && <Check className="w-4 h-4 text-hbo-cyan" />}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 4. Cursor Movement Speed Dropdown */}
+                  <div className="relative" data-cursor-dropdown-container="true">
+                    <span className="block text-xs font-semibold text-gray-300 mb-1.5">
+                      Cursor Movement Speed
+                    </span>
+                    <button
+                      type="button"
+                      id="cursor-speed-btn"
+                      onClick={() => {
+                        setOpenDropdownSlot(null);
+                        setOpenCursorDropdown(openCursorDropdown === 'speed' ? null : 'speed');
+                      }}
+                      className="w-full flex items-center justify-between bg-hbo-dark/80 border border-hbo-border text-white text-xs font-bold rounded-xl px-3.5 py-3 hover:bg-hbo-hover hover:border-hbo-cyan focus:outline-none focus:border-hbo-cyan focus:ring-2 focus:ring-hbo-cyan transition-all tv-focus-target"
+                    >
+                      <div className="text-left truncate">
+                        <span className="font-bold text-white block truncate">
+                          {currentSpeedObj.label}
+                        </span>
+                        <span className="text-[10px] text-gray-400 block truncate">
+                          {currentSpeedObj.desc}
+                        </span>
+                      </div>
+                      <ChevronDown className={`w-4 h-4 text-gray-400 flex-shrink-0 transition-transform ${openCursorDropdown === 'speed' ? 'rotate-180 text-hbo-cyan' : ''}`} />
+                    </button>
+
+                    {openCursorDropdown === 'speed' && (
+                      <div className="absolute left-0 right-0 top-full mt-2 z-50 bg-hbo-card/95 border border-hbo-border rounded-xl shadow-2xl p-1.5 max-h-60 overflow-y-auto space-y-1 focus-scroll-container backdrop-blur-xl animate-fade-in">
+                        {speedOpts.map((opt) => {
+                          const isSelected = currentSpd === opt.speed;
+                          return (
+                            <button
+                              key={opt.speed}
+                              data-cursor-selected={isSelected ? 'true' : 'false'}
+                              onClick={() => {
+                                handleUpdate({ virtualCursorSpeed: opt.speed });
+                                setOpenCursorDropdown(null);
+                                setTimeout(() => {
+                                  document.getElementById('cursor-speed-btn')?.focus();
+                                }, 50);
+                              }}
+                              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-left text-xs transition-all tv-focus-target ${
+                                isSelected
+                                  ? 'bg-hbo-purple/40 border border-hbo-cyan text-white font-bold'
+                                  : 'text-gray-300 hover:bg-hbo-hover hover:text-white'
+                              }`}
+                            >
+                              <div>
+                                <span className="font-semibold text-white block">{opt.label}</span>
+                                <span className="text-[10px] text-gray-400 block">{opt.desc}</span>
+                              </div>
+                              {isSelected && <Check className="w-4 h-4 text-hbo-cyan" />}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
         </div>
 
         {/* Top 3 Priority Stream Resolvers */}
