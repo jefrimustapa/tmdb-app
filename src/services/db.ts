@@ -33,8 +33,10 @@ export const DEFAULT_SETTINGS: UserSettings = {
   filterAdult: true,
   filterUnreleased: true,
   maturityLevel: 'all',
+  streamResolver: 'embed',
   directStreamMode: false,
   directStreamApiUrl: 'https://tmdb-api-yfbu.onrender.com',
+  torboxApiKey: '',
   streamHeaderTimeout: 5,
   includeNightlyUpdates: false,
   virtualCursorEnabled: true,
@@ -183,6 +185,10 @@ export const dbService = {
         'moviesapi',
         'cinesrc'
       ];
+      await db.settings.put(settings);
+    }
+    if (!settings.streamResolver) {
+      settings.streamResolver = settings.directStreamMode ? 'private_extractor' : 'embed';
       await db.settings.put(settings);
     }
     cachedSettings = settings;

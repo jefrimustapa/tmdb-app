@@ -61,6 +61,8 @@ export type VirtualCursorStyle =
   | 'minimal_dot'
   | 'classic_hand';
 
+export type StreamResolverType = 'embed' | 'private_extractor' | 'torbox';
+
 export interface UserSettings {
   id: string; // 'current_settings'
   preferredProvider: string;
@@ -71,8 +73,10 @@ export interface UserSettings {
   filterAdult: boolean;
   filterUnreleased?: boolean;
   maturityLevel: 'all' | 'pg13' | 'family';
-  directStreamMode: boolean; // Option A: Direct Stream Extractor
+  streamResolver: StreamResolverType; // 'embed' (default) | 'private_extractor' | 'torbox'
   directStreamApiUrl?: string; // Custom or default Consumet API URL (e.g. https://tmdb-api-yfbu.onrender.com)
+  torboxApiKey?: string; // TorBox API Key (for 4K HDR & 1080p cloud streams)
+  directStreamMode?: boolean; // Legacy fallback flag
   streamHeaderTimeout: number; // in seconds, e.g. 3, 5, 8, or 0 for always visible
   includeNightlyUpdates: boolean; // Option to check for and install Nightly pre-releases
   virtualCursorEnabled?: boolean; // TV Mode on-demand virtual cursor

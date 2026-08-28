@@ -5,6 +5,8 @@ import type { StreamProvider } from '../../types/stream';
 import { STREAM_PROVIDERS, getProviderById, getOrderedProviders } from '../../services/streamProviders';
 import { dbService } from '../../services/db';
 import { fetchDirectStream, DEFAULT_DIRECT_STREAM_API } from '../../services/directStreamService';
+import { fetchTorboxStream } from '../../services/torboxService';
+import type { StreamResolverType } from '../../types/db';
 import { Logo } from '../common/Logo';
 import { tmdbImages } from '../../services/tmdb';
 
@@ -41,10 +43,12 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
   const [adShieldEnabled, setAdShieldEnabled] = useState(true);
-  const [directStreamMode, setDirectStreamMode] = useState(false);
+  const [streamResolver, setStreamResolver] = useState<StreamResolverType>('embed');
   const [directStreamApiUrl, setDirectStreamApiUrl] = useState(DEFAULT_DIRECT_STREAM_API);
+  const [torboxApiKey, setTorboxApiKey] = useState('');
   const [playerMode, setPlayerMode] = useState<'embed' | 'direct'>('embed');
   const [directStreamUrl, setDirectStreamUrl] = useState<string | null>(null);
+  const [directStreamLabel, setDirectStreamLabel] = useState<string>('');
   const [isExtracting, setIsExtracting] = useState(false);
   const [extractionFailed, setExtractionFailed] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -105,9 +109,13 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     dbService.getSettings().then((s) => {
       if (s) {
         setAdShieldEnabled(s.adBlockShield);
-        setDirectStreamMode(s.directStreamMode || false);
+        const activeResolver = s.streamResolver || (s.directStreamMode ? 'private_extractor' : 'embed');
+        setStreamResolver(activeResolver);
         if (s.directStreamApiUrl) {
           setDirectStreamApiUrl(s.directStreamApiUrl);
+        }
+        if (s.torboxApiKey) {
+          setTorboxApiKey(s.torboxApiKey);
         }
         if (s.topProviders && s.topProviders.length >= 3) {
           setTopProviders(s.topProviders);
@@ -116,17 +124,50 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     });
   }, []);
 
-  // Proactively query Direct Stream API if directStreamMode is on
+  // Proactively query Stream Resolver (TorBox or Private Extractor)
   useEffect(() => {
     let isMounted = true;
-    if (directStreamMode && tmdbId) {
-      setIsExtracting(true);
+    if (!tmdbId || streamResolver === 'embed') {
+      setIsExtracting(false);
+      return;
+    }
+
+    setIsExtracting(true);
+
+    if (streamResolver === 'torbox') {
+      // 1. Resolve via TorBox Cloud Debrid
+      fetchTorboxStream(tmdbId, undefined, mediaType, season, episode, torboxApiKey)
+        .then((result) => {
+          if (!isMounted) return;
+          if (result && result.sources && result.sources.length > 0) {
+            console.log(`[TorBox] Resolved 4K/1080p stream:`, result.sources[0].url);
+            setDirectStreamUrl(result.sources[0].url);
+            setDirectStreamLabel(result.provider);
+            setPlayerMode('direct');
+            setIsExtracting(false);
+            setExtractionFailed(false);
+            setIsLoading(false);
+          } else {
+            console.log('[TorBox] No cached stream found, falling back to embed player.');
+            setIsExtracting(false);
+            setExtractionFailed(true);
+          }
+        })
+        .catch((err) => {
+          if (!isMounted) return;
+          console.warn('[TorBox] Query error:', err);
+          setIsExtracting(false);
+          setExtractionFailed(true);
+        });
+    } else if (streamResolver === 'private_extractor') {
+      // 2. Resolve via Private Consumet API
       fetchDirectStream(tmdbId, title, mediaType, season, episode, directStreamApiUrl)
         .then((result) => {
           if (!isMounted) return;
           if (result && result.sources && result.sources.length > 0) {
             console.log(`[DirectStream] Successfully resolved stream via ${result.provider}:`, result.sources[0].url);
             setDirectStreamUrl(result.sources[0].url);
+            setDirectStreamLabel(result.provider);
             setPlayerMode('direct');
             setIsExtracting(false);
             setExtractionFailed(false);
@@ -148,7 +189,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     return () => {
       isMounted = false;
     };
-  }, [directStreamMode, tmdbId, title, mediaType, season, episode, directStreamApiUrl]);
+  }, [streamResolver, tmdbId, title, mediaType, season, episode, directStreamApiUrl, torboxApiKey]);
 
   const provider = getProviderById(providerId);
   const streamUrl =
@@ -160,8 +201,8 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   useEffect(() => {
     const handleDirectStreamFound = (e: any) => {
       const url = e.detail?.streamUrl;
-      // Only auto-switch if the user explicitly enabled "Direct Stream Extractor" in Settings
-      if (url && (directStreamMode || playerMode === 'direct')) {
+      // Only auto-switch if the user explicitly enabled a direct stream resolver or already in direct mode
+      if (url && (streamResolver !== 'embed' || playerMode === 'direct')) {
         console.log('[NativeStreamSniffer] Captured direct stream:', url);
         setDirectStreamUrl(url);
         setPlayerMode('direct');
@@ -176,7 +217,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     return () => {
       window.removeEventListener('tmdb_direct_stream_found', handleDirectStreamFound);
     };
-  }, [directStreamMode, playerMode]);
+  }, [streamResolver, playerMode]);
 
   // Listen for Native Android iframe / subframe playback state changes
   useEffect(() => {
