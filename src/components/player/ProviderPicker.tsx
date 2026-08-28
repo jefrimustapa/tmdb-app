@@ -38,15 +38,24 @@ export const ProviderPicker: React.FC<ProviderPickerProps> = ({
     }
   }, [isOpen]);
 
-  // Close dropdown on click outside
+  // Close dropdown on click outside or when header auto-hides
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setIsOpen(false);
       }
     };
+    const handleCloseDropdown = () => {
+      setIsOpen(false);
+    };
+
     document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    window.addEventListener('tmdb_close_dropdowns', handleCloseDropdown);
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      window.removeEventListener('tmdb_close_dropdowns', handleCloseDropdown);
+    };
   }, []);
 
   const handleSelect = (provider: StreamProvider) => {
