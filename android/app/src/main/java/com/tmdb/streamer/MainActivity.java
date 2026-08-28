@@ -590,19 +590,18 @@ public class MainActivity extends BridgeActivity {
                             "  var dropdown = header ? header.querySelector('[data-provider-dropdown-open=\"true\"]') : null;" +
                             "  if (dropdown) {" +
                             "    window.dispatchEvent(new CustomEvent('tmdb_close_dropdowns'));" +
-                            "    var trigger = dropdown.querySelector('[data-provider-trigger=\"true\"]');" +
+                            "    var trigger = document.getElementById('watch-provider-trigger');" +
                             "    if (trigger) { trigger.focus(); }" +
                             "    return 'CLOSED_DROPDOWN';" +
                             "  }" +
                             "  var isHeaderFocused = !!window.__tmdbHeaderFocused || (header && header.contains(document.activeElement));" +
-                            "  var backBtn = header ? header.querySelector('button[aria-label=\"Back\"], [data-watch-header-item=\"true\"]:first-child') : null;" +
+                            "  var backBtn = document.getElementById('watch-back-btn') || (header ? header.querySelector('[data-watch-back=\"true\"], [data-watch-header-item=\"true\"]') : null);" +
                             "  if (!isHeaderFocused) {" +
                             "    window.__tmdbHeaderFocused = true;" +
-                            "    window.dispatchEvent(new CustomEvent('tmdb_user_action'));" +
-                            "    window.focus();" +
+                            "    window.dispatchEvent(new CustomEvent('tmdb_show_header_focus_back'));" +
                             "    if (backBtn) { backBtn.focus(); }" +
                             "    setTimeout(function() { if (backBtn) { backBtn.focus(); } }, 50);" +
-                            "    return 'FOCUSED_BACK_BTN';" +
+                            "    return 'FOCUSED_HEADER';" +
                             "  } else {" +
                             "    window.__tmdbHeaderFocused = false;" +
                             "    if (typeof window.tmdbExitWatch === 'function') {" +
