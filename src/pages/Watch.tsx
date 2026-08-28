@@ -129,15 +129,29 @@ export const Watch: React.FC = () => {
 
   useEffect(() => {
     const onExitWatch = () => handleExitWatch();
+    const onShowHeaderFocusBack = () => {
+      setHeaderVisible(true);
+      (window as any).__tmdbHeaderFocused = true;
+      resetHeaderTimer();
+      setTimeout(() => {
+        const backBtn = document.getElementById('watch-back-btn') || document.querySelector<HTMLElement>('[data-watch-back="true"]');
+        if (backBtn) {
+          backBtn.focus();
+        }
+      }, 30);
+    };
+
     window.addEventListener('tmdb_exit_watch', onExitWatch);
+    window.addEventListener('tmdb_show_header_focus_back', onShowHeaderFocusBack);
     (window as any).tmdbExitWatch = handleExitWatch;
     (window as any).__tmdbHeaderFocused = false;
     return () => {
       window.removeEventListener('tmdb_exit_watch', onExitWatch);
+      window.removeEventListener('tmdb_show_header_focus_back', onShowHeaderFocusBack);
       delete (window as any).tmdbExitWatch;
       delete (window as any).__tmdbHeaderFocused;
     };
-  }, [handleExitWatch]);
+  }, [handleExitWatch, resetHeaderTimer]);
 
   // Notify native Android bridge that Watch page is active
   useEffect(() => {
@@ -230,9 +244,30 @@ export const Watch: React.FC = () => {
           <div className="flex items-center gap-3 min-w-0 flex-1 mr-2">
             <button
               onClick={handleExitWatch}
+              id="watch-back-btn"
+              data-watch-back="true"
               data-watch-header-item="true"
               aria-label="Back"
-              className="p-2.5 rounded-full bg-black/70 hover:bg-black text-white border border-white/20 backdrop-blur-md transition hover:scale-110 flex-shrink-0 tv-focus-target"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === 'ArrowRight') {
+                  e.preventDefault();
+                  const trigger = document.getElementById('watch-provider-trigger');
+                  if (trigger) {
+                    trigger.focus();
+                  }
+                } else if (e.key === 'ArrowDown') {
+                  e.preventDefault();
+                  (window as any).__tmdbHeaderFocused = false;
+                  setHeaderVisible(false);
+                  (document.getElementById('watch-back-btn') as HTMLElement)?.blur();
+                  const iframe = document.querySelector<HTMLIFrameElement>('iframe');
+                  if (iframe) {
+                    try { iframe.focus(); } catch {}
+                  }
+                }
+              }}
+              className="p-2.5 rounded-full bg-black/70 hover:bg-black text-white border border-white/20 backdrop-blur-md transition hover:scale-110 flex-shrink-0 tv-focus-target focus:outline-none focus:border-hbo-cyan focus:ring-2 focus:ring-hbo-cyan"
               title="Go Back"
             >
               <ArrowLeft className="w-5 h-5" />
