@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Search as SearchIcon, X, Film, Tv, Sparkles, User, Clapperboard } from 'lucide-react';
-import { tmdbApi, tmdbImages } from '../services/tmdb';
-import type { TMDBMediaItem, TMDBGenre } from '../types/tmdb';
-import { MediaCard } from '../components/common/MediaCard';
+import { tmdbApi, tmdbImages } from '../../services/tmdb';
+import type { TMDBMediaItem, TMDBGenre } from '../../types/tmdb';
+import { MediaCard } from '../../components/common/MediaCard';
 
 export const Search: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -321,3 +321,4 @@ export const Search: React.FC = () => {
     </div>
   );
 };
+

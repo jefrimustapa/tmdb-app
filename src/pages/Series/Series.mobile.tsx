@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { tmdbApi } from '../services/tmdb';
-import type { TMDBMediaItem, TMDBGenre } from '../types/tmdb';
-import { MediaCard } from '../components/common/MediaCard';
-import { PLATFORMS } from '../components/common/PlatformHubs';
-import { SortDropdown, SortOption } from '../components/common/SortDropdown';
+import { tmdbApi } from '../../services/tmdb';
+import type { TMDBMediaItem, TMDBGenre } from '../../types/tmdb';
+import { MediaCard } from '../../components/common/MediaCard';
+import { PLATFORMS } from '../../components/common/PlatformHubs';
+import { SortDropdown, SortOption } from '../../components/common/SortDropdown';
 import { Filter, SlidersHorizontal } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
-import { useDevice } from '../hooks/useDevice';
+import { useDevice } from '../../hooks/useDevice';
 
 const TV_SORT_OPTIONS: SortOption[] = [
   { value: 'popularity.desc', label: 'Most Popular' },
@@ -279,3 +279,4 @@ export const Series: React.FC = () => {
     </div>
   );
 };
+
