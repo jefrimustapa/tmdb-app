@@ -42,13 +42,78 @@ export const Settings: React.FC = () => {
   useEffect(() => {
     if (openDropdownSlot !== null) {
       setTimeout(() => {
-        const activeEl = document.querySelector<HTMLElement>('[data-provider-selected="true"]') ||
-                         document.querySelector<HTMLElement>('.modal-provider-item');
+        const activeEl = document.querySelector<HTMLElement>('[data-priority-dropdown-container="true"] [data-provider-selected="true"]') ||
+                         document.querySelector<HTMLElement>('[data-priority-dropdown-container="true"] .tv-focus-target');
         if (activeEl) {
           activeEl.focus();
         }
       }, 50);
     }
+  }, [openDropdownSlot]);
+
+  // Handle remote Back button, Escape, and Left/Right arrow dismissal for priority dropdowns
+  useEffect(() => {
+    if (openDropdownSlot === null) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Remote Back button or Escape key
+      if (
+        e.key === 'Escape' ||
+        e.key === 'BrowserBack' ||
+        e.key === 'Back' ||
+        e.keyCode === 27 ||
+        e.keyCode === 4 ||
+        e.keyCode === 10009
+      ) {
+        e.preventDefault();
+        e.stopPropagation();
+        const slot = openDropdownSlot;
+        setOpenDropdownSlot(null);
+        setTimeout(() => {
+          document.getElementById(`priority-server-btn-${slot}`)?.focus();
+        }, 50);
+        return;
+      }
+
+      // Arrow Right from inside dropdown closes and moves to next priority slot
+      if (e.key === 'ArrowRight' && openDropdownSlot < 2) {
+        e.preventDefault();
+        e.stopPropagation();
+        const nextSlot = openDropdownSlot + 1;
+        setOpenDropdownSlot(null);
+        setTimeout(() => {
+          document.getElementById(`priority-server-btn-${nextSlot}`)?.focus();
+        }, 50);
+        return;
+      }
+
+      // Arrow Left from inside dropdown closes and moves to previous priority slot
+      if (e.key === 'ArrowLeft' && openDropdownSlot > 0) {
+        e.preventDefault();
+        e.stopPropagation();
+        const prevSlot = openDropdownSlot - 1;
+        setOpenDropdownSlot(null);
+        setTimeout(() => {
+          document.getElementById(`priority-server-btn-${prevSlot}`)?.focus();
+        }, 50);
+        return;
+      }
+    };
+
+    const handleDocumentClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest('[data-priority-dropdown-container="true"]')) {
+        setOpenDropdownSlot(null);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown, { capture: true });
+    document.addEventListener('mousedown', handleDocumentClick);
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown, { capture: true });
+      document.removeEventListener('mousedown', handleDocumentClick);
+    };
   }, [openDropdownSlot]);
 
   const handleBuildNumberClick = () => {
