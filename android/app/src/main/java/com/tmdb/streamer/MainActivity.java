@@ -535,21 +535,6 @@ public class MainActivity extends BridgeActivity {
                     );
                     return true;
                 }
-            } else if (keyCode == KeyEvent.KEYCODE_DPAD_UP) {
-                if (webView != null) {
-                    webView.evaluateJavascript(
-                        "(function() {" +
-                        "  var header = document.querySelector('[data-watch-header=\"true\"]');" +
-                        "  var isHeaderFocused = header && header.contains(document.activeElement);" +
-                        "  if (!isHeaderFocused) {" +
-                        "    window.dispatchEvent(new CustomEvent('tmdb_user_action'));" +
-                        "    var target = header ? header.querySelector('[data-watch-header-item=\"true\"], .tv-focus-target') : null;" +
-                        "    if (target) { target.focus(); }" +
-                        "  }" +
-                        "})();",
-                        null
-                    );
-                }
             } else if (keyCode == KeyEvent.KEYCODE_BACK) {
                 if (webView != null) {
                     webView.evaluateJavascript(
