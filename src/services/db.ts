@@ -26,6 +26,7 @@ let cachedSettings: UserSettings | null = null;
 export const DEFAULT_SETTINGS: UserSettings = {
   id: 'current_settings',
   preferredProvider: 'vidlink',
+  topProviders: ['vidlink', 'moviesapi', 'cinesrc'],
   deviceMode: 'auto',
   autoplayNext: true,
   adBlockShield: true,
@@ -71,34 +72,39 @@ export const dbService = {
           updatedAt: Date.now()
         });
       }
-    } catch (e) {
-      console.error('Failed to save watch progress:', e);
+    } catch (err) {
+      console.error('Failed to save watch progress:', err);
     }
   },
 
   async getHistory(limit = 20): Promise<WatchHistoryItem[]> {
-    const rawHistory = await db.history.orderBy('updatedAt').reverse().toArray();
-    // Unique by tmdbId + mediaType
-    const seen = new Set<string>();
-    const unique: WatchHistoryItem[] = [];
-    for (const item of rawHistory) {
-      const key = `${item.tmdbId}-${item.mediaType}`;
-      if (!seen.has(key)) {
-        seen.add(key);
-        unique.push(item);
-      }
+    try {
+      return await db.history.orderBy('updatedAt').reverse().limit(limit).toArray();
+    } catch {
+      return [];
     }
-    return unique.slice(0, limit);
   },
 
   async getHistoryItem(tmdbId: number, mediaType: 'movie' | 'tv'): Promise<WatchHistoryItem | undefined> {
-    return await db.history.where({ tmdbId, mediaType }).first();
+    try {
+      return await db.history.where({ tmdbId, mediaType }).first();
+    } catch {
+      return undefined;
+    }
+  },
+
+  async deleteHistoryItem(id: number) {
+    await db.history.delete(id);
   },
 
   async removeFromHistory(tmdbId: number, mediaType: 'movie' | 'tv') {
-    const existing = await db.history.where({ tmdbId, mediaType }).first();
-    if (existing && existing.id) {
-      await db.history.delete(existing.id);
+    try {
+      const existing = await db.history.where({ tmdbId, mediaType }).first();
+      if (existing && existing.id) {
+        await db.history.delete(existing.id);
+      }
+    } catch (err) {
+      console.error('Failed to remove from history:', err);
     }
   },
 
@@ -113,7 +119,10 @@ export const dbService = {
       await db.likes.delete(existing.id);
       return false; // unliked
     } else {
-      await db.likes.add({ ...item, addedAt: Date.now() });
+      await db.likes.add({ 
+        ...item, 
+        addedAt: Date.now() 
+      });
       return true; // liked
     }
   },
@@ -134,7 +143,10 @@ export const dbService = {
       await db.watchlist.delete(existing.id);
       return false; // removed
     } else {
-      await db.watchlist.add({ ...item, addedAt: Date.now() });
+      await db.watchlist.add({ 
+        ...item, 
+        addedAt: Date.now() 
+      });
       return true; // added
     }
   },
@@ -150,14 +162,22 @@ export const dbService = {
 
   // Settings
   async getSettings(): Promise<UserSettings> {
-    if (cachedSettings) {
+    if (cachedSettings && cachedSettings.topProviders && cachedSettings.topProviders.length >= 3) {
       return cachedSettings;
     }
-    const settings = await db.settings.get('current_settings');
+    let settings = await db.settings.get('current_settings');
     if (!settings) {
       await db.settings.put(DEFAULT_SETTINGS);
       cachedSettings = DEFAULT_SETTINGS;
       return DEFAULT_SETTINGS;
+    }
+    if (!settings.topProviders || settings.topProviders.length < 3) {
+      settings.topProviders = [
+        settings.preferredProvider || 'vidlink',
+        'moviesapi',
+        'cinesrc'
+      ];
+      await db.settings.put(settings);
     }
     cachedSettings = settings;
     return settings;
