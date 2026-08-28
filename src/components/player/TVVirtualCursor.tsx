@@ -322,6 +322,10 @@ export const TVVirtualCursor: React.FC<TVVirtualCursorProps> = ({
   // Sync window global flag for native Android bridge
   useEffect(() => {
     (window as any).__tmdbVirtualCursorActive = active;
+    try {
+      (window as any).AndroidBridge?.setVirtualCursorActive?.(active);
+    } catch {}
+
     if (active) {
       // Re-center on activation if off-screen
       setPosition({
@@ -341,6 +345,9 @@ export const TVVirtualCursor: React.FC<TVVirtualCursorProps> = ({
 
     return () => {
       (window as any).__tmdbVirtualCursorActive = false;
+      try {
+        (window as any).AndroidBridge?.setVirtualCursorActive?.(false);
+      } catch {}
       if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current);
       if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
       if (clickAnimationTimerRef.current) clearTimeout(clickAnimationTimerRef.current);
