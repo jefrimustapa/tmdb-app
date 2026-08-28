@@ -15,8 +15,8 @@ interface HomeFeedCache {
   popularMovies: TMDBMediaItem[];
   popularTV: TMDBMediaItem[];
   topRated: TMDBMediaItem[];
-  actionMovies: TMDBMediaItem[];
-  sciFiMovies: TMDBMediaItem[];
+  newReleaseMovies: TMDBMediaItem[];
+  newReleaseTV: TMDBMediaItem[];
   history: WatchHistoryItem[];
   timestamp: number;
 }
@@ -29,8 +29,8 @@ export const Home: React.FC = () => {
   const [popularTV, setPopularTV] = useState<TMDBMediaItem[]>(() => homeFeedCache?.popularTV || []);
   const [topRated, setTopRated] = useState<TMDBMediaItem[]>(() => homeFeedCache?.topRated || []);
   const [history, setHistory] = useState<WatchHistoryItem[]>(() => homeFeedCache?.history || []);
-  const [actionMovies, setActionMovies] = useState<TMDBMediaItem[]>(() => homeFeedCache?.actionMovies || []);
-  const [sciFiMovies, setSciFiMovies] = useState<TMDBMediaItem[]>(() => homeFeedCache?.sciFiMovies || []);
+  const [newReleaseMovies, setNewReleaseMovies] = useState<TMDBMediaItem[]>(() => homeFeedCache?.newReleaseMovies || []);
+  const [newReleaseTV, setNewReleaseTV] = useState<TMDBMediaItem[]>(() => homeFeedCache?.newReleaseTV || []);
   const [isLoading, setIsLoading] = useState(() => !homeFeedCache);
 
   useEffect(() => {
@@ -58,13 +58,13 @@ export const Home: React.FC = () => {
       }
 
       try {
-        const [trendRes, popMRes, popTVRes, topRes, actRes, sciRes, histRes] = await Promise.all([
+        const [trendRes, popMRes, popTVRes, topRes, newMRes, newTVRes, histRes] = await Promise.all([
           tmdbApi.getTrending('all', 'day'),
           tmdbApi.getPopularMovies(1),
           tmdbApi.getPopularTV(1),
           tmdbApi.getTopRatedMovies(1),
-          tmdbApi.discoverMovies({ with_genres: '28', sort_by: 'popularity.desc' }),
-          tmdbApi.discoverMovies({ with_genres: '878', sort_by: 'popularity.desc' }),
+          tmdbApi.getNowPlayingMovies(1),
+          tmdbApi.getOnTheAirTV(1),
           dbService.getHistory(10)
         ]);
 
@@ -75,8 +75,8 @@ export const Home: React.FC = () => {
           popularMovies: popMRes.results || [],
           popularTV: popTVRes.results || [],
           topRated: topRes.results || [],
-          actionMovies: actRes.results || [],
-          sciFiMovies: sciRes.results || [],
+          newReleaseMovies: newMRes.results || [],
+          newReleaseTV: newTVRes.results || [],
           history: histRes || [],
           timestamp: Date.now()
         };
@@ -87,8 +87,8 @@ export const Home: React.FC = () => {
         setPopularMovies(newCache.popularMovies);
         setPopularTV(newCache.popularTV);
         setTopRated(newCache.topRated);
-        setActionMovies(newCache.actionMovies);
-        setSciFiMovies(newCache.sciFiMovies);
+        setNewReleaseMovies(newCache.newReleaseMovies);
+        setNewReleaseTV(newCache.newReleaseTV);
         setHistory(newCache.history);
       } catch (err) {
         console.error('Failed to load home feed:', err);
@@ -207,17 +207,17 @@ export const Home: React.FC = () => {
       />
 
       <MediaRow
-        title="Action Packed Cinema"
-        subtitle="High-octane thrillers and blockbusters"
-        items={actionMovies}
+        title="New Release Movie"
+        subtitle="Latest blockbuster films and digital premieres"
+        items={newReleaseMovies}
         type="movie"
       />
 
       <MediaRow
-        title="Sci-Fi & Fantasy Worlds"
-        subtitle="Epic space sagas and alternate realities"
-        items={sciFiMovies}
-        type="movie"
+        title="New Release Series"
+        subtitle="Fresh seasons and newly premiering shows"
+        items={newReleaseTV}
+        type="tv"
       />
 
       <MediaRow
