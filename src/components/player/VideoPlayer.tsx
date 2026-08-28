@@ -4,6 +4,9 @@ import Hls from 'hls.js';
 import type { StreamProvider } from '../../types/stream';
 import { STREAM_PROVIDERS, getProviderById, getOrderedProviders } from '../../services/streamProviders';
 import { dbService } from '../../services/db';
+import { fetchDirectStream, DEFAULT_DIRECT_STREAM_API } from '../../services/directStreamService';
+import { fetchTorboxStream } from '../../services/torboxService';
+import type { StreamResolverType } from '../../types/db';
 import { Logo } from '../common/Logo';
 import { tmdbImages } from '../../services/tmdb';
 
@@ -40,14 +43,18 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
   const [adShieldEnabled, setAdShieldEnabled] = useState(true);
-  const [directStreamMode, setDirectStreamMode] = useState(false);
-  const [playerMode, setPlayerMode] = useState<'embed' | 'direct'>('embed');
+  const [streamResolver, setStreamResolver] = useState<StreamResolverType>('embed');
+  const [directStreamApiUrl, setDirectStreamApiUrl] = useState(DEFAULT_DIRECT_STREAM_API);
+  const [torboxApiKey, setTorboxApiKey] = useState('');
+  const [playerMode, setPlayerMode] = useState<'loading' | 'embed' | 'direct' | 'error'>('loading');
   const [directStreamUrl, setDirectStreamUrl] = useState<string | null>(null);
+  const [directStreamLabel, setDirectStreamLabel] = useState<string>('');
   const [isExtracting, setIsExtracting] = useState(false);
   const [extractionFailed, setExtractionFailed] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showControls, setShowControls] = useState(true);
   const [topProviders, setTopProviders] = useState<string[]>(['vidlink', 'moviesapi', 'cinesrc']);
+  const [enabledResolvers, setEnabledResolvers] = useState<StreamResolverType[]>(['torbox', 'private_extractor', 'embed']);
 
   // Auto-Cycle Provider until first working stream state
   const [autoCycle, setAutoCycle] = useState(true);
@@ -103,7 +110,15 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     dbService.getSettings().then((s) => {
       if (s) {
         setAdShieldEnabled(s.adBlockShield);
-        setDirectStreamMode(s.directStreamMode || false);
+        const activeResolver = s.streamResolver || (s.directStreamMode ? 'private_extractor' : 'embed');
+        setStreamResolver(activeResolver);
+        setEnabledResolvers(s.enabledResolvers && s.enabledResolvers.length > 0 ? s.enabledResolvers : ['torbox', 'private_extractor', 'embed']);
+        if (s.directStreamApiUrl) {
+          setDirectStreamApiUrl(s.directStreamApiUrl);
+        }
+        if (s.torboxApiKey) {
+          setTorboxApiKey(s.torboxApiKey);
+        }
         if (s.topProviders && s.topProviders.length >= 3) {
           setTopProviders(s.topProviders);
         }
@@ -111,33 +126,91 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     });
   }, []);
 
+  // Priority Stream Resolution: TorBox -> Private Extractor -> Embed Resolver
+  useEffect(() => {
+    let isMounted = true;
+    if (!tmdbId) {
+      setIsExtracting(false);
+      return;
+    }
+
+    async function executeStreamResolution() {
+      setIsExtracting(true);
+      setPlayerMode('loading');
+
+      // 1. Try TorBox if enabled
+      if (enabledResolvers.includes('torbox') && torboxApiKey && torboxApiKey.trim()) {
+        try {
+          console.log('[Resolver] Checking TorBox 4K Cloud...');
+          const torboxRes = await fetchTorboxStream(tmdbId, undefined, mediaType, season, episode, torboxApiKey);
+          if (!isMounted) return;
+          if (torboxRes && torboxRes.sources && torboxRes.sources.length > 0) {
+            console.log(`[Resolver] ✅ Playing via TorBox 4K:`, torboxRes.sources[0].url);
+            setDirectStreamUrl(torboxRes.sources[0].url);
+            setDirectStreamLabel('TorBox 4K Cloud');
+            setPlayerMode('direct');
+            setIsExtracting(false);
+            setExtractionFailed(false);
+            setIsLoading(false);
+            return;
+          }
+        } catch (err) {
+          console.warn('[Resolver] TorBox error:', err);
+        }
+      }
+
+      // 2. Try Private Consumet Extractor if enabled
+      if (enabledResolvers.includes('private_extractor')) {
+        try {
+          console.log('[Resolver] Checking Private Stream Extractor...');
+          const directRes = await fetchDirectStream(tmdbId, title, mediaType, season, episode, directStreamApiUrl);
+          if (!isMounted) return;
+          if (directRes && directRes.sources && directRes.sources.length > 0) {
+            console.log(`[Resolver] ✅ Playing via ${directRes.provider}:`, directRes.sources[0].url);
+            setDirectStreamUrl(directRes.sources[0].url);
+            setDirectStreamLabel(directRes.provider);
+            setPlayerMode('direct');
+            setIsExtracting(false);
+            setExtractionFailed(false);
+            setIsLoading(false);
+            return;
+          }
+        } catch (err) {
+          console.warn('[Resolver] Private extractor error:', err);
+        }
+      }
+
+      if (!isMounted) return;
+
+      // 3. Fallback to Embed Resolver ONLY if explicitly enabled
+      if (enabledResolvers.includes('embed')) {
+        console.log('[Resolver] Active: Embed Resolver');
+        setPlayerMode('embed');
+        setDirectStreamUrl(null);
+        setDirectStreamLabel('Embed Mirror');
+        setIsExtracting(false);
+        setExtractionFailed(false);
+      } else {
+        console.log('[Resolver] Direct stream not resolved and Embed Resolver is disabled.');
+        setPlayerMode('error');
+        setDirectStreamUrl(null);
+        setExtractionFailed(true);
+        setIsExtracting(false);
+      }
+    }
+
+    executeStreamResolution();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [enabledResolvers, tmdbId, title, mediaType, season, episode, directStreamApiUrl, torboxApiKey]);
+
   const provider = getProviderById(providerId);
   const streamUrl =
     mediaType === 'movie'
       ? provider.getMovieUrl(tmdbId)
       : provider.getTVUrl(tmdbId, season, episode);
-
-  // Direct stream extractor effect & Native Android Stream Sniffer Interception
-  useEffect(() => {
-    const handleDirectStreamFound = (e: any) => {
-      const url = e.detail?.streamUrl;
-      // Only auto-switch if the user explicitly enabled "Direct Stream Extractor" in Settings
-      if (url && (directStreamMode || playerMode === 'direct')) {
-        console.log('[NativeStreamSniffer] Captured direct stream:', url);
-        setDirectStreamUrl(url);
-        setPlayerMode('direct');
-        setIsExtracting(false);
-        setExtractionFailed(false);
-        setIsLoading(false);
-      }
-    };
-
-    window.addEventListener('tmdb_direct_stream_found', handleDirectStreamFound);
-
-    return () => {
-      window.removeEventListener('tmdb_direct_stream_found', handleDirectStreamFound);
-    };
-  }, [directStreamMode, playerMode]);
 
   // Listen for Native Android iframe / subframe playback state changes
   useEffect(() => {
@@ -504,7 +577,20 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           : 'w-full h-full border-0 rounded-none'
       }`}
     >
-      {/* Loading Spinner for Embed mode */}
+      {/* STATE 1: Resolving Stream Loading Screen */}
+      {playerMode === 'loading' && (
+        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black">
+          <div className="w-12 h-12 border-4 border-hbo-purple-light border-t-hbo-cyan rounded-full animate-spin mb-4 shadow-hbo-glow" />
+          <p className="text-sm font-bold text-white tracking-wide">
+            Resolving Stream...
+          </p>
+          <p className="text-xs text-gray-400 mt-1.5">
+            Checking: {enabledResolvers.map(r => r === 'torbox' ? 'TorBox 4K' : r === 'private_extractor' ? 'Private Extractor' : 'Embed Resolver').join(' → ')}
+          </p>
+        </div>
+      )}
+
+      {/* STATE 2: Embed Provider Loading Spinner */}
       {playerMode === 'embed' && isLoading && (
         <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-black/90 backdrop-blur-md">
           <div className="w-12 h-12 border-4 border-hbo-purple-light border-t-hbo-cyan rounded-full animate-spin mb-3 shadow-hbo-glow" />
@@ -517,32 +603,31 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         </div>
       )}
 
-      {/* MODE A: Native Direct Player Mode */}
-      {playerMode === 'direct' ? (
-        directStreamUrl ? (
-          <video
-            ref={videoRef}
-            controls={showControls}
-            autoPlay
-            playsInline
-            muted={false}
-            className="w-full h-full object-contain bg-black"
-            onLoadedData={() => setIsLoading(false)}
-            onError={() => {
-              console.log('[DirectStream] Playback error on direct stream. Immediate fallback to embed.');
+      {/* STATE 3: Native Direct Player Mode */}
+      {playerMode === 'direct' && directStreamUrl && (
+        <video
+          ref={videoRef}
+          controls={showControls}
+          autoPlay
+          playsInline
+          muted={false}
+          className="w-full h-full object-contain bg-black"
+          onLoadedData={() => setIsLoading(false)}
+          onError={() => {
+            if (enabledResolvers.includes('embed')) {
+              console.log('[DirectStream] Playback error on direct stream. Fallback to embed.');
               setPlayerMode('embed');
-              setDirectStreamUrl(null);
-            }}
-          />
-        ) : (
-          /* Immediate silent fallback to embed if direct stream URL is not present */
-          (() => {
-            setPlayerMode('embed');
-            return null;
-          })()
-        )
-      ) : (
-        /* MODE B: Protected Video Embed with Popup & Redirect Shield */
+            } else {
+              console.log('[DirectStream] Playback error on direct stream. Embed is disabled.');
+              setPlayerMode('error');
+            }
+            setDirectStreamUrl(null);
+          }}
+        />
+      )}
+
+      {/* STATE 4: Protected Video Embed (ONLY rendered if embed is enabled) */}
+      {playerMode === 'embed' && enabledResolvers.includes('embed') && (
         <iframe
           key={`${streamUrl}-${iframeKey}-${adShieldEnabled}`}
           src={streamUrl}
@@ -560,6 +645,35 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           onLoad={handleIframeLoaded}
           onError={handleIframeError}
         />
+      )}
+
+      {/* STATE 5: Direct Stream Not Resolved Error (Embed Disabled) */}
+      {playerMode === 'error' && (
+        <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-black/95 backdrop-blur-md p-6 text-center animate-fade-in">
+          <div className="mb-4">
+            <Logo size="lg" showText={true} />
+          </div>
+          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-400 text-xs font-bold mb-3">
+            <AlertCircle className="w-4 h-4" />
+            <span>Direct Stream Unavailable</span>
+          </div>
+          <h3 className="text-lg sm:text-xl font-black font-display text-white mb-2 tracking-tight">
+            Could Not Resolve Direct Stream
+          </h3>
+          <p className="text-xs sm:text-sm text-gray-400 max-w-md mb-6 leading-relaxed">
+            The active direct stream engines (<span className="text-white font-semibold">{enabledResolvers.map(r => r === 'torbox' ? 'TorBox 4K' : 'Private Extractor').join(', ')}</span>) did not return a working direct video stream for "<span className="text-white">{title}</span>".
+            <br /><br />
+            <span className="text-gray-300">Embed Resolver is currently disabled in your Settings.</span>
+          </p>
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            <button
+              onClick={() => window.location.href = '/settings'}
+              className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-hbo-purple to-hbo-cyan text-white font-bold text-xs sm:text-sm shadow-hbo-glow hover:scale-105 transition tv-focus-target"
+            >
+              Open Settings to Enable Embed Resolver
+            </button>
+          </div>
+        </div>
       )}
 
       {/* Fallback Error Overlay */}

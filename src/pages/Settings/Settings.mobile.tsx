@@ -7,7 +7,7 @@ import { Logo } from '../../components/common/Logo';
 import { APP_VERSION, APP_BUILD_NUMBER, APP_VERSION_FULL, APP_BUILD_CHANNEL } from '../../version';
 import { updateService, type UpdateInfo } from '../../services/updateService';
 import { UpdateModal } from '../../components/common/UpdateModal';
-import { Settings as SettingsIcon, Tv2, Smartphone, Tablet, Monitor, ShieldCheck, Server, Database, Check, ShieldAlert, EyeOff, Lock, Zap, X, ArrowUpCircle, RefreshCw, Moon, Sparkles, AlertCircle, CalendarX, ChevronDown } from 'lucide-react';
+import { Settings as SettingsIcon, Tv2, Smartphone, Tablet, Monitor, ShieldCheck, Server, Database, Check, ShieldAlert, EyeOff, Lock, Zap, X, ArrowUpCircle, RefreshCw, Moon, Sparkles, AlertCircle, CalendarX, ChevronDown, Radio } from 'lucide-react';
 
 export const Settings: React.FC = () => {
   const [settings, setSettings] = useState<UserSettings | null>(null);
@@ -300,16 +300,16 @@ export const Settings: React.FC = () => {
           </div>
         </div>
 
-        {/* Top 3 Priority Stream Resolvers */}
+        {/* Embed Resolver Priority */}
         <div className="bg-hbo-card border border-hbo-border rounded-2xl p-5 sm:p-7 shadow-lg space-y-5">
           <div className="flex items-start justify-between gap-4 flex-wrap sm:flex-nowrap">
             <div>
               <h3 className="text-base sm:text-lg font-bold font-display text-white flex items-center gap-2.5 mb-1.5">
                 <Server className="w-5 h-5 text-hbo-cyan flex-shrink-0" />
-                <span>Top 3 Priority Stream Resolvers</span>
+                <span>Embed Resolver Priority</span>
               </h3>
               <p className="text-xs text-gray-400 leading-relaxed">
-                Choose the 3 primary servers the app will use first in order to resolve streams. If the 1st server fails or buffers, the app automatically fails over to the 2nd and 3rd servers.
+                Choose the 3 primary fallback embed servers the app will use when playing through the Embed Resolver. If the 1st server fails or buffers, the app automatically fails over to the 2nd and 3rd servers.
               </p>
             </div>
             <span className="text-xs px-3 py-1 rounded-full bg-hbo-purple/30 border border-hbo-purple/50 text-hbo-cyan font-bold whitespace-nowrap hidden sm:inline-block flex-shrink-0">
@@ -515,46 +515,151 @@ export const Settings: React.FC = () => {
           </div>
         </div>
 
-        {/* Direct Stream Extractor (Option A) */}
+        {/* Stream Resolver Engine Selection */}
         <div className="bg-hbo-card border border-hbo-border rounded-2xl p-5 sm:p-6 space-y-4">
           <div className="flex items-center justify-between gap-4">
             <div className="flex-1 min-w-0 pr-2">
               <div className="flex items-center gap-2 mb-1 flex-wrap">
                 <h3 className="text-base sm:text-lg font-bold font-display text-white flex items-center gap-2">
                   <Zap className="w-5 h-5 text-hbo-cyan flex-shrink-0" />
-                  <span>Direct Stream Extractor (Option A)</span>
+                  <span>Stream Resolver Engine</span>
                 </h3>
                 <span className="px-2 py-0.5 rounded bg-hbo-purple/40 text-hbo-cyan border border-hbo-purple-light text-[10px] font-extrabold uppercase tracking-wider">
-                  Experimental
+                  Multi-Select Active
                 </span>
               </div>
               <p className="text-xs text-gray-400 leading-relaxed">
-                Attempts background stream sniffing to extract direct <code className="text-hbo-cyan font-mono text-[11px]">.m3u8</code> / <code className="text-hbo-cyan font-mono text-[11px]">.mp4</code> media links and play them inside a clean native player instead of provider iframes. Automatically falls back to standard player if encrypted.
+                Toggle one or more stream engines to enable. When playing a title, the app queries enabled engines in priority order (<span className="text-emerald-400 font-semibold">TorBox 4K</span> → <span className="text-hbo-cyan font-semibold">Private Extractor</span> → <span className="text-gray-300 font-semibold">Embed Resolver</span>).
               </p>
             </div>
-
-            <button
-              onClick={() => handleUpdate({ directStreamMode: !settings.directStreamMode })}
-              className={`flex-shrink-0 w-12 h-6 rounded-full transition-colors relative tv-focus-target ${
-                settings.directStreamMode ? 'bg-hbo-cyan' : 'bg-gray-700'
-              }`}
-            >
-              <div
-                className={`w-5 h-5 rounded-full bg-black transition-transform transform ${
-                  settings.directStreamMode ? 'translate-x-6' : 'translate-x-0.5'
-                }`}
-              />
-            </button>
           </div>
 
-          {settings.directStreamMode && (
-            <div className="p-3.5 rounded-xl bg-hbo-purple/15 border border-hbo-purple-light/40 text-xs text-gray-300 space-y-1">
-              <p className="font-bold text-hbo-cyan flex items-center gap-1.5">
-                <span>⚡ Option A Active</span>
+          {/* 3 Resolver Options (Multi-Select) */}
+          <div className="grid grid-cols-1 gap-3">
+            {[
+              {
+                id: 'torbox' as const,
+                title: 'TorBox Debrid',
+                priority: '#1 Priority',
+                tag: '4K Ultra HD',
+                desc: 'Ultra-fast direct HTTPS 4K HDR & 1080p BluRay cloud streams via TorBox CDN.'
+              },
+              {
+                id: 'private_extractor' as const,
+                title: 'Private Extractor',
+                priority: '#2 Priority',
+                tag: 'Consumet API',
+                desc: 'Direct HLS .m3u8 streams resolved via your private backend (Render API).'
+              },
+              {
+                id: 'embed' as const,
+                title: 'Embed Resolver',
+                priority: '#3 Priority',
+                tag: 'Multi-Mirror',
+                desc: 'Standard multi-server iframe embeds (VidLink, MoviesAPI) with ad & popup sandboxing.'
+              }
+            ].map((resOption) => {
+              const currentEnabled = settings.enabledResolvers && settings.enabledResolvers.length > 0
+                ? settings.enabledResolvers
+                : ['torbox', 'private_extractor', 'embed'];
+              const isEnabled = currentEnabled.includes(resOption.id);
+
+              return (
+                <button
+                  key={resOption.id}
+                  onClick={() => {
+                    let updated: ('embed' | 'private_extractor' | 'torbox')[];
+                    if (isEnabled) {
+                      if (currentEnabled.length === 1) return; // keep at least 1
+                      updated = currentEnabled.filter(r => r !== resOption.id) as ('embed' | 'private_extractor' | 'torbox')[];
+                    } else {
+                      updated = [...currentEnabled, resOption.id] as ('embed' | 'private_extractor' | 'torbox')[];
+                    }
+                    handleUpdate({
+                      enabledResolvers: updated,
+                      streamResolver: updated[0] || 'embed'
+                    });
+                  }}
+                  className={`p-4 rounded-xl border text-left transition-all duration-200 flex flex-col justify-between ${
+                    isEnabled
+                      ? 'bg-hbo-purple/30 border-hbo-cyan text-white shadow-hbo-glow'
+                      : 'bg-black/30 border-hbo-border hover:border-gray-600 text-gray-500 opacity-60'
+                  }`}
+                >
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5 gap-2">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <div className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 ${isEnabled ? 'bg-hbo-cyan border-hbo-cyan' : 'border-gray-600 bg-black/40'}`}>
+                          {isEnabled && <Check className="w-3 h-3 text-black stroke-[3]" />}
+                        </div>
+                        <span className="font-bold text-sm text-white truncate">{resOption.title}</span>
+                      </div>
+                      <span
+                        className={`text-[10px] px-2 py-0.5 rounded font-mono font-bold flex-shrink-0 ${
+                          isEnabled
+                            ? 'bg-hbo-cyan/20 text-hbo-cyan border border-hbo-cyan/40'
+                            : 'bg-gray-800 text-gray-500'
+                        }`}
+                      >
+                        {resOption.tag}
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-300 leading-relaxed mt-2">{resOption.desc}</p>
+                  </div>
+                  <div className="mt-3 flex items-center justify-between text-[11px] font-bold">
+                    <span className={isEnabled ? 'text-hbo-cyan' : 'text-gray-500'}>
+                      {resOption.priority}
+                    </span>
+                    <span className={isEnabled ? 'text-emerald-400' : 'text-gray-500'}>
+                      {isEnabled ? '● Enabled' : '○ Disabled'}
+                    </span>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Configuration sub-panels */}
+          {(settings.enabledResolvers || []).includes('private_extractor') && (
+            <div className="p-4 rounded-xl bg-hbo-purple/15 border border-hbo-purple-light/40 text-xs text-gray-300 space-y-2.5">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <p className="font-bold text-hbo-cyan flex items-center gap-1.5">
+                  <Zap className="w-4 h-4 text-hbo-cyan" />
+                  <span>Private Stream API Configuration</span>
+                </p>
+                <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 font-mono font-bold">
+                  ● Online
+                </span>
+              </div>
+              <p className="text-[11px] text-gray-300 leading-relaxed">
+                Active Server: <code className="text-hbo-cyan font-mono text-[11px] bg-black/40 px-1.5 py-0.5 rounded">{settings.directStreamApiUrl || 'https://tmdb-api-yfbu.onrender.com'}</code>. Direct HLS streams are requested before falling back to embed resolvers.
               </p>
-              <p className="text-[11px] text-gray-400">
-                Direct HLS stream extractor will initialize when opening titles. You can toggle between Native Player and Embed Player at any time on the watch screen.
+            </div>
+          )}
+
+          {(settings.enabledResolvers || []).includes('torbox') && (
+            <div className="p-4 rounded-xl bg-emerald-950/20 border border-emerald-500/40 text-xs text-gray-300 space-y-3">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <p className="font-bold text-emerald-400 flex items-center gap-1.5">
+                  <Radio className="w-4 h-4 text-emerald-400" />
+                  <span>TorBox Debrid API Configuration</span>
+                </p>
+                <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 font-mono font-bold">
+                  ● 212 CDN Nodes
+                </span>
+              </div>
+              <p className="text-[11px] text-gray-300 leading-relaxed">
+                Enter your free or pro TorBox API key from <a href="https://torbox.app/settings" target="_blank" rel="noreferrer" className="text-hbo-cyan underline">torbox.app/settings</a> to unlock direct 4K HDR & 1080p BluRay cloud streaming:
               </p>
+              <div className="flex gap-2 items-center">
+                <input
+                  type="password"
+                  placeholder="Paste your TorBox API Key here..."
+                  value={settings.torboxApiKey || ''}
+                  onChange={(e) => handleUpdate({ torboxApiKey: e.target.value })}
+                  className="flex-1 bg-black/50 border border-gray-700 focus:border-emerald-400 text-white px-3 py-2 rounded-lg text-xs font-mono outline-none"
+                />
+              </div>
             </div>
           )}
         </div>
