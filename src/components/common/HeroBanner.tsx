@@ -72,16 +72,10 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ items }) => {
         {/* Brand Tag & Meta */}
         <div className="flex items-center gap-2.5 mb-3 flex-wrap">
           <span className="px-2.5 py-0.5 rounded-full bg-hbo-purple/60 border border-hbo-purple-light text-white text-xs font-bold uppercase tracking-wider backdrop-blur-md">
-            HBO MAX EXCLUSIVE
+            {mediaType === 'movie' ? 'FILM' : 'SERIES'}
           </span>
           <RatingBadge score={featured.vote_average} size="md" />
           <span className="text-sm font-medium text-gray-300">{releaseYear}</span>
-          <span className="text-xs px-2 py-0.5 rounded bg-white/10 text-gray-300 uppercase font-semibold">
-            {mediaType === 'movie' ? 'Movie' : 'TV Series'}
-          </span>
-          <span className="text-xs px-1.5 py-0.5 rounded bg-hbo-cyan/20 text-hbo-cyan border border-hbo-cyan/40 font-bold">
-            4K UHD
-          </span>
         </div>
 
         {/* Title */}
