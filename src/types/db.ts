@@ -52,5 +52,9 @@ export interface UserSettings {
   directStreamMode: boolean; // Option A: Direct Stream Extractor
   streamHeaderTimeout: number; // in seconds, e.g. 3, 5, 8, or 0 for always visible
   includeNightlyUpdates: boolean; // Option to check for and install Nightly pre-releases
+  virtualCursorEnabled?: boolean; // TV Mode on-demand virtual cursor
+  virtualCursorClicks?: 2 | 3; // Number of repeated OK clicks to activate (2 or 3)
+  virtualCursorTimeout?: number; // Inactivity auto-hide in seconds (5, 10, 15, 30, 0 for never)
+  virtualCursorSpeed?: 'slow' | 'normal' | 'fast'; // Cursor movement speed
   updatedAt: number;
 }
