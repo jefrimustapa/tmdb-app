@@ -27,24 +27,70 @@ export const ProviderPicker: React.FC<ProviderPickerProps> = ({
   // Simplified base provider name (e.g. "VidLink", "Embed.su", "VidSrc CC")
   const shortServerName = selectedProvider.name.replace(/\s*\([^)]*\)/g, '').trim();
 
-  // Close dropdown on click outside
+  // When dropdown opens, automatically focus the selected or first provider
+  useEffect(() => {
+    if (isOpen && dropdownRef.current) {
+      const activeBtn = dropdownRef.current.querySelector<HTMLElement>('[data-provider-selected="true"]') ||
+                        dropdownRef.current.querySelector<HTMLElement>('.tv-focus-target');
+      if (activeBtn) {
+        activeBtn.focus();
+      }
+    }
+  }, [isOpen]);
+
+  // Close dropdown on click outside or when header auto-hides
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setIsOpen(false);
       }
     };
+    const handleCloseDropdown = () => {
+      setIsOpen(false);
+    };
+
     document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    window.addEventListener('tmdb_close_dropdowns', handleCloseDropdown);
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      window.removeEventListener('tmdb_close_dropdowns', handleCloseDropdown);
+    };
   }, []);
 
   const handleSelect = (provider: StreamProvider) => {
     onSelect(provider);
     setIsOpen(false);
+    // Return focus to trigger button
+    setTimeout(() => {
+      const triggerBtn = dropdownRef.current?.querySelector<HTMLElement>('[data-provider-trigger="true"]');
+      if (triggerBtn) {
+        triggerBtn.focus();
+      }
+    }, 50);
+  };
+
+  const handleDropdownKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Escape' || e.keyCode === 27 || e.keyCode === 4 || e.key === 'BrowserBack') {
+      if (isOpen) {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsOpen(false);
+        const triggerBtn = dropdownRef.current?.querySelector<HTMLElement>('[data-provider-trigger="true"]');
+        if (triggerBtn) {
+          triggerBtn.focus();
+        }
+      }
+    }
   };
 
   return (
-    <div className={`relative flex items-center gap-2 ${compact ? 'justify-end' : 'flex-col sm:flex-row sm:items-center justify-between gap-3'}`} ref={dropdownRef}>
+    <div
+      className={`relative flex items-center gap-2 ${compact ? 'justify-end' : 'flex-col sm:flex-row sm:items-center justify-between gap-3'}`}
+      ref={dropdownRef}
+      data-provider-dropdown-open={isOpen ? 'true' : undefined}
+      onKeyDown={handleDropdownKeyDown}
+    >
       {/* Auto-Probing HUD Pill in Header Bar */}
       {compact && isProbing && (
         <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-hbo-purple/40 border border-hbo-cyan/40 backdrop-blur-md text-[10px] font-bold text-hbo-cyan animate-pulse">
@@ -79,6 +125,8 @@ export const ProviderPicker: React.FC<ProviderPickerProps> = ({
         <button
           type="button"
           onClick={() => setIsOpen(!isOpen)}
+          data-provider-trigger="true"
+          data-watch-header-item="true"
           className={`flex items-center justify-between gap-2 bg-black/70 hover:bg-black/90 backdrop-blur-md border border-white/20 rounded-full text-left text-xs font-semibold text-white transition-all shadow-md focus:outline-none focus:border-hbo-cyan tv-focus-target ${
             compact ? 'px-3 py-1.5' : 'w-full px-4 py-2.5 rounded-xl'
           }`}
@@ -93,20 +141,21 @@ export const ProviderPicker: React.FC<ProviderPickerProps> = ({
 
         {/* Dropdown Menu Popup */}
         {isOpen && (
-          <div className="absolute right-0 top-full mt-2 w-full sm:w-80 z-50 bg-hbo-card/95 backdrop-blur-xl border border-hbo-border/90 rounded-2xl p-1.5 shadow-2xl animate-fade-in divide-y divide-hbo-border/40 max-h-80 overflow-y-auto no-scrollbar">
-            <div className="px-3 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider flex items-center justify-between">
+          <div className="absolute right-0 top-full mt-2 w-96 sm:w-96 min-w-[340px] max-w-[calc(100vw-3rem)] z-50 bg-hbo-card/95 backdrop-blur-xl border border-hbo-border/90 rounded-2xl p-3 shadow-2xl animate-fade-in divide-y divide-hbo-border/40 max-h-84 overflow-y-auto no-scrollbar">
+            <div className="px-2 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider flex items-center justify-between">
               <span>Select Stream Server</span>
               <ShieldCheck className="w-3.5 h-3.5 text-green-400" />
             </div>
 
-            <div className="space-y-1 pt-1">
+            <div className="space-y-2 pt-2 px-1 pb-1">
               {STREAM_PROVIDERS.map((provider) => {
                 const isSelected = provider.id === currentProviderId;
                 return (
                   <button
                     key={provider.id}
                     onClick={() => handleSelect(provider)}
-                    className={`w-full flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl text-left transition-all tv-focus-target ${
+                    data-provider-selected={isSelected ? 'true' : undefined}
+                    className={`w-full flex items-center justify-between gap-3 px-4 py-3 rounded-xl text-left transition-all tv-focus-target ${
                       isSelected
                         ? 'bg-gradient-to-r from-hbo-purple/40 to-hbo-cyan/20 border border-hbo-cyan text-white shadow-hbo-glow'
                         : 'text-gray-300 hover:text-white hover:bg-white/5 border border-transparent'
@@ -114,20 +163,20 @@ export const ProviderPicker: React.FC<ProviderPickerProps> = ({
                   >
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
-                        <p className={`text-xs sm:text-sm font-bold truncate ${isSelected ? 'text-hbo-cyan' : 'text-white'}`}>
+                        <p className={`text-xs sm:text-sm font-bold ${isSelected ? 'text-hbo-cyan' : 'text-white'}`}>
                           {provider.name}
                         </p>
-                        <span className="text-[9px] px-1.5 py-0.2 rounded bg-white/10 text-gray-300 font-bold">
+                        <span className="text-[10px] px-2 py-0.5 rounded-md bg-white/10 text-gray-300 font-bold whitespace-nowrap flex-shrink-0">
                           {provider.badge}
                         </span>
                       </div>
-                      <p className="text-[11px] text-gray-400 truncate mt-0.5">
+                      <p className="text-[11px] text-gray-400 mt-0.5 leading-snug">
                         {provider.tagline}
                       </p>
                     </div>
 
                     {isSelected && (
-                      <Check className="w-4 h-4 text-hbo-cyan flex-shrink-0" />
+                      <Check className="w-4 h-4 text-hbo-cyan flex-shrink-0 ml-1" />
                     )}
                   </button>
                 );

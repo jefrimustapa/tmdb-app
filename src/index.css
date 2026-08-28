@@ -50,6 +50,13 @@
   transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
+/* In dropdown menus and tight lists, avoid expanding scale that clips left/right overflow */
+[data-provider-dropdown-open] .tv-focus-target:focus,
+[data-provider-dropdown-open] .tv-focus-target:focus-visible {
+  transform: none !important;
+  box-shadow: 0 0 0 2px #00f0ff, 0 0 15px rgba(0, 240, 255, 0.5) !important;
+}
+
 /* Hide scrollbar for carousel rails */
 .no-scrollbar::-webkit-scrollbar {
   display: none;
