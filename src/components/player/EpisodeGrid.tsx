@@ -7,6 +7,7 @@ interface EpisodeGridProps {
   tvDetails: TMDBTVDetails;
   currentSeason: number;
   currentEpisode: number;
+  hasWatchedHistory?: boolean;
   onSelectEpisode: (season: number, episode: number, title?: string) => void;
 }
 
@@ -14,6 +15,7 @@ export const EpisodeGrid: React.FC<EpisodeGridProps> = ({
   tvDetails,
   currentSeason,
   currentEpisode,
+  hasWatchedHistory = false,
   onSelectEpisode
 }) => {
   const [selectedSeason, setSelectedSeason] = useState(currentSeason || 1);
@@ -24,7 +26,9 @@ export const EpisodeGrid: React.FC<EpisodeGridProps> = ({
   const regularSeasons = tvDetails.seasons.filter((s) => s.season_number > 0);
 
   useEffect(() => {
-    setSelectedSeason(currentSeason);
+    if (currentSeason) {
+      setSelectedSeason(currentSeason);
+    }
   }, [currentSeason]);
 
   useEffect(() => {
@@ -94,7 +98,7 @@ export const EpisodeGrid: React.FC<EpisodeGridProps> = ({
                 onClick={() => onSelectEpisode(selectedSeason, ep.episode_number, ep.name)}
                 className={`flex text-left gap-3.5 p-3 rounded-xl border transition-all duration-200 tv-focus-target group ${
                   isPlaying
-                    ? 'bg-gradient-to-r from-hbo-purple/30 to-hbo-cyan/10 border-hbo-cyan shadow-hbo-cyan-glow'
+                    ? 'bg-gradient-to-r from-hbo-purple/30 to-hbo-cyan/10 border-hbo-cyan shadow-hbo-cyan-glow ring-1 ring-hbo-cyan/50'
                     : isUnaired
                     ? 'bg-hbo-dark/40 border-hbo-border/30 opacity-80 hover:opacity-100 hover:bg-hbo-hover hover:border-hbo-border'
                     : 'bg-hbo-dark/60 border-hbo-border/40 hover:bg-hbo-hover hover:border-hbo-purple/60'
@@ -110,11 +114,15 @@ export const EpisodeGrid: React.FC<EpisodeGridProps> = ({
                       isUnaired ? 'grayscale contrast-75 brightness-75 opacity-60' : ''
                     }`}
                   />
-                  {isUnaired && (
+                  {isUnaired ? (
                     <div className="absolute top-1 left-1 px-1.5 py-0.5 rounded bg-black/85 text-[10px] font-extrabold uppercase tracking-wider text-yellow-400 border border-yellow-500/30 backdrop-blur-sm z-10">
                       Unaired
                     </div>
-                  )}
+                  ) : isPlaying && hasWatchedHistory ? (
+                    <div className="absolute top-1 left-1 px-2 py-0.5 rounded bg-hbo-cyan text-[10px] font-black uppercase tracking-wider text-black shadow-md z-10">
+                      Resume
+                    </div>
+                  ) : null}
                   <div className={`absolute inset-0 flex items-center justify-center bg-black/40 ${isPlaying ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} transition`}>
                     <Play className="w-6 h-6 fill-current text-white" />
                   </div>
