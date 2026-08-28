@@ -137,10 +137,19 @@ export function useTVNavigation(isEnabled = true) {
             return;
           }
           const backBtn = header?.querySelector<HTMLElement>('button[aria-label="Back"], [data-watch-header-item="true"]');
-          if (backBtn && typeof backBtn.click === 'function') {
-            backBtn.click();
+          const isBackBtnFocused = backBtn && document.activeElement === backBtn;
+          if (!isBackBtnFocused) {
+            window.dispatchEvent(new CustomEvent('tmdb_user_action'));
+            if (backBtn) { backBtn.focus(); }
+            return;
+          }
+          if (typeof (window as any).tmdbExitWatch === 'function') {
+            (window as any).tmdbExitWatch();
           } else {
-            window.history.back();
+            window.dispatchEvent(new CustomEvent('tmdb_exit_watch'));
+            if (backBtn && typeof backBtn.click === 'function') {
+              backBtn.click();
+            }
           }
           return;
         }
