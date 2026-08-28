@@ -7,7 +7,7 @@ import { Logo } from '../components/common/Logo';
 import { APP_VERSION, APP_BUILD_NUMBER, APP_VERSION_FULL, APP_BUILD_CHANNEL } from '../version';
 import { updateService, type UpdateInfo } from '../services/updateService';
 import { UpdateModal } from '../components/common/UpdateModal';
-import { Settings as SettingsIcon, Tv2, Smartphone, Tablet, Monitor, ShieldCheck, Server, Database, Check, ShieldAlert, EyeOff, Lock, Zap, X, ArrowUpCircle, RefreshCw, Moon, Sparkles, AlertCircle, CalendarX } from 'lucide-react';
+import { Settings as SettingsIcon, Tv2, Smartphone, Tablet, Monitor, ShieldCheck, Server, Database, Check, ShieldAlert, EyeOff, Lock, Zap, X, ArrowUpCircle, RefreshCw, Moon, Sparkles, AlertCircle, CalendarX, ChevronDown } from 'lucide-react';
 
 export const Settings: React.FC = () => {
   const [settings, setSettings] = useState<UserSettings | null>(null);
@@ -34,9 +34,114 @@ export const Settings: React.FC = () => {
   };
 
   const [showEasterEgg, setShowEasterEgg] = useState(false);
+  const [openDropdownSlot, setOpenDropdownSlot] = useState<number | null>(null);
   const clickCountRef = useRef(0);
   const clickTimerRef = useRef<NodeJS.Timeout | null>(null);
   const { deviceMode, setDeviceMode, detectedPlatform, activeLayout } = useDevice();
+
+  useEffect(() => {
+    try {
+      (window as any).AndroidBridge?.setDropdownOpen?.(openDropdownSlot !== null);
+    } catch {}
+
+    if (openDropdownSlot !== null) {
+      setTimeout(() => {
+        const activeEl = document.querySelector<HTMLElement>('[data-priority-dropdown-container="true"] [data-provider-selected="true"]') ||
+                         document.querySelector<HTMLElement>('[data-priority-dropdown-container="true"] .tv-focus-target');
+        if (activeEl) {
+          activeEl.focus();
+        }
+      }, 50);
+    }
+
+    return () => {
+      try {
+        (window as any).AndroidBridge?.setDropdownOpen?.(false);
+      } catch {}
+    };
+  }, [openDropdownSlot]);
+
+  // Handle remote Back button, Escape, and Left/Right arrow dismissal for priority dropdowns
+  useEffect(() => {
+    const handleCloseFromEvent = () => {
+      const slot = openDropdownSlot;
+      setOpenDropdownSlot(null);
+      if (slot !== null) {
+        setTimeout(() => {
+          document.getElementById(`priority-server-btn-${slot}`)?.focus();
+        }, 50);
+      }
+    };
+
+    window.addEventListener('tmdb_close_dropdowns', handleCloseFromEvent);
+
+    if (openDropdownSlot === null) {
+      return () => {
+        window.removeEventListener('tmdb_close_dropdowns', handleCloseFromEvent);
+      };
+    }
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Remote Back button or Escape key
+      if (
+        e.key === 'Escape' ||
+        e.key === 'BrowserBack' ||
+        e.key === 'Back' ||
+        e.keyCode === 27 ||
+        e.keyCode === 4 ||
+        e.keyCode === 10009
+      ) {
+        e.preventDefault();
+        e.stopPropagation();
+        const slot = openDropdownSlot;
+        setOpenDropdownSlot(null);
+        setTimeout(() => {
+          document.getElementById(`priority-server-btn-${slot}`)?.focus();
+        }, 50);
+        return;
+      }
+
+      // Arrow Right from inside dropdown closes and moves to next priority slot
+      if (e.key === 'ArrowRight' && openDropdownSlot < 2) {
+        e.preventDefault();
+        e.stopPropagation();
+        const nextSlot = openDropdownSlot + 1;
+        setOpenDropdownSlot(null);
+        setTimeout(() => {
+          document.getElementById(`priority-server-btn-${nextSlot}`)?.focus();
+        }, 50);
+        return;
+      }
+
+      // Arrow Left from inside dropdown closes and moves to previous priority slot
+      if (e.key === 'ArrowLeft' && openDropdownSlot > 0) {
+        e.preventDefault();
+        e.stopPropagation();
+        const prevSlot = openDropdownSlot - 1;
+        setOpenDropdownSlot(null);
+        setTimeout(() => {
+          document.getElementById(`priority-server-btn-${prevSlot}`)?.focus();
+        }, 50);
+        return;
+      }
+    };
+
+    const handleDocumentClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest('[data-priority-dropdown-container="true"]')) {
+        setOpenDropdownSlot(null);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown, { capture: true });
+    document.addEventListener('mousedown', handleDocumentClick);
+
+    return () => {
+      window.removeEventListener('tmdb_close_dropdowns', handleCloseFromEvent);
+      window.removeEventListener('keydown', handleKeyDown, { capture: true });
+      document.removeEventListener('mousedown', handleDocumentClick);
+    };
+  }, [openDropdownSlot]);
 
   const handleBuildNumberClick = () => {
     clickCountRef.current += 1;
@@ -193,39 +298,122 @@ export const Settings: React.FC = () => {
           </div>
         </div>
 
-        {/* Preferred Stream Provider */}
-        <div className="bg-hbo-card border border-hbo-border rounded-2xl p-5 sm:p-6">
-          <h3 className="text-base sm:text-lg font-bold font-display text-white flex items-center gap-2 mb-2">
-            <Server className="w-5 h-5 text-hbo-purple-light" />
-            <span>Default Streaming Resolver</span>
-          </h3>
-          <p className="text-xs text-gray-400 mb-4">
-            Choose which provider automatically loads when clicking Play.
-          </p>
+        {/* Top 3 Priority Stream Resolvers */}
+        <div className="bg-hbo-card border border-hbo-border rounded-2xl p-5 sm:p-6 space-y-4">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h3 className="text-base sm:text-lg font-bold font-display text-white flex items-center gap-2 mb-1">
+                <Server className="w-5 h-5 text-hbo-cyan" />
+                <span>Top 3 Priority Stream Resolvers</span>
+              </h3>
+              <p className="text-xs text-gray-400">
+                Choose the 3 primary servers the app will use first in order to resolve streams. If the 1st server fails or buffers, the app automatically fails over to the 2nd and 3rd servers.
+              </p>
+            </div>
+            <span className="text-xs px-2.5 py-1 rounded-full bg-hbo-purple/30 border border-hbo-purple/50 text-hbo-cyan font-bold whitespace-nowrap hidden sm:inline-block">
+              {STREAM_PROVIDERS.length} Servers Available
+            </span>
+          </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {STREAM_PROVIDERS.map((provider) => {
-              const isSelected = settings.preferredProvider === provider.id;
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
+            {[
+              {
+                index: 0,
+                priorityLabel: 'Priority #1 Server (Primary Initial)',
+                badgeClass: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40',
+                defaultId: 'vidlink'
+              },
+              {
+                index: 1,
+                priorityLabel: 'Priority #2 Server (First Failover)',
+                badgeClass: 'bg-hbo-purple/30 text-hbo-purple-light border-hbo-purple/40',
+                defaultId: 'moviesapi'
+              },
+              {
+                index: 2,
+                priorityLabel: 'Priority #3 Server (Second Failover)',
+                badgeClass: 'bg-hbo-cyan/20 text-hbo-cyan border-hbo-cyan/40',
+                defaultId: 'cinesrc'
+              }
+            ].map(({ index, priorityLabel, badgeClass, defaultId }) => {
+              const currentTop = settings.topProviders && settings.topProviders.length >= 3
+                ? settings.topProviders
+                : ['vidlink', 'moviesapi', 'cinesrc'];
+              const selectedId = currentTop[index] || defaultId;
+              const selectedProviderObj = STREAM_PROVIDERS.find(p => p.id === selectedId) || STREAM_PROVIDERS[0];
+
               return (
-                <button
-                  key={provider.id}
-                  onClick={() => handleUpdate({ preferredProvider: provider.id })}
-                  className={`flex items-center justify-between p-4 rounded-xl border text-left transition-all tv-focus-target ${
-                    isSelected
-                      ? 'bg-hbo-purple/30 border-hbo-purple-light shadow-hbo-glow'
-                      : 'bg-hbo-dark/60 border-hbo-border hover:bg-hbo-hover'
-                  }`}
+                <div
+                  key={index}
+                  className="bg-hbo-dark/70 border border-hbo-border/90 rounded-xl p-4 flex flex-col justify-between gap-3 shadow-inner"
                 >
-                  <div className="flex-1 min-w-0 pr-2">
-                    <p className="text-sm font-bold text-white">{provider.name}</p>
-                    <p className="text-xs text-gray-400 mt-0.5 truncate">{provider.tagline}</p>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className={`text-[11px] font-bold px-2 py-0.5 rounded-md border ${badgeClass}`}>
+                      #{index + 1} Priority
+                    </span>
+                    <span className="text-[10px] px-1.5 py-0.2 rounded bg-white/10 text-gray-300 font-bold truncate max-w-[120px]">
+                      {selectedProviderObj.badge}
+                    </span>
                   </div>
-                  <span className={`flex-shrink-0 text-xs px-2 py-0.5 rounded font-bold ${
-                    isSelected ? 'bg-hbo-cyan text-black' : 'bg-white/10 text-gray-300'
-                  }`}>
-                    {provider.badge}
-                  </span>
-                </button>
+
+                  <div className="relative" data-priority-dropdown-container="true">
+                    <span className="block text-xs font-semibold text-gray-300 mb-1.5">
+                      {priorityLabel}
+                    </span>
+                    <button
+                      type="button"
+                      id={`priority-server-btn-${index}`}
+                      onClick={() => setOpenDropdownSlot(openDropdownSlot === index ? null : index)}
+                      className="w-full flex items-center justify-between bg-hbo-card/90 border border-hbo-border text-white text-xs font-bold rounded-lg px-3 py-2.5 hover:bg-hbo-hover hover:border-hbo-cyan focus:outline-none focus:border-hbo-cyan focus:ring-2 focus:ring-hbo-cyan transition-all tv-focus-target"
+                    >
+                      <span className="truncate pr-2">{selectedProviderObj.name}</span>
+                      <ChevronDown className={`w-4 h-4 text-gray-400 flex-shrink-0 transition-transform ${openDropdownSlot === index ? 'rotate-180 text-hbo-cyan' : ''}`} />
+                    </button>
+
+                    {/* Inline Dropdown Menu */}
+                    {openDropdownSlot === index && (
+                      <div
+                        className="absolute left-0 right-0 top-full mt-2 z-50 bg-hbo-card/95 border border-hbo-border rounded-xl shadow-2xl p-1.5 max-h-60 overflow-y-auto space-y-1 focus-scroll-container backdrop-blur-xl animate-fade-in"
+                      >
+                        {STREAM_PROVIDERS.map((provider) => {
+                          const isSelected = selectedId === provider.id;
+                          return (
+                            <button
+                              key={provider.id}
+                              data-provider-selected={isSelected ? 'true' : 'false'}
+                              onClick={() => {
+                                const updated = [...currentTop] as [string, string, string];
+                                updated[index] = provider.id;
+                                handleUpdate({
+                                  topProviders: updated,
+                                  preferredProvider: updated[0]
+                                });
+                                setOpenDropdownSlot(null);
+                                setTimeout(() => {
+                                  document.getElementById(`priority-server-btn-${index}`)?.focus();
+                                }, 50);
+                              }}
+                              className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-left text-xs transition-all tv-focus-target ${
+                                isSelected
+                                  ? 'bg-hbo-purple/40 border border-hbo-cyan text-white font-bold'
+                                  : 'text-gray-300 hover:bg-hbo-hover hover:text-white'
+                              }`}
+                            >
+                              <span className="truncate pr-2">{provider.name}</span>
+                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/10 text-gray-300 flex-shrink-0">
+                                {provider.badge}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  <p className="text-[11px] text-gray-400 line-clamp-2 min-h-[32px] leading-snug">
+                    {selectedProviderObj.tagline}
+                  </p>
+                </div>
               );
             })}
           </div>
