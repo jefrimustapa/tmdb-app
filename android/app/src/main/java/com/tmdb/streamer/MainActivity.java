@@ -520,9 +520,57 @@ public class MainActivity extends BridgeActivity {
             }
 
             if (isTV() && isWatchPageActive) {
-                // Allow repeated presses for Left & Right (and media scrub) keys on remote so user can scrub the timeline
-                if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT || keyCode == KeyEvent.KEYCODE_DPAD_RIGHT ||
-                    keyCode == KeyEvent.KEYCODE_MEDIA_FAST_FORWARD || keyCode == KeyEvent.KEYCODE_MEDIA_REWIND ||
+                WebView webView = bridge.getWebView();
+
+                if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) {
+                    if (webView != null) {
+                        webView.evaluateJavascript(
+                            "(function() {" +
+                            "  var header = document.querySelector('[data-watch-header=\"true\"]');" +
+                            "  var isHeaderFocused = !!window.__tmdbHeaderFocused || (header && header.contains(document.activeElement));" +
+                            "  if (isHeaderFocused) {" +
+                            "    var trigger = document.getElementById('watch-provider-trigger');" +
+                            "    if (trigger && document.activeElement !== trigger) {" +
+                            "      trigger.focus();" +
+                            "      return true;" +
+                            "    }" +
+                            "  }" +
+                            "  return false;" +
+                            "})();",
+                            null
+                        );
+                    }
+                    return super.dispatchKeyEvent(event);
+                } else if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT) {
+                    if (webView != null) {
+                        webView.evaluateJavascript(
+                            "(function() {" +
+                            "  var header = document.querySelector('[data-watch-header=\"true\"]');" +
+                            "  var openDropdown = header ? header.querySelector('[data-provider-dropdown-open=\"true\"]') : null;" +
+                            "  if (openDropdown) {" +
+                            "    window.dispatchEvent(new CustomEvent('tmdb_close_dropdowns'));" +
+                            "    var trigger = document.getElementById('watch-provider-trigger');" +
+                            "    if (trigger) { trigger.focus(); }" +
+                            "    return true;" +
+                            "  }" +
+                            "  var isHeaderFocused = !!window.__tmdbHeaderFocused || (header && header.contains(document.activeElement));" +
+                            "  if (isHeaderFocused) {" +
+                            "    var backBtn = document.getElementById('watch-back-btn');" +
+                            "    if (backBtn && document.activeElement !== backBtn) {" +
+                            "      backBtn.focus();" +
+                            "      return true;" +
+                            "    }" +
+                            "  }" +
+                            "  return false;" +
+                            "})();",
+                            null
+                        );
+                    }
+                    return super.dispatchKeyEvent(event);
+                }
+
+                // Allow repeated presses for media scrub keys on remote so user can scrub the timeline
+                if (keyCode == KeyEvent.KEYCODE_MEDIA_FAST_FORWARD || keyCode == KeyEvent.KEYCODE_MEDIA_REWIND ||
                     keyCode == KeyEvent.KEYCODE_MEDIA_STEP_FORWARD || keyCode == KeyEvent.KEYCODE_MEDIA_STEP_BACKWARD) {
                     return super.dispatchKeyEvent(event);
                 }
@@ -531,11 +579,10 @@ public class MainActivity extends BridgeActivity {
                 if (event.getRepeatCount() > 0) {
                     return true;
                 }
-                WebView webView = bridge.getWebView();
 
                 if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER || keyCode == KeyEvent.KEYCODE_NUMPAD_ENTER) {
                     long now = SystemClock.uptimeMillis();
-                    if (now - lastDpadCenterTime < 500) {
+                    if (now - lastDpadCenterTime < 400) {
                         return true; // Debounce rapid key bounces
                     }
                     lastDpadCenterTime = now;
@@ -544,7 +591,7 @@ public class MainActivity extends BridgeActivity {
                         webView.evaluateJavascript(
                             "(function() {" +
                             "  var header = document.querySelector('[data-watch-header=\"true\"]');" +
-                            "  var isHeaderFocused = header && header.contains(document.activeElement);" +
+                            "  var isHeaderFocused = !!window.__tmdbHeaderFocused || (header && header.contains(document.activeElement));" +
                             "  if (!isHeaderFocused) {" +
                             "    if (typeof window.AndroidBridge !== 'undefined' && typeof window.AndroidBridge.simulateTouchAt === 'function') {" +
                             "      window.AndroidBridge.simulateTouchAt(window.innerWidth / 2, window.innerHeight / 2);" +
@@ -565,8 +612,15 @@ public class MainActivity extends BridgeActivity {
                             "(function() {" +
                             "  var header = document.querySelector('[data-watch-header=\"true\"]');" +
                             "  var openDropdown = header ? header.querySelector('[data-provider-dropdown-open=\"true\"]') : null;" +
+                            "  var isTrigger = document.activeElement && document.activeElement.id === 'watch-provider-trigger';" +
+                            "  if (isTrigger && !openDropdown) {" +
+                            "    if (typeof document.activeElement.click === 'function') {" +
+                            "      document.activeElement.click();" +
+                            "      return true;" +
+                            "    }" +
+                            "  }" +
                             "  var isHeaderFocused = !!window.__tmdbHeaderFocused || (header && header.contains(document.activeElement));" +
-                            "  if (isHeaderFocused && !openDropdown) {" +
+                            "  if (isHeaderFocused && !openDropdown && !isTrigger) {" +
                             "    window.__tmdbHeaderFocused = false;" +
                             "    if (document.activeElement && typeof document.activeElement.blur === 'function') {" +
                             "      document.activeElement.blur();" +
