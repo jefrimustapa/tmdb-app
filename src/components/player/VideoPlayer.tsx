@@ -104,6 +104,8 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     }
   };
 
+  const [enabledResolvers, setEnabledResolvers] = useState<StreamResolverType[]>(['torbox', 'private_extractor', 'embed']);
+
   // Load user settings
   useEffect(() => {
     dbService.getSettings().then((s) => {
@@ -111,6 +113,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         setAdShieldEnabled(s.adBlockShield);
         const activeResolver = s.streamResolver || (s.directStreamMode ? 'private_extractor' : 'embed');
         setStreamResolver(activeResolver);
+        setEnabledResolvers(s.enabledResolvers && s.enabledResolvers.length > 0 ? s.enabledResolvers : ['torbox', 'private_extractor', 'embed']);
         if (s.directStreamApiUrl) {
           setDirectStreamApiUrl(s.directStreamApiUrl);
         }
@@ -124,72 +127,83 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     });
   }, []);
 
-  // Proactively query Stream Resolver (TorBox or Private Extractor)
+  // Priority Stream Resolution: TorBox -> Private Extractor -> Embed Resolver
   useEffect(() => {
     let isMounted = true;
-    if (!tmdbId || streamResolver === 'embed') {
+    if (!tmdbId) {
       setIsExtracting(false);
       return;
     }
 
-    setIsExtracting(true);
+    async function executeStreamResolution() {
+      setIsExtracting(true);
 
-    if (streamResolver === 'torbox') {
-      // 1. Resolve via TorBox Cloud Debrid
-      fetchTorboxStream(tmdbId, undefined, mediaType, season, episode, torboxApiKey)
-        .then((result) => {
+      // 1. Try TorBox if enabled
+      if (enabledResolvers.includes('torbox') && torboxApiKey && torboxApiKey.trim()) {
+        try {
+          console.log('[Resolver] Checking TorBox 4K Cloud...');
+          const torboxRes = await fetchTorboxStream(tmdbId, undefined, mediaType, season, episode, torboxApiKey);
           if (!isMounted) return;
-          if (result && result.sources && result.sources.length > 0) {
-            console.log(`[TorBox] Resolved 4K/1080p stream:`, result.sources[0].url);
-            setDirectStreamUrl(result.sources[0].url);
-            setDirectStreamLabel(result.provider);
+          if (torboxRes && torboxRes.sources && torboxRes.sources.length > 0) {
+            console.log(`[Resolver] ✅ Playing via TorBox 4K:`, torboxRes.sources[0].url);
+            setDirectStreamUrl(torboxRes.sources[0].url);
+            setDirectStreamLabel('TorBox 4K Cloud');
             setPlayerMode('direct');
             setIsExtracting(false);
             setExtractionFailed(false);
             setIsLoading(false);
-          } else {
-            console.log('[TorBox] No cached stream found, falling back to embed player.');
-            setIsExtracting(false);
-            setExtractionFailed(true);
+            return;
           }
-        })
-        .catch((err) => {
+        } catch (err) {
+          console.warn('[Resolver] TorBox error:', err);
+        }
+      }
+
+      // 2. Try Private Consumet Extractor if enabled
+      if (enabledResolvers.includes('private_extractor')) {
+        try {
+          console.log('[Resolver] Checking Private Stream Extractor...');
+          const directRes = await fetchDirectStream(tmdbId, title, mediaType, season, episode, directStreamApiUrl);
           if (!isMounted) return;
-          console.warn('[TorBox] Query error:', err);
-          setIsExtracting(false);
-          setExtractionFailed(true);
-        });
-    } else if (streamResolver === 'private_extractor') {
-      // 2. Resolve via Private Consumet API
-      fetchDirectStream(tmdbId, title, mediaType, season, episode, directStreamApiUrl)
-        .then((result) => {
-          if (!isMounted) return;
-          if (result && result.sources && result.sources.length > 0) {
-            console.log(`[DirectStream] Successfully resolved stream via ${result.provider}:`, result.sources[0].url);
-            setDirectStreamUrl(result.sources[0].url);
-            setDirectStreamLabel(result.provider);
+          if (directRes && directRes.sources && directRes.sources.length > 0) {
+            console.log(`[Resolver] ✅ Playing via ${directRes.provider}:`, directRes.sources[0].url);
+            setDirectStreamUrl(directRes.sources[0].url);
+            setDirectStreamLabel(directRes.provider);
             setPlayerMode('direct');
             setIsExtracting(false);
             setExtractionFailed(false);
             setIsLoading(false);
-          } else {
-            console.log('[DirectStream] No direct stream available from API, falling back to top embed.');
-            setIsExtracting(false);
-            setExtractionFailed(true);
+            return;
           }
-        })
-        .catch((err) => {
-          if (!isMounted) return;
-          console.warn('[DirectStream] Direct query error:', err);
-          setIsExtracting(false);
-          setExtractionFailed(true);
-        });
+        } catch (err) {
+          console.warn('[Resolver] Private extractor error:', err);
+        }
+      }
+
+      if (!isMounted) return;
+
+      // 3. Fallback to Embed Resolver if enabled
+      if (enabledResolvers.includes('embed')) {
+        console.log('[Resolver] Active: Embed Resolver');
+        setPlayerMode('embed');
+        setDirectStreamUrl(null);
+        setDirectStreamLabel('Embed Mirror');
+        setIsExtracting(false);
+        setExtractionFailed(false);
+      } else {
+        console.log('[Resolver] All enabled direct engines failed and Embed Resolver is disabled.');
+        setPlayerMode('embed');
+        setExtractionFailed(true);
+        setIsExtracting(false);
+      }
     }
+
+    executeStreamResolution();
 
     return () => {
       isMounted = false;
     };
-  }, [streamResolver, tmdbId, title, mediaType, season, episode, directStreamApiUrl, torboxApiKey]);
+  }, [enabledResolvers, tmdbId, title, mediaType, season, episode, directStreamApiUrl, torboxApiKey]);
 
   const provider = getProviderById(providerId);
   const streamUrl =

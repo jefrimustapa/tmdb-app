@@ -34,6 +34,7 @@ export const DEFAULT_SETTINGS: UserSettings = {
   filterUnreleased: true,
   maturityLevel: 'all',
   streamResolver: 'embed',
+  enabledResolvers: ['torbox', 'private_extractor', 'embed'],
   directStreamMode: false,
   directStreamApiUrl: 'https://tmdb-api-yfbu.onrender.com',
   torboxApiKey: 'fd12d8fe-2429-43eb-bcb3-1a3d2dfeb5f9',
@@ -193,6 +194,10 @@ export const dbService = {
     }
     if (!settings.torboxApiKey) {
       settings.torboxApiKey = 'fd12d8fe-2429-43eb-bcb3-1a3d2dfeb5f9';
+      await db.settings.put(settings);
+    }
+    if (!settings.enabledResolvers || settings.enabledResolvers.length === 0) {
+      settings.enabledResolvers = ['torbox', 'private_extractor', 'embed'];
       await db.settings.put(settings);
     }
     cachedSettings = settings;
