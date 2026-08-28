@@ -34,9 +34,22 @@ export const Settings: React.FC = () => {
   };
 
   const [showEasterEgg, setShowEasterEgg] = useState(false);
+  const [openDropdownSlot, setOpenDropdownSlot] = useState<number | null>(null);
   const clickCountRef = useRef(0);
   const clickTimerRef = useRef<NodeJS.Timeout | null>(null);
   const { deviceMode, setDeviceMode, detectedPlatform, activeLayout } = useDevice();
+
+  useEffect(() => {
+    if (openDropdownSlot !== null) {
+      setTimeout(() => {
+        const activeEl = document.querySelector<HTMLElement>('[data-provider-selected="true"]') ||
+                         document.querySelector<HTMLElement>('.modal-provider-item');
+        if (activeEl) {
+          activeEl.focus();
+        }
+      }, 50);
+    }
+  }, [openDropdownSlot]);
 
   const handleBuildNumberClick = () => {
     clickCountRef.current += 1;
@@ -252,32 +265,18 @@ export const Settings: React.FC = () => {
                   </div>
 
                   <div>
-                    <label htmlFor={`top-provider-${index}`} className="block text-xs font-semibold text-gray-300 mb-1.5">
+                    <span className="block text-xs font-semibold text-gray-300 mb-1.5">
                       {priorityLabel}
-                    </label>
-                    <div className="relative">
-                      <select
-                        id={`top-provider-${index}`}
-                        value={selectedId}
-                        onChange={(e) => {
-                          const newId = e.target.value;
-                          const updated = [...currentTop] as [string, string, string];
-                          updated[index] = newId;
-                          handleUpdate({
-                            topProviders: updated,
-                            preferredProvider: updated[0]
-                          });
-                        }}
-                        className="w-full bg-hbo-card/90 border border-hbo-border text-white text-xs font-bold rounded-lg pl-3 pr-8 py-2.5 appearance-none focus:outline-none focus:border-hbo-cyan focus:ring-1 focus:ring-hbo-cyan transition-all tv-focus-target cursor-pointer"
-                      >
-                        {STREAM_PROVIDERS.map((provider) => (
-                          <option key={provider.id} value={provider.id} className="bg-hbo-dark text-white text-xs py-1">
-                            {provider.name} ({provider.badge})
-                          </option>
-                        ))}
-                      </select>
-                      <ChevronDown className="w-4 h-4 text-gray-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                    </div>
+                    </span>
+                    <button
+                      type="button"
+                      id={`priority-server-btn-${index}`}
+                      onClick={() => setOpenDropdownSlot(index)}
+                      className="w-full flex items-center justify-between bg-hbo-card/90 border border-hbo-border text-white text-xs font-bold rounded-lg px-3 py-2.5 hover:bg-hbo-hover hover:border-hbo-cyan focus:outline-none focus:border-hbo-cyan focus:ring-2 focus:ring-hbo-cyan transition-all tv-focus-target"
+                    >
+                      <span className="truncate pr-2">{selectedProviderObj.name}</span>
+                      <ChevronDown className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                    </button>
                   </div>
 
                   <p className="text-[11px] text-gray-400 line-clamp-2 min-h-[32px] leading-snug">
@@ -288,6 +287,103 @@ export const Settings: React.FC = () => {
             })}
           </div>
         </div>
+
+        {/* Server Picker Modal for Top 3 Resolvers */}
+        {openDropdownSlot !== null && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in"
+            onClick={() => {
+              const closedSlot = openDropdownSlot;
+              setOpenDropdownSlot(null);
+              setTimeout(() => {
+                document.getElementById(`priority-server-btn-${closedSlot}`)?.focus();
+              }, 50);
+            }}
+          >
+            <div
+              className="bg-hbo-card border border-hbo-border rounded-2xl max-w-lg w-full max-h-[85vh] flex flex-col shadow-2xl overflow-hidden animate-scale-up"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Modal Header */}
+              <div className="p-4 border-b border-hbo-border flex items-center justify-between bg-hbo-dark/60">
+                <div>
+                  <h3 className="text-base font-bold text-white flex items-center gap-2">
+                    <Server className="w-5 h-5 text-hbo-cyan" />
+                    <span>Select Priority #{openDropdownSlot + 1} Stream Server</span>
+                  </h3>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    {openDropdownSlot === 0
+                      ? 'Primary Initial Resolver (default player start)'
+                      : openDropdownSlot === 1
+                      ? 'First Failover Server (used if server #1 fails)'
+                      : 'Second Failover Server (used if server #2 fails)'}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const closedSlot = openDropdownSlot;
+                    setOpenDropdownSlot(null);
+                    setTimeout(() => {
+                      document.getElementById(`priority-server-btn-${closedSlot}`)?.focus();
+                    }, 50);
+                  }}
+                  className="p-2 rounded-xl bg-hbo-dark/80 border border-hbo-border text-gray-400 hover:text-white tv-focus-target"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Provider List */}
+              <div className="p-3 overflow-y-auto space-y-2 max-h-[60vh] focus-scroll-container">
+                {STREAM_PROVIDERS.map((provider) => {
+                  const currentTop = settings.topProviders && settings.topProviders.length >= 3
+                    ? settings.topProviders
+                    : ['vidlink', 'moviesapi', 'cinesrc'];
+                  const isSelected = currentTop[openDropdownSlot] === provider.id;
+
+                  return (
+                    <button
+                      key={provider.id}
+                      data-provider-selected={isSelected ? 'true' : 'false'}
+                      onClick={() => {
+                        const slot = openDropdownSlot;
+                        const updated = [...currentTop] as [string, string, string];
+                        updated[slot] = provider.id;
+                        handleUpdate({
+                          topProviders: updated,
+                          preferredProvider: updated[0]
+                        });
+                        setOpenDropdownSlot(null);
+                        setTimeout(() => {
+                          document.getElementById(`priority-server-btn-${slot}`)?.focus();
+                        }, 50);
+                      }}
+                      className={`w-full flex items-center justify-between p-3.5 rounded-xl border text-left transition-all modal-provider-item tv-focus-target ${
+                        isSelected
+                          ? 'bg-hbo-purple/40 border-hbo-cyan shadow-hbo-glow'
+                          : 'bg-hbo-dark/60 border-hbo-border hover:bg-hbo-hover'
+                      }`}
+                    >
+                      <div className="flex-1 min-w-0 pr-3">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-bold text-white">{provider.name}</span>
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
+                            isSelected ? 'bg-hbo-cyan text-black' : 'bg-white/10 text-gray-300'
+                          }`}>
+                            {provider.badge}
+                          </span>
+                        </div>
+                        <p className="text-xs text-gray-400 mt-0.5 truncate">{provider.tagline}</p>
+                      </div>
+                      {isSelected && <Check className="w-5 h-5 text-hbo-cyan flex-shrink-0" />}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Content Safety & Filtering */}
         <div className="bg-hbo-card border border-hbo-border rounded-2xl p-5 sm:p-6 space-y-5">

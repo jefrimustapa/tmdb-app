@@ -300,12 +300,14 @@ export function useTVNavigation(isEnabled = true) {
                 if (nextSibling) {
                   const targetToFocus = nextSibling.classList.contains('tv-focus-target')
                     ? nextSibling
-                    : nextSibling.querySelector<HTMLElement>('.tv-focus-target') || nextSibling;
+                    : nextSibling.querySelector<HTMLElement>('.tv-focus-target');
                   
-                  e.preventDefault();
-                  targetToFocus.focus();
-                  targetToFocus.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
-                  return;
+                  if (targetToFocus) {
+                    e.preventDefault();
+                    targetToFocus.focus();
+                    targetToFocus.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+                    return;
+                  }
                 }
               }
             }
@@ -325,12 +327,14 @@ export function useTVNavigation(isEnabled = true) {
                 if (prevSibling) {
                   const targetToFocus = prevSibling.classList.contains('tv-focus-target')
                     ? prevSibling
-                    : prevSibling.querySelector<HTMLElement>('.tv-focus-target') || prevSibling;
+                    : prevSibling.querySelector<HTMLElement>('.tv-focus-target');
                   
-                  e.preventDefault();
-                  targetToFocus.focus();
-                  targetToFocus.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
-                  return;
+                  if (targetToFocus) {
+                    e.preventDefault();
+                    targetToFocus.focus();
+                    targetToFocus.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+                    return;
+                  }
                 }
               }
             }
