@@ -72,6 +72,7 @@ export interface UserSettings {
   filterUnreleased?: boolean;
   maturityLevel: 'all' | 'pg13' | 'family';
   directStreamMode: boolean; // Option A: Direct Stream Extractor
+  directStreamApiUrl?: string; // Custom or default Consumet API URL (e.g. https://tmdb-api-yfbu.onrender.com)
   streamHeaderTimeout: number; // in seconds, e.g. 3, 5, 8, or 0 for always visible
   includeNightlyUpdates: boolean; // Option to check for and install Nightly pre-releases
   virtualCursorEnabled?: boolean; // TV Mode on-demand virtual cursor

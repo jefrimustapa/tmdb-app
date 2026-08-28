@@ -4,6 +4,7 @@ import Hls from 'hls.js';
 import type { StreamProvider } from '../../types/stream';
 import { STREAM_PROVIDERS, getProviderById, getOrderedProviders } from '../../services/streamProviders';
 import { dbService } from '../../services/db';
+import { fetchDirectStream, DEFAULT_DIRECT_STREAM_API } from '../../services/directStreamService';
 import { Logo } from '../common/Logo';
 import { tmdbImages } from '../../services/tmdb';
 
@@ -41,6 +42,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const [hasError, setHasError] = useState(false);
   const [adShieldEnabled, setAdShieldEnabled] = useState(true);
   const [directStreamMode, setDirectStreamMode] = useState(false);
+  const [directStreamApiUrl, setDirectStreamApiUrl] = useState(DEFAULT_DIRECT_STREAM_API);
   const [playerMode, setPlayerMode] = useState<'embed' | 'direct'>('embed');
   const [directStreamUrl, setDirectStreamUrl] = useState<string | null>(null);
   const [isExtracting, setIsExtracting] = useState(false);
@@ -104,12 +106,49 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       if (s) {
         setAdShieldEnabled(s.adBlockShield);
         setDirectStreamMode(s.directStreamMode || false);
+        if (s.directStreamApiUrl) {
+          setDirectStreamApiUrl(s.directStreamApiUrl);
+        }
         if (s.topProviders && s.topProviders.length >= 3) {
           setTopProviders(s.topProviders);
         }
       }
     });
   }, []);
+
+  // Proactively query Direct Stream API if directStreamMode is on
+  useEffect(() => {
+    let isMounted = true;
+    if (directStreamMode && tmdbId) {
+      setIsExtracting(true);
+      fetchDirectStream(tmdbId, title, mediaType, season, episode, directStreamApiUrl)
+        .then((result) => {
+          if (!isMounted) return;
+          if (result && result.sources && result.sources.length > 0) {
+            console.log(`[DirectStream] Successfully resolved stream via ${result.provider}:`, result.sources[0].url);
+            setDirectStreamUrl(result.sources[0].url);
+            setPlayerMode('direct');
+            setIsExtracting(false);
+            setExtractionFailed(false);
+            setIsLoading(false);
+          } else {
+            console.log('[DirectStream] No direct stream available from API, falling back to top embed.');
+            setIsExtracting(false);
+            setExtractionFailed(true);
+          }
+        })
+        .catch((err) => {
+          if (!isMounted) return;
+          console.warn('[DirectStream] Direct query error:', err);
+          setIsExtracting(false);
+          setExtractionFailed(true);
+        });
+    }
+
+    return () => {
+      isMounted = false;
+    };
+  }, [directStreamMode, tmdbId, title, mediaType, season, episode, directStreamApiUrl]);
 
   const provider = getProviderById(providerId);
   const streamUrl =

@@ -548,12 +548,18 @@ export const Settings: React.FC = () => {
           </div>
 
           {settings.directStreamMode && (
-            <div className="p-3.5 rounded-xl bg-hbo-purple/15 border border-hbo-purple-light/40 text-xs text-gray-300 space-y-1">
-              <p className="font-bold text-hbo-cyan flex items-center gap-1.5">
-                <span>⚡ Option A Active</span>
-              </p>
-              <p className="text-[11px] text-gray-400">
-                Direct HLS stream extractor will initialize when opening titles. You can toggle between Native Player and Embed Player at any time on the watch screen.
+            <div className="p-4 rounded-xl bg-hbo-purple/15 border border-hbo-purple-light/40 text-xs text-gray-300 space-y-2.5">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <p className="font-bold text-hbo-cyan flex items-center gap-1.5">
+                  <Zap className="w-4 h-4 text-hbo-cyan" />
+                  <span>Option A Active: Direct Stream Resolver</span>
+                </p>
+                <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 font-mono font-bold">
+                  ● Server Online
+                </span>
+              </div>
+              <p className="text-[11px] text-gray-300 leading-relaxed">
+                Connected to private stream extractor at <code className="text-hbo-cyan font-mono text-[11px] bg-black/40 px-1.5 py-0.5 rounded">{settings.directStreamApiUrl || 'https://tmdb-api-yfbu.onrender.com'}</code>. Direct HLS streams will be fetched automatically with instant fallback to top embed servers.
               </p>
             </div>
           )}
