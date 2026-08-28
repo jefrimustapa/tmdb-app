@@ -153,6 +153,28 @@ export const Watch: React.FC = () => {
     };
   }, [handleExitWatch, resetHeaderTimer]);
 
+  // Global TV key listener for header navigation
+  useEffect(() => {
+    const handleTVHeaderNav = (e: KeyboardEvent) => {
+      const backBtn = document.getElementById('watch-back-btn');
+      const trigger = document.getElementById('watch-provider-trigger');
+      if (e.key === 'ArrowRight' && (document.activeElement === backBtn || (window as any).__tmdbHeaderFocused)) {
+        if (trigger) {
+          e.preventDefault();
+          trigger.focus();
+        }
+      } else if (e.key === 'ArrowLeft' && document.activeElement === trigger) {
+        if (backBtn) {
+          e.preventDefault();
+          backBtn.focus();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleTVHeaderNav, true);
+    return () => window.removeEventListener('keydown', handleTVHeaderNav, true);
+  }, []);
+
   // Notify native Android bridge that Watch page is active
   useEffect(() => {
     try {
