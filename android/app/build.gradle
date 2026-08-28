@@ -13,19 +13,26 @@ def getBuildInfo() {
     return [version: "1.2.0", buildNumber: 1]
 }
 
-def getVersionCodeFromSemver(String version, int buildNum) {
-    def parts = version.tokenize('-')[0].tokenize('.')
-    def major = parts.size() > 0 ? parts[0].toInteger() : 1
-    def minor = parts.size() > 1 ? parts[1].toInteger() : 0
-    def patch = parts.size() > 2 ? parts[2].toInteger() : 0
-    return major * 100000 + minor * 1000 + patch * 100 + (buildNum % 100)
+def getVersionCodeFromBuildNumber(String version, Object buildNum) {
+    try {
+        def digits = buildNum.toString().replaceAll('\\D', '')
+        if (digits.length() >= 8) {
+            def parts = version.tokenize('-')[0].tokenize('.')
+            def major = parts.size() > 0 ? parts[0].toInteger() : 1
+            def timeCode = digits.substring(2, Math.min(digits.length(), 10)).toInteger()
+            return major * 100000000 + timeCode
+        }
+        return 102000
+    } catch(Exception e) {
+        return 102000
+    }
 }
 
 def buildInfo = getBuildInfo()
 def appVersion = buildInfo.version ?: "1.2.0"
-def appBuildNumber = buildInfo.buildNumber ?: 1
-def appVersionName = buildInfo.versionName ?: "${appVersion}.${appBuildNumber}"
-def appVersionCode = buildInfo.versionCode ?: getVersionCodeFromSemver(appVersion, appBuildNumber as int)
+def appBuildNumber = buildInfo.buildNumber ?: "1"
+def appVersionName = buildInfo.versionName ?: "${appVersion}-dev.${appBuildNumber}"
+def appVersionCode = buildInfo.versionCode ?: getVersionCodeFromBuildNumber(appVersion, appBuildNumber)
 
 android {
     namespace = "com.tmdb.streamer"
