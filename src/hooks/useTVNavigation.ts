@@ -103,16 +103,8 @@ export function useTVNavigation(isEnabled = true) {
 
         const isHeaderFocused = header && header.contains(document.activeElement);
 
-        // If not in header and user presses ArrowUp, move focus to header and reveal it
+        // If not in header, allow default behavior (iframe / player control)
         if (!isHeaderFocused) {
-          if (e.key === 'ArrowUp' || e.keyCode === 19) {
-            e.preventDefault();
-            const firstHeaderItem = header?.querySelector<HTMLElement>('[data-watch-header-item="true"], .tv-focus-target');
-            if (firstHeaderItem) {
-              firstHeaderItem.focus();
-              return;
-            }
-          }
           return;
         }
 
