@@ -43,7 +43,7 @@ export const EpisodeGrid: React.FC<EpisodeGridProps> = ({
   }, [tvDetails.id, selectedSeason]);
 
   return (
-    <div className="mt-8 bg-hbo-card/80 border border-hbo-border/70 rounded-2xl p-4 sm:p-6">
+    <div className="mt-8 bg-hbo-card/80 border border-hbo-border/70 rounded-2xl p-4 sm:p-6 lg:p-7 shadow-xl">
       {/* Season Selector Tabs */}
       <div className="flex items-center justify-between gap-4 mb-6 flex-wrap">
         <h3 className="text-lg sm:text-xl font-bold font-display text-white flex items-center gap-2">
@@ -51,15 +51,15 @@ export const EpisodeGrid: React.FC<EpisodeGridProps> = ({
           Episodes & Seasons
         </h3>
 
-        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1">
+        <div className="flex items-center gap-3 overflow-x-auto no-scrollbar py-3 px-3 -my-2 -mx-2 max-w-full">
           {regularSeasons.map((season) => (
             <button
               key={season.id}
               onClick={() => setSelectedSeason(season.season_number)}
-              className={`px-4 py-1.5 rounded-lg text-xs sm:text-sm font-bold whitespace-nowrap transition-all border tv-focus-target ${
+              className={`px-5 py-2 rounded-full text-xs sm:text-sm font-bold whitespace-nowrap transition-all border tv-focus-target cursor-pointer flex-shrink-0 ${
                 season.season_number === selectedSeason
-                  ? 'bg-hbo-purple text-white border-hbo-purple-light shadow-hbo-glow'
-                  : 'bg-hbo-hover text-gray-300 border-hbo-border hover:text-white'
+                  ? 'bg-gradient-to-r from-hbo-purple to-hbo-purple-light text-white border-hbo-cyan/60 ring-2 ring-hbo-cyan/40 shadow-lg shadow-hbo-purple/50'
+                  : 'bg-hbo-card/90 text-gray-300 border-hbo-border/80 hover:text-white hover:border-gray-400 hover:bg-hbo-hover'
               }`}
             >
               Season {season.season_number}
@@ -137,28 +137,24 @@ export const EpisodeGrid: React.FC<EpisodeGridProps> = ({
                     </h4>
                   </div>
 
-                  {/* Release Date & Runtime Meta */}
-                  <div className="flex items-center gap-2 flex-wrap text-xs text-gray-400 mt-1">
+                  {/* Release Date, Duration & Rating Meta */}
+                  <div className="flex items-center gap-x-3 gap-y-1 flex-wrap text-xs text-gray-400 mt-1.5">
                     <div className="flex items-center gap-1 font-medium">
-                      <Calendar className={`w-3.5 h-3.5 ${isUnaired ? 'text-yellow-400/80' : 'text-hbo-cyan'}`} />
+                      <Calendar className={`w-3.5 h-3.5 ${isUnaired ? 'text-yellow-400/80' : 'text-hbo-cyan'} flex-shrink-0`} />
                       <span className={isUnaired ? 'text-yellow-400/90 font-semibold' : 'text-gray-300'}>
                         {formattedAirDate}
                       </span>
                     </div>
                     {ep.runtime > 0 && (
-                      <>
-                        <span>•</span>
-                        <span>{ep.runtime}m</span>
-                      </>
+                      <span className="text-gray-400 font-medium">
+                        {ep.runtime}m
+                      </span>
                     )}
                     {ep.vote_average > 0 && !isUnaired && (
-                      <>
-                        <span>•</span>
-                        <div className="flex items-center gap-1 text-yellow-400 font-semibold">
-                          <Star className="w-3 h-3 fill-current" />
-                          <span>{ep.vote_average.toFixed(1)}</span>
-                        </div>
-                      </>
+                      <div className="flex items-center gap-1 text-yellow-400 font-semibold">
+                        <Star className="w-3 h-3 fill-current flex-shrink-0" />
+                        <span>{ep.vote_average.toFixed(1)}</span>
+                      </div>
                     )}
                   </div>
 
