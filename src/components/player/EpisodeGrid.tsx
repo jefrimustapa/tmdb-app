@@ -51,15 +51,15 @@ export const EpisodeGrid: React.FC<EpisodeGridProps> = ({
           Episodes & Seasons
         </h3>
 
-        <div className="flex items-center gap-2.5 overflow-x-auto no-scrollbar py-2 px-1">
+        <div className="flex items-center gap-3 overflow-x-auto no-scrollbar py-3 px-3 -my-2 -mx-2 max-w-full">
           {regularSeasons.map((season) => (
             <button
               key={season.id}
               onClick={() => setSelectedSeason(season.season_number)}
-              className={`px-4 py-2 rounded-lg text-xs sm:text-sm font-bold whitespace-nowrap transition-all border tv-focus-target ${
+              className={`px-5 py-2 rounded-full text-xs sm:text-sm font-bold whitespace-nowrap transition-all border tv-focus-target cursor-pointer flex-shrink-0 ${
                 season.season_number === selectedSeason
-                  ? 'bg-hbo-purple text-white border-hbo-purple-light shadow-hbo-glow scale-105'
-                  : 'bg-hbo-hover text-gray-300 border-hbo-border hover:text-white hover:border-gray-500'
+                  ? 'bg-gradient-to-r from-hbo-purple to-hbo-purple-light text-white border-hbo-cyan/60 ring-2 ring-hbo-cyan/40 shadow-lg shadow-hbo-purple/50'
+                  : 'bg-hbo-card/90 text-gray-300 border-hbo-border/80 hover:text-white hover:border-gray-400 hover:bg-hbo-hover'
               }`}
             >
               Season {season.season_number}
