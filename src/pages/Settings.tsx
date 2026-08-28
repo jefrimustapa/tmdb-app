@@ -264,19 +264,58 @@ export const Settings: React.FC = () => {
                     </span>
                   </div>
 
-                  <div>
+                  <div className="relative" data-priority-dropdown-container="true">
                     <span className="block text-xs font-semibold text-gray-300 mb-1.5">
                       {priorityLabel}
                     </span>
                     <button
                       type="button"
                       id={`priority-server-btn-${index}`}
-                      onClick={() => setOpenDropdownSlot(index)}
+                      onClick={() => setOpenDropdownSlot(openDropdownSlot === index ? null : index)}
                       className="w-full flex items-center justify-between bg-hbo-card/90 border border-hbo-border text-white text-xs font-bold rounded-lg px-3 py-2.5 hover:bg-hbo-hover hover:border-hbo-cyan focus:outline-none focus:border-hbo-cyan focus:ring-2 focus:ring-hbo-cyan transition-all tv-focus-target"
                     >
                       <span className="truncate pr-2">{selectedProviderObj.name}</span>
-                      <ChevronDown className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                      <ChevronDown className={`w-4 h-4 text-gray-400 flex-shrink-0 transition-transform ${openDropdownSlot === index ? 'rotate-180 text-hbo-cyan' : ''}`} />
                     </button>
+
+                    {/* Inline Dropdown Menu */}
+                    {openDropdownSlot === index && (
+                      <div
+                        className="absolute left-0 right-0 top-full mt-2 z-50 bg-hbo-card/95 border border-hbo-border rounded-xl shadow-2xl p-1.5 max-h-60 overflow-y-auto space-y-1 focus-scroll-container backdrop-blur-xl animate-fade-in"
+                      >
+                        {STREAM_PROVIDERS.map((provider) => {
+                          const isSelected = selectedId === provider.id;
+                          return (
+                            <button
+                              key={provider.id}
+                              data-provider-selected={isSelected ? 'true' : 'false'}
+                              onClick={() => {
+                                const updated = [...currentTop] as [string, string, string];
+                                updated[index] = provider.id;
+                                handleUpdate({
+                                  topProviders: updated,
+                                  preferredProvider: updated[0]
+                                });
+                                setOpenDropdownSlot(null);
+                                setTimeout(() => {
+                                  document.getElementById(`priority-server-btn-${index}`)?.focus();
+                                }, 50);
+                              }}
+                              className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-left text-xs transition-all tv-focus-target ${
+                                isSelected
+                                  ? 'bg-hbo-purple/40 border border-hbo-cyan text-white font-bold'
+                                  : 'text-gray-300 hover:bg-hbo-hover hover:text-white'
+                              }`}
+                            >
+                              <span className="truncate pr-2">{provider.name}</span>
+                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/10 text-gray-300 flex-shrink-0">
+                                {provider.badge}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
 
                   <p className="text-[11px] text-gray-400 line-clamp-2 min-h-[32px] leading-snug">
@@ -287,103 +326,6 @@ export const Settings: React.FC = () => {
             })}
           </div>
         </div>
-
-        {/* Server Picker Modal for Top 3 Resolvers */}
-        {openDropdownSlot !== null && (
-          <div
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in"
-            onClick={() => {
-              const closedSlot = openDropdownSlot;
-              setOpenDropdownSlot(null);
-              setTimeout(() => {
-                document.getElementById(`priority-server-btn-${closedSlot}`)?.focus();
-              }, 50);
-            }}
-          >
-            <div
-              className="bg-hbo-card border border-hbo-border rounded-2xl max-w-lg w-full max-h-[85vh] flex flex-col shadow-2xl overflow-hidden animate-scale-up"
-              onClick={(e) => e.stopPropagation()}
-            >
-              {/* Modal Header */}
-              <div className="p-4 border-b border-hbo-border flex items-center justify-between bg-hbo-dark/60">
-                <div>
-                  <h3 className="text-base font-bold text-white flex items-center gap-2">
-                    <Server className="w-5 h-5 text-hbo-cyan" />
-                    <span>Select Priority #{openDropdownSlot + 1} Stream Server</span>
-                  </h3>
-                  <p className="text-xs text-gray-400 mt-0.5">
-                    {openDropdownSlot === 0
-                      ? 'Primary Initial Resolver (default player start)'
-                      : openDropdownSlot === 1
-                      ? 'First Failover Server (used if server #1 fails)'
-                      : 'Second Failover Server (used if server #2 fails)'}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const closedSlot = openDropdownSlot;
-                    setOpenDropdownSlot(null);
-                    setTimeout(() => {
-                      document.getElementById(`priority-server-btn-${closedSlot}`)?.focus();
-                    }, 50);
-                  }}
-                  className="p-2 rounded-xl bg-hbo-dark/80 border border-hbo-border text-gray-400 hover:text-white tv-focus-target"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              {/* Provider List */}
-              <div className="p-3 overflow-y-auto space-y-2 max-h-[60vh] focus-scroll-container">
-                {STREAM_PROVIDERS.map((provider) => {
-                  const currentTop = settings.topProviders && settings.topProviders.length >= 3
-                    ? settings.topProviders
-                    : ['vidlink', 'moviesapi', 'cinesrc'];
-                  const isSelected = currentTop[openDropdownSlot] === provider.id;
-
-                  return (
-                    <button
-                      key={provider.id}
-                      data-provider-selected={isSelected ? 'true' : 'false'}
-                      onClick={() => {
-                        const slot = openDropdownSlot;
-                        const updated = [...currentTop] as [string, string, string];
-                        updated[slot] = provider.id;
-                        handleUpdate({
-                          topProviders: updated,
-                          preferredProvider: updated[0]
-                        });
-                        setOpenDropdownSlot(null);
-                        setTimeout(() => {
-                          document.getElementById(`priority-server-btn-${slot}`)?.focus();
-                        }, 50);
-                      }}
-                      className={`w-full flex items-center justify-between p-3.5 rounded-xl border text-left transition-all modal-provider-item tv-focus-target ${
-                        isSelected
-                          ? 'bg-hbo-purple/40 border-hbo-cyan shadow-hbo-glow'
-                          : 'bg-hbo-dark/60 border-hbo-border hover:bg-hbo-hover'
-                      }`}
-                    >
-                      <div className="flex-1 min-w-0 pr-3">
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-bold text-white">{provider.name}</span>
-                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
-                            isSelected ? 'bg-hbo-cyan text-black' : 'bg-white/10 text-gray-300'
-                          }`}>
-                            {provider.badge}
-                          </span>
-                        </div>
-                        <p className="text-xs text-gray-400 mt-0.5 truncate">{provider.tagline}</p>
-                      </div>
-                      {isSelected && <Check className="w-5 h-5 text-hbo-cyan flex-shrink-0" />}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* Content Safety & Filtering */}
         <div className="bg-hbo-card border border-hbo-border rounded-2xl p-5 sm:p-6 space-y-5">
