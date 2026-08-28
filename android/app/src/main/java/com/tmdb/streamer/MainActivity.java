@@ -496,25 +496,32 @@ public class MainActivity extends BridgeActivity {
 
 
 
+    private long lastDpadCenterTime = 0;
+
     @Override
     public boolean dispatchKeyEvent(KeyEvent event) {
         if (isTV() && isWatchPageActive && event.getAction() == KeyEvent.ACTION_DOWN) {
+            // Drop auto-repeated key events to prevent rapid multi-firing
+            if (event.getRepeatCount() > 0) {
+                return true;
+            }
+
             int keyCode = event.getKeyCode();
             WebView webView = bridge.getWebView();
 
             if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER || keyCode == KeyEvent.KEYCODE_NUMPAD_ENTER) {
+                long now = SystemClock.uptimeMillis();
+                if (now - lastDpadCenterTime < 500) {
+                    return true; // Debounce rapid key bounces
+                }
+                lastDpadCenterTime = now;
+
                 if (webView != null) {
                     webView.evaluateJavascript(
                         "(function() {" +
                         "  var header = document.querySelector('[data-watch-header=\"true\"]');" +
                         "  var isHeaderFocused = header && header.contains(document.activeElement);" +
                         "  if (!isHeaderFocused) {" +
-                        "    var iframe = document.querySelector('iframe');" +
-                        "    if (iframe && iframe.contentWindow) {" +
-                        "      try { iframe.contentWindow.postMessage({ type: 'play' }, '*'); } catch(e){}" +
-                        "      try { iframe.contentWindow.postMessage({ action: 'play' }, '*'); } catch(e){}" +
-                        "      try { iframe.contentWindow.postMessage({ event: 'command', func: 'playVideo' }, '*'); } catch(e){}" +
-                        "    }" +
                         "    if (typeof window.AndroidBridge !== 'undefined' && typeof window.AndroidBridge.simulateTouchAt === 'function') {" +
                         "      window.AndroidBridge.simulateTouchAt(window.innerWidth / 2, window.innerHeight / 2);" +
                         "    }" +
