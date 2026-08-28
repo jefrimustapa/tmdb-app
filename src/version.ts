@@ -2,8 +2,8 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20260829-0142';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.feature-direct-strea.20260829-0142';
+export const APP_BUILD_NUMBER = '20260829-0751';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.fix-nightly-update-e.20260829-0751';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
-export const APP_BRANCH = 'feature-direct-strea';
+export const APP_BRANCH = 'fix-nightly-update-e';
