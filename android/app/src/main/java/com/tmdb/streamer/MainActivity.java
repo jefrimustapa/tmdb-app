@@ -40,6 +40,7 @@ public class MainActivity extends BridgeActivity {
     private boolean isCurrentlyFullscreen = false;
     private boolean isWatchPageActive = false;
     private volatile boolean isDropdownOpen = false;
+    private volatile boolean isVirtualCursorActive = false;
     private volatile boolean isSimulatingTouch = false;
     private OrientationEventListener orientationListener;
 
@@ -221,6 +222,12 @@ public class MainActivity extends BridgeActivity {
                 public void setDropdownOpen(boolean open) {
                     isDropdownOpen = open;
                     Log.i("TMDB_APP", "[AndroidBridge] setDropdownOpen: " + open);
+                }
+
+                @JavascriptInterface
+                public void setVirtualCursorActive(boolean active) {
+                    isVirtualCursorActive = active;
+                    Log.i("TMDB_APP", "[AndroidBridge] setVirtualCursorActive: " + active);
                 }
 
                 @JavascriptInterface
@@ -526,24 +533,44 @@ public class MainActivity extends BridgeActivity {
             if (isTV() && isWatchPageActive) {
                 WebView webView = bridge.getWebView();
 
-                // Intercept D-pad movement for Virtual Cursor
-                if (keyCode == KeyEvent.KEYCODE_DPAD_UP || keyCode == KeyEvent.KEYCODE_DPAD_DOWN ||
-                    keyCode == KeyEvent.KEYCODE_DPAD_LEFT || keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) {
-                    if (webView != null) {
-                        String dir = keyCode == KeyEvent.KEYCODE_DPAD_UP ? "Up" :
-                                     keyCode == KeyEvent.KEYCODE_DPAD_DOWN ? "Down" :
-                                     keyCode == KeyEvent.KEYCODE_DPAD_LEFT ? "Left" : "Right";
-                        webView.evaluateJavascript(
-                            String.format(
-                                "(function() {" +
-                                "  if (window.__tmdbVirtualCursorActive) {" +
-                                "    window.dispatchEvent(new CustomEvent('tmdb_cursor_move', { detail: { direction: '%s' } }));" +
-                                "    return true;" +
-                                "  }" +
-                                "  return false;" +
-                                "})()", dir),
-                            null
-                        );
+                // If Virtual Cursor is active, completely intercept D-Pad movement, OK clicks, and Back key
+                if (isVirtualCursorActive) {
+                    if (keyCode == KeyEvent.KEYCODE_DPAD_UP || keyCode == KeyEvent.KEYCODE_DPAD_DOWN ||
+                        keyCode == KeyEvent.KEYCODE_DPAD_LEFT || keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) {
+                        if (webView != null) {
+                            String dir = keyCode == KeyEvent.KEYCODE_DPAD_UP ? "Up" :
+                                         keyCode == KeyEvent.KEYCODE_DPAD_DOWN ? "Down" :
+                                         keyCode == KeyEvent.KEYCODE_DPAD_LEFT ? "Left" : "Right";
+                            webView.evaluateJavascript(
+                                String.format("window.dispatchEvent(new CustomEvent('tmdb_cursor_move', { detail: { direction: '%s' } }));", dir),
+                                null
+                            );
+                        }
+                        return true; // CONSUMED: Prevents WebView and iframe from moving native focus!
+                    }
+
+                    if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER || keyCode == KeyEvent.KEYCODE_NUMPAD_ENTER) {
+                        long now = SystemClock.uptimeMillis();
+                        boolean isDoublePress = (now - lastOkPressTime < 650);
+                        lastOkPressTime = now;
+
+                        if (webView != null) {
+                            if (isDoublePress) {
+                                isVirtualCursorActive = false;
+                                webView.evaluateJavascript("window.dispatchEvent(new CustomEvent('tmdb_close_cursor'));", null);
+                            } else {
+                                webView.evaluateJavascript("window.dispatchEvent(new CustomEvent('tmdb_cursor_click'));", null);
+                            }
+                        }
+                        return true; // CONSUMED: Prevents direct player click toggling
+                    }
+
+                    if (keyCode == KeyEvent.KEYCODE_BACK) {
+                        isVirtualCursorActive = false;
+                        if (webView != null) {
+                            webView.evaluateJavascript("window.dispatchEvent(new CustomEvent('tmdb_close_cursor'));", null);
+                        }
+                        return true; // CONSUMED: Dismiss cursor without leaving Watch page
                     }
                 }
 
