@@ -141,13 +141,13 @@ export const ProviderPicker: React.FC<ProviderPickerProps> = ({
 
         {/* Dropdown Menu Popup */}
         {isOpen && (
-          <div className="absolute right-0 top-full mt-2 w-full sm:w-80 z-50 bg-hbo-card/95 backdrop-blur-xl border border-hbo-border/90 rounded-2xl p-1.5 shadow-2xl animate-fade-in divide-y divide-hbo-border/40 max-h-80 overflow-y-auto no-scrollbar">
-            <div className="px-3 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider flex items-center justify-between">
+          <div className="absolute right-0 top-full mt-2 w-80 sm:w-88 min-w-[300px] max-w-[calc(100vw-2rem)] z-50 bg-hbo-card/95 backdrop-blur-xl border border-hbo-border/90 rounded-2xl p-2 shadow-2xl animate-fade-in divide-y divide-hbo-border/40 max-h-84 overflow-y-auto no-scrollbar">
+            <div className="px-3.5 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider flex items-center justify-between">
               <span>Select Stream Server</span>
               <ShieldCheck className="w-3.5 h-3.5 text-green-400" />
             </div>
 
-            <div className="space-y-1 pt-1">
+            <div className="space-y-1.5 pt-1.5">
               {STREAM_PROVIDERS.map((provider) => {
                 const isSelected = provider.id === currentProviderId;
                 return (
@@ -155,7 +155,7 @@ export const ProviderPicker: React.FC<ProviderPickerProps> = ({
                     key={provider.id}
                     onClick={() => handleSelect(provider)}
                     data-provider-selected={isSelected ? 'true' : undefined}
-                    className={`w-full flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl text-left transition-all tv-focus-target ${
+                    className={`w-full flex items-center justify-between gap-3 px-3.5 py-2.5 rounded-xl text-left transition-all tv-focus-target ${
                       isSelected
                         ? 'bg-gradient-to-r from-hbo-purple/40 to-hbo-cyan/20 border border-hbo-cyan text-white shadow-hbo-glow'
                         : 'text-gray-300 hover:text-white hover:bg-white/5 border border-transparent'
@@ -163,20 +163,20 @@ export const ProviderPicker: React.FC<ProviderPickerProps> = ({
                   >
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
-                        <p className={`text-xs sm:text-sm font-bold truncate ${isSelected ? 'text-hbo-cyan' : 'text-white'}`}>
+                        <p className={`text-xs sm:text-sm font-bold ${isSelected ? 'text-hbo-cyan' : 'text-white'}`}>
                           {provider.name}
                         </p>
-                        <span className="text-[9px] px-1.5 py-0.2 rounded bg-white/10 text-gray-300 font-bold">
+                        <span className="text-[10px] px-2 py-0.5 rounded-md bg-white/10 text-gray-300 font-bold whitespace-nowrap flex-shrink-0">
                           {provider.badge}
                         </span>
                       </div>
-                      <p className="text-[11px] text-gray-400 truncate mt-0.5">
+                      <p className="text-[11px] text-gray-400 mt-0.5 leading-snug">
                         {provider.tagline}
                       </p>
                     </div>
 
                     {isSelected && (
-                      <Check className="w-4 h-4 text-hbo-cyan flex-shrink-0" />
+                      <Check className="w-4 h-4 text-hbo-cyan flex-shrink-0 ml-1" />
                     )}
                   </button>
                 );
