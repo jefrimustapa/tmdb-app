@@ -24,32 +24,42 @@ export async function fetchTorboxStream(
     return null;
   }
 
+  const cleanKey = apiKey.trim();
+
+  // 1. Try resolving through TorBox Debrid Stream Bridge
   try {
     const id = imdbId || `tmdb:${tmdbId}`;
     const streamEndpoint = mediaType === 'tv' && season && episode
-      ? `https://torrentio.strem.fun/torbox=${apiKey.trim()}/stream/series/${id}:${season}:${episode}.json`
-      : `https://torrentio.strem.fun/torbox=${apiKey.trim()}/stream/movie/${id}.json`;
+      ? `https://torrentio.strem.fun/torbox=${cleanKey}/stream/series/${id}:${season}:${episode}.json`
+      : `https://torrentio.strem.fun/torbox=${cleanKey}/stream/movie/${id}.json`;
 
     const res = await fetch(streamEndpoint, { signal: AbortSignal.timeout(7000) });
-    if (!res.ok) return null;
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.streams && data.streams.length > 0) {
+        // Filter out Torrentio error videos (e.g. failed_access_v3.mp4)
+        const validStreams = data.streams.filter((s: any) => 
+          s.url && !s.url.includes('failed_access') && !s.url.includes('invalid_token')
+        );
 
-    const data = await res.json();
-    if (data && data.streams && data.streams.length > 0) {
-      const topStream = data.streams[0];
-      const streamUrl = topStream.url;
+        if (validStreams.length > 0) {
+          const topStream = validStreams[0];
+          const streamUrl = topStream.url;
 
-      if (streamUrl) {
-        return {
-          provider: 'TorBox Debrid',
-          sources: [
-            {
-              url: streamUrl,
-              quality: topStream.name?.includes('4k') ? '4K UHD' : '1080p HD',
-              isM3U8: streamUrl.includes('.m3u8')
-            }
-          ],
-          title: topStream.title?.split('\n')[0] || 'Direct TorBox Stream'
-        };
+          return {
+            provider: 'TorBox 4K Cloud',
+            sources: [
+              {
+                url: streamUrl,
+                quality: topStream.name?.includes('4k') || topStream.title?.includes('2160p') ? '4K Ultra HD' : '1080p Full HD',
+                isM3U8: streamUrl.includes('.m3u8')
+              }
+            ],
+            title: topStream.title?.split('\n')[0] || 'TorBox Direct Stream'
+          };
+        } else {
+          console.warn('[TorBox] TorBox returned invalid/unauthorized stream token. Please check your API key on torbox.app/settings.');
+        }
       }
     }
   } catch (err) {

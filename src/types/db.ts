@@ -73,7 +73,8 @@ export interface UserSettings {
   filterAdult: boolean;
   filterUnreleased?: boolean;
   maturityLevel: 'all' | 'pg13' | 'family';
-  streamResolver: StreamResolverType; // 'embed' (default) | 'private_extractor' | 'torbox'
+  streamResolver: StreamResolverType; // Legacy single selection
+  enabledResolvers: StreamResolverType[]; // Multi or single enabled engines (e.g. ['torbox', 'private_extractor', 'embed'])
   directStreamApiUrl?: string; // Custom or default Consumet API URL (e.g. https://tmdb-api-yfbu.onrender.com)
   torboxApiKey?: string; // TorBox API Key (for 4K HDR & 1080p cloud streams)
   directStreamMode?: boolean; // Legacy fallback flag
