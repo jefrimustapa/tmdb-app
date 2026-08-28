@@ -73,12 +73,62 @@ export function useTVNavigation(isEnabled = true) {
       if (window.location.pathname.startsWith('/watch')) {
         const header = document.querySelector('[data-watch-header="true"]');
         const isHeaderFocused = header && header.contains(document.activeElement);
+
+        // If not in header and user presses ArrowUp, move focus to header and reveal it
         if (!isHeaderFocused) {
+          if (e.key === 'ArrowUp' || e.keyCode === 19) {
+            e.preventDefault();
+            const firstHeaderItem = header?.querySelector<HTMLElement>('[data-watch-header-item="true"], .tv-focus-target');
+            if (firstHeaderItem) {
+              firstHeaderItem.focus();
+              return;
+            }
+          }
           return;
         }
 
-        // When in watch header, navigate between header elements (Back Button <-> Provider Picker)
-        const headerFocusables = Array.from(header.querySelectorAll<HTMLElement>('.tv-focus-target, button, [tabindex="0"]'))
+        // Check if provider dropdown is currently open
+        const openDropdown = header.querySelector('[data-provider-dropdown-open="true"]');
+        if (openDropdown) {
+          const dropdownOptions = Array.from(openDropdown.querySelectorAll<HTMLElement>('.tv-focus-target, button'))
+            .filter(el => {
+              const style = window.getComputedStyle(el);
+              const rect = el.getBoundingClientRect();
+              return style.display !== 'none' && style.visibility !== 'hidden' && !el.hasAttribute('disabled') && (rect.width > 0 || rect.height > 0);
+            });
+
+          if (dropdownOptions.length > 0) {
+            const currentIdx = dropdownOptions.indexOf(document.activeElement as HTMLElement);
+            if (e.key === 'ArrowDown' || e.keyCode === 20) {
+              e.preventDefault();
+              const nextIdx = (currentIdx + 1) % dropdownOptions.length;
+              dropdownOptions[nextIdx].focus();
+              dropdownOptions[nextIdx].scrollIntoView({ block: 'nearest' });
+              return;
+            } else if (e.key === 'ArrowUp' || e.keyCode === 19) {
+              e.preventDefault();
+              const prevIdx = (currentIdx - 1 + dropdownOptions.length) % dropdownOptions.length;
+              dropdownOptions[prevIdx].focus();
+              dropdownOptions[prevIdx].scrollIntoView({ block: 'nearest' });
+              return;
+            }
+          }
+        }
+
+        // If dropdown is NOT open and user presses ArrowDown, return focus down to player iframe
+        if (!openDropdown && (e.key === 'ArrowDown' || e.keyCode === 20)) {
+          e.preventDefault();
+          const iframe = document.querySelector<HTMLIFrameElement>('iframe');
+          if (iframe) {
+            try {
+              iframe.focus();
+            } catch {}
+          }
+          return;
+        }
+
+        // When dropdown is closed, navigate horizontally between header elements (Back Button <-> Provider Picker Trigger)
+        const headerFocusables = Array.from(header.querySelectorAll<HTMLElement>('[data-watch-header-item="true"], .tv-focus-target, button'))
           .filter(el => {
             const style = window.getComputedStyle(el);
             const rect = el.getBoundingClientRect();
