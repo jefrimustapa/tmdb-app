@@ -126,6 +126,11 @@ export const updateService = {
           } else if (APP_BUILD_CHANNEL !== 'nightly' || !APP_VERSION_FULL.includes(cleanTag)) {
             hasUpdate = true;
           }
+        } else {
+          // If local is on an unreleased dev build, allow upgrading to official published nightly
+          if (APP_BUILD_CHANNEL === 'dev') {
+            hasUpdate = true;
+          }
         }
       } else {
         const versionDiff = compareVersions(cleanTag, APP_VERSION);

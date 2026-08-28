@@ -25,11 +25,11 @@ function getGitOutput(cmd) {
 function getTimestampBuildNumber() {
   const d = new Date();
   const pad = (n) => String(n).padStart(2, '0');
-  const yyyy = d.getFullYear();
-  const mm = pad(d.getMonth() + 1);
-  const dd = pad(d.getDate());
-  const hh = pad(d.getHours());
-  const min = pad(d.getMinutes());
+  const yyyy = d.getUTCFullYear();
+  const mm = pad(d.getUTCMonth() + 1);
+  const dd = pad(d.getUTCDate());
+  const hh = pad(d.getUTCHours());
+  const min = pad(d.getUTCMinutes());
   return `${yyyy}${mm}${dd}-${hh}${min}`;
 }
 
