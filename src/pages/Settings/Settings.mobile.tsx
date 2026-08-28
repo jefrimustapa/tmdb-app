@@ -375,7 +375,7 @@ export const Settings: React.FC = () => {
                     {/* Inline Dropdown Menu */}
                     {openDropdownSlot === index && (
                       <div
-                        className={`absolute ${index === 2 ? 'right-0' : 'left-0'} w-[300px] sm:w-[340px] md:w-[380px] top-full mt-2 z-50 bg-hbo-card/98 border border-hbo-border rounded-2xl shadow-2xl p-2.5 max-h-72 overflow-y-auto space-y-2 focus-scroll-container backdrop-blur-2xl animate-fade-in`}
+                        className={`absolute ${index === 2 ? 'right-0' : 'left-0'} w-[340px] sm:w-[400px] md:w-[440px] top-full mt-2 z-50 bg-hbo-card/98 border border-hbo-border rounded-2xl shadow-2xl p-3.5 sm:p-4 max-h-72 overflow-y-auto space-y-2.5 focus-scroll-container backdrop-blur-2xl animate-fade-in`}
                       >
                         {STREAM_PROVIDERS.map((provider) => {
                           const isSelected = selectedId === provider.id;
@@ -395,17 +395,17 @@ export const Settings: React.FC = () => {
                                   document.getElementById(`priority-server-btn-${index}`)?.focus();
                                 }, 50);
                               }}
-                              className={`w-full flex items-center justify-between gap-3.5 px-4 py-3 rounded-xl text-left text-xs transition-all tv-focus-target ${
+                              className={`w-full flex items-center justify-between gap-4 px-5 sm:px-6 py-3.5 sm:py-4 rounded-2xl text-left text-xs transition-all tv-focus-target ${
                                 isSelected
                                   ? 'bg-hbo-purple/40 border border-hbo-cyan text-white font-bold shadow-hbo-glow'
                                   : 'text-gray-300 hover:bg-hbo-hover hover:text-white border border-transparent'
                               }`}
                             >
-                              <div className="min-w-0 flex-1 pr-1">
+                              <div className="min-w-0 flex-1 pr-3 pl-1">
                                 <span className="font-bold text-white block text-xs sm:text-sm leading-snug whitespace-normal break-words">{provider.name}</span>
                                 <span className="text-[11px] text-gray-400 block leading-normal mt-0.5 whitespace-normal break-words">{provider.tagline}</span>
                               </div>
-                              <span className="text-[10px] px-2.5 py-1 rounded-md bg-white/10 text-gray-300 font-bold flex-shrink-0 ml-1 whitespace-nowrap">
+                              <span className="text-[10px] px-3 py-1 rounded-md bg-white/10 text-gray-300 font-bold flex-shrink-0 ml-3 whitespace-nowrap">
                                 {provider.badge}
                               </span>
                             </button>
