@@ -17,7 +17,14 @@ export function useTVNavigation(isEnabled = true) {
       let target: HTMLElement | null = null;
 
       if (mainContent) {
-        if (pathname === '/') {
+        if (pathname.startsWith('/watch')) {
+          // On Watch page: the ONLY way to move focus to header is by pressing Back on remote
+          const iframe = document.querySelector<HTMLIFrameElement>('iframe');
+          if (iframe) {
+            try { iframe.focus(); } catch {}
+          }
+          return;
+        } else if (pathname === '/') {
           // On Home page: focus the Billboard "Watch Now" button
           target = mainContent.querySelector<HTMLElement>('[data-hero-watch-now="true"]') ||
                    Array.from(mainContent.querySelectorAll<HTMLElement>('.tv-focus-target, a, button')).find(
@@ -139,6 +146,9 @@ export function useTVNavigation(isEnabled = true) {
         // If dropdown is NOT open and user presses ArrowDown, return focus down to player iframe
         if (!openDropdown && (e.key === 'ArrowDown' || e.keyCode === 20)) {
           e.preventDefault();
+          if (document.activeElement && typeof (document.activeElement as HTMLElement).blur === 'function') {
+            (document.activeElement as HTMLElement).blur();
+          }
           const iframe = document.querySelector<HTMLIFrameElement>('iframe');
           if (iframe) {
             try {
