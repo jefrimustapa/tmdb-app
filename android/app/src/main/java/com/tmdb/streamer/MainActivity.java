@@ -535,6 +535,28 @@ public class MainActivity extends BridgeActivity {
                     );
                     return true;
                 }
+            } else if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
+                if (webView != null) {
+                    webView.evaluateJavascript(
+                        "(function() {" +
+                        "  var header = document.querySelector('[data-watch-header=\"true\"]');" +
+                        "  var openDropdown = header ? header.querySelector('[data-provider-dropdown-open=\"true\"]') : null;" +
+                        "  var isHeaderFocused = header && header.contains(document.activeElement);" +
+                        "  if (isHeaderFocused && !openDropdown) {" +
+                        "    if (document.activeElement && typeof document.activeElement.blur === 'function') {" +
+                        "      document.activeElement.blur();" +
+                        "    }" +
+                        "    var iframe = document.querySelector('iframe');" +
+                        "    if (iframe && typeof iframe.focus === 'function') {" +
+                        "      iframe.focus();" +
+                        "    }" +
+                        "    return true;" +
+                        "  }" +
+                        "  return false;" +
+                        "})();",
+                        null
+                    );
+                }
             } else if (keyCode == KeyEvent.KEYCODE_BACK) {
                 if (webView != null) {
                     webView.evaluateJavascript(
