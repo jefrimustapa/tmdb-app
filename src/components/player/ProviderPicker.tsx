@@ -141,13 +141,13 @@ export const ProviderPicker: React.FC<ProviderPickerProps> = ({
 
         {/* Dropdown Menu Popup */}
         {isOpen && (
-          <div className="absolute right-0 top-full mt-2 w-80 sm:w-88 min-w-[300px] max-w-[calc(100vw-2rem)] z-50 bg-hbo-card/95 backdrop-blur-xl border border-hbo-border/90 rounded-2xl p-2 shadow-2xl animate-fade-in divide-y divide-hbo-border/40 max-h-84 overflow-y-auto no-scrollbar">
-            <div className="px-3.5 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider flex items-center justify-between">
+          <div className="absolute right-0 top-full mt-2 w-96 sm:w-96 min-w-[340px] max-w-[calc(100vw-3rem)] z-50 bg-hbo-card/95 backdrop-blur-xl border border-hbo-border/90 rounded-2xl p-3 shadow-2xl animate-fade-in divide-y divide-hbo-border/40 max-h-84 overflow-y-auto no-scrollbar">
+            <div className="px-2 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider flex items-center justify-between">
               <span>Select Stream Server</span>
               <ShieldCheck className="w-3.5 h-3.5 text-green-400" />
             </div>
 
-            <div className="space-y-1.5 pt-1.5">
+            <div className="space-y-2 pt-2 px-1 pb-1">
               {STREAM_PROVIDERS.map((provider) => {
                 const isSelected = provider.id === currentProviderId;
                 return (
@@ -155,7 +155,7 @@ export const ProviderPicker: React.FC<ProviderPickerProps> = ({
                     key={provider.id}
                     onClick={() => handleSelect(provider)}
                     data-provider-selected={isSelected ? 'true' : undefined}
-                    className={`w-full flex items-center justify-between gap-3 px-3.5 py-2.5 rounded-xl text-left transition-all tv-focus-target ${
+                    className={`w-full flex items-center justify-between gap-3 px-4 py-3 rounded-xl text-left transition-all tv-focus-target ${
                       isSelected
                         ? 'bg-gradient-to-r from-hbo-purple/40 to-hbo-cyan/20 border border-hbo-cyan text-white shadow-hbo-glow'
                         : 'text-gray-300 hover:text-white hover:bg-white/5 border border-transparent'
