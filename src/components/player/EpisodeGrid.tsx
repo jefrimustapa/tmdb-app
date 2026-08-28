@@ -137,28 +137,24 @@ export const EpisodeGrid: React.FC<EpisodeGridProps> = ({
                     </h4>
                   </div>
 
-                  {/* Release Date & Runtime Meta */}
-                  <div className="flex items-center gap-2 flex-wrap text-xs text-gray-400 mt-1">
+                  {/* Release Date, Duration & Rating Meta */}
+                  <div className="flex items-center gap-x-3 gap-y-1 flex-wrap text-xs text-gray-400 mt-1.5">
                     <div className="flex items-center gap-1 font-medium">
-                      <Calendar className={`w-3.5 h-3.5 ${isUnaired ? 'text-yellow-400/80' : 'text-hbo-cyan'}`} />
+                      <Calendar className={`w-3.5 h-3.5 ${isUnaired ? 'text-yellow-400/80' : 'text-hbo-cyan'} flex-shrink-0`} />
                       <span className={isUnaired ? 'text-yellow-400/90 font-semibold' : 'text-gray-300'}>
                         {formattedAirDate}
                       </span>
                     </div>
                     {ep.runtime > 0 && (
-                      <>
-                        <span>•</span>
-                        <span>{ep.runtime}m</span>
-                      </>
+                      <span className="text-gray-400 font-medium">
+                        {ep.runtime}m
+                      </span>
                     )}
                     {ep.vote_average > 0 && !isUnaired && (
-                      <>
-                        <span>•</span>
-                        <div className="flex items-center gap-1 text-yellow-400 font-semibold">
-                          <Star className="w-3 h-3 fill-current" />
-                          <span>{ep.vote_average.toFixed(1)}</span>
-                        </div>
-                      </>
+                      <div className="flex items-center gap-1 text-yellow-400 font-semibold">
+                        <Star className="w-3 h-3 fill-current flex-shrink-0" />
+                        <span>{ep.vote_average.toFixed(1)}</span>
+                      </div>
                     )}
                   </div>
 
