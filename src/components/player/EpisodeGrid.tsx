@@ -43,7 +43,7 @@ export const EpisodeGrid: React.FC<EpisodeGridProps> = ({
   }, [tvDetails.id, selectedSeason]);
 
   return (
-    <div className="mt-8 bg-hbo-card/80 border border-hbo-border/70 rounded-2xl p-4 sm:p-6">
+    <div className="mt-8 bg-hbo-card/80 border border-hbo-border/70 rounded-2xl p-4 sm:p-6 lg:p-7 shadow-xl">
       {/* Season Selector Tabs */}
       <div className="flex items-center justify-between gap-4 mb-6 flex-wrap">
         <h3 className="text-lg sm:text-xl font-bold font-display text-white flex items-center gap-2">
@@ -51,15 +51,15 @@ export const EpisodeGrid: React.FC<EpisodeGridProps> = ({
           Episodes & Seasons
         </h3>
 
-        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1">
+        <div className="flex items-center gap-2.5 overflow-x-auto no-scrollbar py-2 px-1">
           {regularSeasons.map((season) => (
             <button
               key={season.id}
               onClick={() => setSelectedSeason(season.season_number)}
-              className={`px-4 py-1.5 rounded-lg text-xs sm:text-sm font-bold whitespace-nowrap transition-all border tv-focus-target ${
+              className={`px-4 py-2 rounded-lg text-xs sm:text-sm font-bold whitespace-nowrap transition-all border tv-focus-target ${
                 season.season_number === selectedSeason
-                  ? 'bg-hbo-purple text-white border-hbo-purple-light shadow-hbo-glow'
-                  : 'bg-hbo-hover text-gray-300 border-hbo-border hover:text-white'
+                  ? 'bg-hbo-purple text-white border-hbo-purple-light shadow-hbo-glow scale-105'
+                  : 'bg-hbo-hover text-gray-300 border-hbo-border hover:text-white hover:border-gray-500'
               }`}
             >
               Season {season.season_number}

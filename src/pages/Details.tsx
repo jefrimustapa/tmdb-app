@@ -143,7 +143,7 @@ export const Details: React.FC = () => {
   const contentRating = extractContentRating(details);
 
   return (
-    <div className="min-h-screen bg-hbo-dark text-white pb-20">
+    <div className="min-h-screen bg-hbo-dark text-white pb-28 sm:pb-36">
       {/* Top Hero Backdrop & Vignette */}
       <div className="relative w-full h-[65vh] sm:h-[75vh] overflow-hidden bg-gray-950">
         <img
@@ -157,7 +157,7 @@ export const Details: React.FC = () => {
 
         {/* Back Navigation Bar (Top Left) */}
         <div
-          className={`absolute z-30 left-4 sm:left-8 ${
+          className={`absolute z-30 left-4 sm:left-8 lg:left-12 ${
             isTV
               ? 'top-6 sm:top-8'
               : 'top-[max(4.25rem,calc(env(safe-area-inset-top,0px)+3.75rem))]'
@@ -183,7 +183,7 @@ export const Details: React.FC = () => {
         </div>
 
         {/* Hero Title & Actions Overlay */}
-        <div className="absolute bottom-6 sm:bottom-10 left-4 sm:left-8 right-4 sm:right-8 max-w-4xl z-20 space-y-4">
+        <div className="absolute bottom-6 sm:bottom-10 lg:bottom-12 left-4 sm:left-8 lg:left-12 right-4 sm:right-8 lg:right-12 max-w-4xl z-20 space-y-4 sm:space-y-5">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="px-3 py-0.5 rounded-md bg-hbo-purple text-hbo-cyan border border-hbo-cyan/30 text-xs font-black uppercase tracking-wider">
               {mediaType === 'movie' ? 'FILM' : 'SERIES'}
@@ -228,7 +228,7 @@ export const Details: React.FC = () => {
           </div>
 
           {/* Primary Action Buttons */}
-          <div className="flex items-center gap-3 sm:gap-4 pt-2 flex-wrap">
+          <div className="flex items-center gap-3 sm:gap-4 pt-2.5 flex-wrap p-1">
             <Link
               to={`/watch/${mediaType}/${tmdbId}`}
               data-details-primary="true"
@@ -266,7 +266,7 @@ export const Details: React.FC = () => {
       </div>
 
       {/* Details & Overview Body */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-8 pt-8 space-y-10">
+      <div className="max-w-7xl mx-auto px-4 sm:px-8 lg:px-12 pt-8 sm:pt-10 space-y-10 sm:space-y-12">
         {/* Synopsis & Tagline */}
         <div className="max-w-3xl space-y-3">
           {'tagline' in details && details.tagline && (
@@ -282,7 +282,7 @@ export const Details: React.FC = () => {
 
         {/* Series Seasons & Episode Selector Grid (TV Series only) */}
         {mediaType === 'tv' && details && 'seasons' in details && (
-          <div className="-mx-4 sm:-mx-8 px-4 sm:px-8">
+          <div className="-mx-4 sm:-mx-8 lg:-mx-12 px-4 sm:px-8 lg:px-12">
             <EpisodeGrid
               tvDetails={details as TMDBTVDetails}
               currentSeason={1}
@@ -296,20 +296,20 @@ export const Details: React.FC = () => {
 
         {/* Top Cast Section */}
         {details.credits?.cast && details.credits.cast.length > 0 && (
-          <div>
-            <div className="flex items-center justify-between mb-4">
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
               <h3 className="text-lg sm:text-xl font-bold font-display text-white flex items-center gap-2">
                 <span className="w-1.5 h-5 bg-gradient-to-b from-hbo-purple to-hbo-cyan rounded-full inline-block"></span>
                 Cast & Crew
               </h3>
               <span className="text-xs text-gray-400">Select actor to see filmography</span>
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 sm:gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3.5 sm:gap-4.5 p-1">
               {details.credits.cast.slice(0, 12).map((actor) => (
                 <Link
                   key={actor.id}
                   to={`/search?personId=${actor.id}&personName=${encodeURIComponent(actor.name)}`}
-                  className="flex items-center gap-3 p-2.5 rounded-xl bg-hbo-card/80 border border-hbo-border/60 hover:border-hbo-cyan/50 hover:bg-hbo-hover transition hover:scale-105 group tv-focus-target"
+                  className="flex items-center gap-3 p-3 rounded-xl bg-hbo-card/80 border border-hbo-border/60 hover:border-hbo-cyan/50 hover:bg-hbo-hover transition hover:scale-105 group tv-focus-target"
                 >
                   <img
                     src={tmdbImages.profile(actor.profile_path, 'w185')}
@@ -329,7 +329,7 @@ export const Details: React.FC = () => {
 
         {/* Recommended / Similar Titles Rail */}
         {similar.length > 0 && (
-          <div className="-mx-4 sm:-mx-8">
+          <div className="-mx-4 sm:-mx-8 lg:-mx-12 pt-2">
             <MediaRow
               title="More Like This"
               subtitle="Titles you may also enjoy based on this selection"
