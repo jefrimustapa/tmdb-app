@@ -34,7 +34,7 @@ export const Watch: React.FC = () => {
     clicks: 2,
     timeout: 10,
     speed: 'normal',
-    style: 'cyan_glow'
+    style: 'hbo_max'
   });
 
   const tmdbId = parseInt(id || '0', 10);
@@ -51,7 +51,7 @@ export const Watch: React.FC = () => {
           clicks: s.virtualCursorClicks ?? 2,
           timeout: s.virtualCursorTimeout ?? 10,
           speed: s.virtualCursorSpeed ?? 'normal',
-          style: s.virtualCursorStyle ?? 'cyan_glow'
+          style: s.virtualCursorStyle ?? 'hbo_max'
         });
       }
     });

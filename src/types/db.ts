@@ -40,6 +40,16 @@ export interface WatchlistItem {
 }
 
 export type VirtualCursorStyle =
+  | 'hbo_max'
+  | 'netflix'
+  | 'apple_tv'
+  | 'prime_video'
+  | 'disney_plus'
+  | 'viu'
+  | 'hulu'
+  | 'paramount'
+  | 'crunchyroll'
+  | 'peacock'
   | 'cyan_glow'
   | 'classic_white'
   | 'neon_yellow'

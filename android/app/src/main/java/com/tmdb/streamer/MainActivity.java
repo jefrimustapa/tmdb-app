@@ -220,6 +220,7 @@ public class MainActivity extends BridgeActivity {
                 @JavascriptInterface
                 public void setDropdownOpen(boolean open) {
                     isDropdownOpen = open;
+                    Log.i("TMDB_APP", "[AndroidBridge] setDropdownOpen: " + open);
                 }
 
                 @JavascriptInterface
@@ -513,6 +514,7 @@ public class MainActivity extends BridgeActivity {
 
             // Synchronously consume Back key if any dropdown is open anywhere in the app
             if (keyCode == KeyEvent.KEYCODE_BACK && isDropdownOpen) {
+                Log.i("TMDB_APP", "[Native Key] Back key consumed by open dropdown");
                 isDropdownOpen = false;
                 WebView webView = bridge.getWebView();
                 if (webView != null) {

@@ -40,7 +40,7 @@ export const DEFAULT_SETTINGS: UserSettings = {
   virtualCursorClicks: 2,
   virtualCursorTimeout: 10,
   virtualCursorSpeed: 'normal',
-  virtualCursorStyle: 'cyan_glow',
+  virtualCursorStyle: 'hbo_max',
   updatedAt: Date.now()
 };
 

@@ -351,7 +351,7 @@ export const Settings: React.FC = () => {
           </div>
 
           {(settings.virtualCursorEnabled ?? true) && (() => {
-            const currentStyleId = settings.virtualCursorStyle ?? 'cyan_glow';
+            const currentStyleId = settings.virtualCursorStyle ?? 'hbo_max';
             const currentStyleObj = CURSOR_STYLES_LIST.find((c) => c.id === currentStyleId) || CURSOR_STYLES_LIST[0];
 
             const currentTimeoutSec = settings.virtualCursorTimeout ?? 10;
