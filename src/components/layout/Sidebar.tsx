@@ -5,7 +5,7 @@ import { Logo } from '../common/Logo';
 import { useDevice } from '../../hooks/useDevice';
 
 export const Sidebar: React.FC = () => {
-  const { deviceMode, setDeviceMode, activeLayout } = useDevice();
+  const { deviceMode, activeLayout } = useDevice();
   const navigate = useNavigate();
 
   const links = [
@@ -16,13 +16,6 @@ export const Sidebar: React.FC = () => {
     { label: 'My Library', path: '/library', icon: Bookmark },
     { label: 'Settings', path: '/settings', icon: Settings },
   ];
-
-  const cycleDeviceMode = () => {
-    const modes: ('auto' | 'mobile' | 'tablet' | 'tv' | 'desktop')[] = ['auto', 'mobile', 'tablet', 'tv', 'desktop'];
-    const currentIndex = modes.indexOf(deviceMode as any);
-    const nextMode = modes[(currentIndex + 1) % modes.length];
-    setDeviceMode(nextMode);
-  };
 
   const getModeIcon = () => {
     if (activeLayout === 'tv') return <Tv2 className="w-4 h-4 text-hbo-cyan" />;
@@ -73,18 +66,16 @@ export const Sidebar: React.FC = () => {
       </div>
 
       <div className="pt-3 border-t border-hbo-border/40 space-y-2">
-        {/* Device Mode Switcher / Indicator Button */}
-        <button
-          onClick={cycleDeviceMode}
-          data-tv-nav="true"
-          className="w-full flex items-center justify-center lg:justify-start gap-2.5 p-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-semibold text-gray-200 transition tv-focus-target"
-          title={`Platform: ${getModeLabel()} - Click to switch`}
+        {/* Device Mode Indicator (View Only, Non-clickable, Non-focusable) */}
+        <div
+          className="w-full flex items-center justify-center lg:justify-start gap-2.5 p-2 rounded-xl bg-white/5 border border-white/10 text-xs font-semibold text-gray-300 pointer-events-none select-none"
+          title={`Platform: ${getModeLabel()}`}
         >
           {getModeIcon()}
-          <span className="hidden lg:inline text-xs font-medium text-gray-300">
+          <span className="hidden lg:inline text-xs font-medium text-gray-400">
             {getModeLabel()}
           </span>
-        </button>
+        </div>
 
         <div className="hidden lg:block text-[10px] text-gray-500 text-center">
           Powered by TMDB
