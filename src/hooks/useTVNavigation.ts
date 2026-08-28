@@ -90,13 +90,17 @@ export function useTVNavigation(isEnabled = true) {
             if (trigger) { trigger.focus(); }
             return;
           }
+          const isHeaderFocused = !!(window as any).__tmdbHeaderFocused || (header && header.contains(document.activeElement));
           const backBtn = header?.querySelector<HTMLElement>('button[aria-label="Back"], [data-watch-header-item="true"]');
-          const isHeaderVisible = header && !header.classList.contains('pointer-events-none') && window.getComputedStyle(header).opacity !== '0';
-          if (!isHeaderVisible) {
+          if (!isHeaderFocused) {
+            (window as any).__tmdbHeaderFocused = true;
             window.dispatchEvent(new CustomEvent('tmdb_user_action'));
+            window.focus();
+            if (backBtn) { backBtn.focus(); }
             setTimeout(() => { if (backBtn) { backBtn.focus(); } }, 50);
             return;
           }
+          (window as any).__tmdbHeaderFocused = false;
           if (typeof (window as any).tmdbExitWatch === 'function') {
             (window as any).tmdbExitWatch();
           } else {
@@ -108,7 +112,7 @@ export function useTVNavigation(isEnabled = true) {
           return;
         }
 
-        const isHeaderFocused = header && header.contains(document.activeElement);
+        const isHeaderFocused = !!(window as any).__tmdbHeaderFocused || (header && header.contains(document.activeElement));
 
         // If not in header, allow default behavior (iframe / player control)
         if (!isHeaderFocused) {
@@ -146,6 +150,7 @@ export function useTVNavigation(isEnabled = true) {
         // If dropdown is NOT open and user presses ArrowDown, return focus down to player iframe
         if (!openDropdown && (e.key === 'ArrowDown' || e.keyCode === 20)) {
           e.preventDefault();
+          (window as any).__tmdbHeaderFocused = false;
           if (document.activeElement && typeof (document.activeElement as HTMLElement).blur === 'function') {
             (document.activeElement as HTMLElement).blur();
           }
@@ -159,12 +164,12 @@ export function useTVNavigation(isEnabled = true) {
         }
 
         // When dropdown is closed, navigate horizontally between header elements (Back Button <-> Provider Picker Trigger)
-        const headerFocusables = Array.from(header.querySelectorAll<HTMLElement>('[data-watch-header-item="true"], .tv-focus-target, button'))
+        const headerFocusables = header ? Array.from(header.querySelectorAll<HTMLElement>('[data-watch-header-item="true"], .tv-focus-target, button'))
           .filter(el => {
             const style = window.getComputedStyle(el);
             const rect = el.getBoundingClientRect();
             return style.display !== 'none' && style.visibility !== 'hidden' && !el.hasAttribute('disabled') && (rect.width > 0 || rect.height > 0);
-          });
+          }) : [];
 
         if (headerFocusables.length > 1) {
           const currentIdx = headerFocusables.indexOf(document.activeElement as HTMLElement);

@@ -102,9 +102,9 @@ export const Watch: React.FC = () => {
         setHeaderVisible(false);
         window.dispatchEvent(new CustomEvent('tmdb_close_dropdowns'));
 
-        // Blur any focused element in the header and return focus to player iframe
-        if (document.activeElement instanceof HTMLElement) {
-          document.activeElement.blur();
+        (window as any).__tmdbHeaderFocused = false;
+        if (document.activeElement && (document.activeElement.tagName === 'BUTTON' || (document.activeElement as HTMLElement).dataset?.watchHeaderItem === 'true')) {
+          (document.activeElement as HTMLElement).blur();
         }
         const iframe = document.querySelector<HTMLIFrameElement>('iframe');
         if (iframe) {
@@ -130,9 +130,11 @@ export const Watch: React.FC = () => {
     const onExitWatch = () => handleExitWatch();
     window.addEventListener('tmdb_exit_watch', onExitWatch);
     (window as any).tmdbExitWatch = handleExitWatch;
+    (window as any).__tmdbHeaderFocused = false;
     return () => {
       window.removeEventListener('tmdb_exit_watch', onExitWatch);
       delete (window as any).tmdbExitWatch;
+      delete (window as any).__tmdbHeaderFocused;
     };
   }, [handleExitWatch]);
 
