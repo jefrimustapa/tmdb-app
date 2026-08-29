@@ -129,8 +129,17 @@ export const Watch: React.FC = () => {
       hideTimerRef.current = null;
     }
 
+    // Do NOT auto-hide the header if the server dropdown is currently open
+    const isDropdownOpen = !!document.querySelector('[data-provider-dropdown-open="true"]');
+    if (isDropdownOpen) {
+      return;
+    }
+
     if (headerTimeoutSeconds > 0) {
       hideTimerRef.current = setTimeout(() => {
+        const checkDropdown = !!document.querySelector('[data-provider-dropdown-open="true"]');
+        if (checkDropdown) return;
+
         setHeaderVisible(false);
         window.dispatchEvent(new CustomEvent('tmdb_close_dropdowns'));
 
@@ -187,6 +196,10 @@ export const Watch: React.FC = () => {
   // Global TV key listener for header navigation
   useEffect(() => {
     const handleTVHeaderNav = (e: KeyboardEvent) => {
+      // If dropdown is open, let the dropdown handle its own navigation
+      if (document.querySelector('[data-provider-dropdown-open="true"]')) {
+        return;
+      }
       const backBtn = document.getElementById('watch-back-btn');
       const trigger = document.getElementById('watch-provider-trigger');
       if (e.key === 'ArrowRight' && (document.activeElement === backBtn || (window as any).__tmdbHeaderFocused)) {
