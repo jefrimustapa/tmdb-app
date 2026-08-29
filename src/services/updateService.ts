@@ -102,8 +102,10 @@ export const updateService = {
       const cleanTag = latest.tag_name.replace(/^v/, '');
       const isNightly = latest.prerelease || latest.tag_name.toLowerCase().includes('nightly');
 
-      // Find APK asset
-      const apkAsset = latest.assets.find(a => a.name.toLowerCase().endsWith('.apk'));
+      // Find latest APK asset (sort descending so highest run number / latest APK is chosen)
+      const apkAssets = (latest.assets || []).filter(a => a.name.toLowerCase().endsWith('.apk'));
+      apkAssets.sort((a, b) => b.name.localeCompare(a.name));
+      const apkAsset = apkAssets[0];
       const apkUrl = apkAsset ? apkAsset.browser_download_url : null;
       const apkName = apkAsset ? apkAsset.name : `tmdb-stream-v${cleanTag}.apk`;
 
