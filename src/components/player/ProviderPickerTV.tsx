@@ -130,18 +130,31 @@ export const ProviderPickerTV: React.FC<ProviderPickerTVProps> = ({
               return (
                 <button
                   key={provider.id}
+                  id={`provider-item-${idx}`}
                   onClick={() => handleSelect(provider)}
                   data-provider-selected={isSelected ? 'true' : undefined}
                   data-provider-item="true"
+                  tabIndex={0}
                   onFocus={(e) => {
                     e.currentTarget.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
                   }}
                   onKeyDown={(e) => {
-                    if (e.key === 'ArrowLeft' || e.key === 'Escape') {
+                    if (e.key === 'ArrowDown') {
+                      e.preventDefault();
+                      const nextBtn = document.getElementById(`provider-item-${idx + 1}`) || document.getElementById('provider-item-0');
+                      if (nextBtn) nextBtn.focus();
+                    } else if (e.key === 'ArrowUp') {
+                      e.preventDefault();
+                      const prevBtn = idx > 0 ? document.getElementById(`provider-item-${idx - 1}`) : document.getElementById(`provider-item-${STREAM_PROVIDERS.length - 1}`);
+                      if (prevBtn) prevBtn.focus();
+                    } else if (e.key === 'ArrowLeft' || e.key === 'Escape') {
                       e.preventDefault();
                       setIsOpen(false);
                       const trigger = document.getElementById('watch-provider-trigger');
                       if (trigger) trigger.focus();
+                    } else if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      handleSelect(provider);
                     }
                   }}
                   className={`w-full flex items-center justify-between gap-3.5 px-4 py-3 sm:px-4.5 sm:py-3.5 rounded-xl text-left transition-all tv-focus-target focus:outline-none focus:border-hbo-cyan focus:ring-2 focus:ring-hbo-cyan ${

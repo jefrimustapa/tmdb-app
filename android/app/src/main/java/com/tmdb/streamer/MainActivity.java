@@ -584,6 +584,23 @@ public class MainActivity extends BridgeActivity {
             if (isTV() && isWatchPageActive) {
                 WebView webView = bridge.getWebView();
 
+                // If any dropdown is currently open on the Watch page, route D-Pad and Enter directly to the dropdown list
+                if (isDropdownOpen) {
+                    if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER || keyCode == KeyEvent.KEYCODE_NUMPAD_ENTER) {
+                        if (webView != null) {
+                            webView.evaluateJavascript(
+                                "if (document.activeElement && typeof document.activeElement.click === 'function') { document.activeElement.click(); }",
+                                null
+                            );
+                        }
+                        return true;
+                    }
+                    if (keyCode == KeyEvent.KEYCODE_DPAD_UP || keyCode == KeyEvent.KEYCODE_DPAD_DOWN ||
+                        keyCode == KeyEvent.KEYCODE_DPAD_LEFT || keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) {
+                        return super.dispatchKeyEvent(event);
+                    }
+                }
+
                 // If Virtual Cursor is active, completely intercept D-Pad movement, OK clicks, and Back key
                 if (isVirtualCursorActive) {
                     if (keyCode == KeyEvent.KEYCODE_DPAD_UP || keyCode == KeyEvent.KEYCODE_DPAD_DOWN ||
