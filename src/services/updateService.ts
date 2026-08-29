@@ -109,16 +109,37 @@ export const updateService = {
 
       // Determine if it is actually newer than current build
       let hasUpdate = false;
-      const versionDiff = compareVersions(cleanTag, APP_VERSION);
 
-      if (versionDiff > 0) {
-        hasUpdate = true;
-      } else if (versionDiff === 0) {
-        // If same base version, check if current is local dev or if nightly tag is newer
-        if (APP_BUILD_CHANNEL === 'dev') {
+      if (isNightly) {
+        // Extract 8-digit date (YYYYMMDD) from tag e.g. "nightly-20260828" -> 20260828
+        const tagDateMatch = latest.tag_name.match(/\d{8}/);
+        const localDateMatch = APP_BUILD_NUMBER.match(/\d{8}/);
+
+        const tagDate = tagDateMatch ? parseInt(tagDateMatch[0], 10) : 0;
+        const localDate = localDateMatch ? parseInt(localDateMatch[0], 10) : 0;
+
+        if (tagDate > localDate) {
           hasUpdate = true;
-        } else if (isNightly && !APP_VERSION_FULL.includes(cleanTag)) {
+        } else if (tagDate === localDate) {
+          if (APP_BUILD_CHANNEL === 'dev') {
+            hasUpdate = true;
+          } else if (APP_BUILD_CHANNEL !== 'nightly' || !APP_VERSION_FULL.includes(cleanTag)) {
+            hasUpdate = true;
+          }
+        } else {
+          // If local is on an unreleased dev build, allow upgrading to official published nightly
+          if (APP_BUILD_CHANNEL === 'dev') {
+            hasUpdate = true;
+          }
+        }
+      } else {
+        const versionDiff = compareVersions(cleanTag, APP_VERSION);
+        if (versionDiff > 0) {
           hasUpdate = true;
+        } else if (versionDiff === 0) {
+          if (APP_BUILD_CHANNEL === 'dev' || !APP_VERSION_FULL.includes(cleanTag)) {
+            hasUpdate = true;
+          }
         }
       }
 
