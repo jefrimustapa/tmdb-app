@@ -655,24 +655,14 @@ public class MainActivity extends BridgeActivity {
                     }
                 }
 
-                if (keyCode == KeyEvent.KEYCODE_DPAD_UP) {
+                if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) {
                     if (webView != null) {
                         webView.evaluateJavascript(
                             "(function() {" +
                             "  if (window.__tmdbVirtualCursorActive) return false;" +
-                            "  window.dispatchEvent(new CustomEvent('tmdb_show_header_focus_back'));" +
-                            "  return true;" +
-                            "})();",
-                            null
-                        );
-                        return true;
-                    }
-                    return super.dispatchKeyEvent(event);
-                } else if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) {
-                    if (webView != null) {
-                        webView.evaluateJavascript(
-                            "(function() {" +
-                            "  if (window.__tmdbVirtualCursorActive) return false;" +
+                            "  var header = document.querySelector('[data-watch-header=\"true\"]');" +
+                            "  var isHeaderFocused = !!window.__tmdbHeaderFocused || (header && header.contains(document.activeElement));" +
+                            "  if (!isHeaderFocused) return false;" +
                             "  var trigger = document.getElementById('watch-provider-trigger');" +
                             "  if (trigger && document.activeElement !== trigger) {" +
                             "    trigger.focus();" +
@@ -690,6 +680,9 @@ public class MainActivity extends BridgeActivity {
                         webView.evaluateJavascript(
                             "(function() {" +
                             "  if (window.__tmdbVirtualCursorActive) return false;" +
+                            "  var header = document.querySelector('[data-watch-header=\"true\"]');" +
+                            "  var isHeaderFocused = !!window.__tmdbHeaderFocused || (header && header.contains(document.activeElement));" +
+                            "  if (!isHeaderFocused) return false;" +
                             "  var backBtn = document.getElementById('watch-back-btn');" +
                             "  if (backBtn && document.activeElement !== backBtn) {" +
                             "    backBtn.focus();" +
@@ -766,8 +759,13 @@ public class MainActivity extends BridgeActivity {
                         webView.evaluateJavascript(
                             "(function() {" +
                             "  if (window.__tmdbVirtualCursorActive) return false;" +
-                            "  window.dispatchEvent(new CustomEvent('tmdb_hide_header_and_focus_player'));" +
-                            "  return true;" +
+                            "  var header = document.querySelector('[data-watch-header=\"true\"]');" +
+                            "  var isHeaderFocused = !!window.__tmdbHeaderFocused || (header && header.contains(document.activeElement));" +
+                            "  if (isHeaderFocused) {" +
+                            "    window.dispatchEvent(new CustomEvent('tmdb_hide_header_and_focus_player'));" +
+                            "    return true;" +
+                            "  }" +
+                            "  return false;" +
                             "})();",
                             null
                         );
@@ -814,6 +812,32 @@ public class MainActivity extends BridgeActivity {
                         );
                         return true;
                     }
+                    return super.dispatchKeyEvent(event);
+                }
+            }
+        }
+
+        if (isTV() && !isWatchPageActive && event.getAction() == KeyEvent.ACTION_DOWN) {
+            int keyCode = event.getKeyCode();
+            if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER || keyCode == KeyEvent.KEYCODE_NUMPAD_ENTER) {
+                if (event.getRepeatCount() > 0) return true;
+                WebView webView = bridge.getWebView();
+                if (webView != null) {
+                    webView.evaluateJavascript(
+                        "(function() {" +
+                        "  var active = document.activeElement;" +
+                        "  console.log('[TMDB Streamer] Enter pressed! activeElement:', active ? (active.tagName + '#' + active.id + ' text: ' + (active.textContent || '').trim().substring(0, 30)) : 'null');" +
+                        "  if (active && active !== document.body && active !== document.documentElement) {" +
+                        "    if (typeof active.click === 'function') {" +
+                        "      active.click();" +
+                        "      return true;" +
+                        "    }" +
+                        "  }" +
+                        "  return false;" +
+                        "})()",
+                        null
+                    );
+                    return true;
                 }
             }
         }
