@@ -172,7 +172,8 @@ export const Details: React.FC = () => {
   }
 
   const title = details.title || details.name || 'Untitled';
-  const backdropUrl = tmdbImages.backdrop(details.backdrop_path, 'original');
+  const isPerfMode = typeof document !== 'undefined' && document.documentElement.getAttribute('data-perf-mode') === 'true';
+  const backdropUrl = tmdbImages.backdrop(details.backdrop_path, isPerfMode ? 'w780' : 'original');
   const posterUrl = tmdbImages.poster(details.poster_path, 'w500');
   const releaseYear = (details.release_date || details.first_air_date || '').split('-')[0];
   const contentRating = extractContentRating(details);
@@ -184,6 +185,7 @@ export const Details: React.FC = () => {
         <img
           src={backdropUrl}
           alt={title}
+          decoding="async"
           onError={(e) => tmdbImages.handleImgError(e, true)}
           className="w-full h-full object-cover object-top opacity-45 sm:opacity-55 scale-105 transform"
         />
@@ -288,6 +290,22 @@ export const Details: React.FC = () => {
                     : `/watch/movie/${tmdbId}`
                 }
                 data-details-primary="true"
+                onClick={(e) => {
+                  e.preventDefault();
+                  const targetUrl = mediaType === 'tv'
+                    ? `/watch/tv/${tmdbId}?s=${lastWatched?.season || 1}&e=${lastWatched?.episode || 1}`
+                    : `/watch/movie/${tmdbId}`;
+                  navigate(targetUrl);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    const targetUrl = mediaType === 'tv'
+                      ? `/watch/tv/${tmdbId}?s=${lastWatched?.season || 1}&e=${lastWatched?.episode || 1}`
+                      : `/watch/movie/${tmdbId}`;
+                    navigate(targetUrl);
+                  }
+                }}
                 className="flex items-center gap-2.5 px-8 py-3.5 rounded-xl bg-gradient-to-r from-hbo-purple to-hbo-cyan text-white font-bold text-sm sm:text-base shadow-hbo-glow hover:scale-105 transition-all tv-focus-target"
               >
                 <Play className="w-5 h-5 fill-current" />
@@ -376,6 +394,8 @@ export const Details: React.FC = () => {
                   <img
                     src={tmdbImages.profile(actor.profile_path, 'w185')}
                     alt={actor.name}
+                    loading="lazy"
+                    decoding="async"
                     onError={tmdbImages.handleImgError}
                     className="w-12 h-12 rounded-full object-cover border border-hbo-border group-hover:border-hbo-cyan flex-shrink-0"
                   />

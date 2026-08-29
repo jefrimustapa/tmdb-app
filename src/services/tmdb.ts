@@ -19,7 +19,7 @@ export const TMDB_FALLBACK_POSTER = '/placeholder-poster.svg';
 export const TMDB_FALLBACK_BACKDROP = '/placeholder-backdrop.svg';
 
 export const tmdbImages = {
-  poster: (path: string | null, size: 'w342' | 'w500' | 'w780' | 'original' = 'w500') =>
+  poster: (path: string | null, size: 'w92' | 'w154' | 'w185' | 'w342' | 'w500' | 'w780' | 'original' = 'w500') =>
     path ? `${IMAGE_BASE_URL}/${size}${path}` : TMDB_FALLBACK_POSTER,
   backdrop: (path: string | null, size: 'w780' | 'w1280' | 'original' = 'w1280') =>
     path ? `${IMAGE_BASE_URL}/${size}${path}` : TMDB_FALLBACK_BACKDROP,
@@ -37,7 +37,12 @@ export const tmdbImages = {
 };
 
 const apiCache = new Map<string, { data: any; expiry: number }>();
-const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes in-memory cache
+const CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes in-memory cache for instant 0ms back-navigation
+
+// Clear cache on settings changes
+if (typeof window !== 'undefined') {
+  window.addEventListener('tmdb_settings_changed', () => apiCache.clear());
+}
 
 async function tmdbFetch<T>(endpoint: string, params: Record<string, string | number> = {}): Promise<T> {
   const settings = await dbService.getSettings();

@@ -42,24 +42,6 @@ export const Watch: React.FC = () => {
 
   const [enabledResolvers, setEnabledResolvers] = useState<('embed' | 'private_extractor' | 'torbox')[]>(['torbox', 'private_extractor', 'embed']);
 
-  // Load default user settings for preferred provider and virtual cursor
-  useEffect(() => {
-    dbService.getSettings().then((s) => {
-      if (s) {
-        if (s.preferredProvider) setProviderId(s.preferredProvider);
-        if (s.streamHeaderTimeout !== undefined) setHeaderTimeoutSeconds(s.streamHeaderTimeout);
-        if (s.enabledResolvers && s.enabledResolvers.length > 0) setEnabledResolvers(s.enabledResolvers);
-        setCursorSettings({
-          enabled: s.virtualCursorEnabled ?? true,
-          clicks: s.virtualCursorClicks ?? 2,
-          timeout: s.virtualCursorTimeout ?? 10,
-          speed: s.virtualCursorSpeed ?? 'normal',
-          style: s.virtualCursorStyle ?? 'hbo_max'
-        });
-      }
-    });
-  }, []);
-
   useEffect(() => {
     if (!tmdbId) return;
 
@@ -87,8 +69,73 @@ export const Watch: React.FC = () => {
   const [serverIndex, setServerIndex] = useState(1);
   const [headerVisible, setHeaderVisible] = useState(true);
   const [headerTimeoutSeconds, setHeaderTimeoutSeconds] = useState(5);
+  const headerTimeoutRef = React.useRef(5);
   const [isPortrait, setIsPortrait] = useState(() => window.innerHeight > window.innerWidth);
   const hideTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const resetHeaderTimer = React.useCallback(() => {
+    setHeaderVisible(true);
+
+    if (hideTimerRef.current) {
+      clearTimeout(hideTimerRef.current);
+      hideTimerRef.current = null;
+    }
+
+    const timeoutSec = headerTimeoutRef.current;
+    console.log('[TMDB Streamer] resetHeaderTimer called, timeoutSec:', timeoutSec);
+    if (timeoutSec === 0) {
+      console.log('[TMDB Streamer] Header auto-hide disabled (timeoutSec = 0)');
+      return;
+    }
+
+    const delayMs = (timeoutSec > 0 ? timeoutSec : 5) * 1000;
+    console.log('[TMDB Streamer] Scheduling header auto-hide in', delayMs, 'ms');
+    hideTimerRef.current = setTimeout(() => {
+      const isDropdownOpen = !!document.querySelector('[data-provider-dropdown-open="true"]');
+      if (isDropdownOpen) {
+        console.log('[TMDB Streamer] Dropdown is open, extending header timer');
+        resetHeaderTimer();
+        return;
+      }
+
+      console.log('[TMDB Streamer] >>> HIDING HEADER NOW (headerVisible = false) <<<');
+      setHeaderVisible(false);
+      window.dispatchEvent(new CustomEvent('tmdb_close_dropdowns'));
+
+      (window as any).__tmdbHeaderFocused = false;
+      if (document.activeElement && (document.activeElement.tagName === 'BUTTON' || (document.activeElement as HTMLElement).dataset?.watchHeaderItem === 'true')) {
+        (document.activeElement as HTMLElement).blur();
+      }
+      const iframe = document.querySelector<HTMLIFrameElement>('iframe');
+      if (iframe) {
+        try {
+          iframe.focus();
+        } catch {}
+      }
+    }, delayMs);
+  }, []);
+
+  // Load default user settings for preferred provider, timeout, and virtual cursor
+  useEffect(() => {
+    dbService.getSettings().then((s) => {
+      if (s) {
+        if (s.preferredProvider) setProviderId(s.preferredProvider);
+        if (s.streamHeaderTimeout !== undefined) {
+          setHeaderTimeoutSeconds(s.streamHeaderTimeout);
+          headerTimeoutRef.current = s.streamHeaderTimeout;
+        }
+        if (s.enabledResolvers && s.enabledResolvers.length > 0) setEnabledResolvers(s.enabledResolvers);
+        setCursorSettings({
+          enabled: s.virtualCursorEnabled ?? true,
+          clicks: s.virtualCursorClicks ?? 2,
+          timeout: s.virtualCursorTimeout ?? 10,
+          speed: s.virtualCursorSpeed ?? 'normal',
+          style: s.virtualCursorStyle ?? 'hbo_max'
+        });
+      }
+      resetHeaderTimer();
+    });
+  }, [resetHeaderTimer]);
 
   // Dynamically track portrait vs landscape across orientation changes and window resizes
   useEffect(() => {
@@ -109,44 +156,6 @@ export const Watch: React.FC = () => {
       window.removeEventListener('orientationchange', handleOrientation);
     };
   }, []);
-
-  // Load user settings for preferred provider and header auto-hide timeout
-  useEffect(() => {
-    dbService.getSettings().then((s) => {
-      const initialProvider = s?.topProviders?.[0] || s?.preferredProvider;
-      if (initialProvider) setProviderId(initialProvider);
-      if (s?.streamHeaderTimeout !== undefined) {
-        setHeaderTimeoutSeconds(s.streamHeaderTimeout);
-      }
-    });
-  }, []);
-
-  const resetHeaderTimer = React.useCallback(() => {
-    setHeaderVisible(true);
-
-    if (hideTimerRef.current) {
-      clearTimeout(hideTimerRef.current);
-      hideTimerRef.current = null;
-    }
-
-    if (headerTimeoutSeconds > 0) {
-      hideTimerRef.current = setTimeout(() => {
-        setHeaderVisible(false);
-        window.dispatchEvent(new CustomEvent('tmdb_close_dropdowns'));
-
-        (window as any).__tmdbHeaderFocused = false;
-        if (document.activeElement && (document.activeElement.tagName === 'BUTTON' || (document.activeElement as HTMLElement).dataset?.watchHeaderItem === 'true')) {
-          (document.activeElement as HTMLElement).blur();
-        }
-        const iframe = document.querySelector<HTMLIFrameElement>('iframe');
-        if (iframe) {
-          try {
-            iframe.focus();
-          } catch {}
-        }
-      }, headerTimeoutSeconds * 1000);
-    }
-  }, [headerTimeoutSeconds]);
 
   // Robust exit watch navigation that cannot be trapped by iframe history
   const handleExitWatch = React.useCallback(() => {
@@ -172,13 +181,37 @@ export const Watch: React.FC = () => {
       }, 30);
     };
 
+    const onResetHeaderTimer = () => {
+      resetHeaderTimer();
+    };
+    const onHideHeaderFocusPlayer = () => {
+      if (hideTimerRef.current) {
+        clearTimeout(hideTimerRef.current);
+        hideTimerRef.current = null;
+      }
+      setHeaderVisible(false);
+      window.dispatchEvent(new CustomEvent('tmdb_close_dropdowns'));
+      (window as any).__tmdbHeaderFocused = false;
+      if (document.activeElement && typeof (document.activeElement as HTMLElement).blur === 'function') {
+        (document.activeElement as HTMLElement).blur();
+      }
+      const iframe = document.querySelector<HTMLIFrameElement>('iframe');
+      if (iframe) {
+        try { iframe.focus(); } catch {}
+      }
+    };
+
     window.addEventListener('tmdb_exit_watch', onExitWatch);
     window.addEventListener('tmdb_show_header_focus_back', onShowHeaderFocusBack);
+    window.addEventListener('tmdb_reset_header_timer', onResetHeaderTimer);
+    window.addEventListener('tmdb_hide_header_and_focus_player', onHideHeaderFocusPlayer);
     (window as any).tmdbExitWatch = handleExitWatch;
     (window as any).__tmdbHeaderFocused = false;
     return () => {
       window.removeEventListener('tmdb_exit_watch', onExitWatch);
       window.removeEventListener('tmdb_show_header_focus_back', onShowHeaderFocusBack);
+      window.removeEventListener('tmdb_reset_header_timer', onResetHeaderTimer);
+      window.removeEventListener('tmdb_hide_header_and_focus_player', onHideHeaderFocusPlayer);
       delete (window as any).tmdbExitWatch;
       delete (window as any).__tmdbHeaderFocused;
     };
@@ -187,17 +220,28 @@ export const Watch: React.FC = () => {
   // Global TV key listener for header navigation
   useEffect(() => {
     const handleTVHeaderNav = (e: KeyboardEvent) => {
+      // If dropdown is open, let the dropdown handle its own navigation
+      if (document.querySelector('[data-provider-dropdown-open="true"]')) {
+        return;
+      }
       const backBtn = document.getElementById('watch-back-btn');
       const trigger = document.getElementById('watch-provider-trigger');
-      if (e.key === 'ArrowRight' && (document.activeElement === backBtn || (window as any).__tmdbHeaderFocused)) {
-        if (trigger) {
+      if (e.key === 'ArrowRight') {
+        if (trigger && document.activeElement !== trigger) {
           e.preventDefault();
           trigger.focus();
+          resetHeaderTimer();
         }
-      } else if (e.key === 'ArrowLeft' && document.activeElement === trigger) {
-        if (backBtn) {
+      } else if (e.key === 'ArrowLeft') {
+        if (backBtn && document.activeElement !== backBtn) {
           e.preventDefault();
           backBtn.focus();
+          resetHeaderTimer();
+        }
+      } else if (e.key === 'ArrowDown') {
+        if (document.activeElement === backBtn || document.activeElement === trigger) {
+          e.preventDefault();
+          window.dispatchEvent(new CustomEvent('tmdb_hide_header_and_focus_player'));
         }
       }
     };
@@ -276,29 +320,6 @@ export const Watch: React.FC = () => {
   const lastMousePosRef = React.useRef({ x: -1, y: -1 });
 
   useEffect(() => {
-    const handleKeyOrTouch = () => {
-      resetHeaderTimer();
-    };
-
-    const handleMouseMove = (e: MouseEvent) => {
-      if (
-        lastMousePosRef.current.x === -1 ||
-        Math.abs(e.clientX - lastMousePosRef.current.x) > 3 ||
-        Math.abs(e.clientY - lastMousePosRef.current.y) > 3
-      ) {
-        lastMousePosRef.current = { x: e.clientX, y: e.clientY };
-        resetHeaderTimer();
-      }
-    };
-
-    // Genuine user input listeners
-    window.addEventListener('keydown', handleKeyOrTouch, true);
-    window.addEventListener('touchstart', handleKeyOrTouch, true);
-    window.addEventListener('click', handleKeyOrTouch, true);
-    window.addEventListener('mousemove', handleMouseMove, true);
-    window.addEventListener('tmdb_screen_touched', handleKeyOrTouch);
-    window.addEventListener('tmdb_user_action', handleKeyOrTouch);
-
     resetHeaderTimer();
 
     return () => {
@@ -306,12 +327,6 @@ export const Watch: React.FC = () => {
         clearTimeout(hideTimerRef.current);
         hideTimerRef.current = null;
       }
-      window.removeEventListener('keydown', handleKeyOrTouch, true);
-      window.removeEventListener('touchstart', handleKeyOrTouch, true);
-      window.removeEventListener('click', handleKeyOrTouch, true);
-      window.removeEventListener('mousemove', handleMouseMove, true);
-      window.removeEventListener('tmdb_screen_touched', handleKeyOrTouch);
-      window.removeEventListener('tmdb_user_action', handleKeyOrTouch);
     };
   }, [resetHeaderTimer]);
 
@@ -331,9 +346,6 @@ export const Watch: React.FC = () => {
   return (
     <div
       className="relative w-screen h-screen min-h-screen bg-black overflow-hidden flex flex-col justify-start select-none"
-      onClick={resetHeaderTimer}
-      onTouchStart={resetHeaderTimer}
-      onMouseMove={resetHeaderTimer}
     >
       {/* Stream Player Area with Overlay Header */}
       <div className="relative w-full h-full flex-1 bg-black overflow-hidden group">

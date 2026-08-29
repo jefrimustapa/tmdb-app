@@ -26,23 +26,16 @@ export const ProviderPickerTV: React.FC<ProviderPickerTVProps> = ({
   const selectedProvider = getProviderById(currentProviderId);
   const shortServerName = selectedProvider.name.replace(/\s*\([^)]*\)/g, '').trim();
 
+  const selectedIndex = Math.max(0, STREAM_PROVIDERS.findIndex(p => p.id === currentProviderId));
+  const [highlightedIndex, setHighlightedIndex] = useState(selectedIndex);
+  const highlightedIndexRef = useRef(selectedIndex);
+  highlightedIndexRef.current = highlightedIndex;
+
+  // 1. Sync AndroidBridge open state strictly on isOpen
   useEffect(() => {
     try {
       (window as any).AndroidBridge?.setDropdownOpen?.(isOpen);
     } catch {}
-
-    if (isOpen && dropdownRef.current) {
-      setTimeout(() => {
-        const activeBtn =
-          dropdownRef.current?.querySelector<HTMLElement>('[data-provider-selected="true"]') ||
-          dropdownRef.current?.querySelector<HTMLElement>('[data-provider-item="true"]') ||
-          dropdownRef.current?.querySelector<HTMLElement>('.tv-focus-target');
-        if (activeBtn) {
-          activeBtn.focus();
-          activeBtn.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-        }
-      }, 60);
-    }
 
     return () => {
       try {
@@ -51,8 +44,70 @@ export const ProviderPickerTV: React.FC<ProviderPickerTVProps> = ({
     };
   }, [isOpen]);
 
+  // 2. When dropdown opens, initialize index and focus active button
   useEffect(() => {
-    const handleCloseDropdown = () => setIsOpen(false);
+    if (isOpen) {
+      setHighlightedIndex(selectedIndex);
+      const focusActiveBtn = () => {
+        const activeBtn =
+          document.getElementById(`provider-item-${selectedIndex}`) ||
+          dropdownRef.current?.querySelector<HTMLElement>('[data-provider-selected="true"]') ||
+          dropdownRef.current?.querySelector<HTMLElement>('[data-provider-item="true"]');
+        if (activeBtn) {
+          activeBtn.focus();
+          activeBtn.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        }
+      };
+      setTimeout(focusActiveBtn, 30);
+    }
+  }, [isOpen, selectedIndex]);
+
+  // 3. Listen to native navigation events while dropdown is open
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleDropdownNav = (e: any) => {
+      const direction = e.detail?.direction;
+      const current = highlightedIndexRef.current;
+      if (direction === 'down') {
+        const next = (current + 1) % STREAM_PROVIDERS.length;
+        setHighlightedIndex(next);
+        const el = document.getElementById(`provider-item-${next}`);
+        if (el) {
+          el.focus();
+          el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        }
+      } else if (direction === 'up') {
+        const next = (current - 1 + STREAM_PROVIDERS.length) % STREAM_PROVIDERS.length;
+        setHighlightedIndex(next);
+        const el = document.getElementById(`provider-item-${next}`);
+        if (el) {
+          el.focus();
+          el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        }
+      }
+    };
+
+    const handleDropdownSelect = () => {
+      const target = STREAM_PROVIDERS[highlightedIndexRef.current];
+      if (target) {
+        handleSelect(target);
+      }
+    };
+
+    window.addEventListener('tmdb_dropdown_nav', handleDropdownNav);
+    window.addEventListener('tmdb_dropdown_select', handleDropdownSelect);
+
+    return () => {
+      window.removeEventListener('tmdb_dropdown_nav', handleDropdownNav);
+      window.removeEventListener('tmdb_dropdown_select', handleDropdownSelect);
+    };
+  }, [isOpen]);
+
+  useEffect(() => {
+    const handleCloseDropdown = () => {
+      setIsOpen(false);
+    };
     window.addEventListener('tmdb_close_dropdowns', handleCloseDropdown);
     return () => window.removeEventListener('tmdb_close_dropdowns', handleCloseDropdown);
   }, []);
@@ -60,6 +115,7 @@ export const ProviderPickerTV: React.FC<ProviderPickerTVProps> = ({
   const handleSelect = (provider: StreamProvider) => {
     onSelect(provider);
     setIsOpen(false);
+    window.dispatchEvent(new CustomEvent('tmdb_reset_header_timer'));
     setTimeout(() => {
       const triggerBtn = document.getElementById('watch-provider-trigger');
       if (triggerBtn) triggerBtn.focus();
@@ -82,7 +138,7 @@ export const ProviderPickerTV: React.FC<ProviderPickerTVProps> = ({
           } else if (e.key === 'ArrowDown') {
             if (!isOpen) {
               e.preventDefault();
-              setIsOpen(true);
+              window.dispatchEvent(new CustomEvent('tmdb_hide_header_and_focus_player'));
             }
           }
         }}
@@ -127,32 +183,61 @@ export const ProviderPickerTV: React.FC<ProviderPickerTVProps> = ({
           <div className="space-y-2 pt-1 px-1 pb-1">
             {STREAM_PROVIDERS.map((provider, idx) => {
               const isSelected = provider.id === currentProviderId;
+              const isHighlighted = idx === highlightedIndex;
               return (
                 <button
                   key={provider.id}
+                  id={`provider-item-${idx}`}
                   onClick={() => handleSelect(provider)}
-                  data-provider-selected={isSelected ? 'true' : undefined}
-                  data-provider-item="true"
-                  onFocus={(e) => {
-                    e.currentTarget.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                  onMouseEnter={() => setHighlightedIndex(idx)}
+                  onFocus={() => {
+                    setHighlightedIndex(idx);
+                    document.getElementById(`provider-item-${idx}`)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
                   }}
+                  data-provider-selected={isSelected ? 'true' : undefined}
+                  data-provider-highlighted={isHighlighted ? 'true' : undefined}
+                  data-provider-item="true"
+                  tabIndex={0}
                   onKeyDown={(e) => {
-                    if (e.key === 'ArrowLeft' || e.key === 'Escape') {
+                    if (e.key === 'ArrowDown') {
+                      e.preventDefault();
+                      const next = (idx + 1) % STREAM_PROVIDERS.length;
+                      setHighlightedIndex(next);
+                      const nextBtn = document.getElementById(`provider-item-${next}`);
+                      if (nextBtn) {
+                        nextBtn.focus();
+                        nextBtn.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                      }
+                    } else if (e.key === 'ArrowUp') {
+                      e.preventDefault();
+                      const prev = (idx - 1 + STREAM_PROVIDERS.length) % STREAM_PROVIDERS.length;
+                      setHighlightedIndex(prev);
+                      const prevBtn = document.getElementById(`provider-item-${prev}`);
+                      if (prevBtn) {
+                        prevBtn.focus();
+                        prevBtn.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                      }
+                    } else if (e.key === 'ArrowLeft' || e.key === 'Escape') {
                       e.preventDefault();
                       setIsOpen(false);
                       const trigger = document.getElementById('watch-provider-trigger');
                       if (trigger) trigger.focus();
+                    } else if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      handleSelect(provider);
                     }
                   }}
-                  className={`w-full flex items-center justify-between gap-3.5 px-4 py-3 sm:px-4.5 sm:py-3.5 rounded-xl text-left transition-all tv-focus-target focus:outline-none focus:border-hbo-cyan focus:ring-2 focus:ring-hbo-cyan ${
-                    isSelected
-                      ? 'bg-gradient-to-r from-hbo-purple/40 to-hbo-cyan/20 border border-hbo-cyan text-white shadow-hbo-glow'
-                      : 'text-gray-300 hover:text-white hover:bg-white/5 border border-transparent'
+                  className={`w-full flex items-center justify-between gap-3.5 px-4 py-3 sm:px-4.5 sm:py-3.5 rounded-xl text-left transition-all tv-focus-target focus:outline-none ${
+                    isHighlighted
+                      ? 'bg-gradient-to-r from-hbo-purple/60 to-hbo-cyan/30 border-2 border-hbo-cyan text-white shadow-hbo-glow ring-2 ring-hbo-cyan scale-[1.02]'
+                      : (isSelected
+                        ? 'bg-hbo-purple/25 border border-hbo-cyan/50 text-white'
+                        : 'text-gray-300 hover:text-white hover:bg-white/5 border border-transparent')
                   }`}
                 >
                   <div className="min-w-0 flex-1 pr-1">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <p className={`text-xs sm:text-sm font-bold ${isSelected ? 'text-hbo-cyan' : 'text-white'}`}>
+                      <p className={`text-xs sm:text-sm font-bold ${isHighlighted || isSelected ? 'text-hbo-cyan' : 'text-white'}`}>
                         {provider.name}
                       </p>
                       <span className="text-[10px] px-2 py-0.5 rounded-md bg-white/10 text-gray-300 font-bold whitespace-nowrap flex-shrink-0">
