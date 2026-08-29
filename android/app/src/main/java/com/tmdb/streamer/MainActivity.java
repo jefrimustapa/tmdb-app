@@ -756,6 +756,21 @@ public class MainActivity extends BridgeActivity {
 
     private void promptInstallApk(File apkFile) {
         try {
+            if (apkFile == null || !apkFile.exists()) {
+                Log.e("TMDB_APP", "[Update] APK file does not exist: " + (apkFile != null ? apkFile.getAbsolutePath() : "null"));
+                return;
+            }
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                if (!getPackageManager().canRequestPackageInstalls()) {
+                    Log.w("TMDB_APP", "[Update] Prompting user for ACTION_MANAGE_UNKNOWN_APP_SOURCES");
+                    Intent manageIntent = new Intent(android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES);
+                    manageIntent.setData(Uri.parse("package:" + getPackageName()));
+                    manageIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                    startActivity(manageIntent);
+                }
+            }
+
             Uri apkUri = FileProvider.getUriForFile(
                 this,
                 getPackageName() + ".fileprovider",
@@ -764,8 +779,12 @@ public class MainActivity extends BridgeActivity {
 
             Intent intent = new Intent(Intent.ACTION_VIEW);
             intent.setDataAndType(apkUri, "application/vnd.android.package-archive");
-            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+            
+            // Explicitly grant read URI permission
+            grantUriPermission(getPackageName(), apkUri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+
             startActivity(intent);
         } catch (Exception e) {
             Log.e("TMDB_APP", "[Update] Failed to launch package installer: " + e.getMessage(), e);

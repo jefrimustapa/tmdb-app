@@ -12,7 +12,30 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({ updateInfo, onClose })
   const [downloading, setDownloading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [statusText, setStatusText] = useState('');
+  const changelogRef = useRef<HTMLDivElement>(null);
   const installButtonRef = useRef<HTMLButtonElement>(null);
+
+  const handleChangelogKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (!changelogRef.current) return;
+    const el = changelogRef.current;
+    const step = 60;
+
+    if (e.key === 'ArrowDown') {
+      const isAtBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 5;
+      if (!isAtBottom) {
+        e.preventDefault();
+        e.stopPropagation();
+        el.scrollBy({ top: step, behavior: 'smooth' });
+      }
+    } else if (e.key === 'ArrowUp') {
+      const isAtTop = el.scrollTop <= 5;
+      if (!isAtTop) {
+        e.preventDefault();
+        e.stopPropagation();
+        el.scrollBy({ top: -step, behavior: 'smooth' });
+      }
+    }
+  };
 
   useEffect(() => {
     // Focus install button by default for TV D-Pad navigation
@@ -104,8 +127,16 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({ updateInfo, onClose })
         </div>
 
         {/* Release Notes / Changelog */}
-        <div className="flex-1 overflow-y-auto pr-1 mb-5 space-y-2 border-t border-b border-hbo-border/60 py-3 scrollbar-thin scrollbar-thumb-hbo-purple">
-          <p className="text-xs font-bold text-gray-300 uppercase tracking-wider">What's New in this Build:</p>
+        <div
+          ref={changelogRef}
+          tabIndex={0}
+          onKeyDown={handleChangelogKeyDown}
+          className="flex-1 overflow-y-auto pr-1 mb-5 space-y-2 border-t border-b border-hbo-border/60 py-3 scrollbar-thin scrollbar-thumb-hbo-purple tv-focus-target focus:outline-none focus:ring-2 focus:ring-hbo-cyan/60 rounded-xl px-2 transition-all"
+        >
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-bold text-gray-300 uppercase tracking-wider">What's New in this Build:</p>
+            <span className="text-[10px] text-gray-400 font-mono italic">(D-Pad Up/Down to scroll)</span>
+          </div>
           <div className="text-xs text-gray-300 whitespace-pre-wrap leading-relaxed bg-black/30 p-3 rounded-xl border border-white/5 font-sans">
             {updateInfo.releaseNotes || 'Bug fixes, performance improvements, and media streaming updates.'}
           </div>
