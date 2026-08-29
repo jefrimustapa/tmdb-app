@@ -81,14 +81,32 @@
   -webkit-backdrop-filter: none !important;
 }
 
-/* 2. Fast opaque background fallbacks to prevent transparent composite layers */
+/* 2. Fast 100% solid opaque background fallbacks for all bars, modals, menus, and dropdowns */
 [data-perf-mode="true"] aside,
 [data-perf-mode="true"] nav,
+[data-perf-mode="true"] [role="listbox"],
+[data-perf-mode="true"] [role="menu"],
+[data-perf-mode="true"] [role="dialog"],
+[data-perf-mode="true"] [data-provider-dropdown-open="true"],
+[data-perf-mode="true"] [data-priority-dropdown-container="true"] > div.absolute,
+[data-perf-mode="true"] [data-cursor-dropdown-container="true"] > div.absolute,
+[data-perf-mode="true"] [data-watch-header="true"],
+[data-perf-mode="true"] .bg-hbo-card\/98,
 [data-perf-mode="true"] .bg-hbo-card\/95,
 [data-perf-mode="true"] .bg-hbo-card\/90,
 [data-perf-mode="true"] .bg-hbo-card\/80,
-[data-perf-mode="true"] .bg-hbo-dark\/95 {
-  background-color: #0b0b14 !important;
+[data-perf-mode="true"] .bg-hbo-dark\/95,
+[data-perf-mode="true"] .bg-hbo-dark\/90,
+[data-perf-mode="true"] .bg-hbo-dark\/80,
+[data-perf-mode="true"] .bg-\[\#0e0e17\]\/95,
+[data-perf-mode="true"] .bg-black\/95,
+[data-perf-mode="true"] .bg-black\/90,
+[data-perf-mode="true"] .bg-black\/85,
+[data-perf-mode="true"] .bg-black\/80,
+[data-perf-mode="true"] .bg-gray-900\/95,
+[data-perf-mode="true"] .bg-gray-900\/90 {
+  background-color: #0e0e1a !important;
+  opacity: 1 !important;
 }
 
 /* 3. Crisp focus indicators without 30px diffused gaussian blurs */
