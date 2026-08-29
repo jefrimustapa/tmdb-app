@@ -28,49 +28,68 @@ export const ProviderPickerTV: React.FC<ProviderPickerTVProps> = ({
 
   const selectedIndex = Math.max(0, STREAM_PROVIDERS.findIndex(p => p.id === currentProviderId));
   const [highlightedIndex, setHighlightedIndex] = useState(selectedIndex);
+  const highlightedIndexRef = useRef(selectedIndex);
+  highlightedIndexRef.current = highlightedIndex;
 
-  useEffect(() => {
-    if (isOpen) {
-      setHighlightedIndex(selectedIndex);
-    }
-  }, [isOpen, selectedIndex]);
-
+  // 1. Sync AndroidBridge open state strictly on isOpen
   useEffect(() => {
     try {
       (window as any).AndroidBridge?.setDropdownOpen?.(isOpen);
     } catch {}
 
-    if (!isOpen) {
-      return;
+    return () => {
+      try {
+        (window as any).AndroidBridge?.setDropdownOpen?.(false);
+      } catch {}
+    };
+  }, [isOpen]);
+
+  // 2. When dropdown opens, initialize index and focus active button
+  useEffect(() => {
+    if (isOpen) {
+      setHighlightedIndex(selectedIndex);
+      const focusActiveBtn = () => {
+        const activeBtn =
+          document.getElementById(`provider-item-${selectedIndex}`) ||
+          dropdownRef.current?.querySelector<HTMLElement>('[data-provider-selected="true"]') ||
+          dropdownRef.current?.querySelector<HTMLElement>('[data-provider-item="true"]');
+        if (activeBtn) {
+          activeBtn.focus();
+          activeBtn.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        }
+      };
+      setTimeout(focusActiveBtn, 30);
     }
+  }, [isOpen, selectedIndex]);
+
+  // 3. Listen to native navigation events while dropdown is open
+  useEffect(() => {
+    if (!isOpen) return;
 
     const handleDropdownNav = (e: any) => {
       const direction = e.detail?.direction;
+      const current = highlightedIndexRef.current;
       if (direction === 'down') {
-        setHighlightedIndex((prev) => {
-          const next = (prev + 1) % STREAM_PROVIDERS.length;
-          const el = document.getElementById(`provider-item-${next}`);
-          if (el) {
-            el.focus();
-            el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-          }
-          return next;
-        });
+        const next = (current + 1) % STREAM_PROVIDERS.length;
+        setHighlightedIndex(next);
+        const el = document.getElementById(`provider-item-${next}`);
+        if (el) {
+          el.focus();
+          el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        }
       } else if (direction === 'up') {
-        setHighlightedIndex((prev) => {
-          const next = (prev - 1 + STREAM_PROVIDERS.length) % STREAM_PROVIDERS.length;
-          const el = document.getElementById(`provider-item-${next}`);
-          if (el) {
-            el.focus();
-            el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-          }
-          return next;
-        });
+        const next = (current - 1 + STREAM_PROVIDERS.length) % STREAM_PROVIDERS.length;
+        setHighlightedIndex(next);
+        const el = document.getElementById(`provider-item-${next}`);
+        if (el) {
+          el.focus();
+          el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        }
       }
     };
 
     const handleDropdownSelect = () => {
-      const target = STREAM_PROVIDERS[highlightedIndex];
+      const target = STREAM_PROVIDERS[highlightedIndexRef.current];
       if (target) {
         handleSelect(target);
       }
@@ -79,26 +98,11 @@ export const ProviderPickerTV: React.FC<ProviderPickerTVProps> = ({
     window.addEventListener('tmdb_dropdown_nav', handleDropdownNav);
     window.addEventListener('tmdb_dropdown_select', handleDropdownSelect);
 
-    const focusActiveBtn = () => {
-      const activeBtn =
-        document.getElementById(`provider-item-${selectedIndex}`) ||
-        dropdownRef.current?.querySelector<HTMLElement>('[data-provider-selected="true"]') ||
-        dropdownRef.current?.querySelector<HTMLElement>('[data-provider-item="true"]');
-      if (activeBtn) {
-        activeBtn.focus();
-        activeBtn.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-      }
-    };
-    setTimeout(focusActiveBtn, 20);
-
     return () => {
       window.removeEventListener('tmdb_dropdown_nav', handleDropdownNav);
       window.removeEventListener('tmdb_dropdown_select', handleDropdownSelect);
-      try {
-        (window as any).AndroidBridge?.setDropdownOpen?.(false);
-      } catch {}
     };
-  }, [isOpen, highlightedIndex, selectedIndex]);
+  }, [isOpen]);
 
   useEffect(() => {
     const handleCloseDropdown = () => setIsOpen(false);
