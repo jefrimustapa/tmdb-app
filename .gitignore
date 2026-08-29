@@ -48,6 +48,7 @@ android/app/.cxx
 *.apk
 *.aab
 *.keystore
+!android/app/debug.keystore
 *.jks
 android/app/release/
 android/app/debug/
