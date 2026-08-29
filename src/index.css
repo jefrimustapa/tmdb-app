@@ -81,7 +81,7 @@
   -webkit-backdrop-filter: none !important;
 }
 
-/* 2. Fast 100% solid opaque background fallbacks for all bars, modals, menus, and dropdowns */
+/* 2. Fast 100% solid opaque background fallbacks for dropdowns, modals, and menus */
 [data-perf-mode="true"] aside,
 [data-perf-mode="true"] nav,
 [data-perf-mode="true"] [role="listbox"],
@@ -90,7 +90,6 @@
 [data-perf-mode="true"] [data-provider-dropdown-open="true"],
 [data-perf-mode="true"] [data-priority-dropdown-container="true"] > div.absolute,
 [data-perf-mode="true"] [data-cursor-dropdown-container="true"] > div.absolute,
-[data-perf-mode="true"] [data-watch-header="true"],
 [data-perf-mode="true"] .bg-hbo-card\/98,
 [data-perf-mode="true"] .bg-hbo-card\/95,
 [data-perf-mode="true"] .bg-hbo-card\/90,
@@ -106,7 +105,6 @@
 [data-perf-mode="true"] .bg-gray-900\/95,
 [data-perf-mode="true"] .bg-gray-900\/90 {
   background-color: #0e0e1a !important;
-  opacity: 1 !important;
 }
 
 /* 3. Crisp focus indicators without 30px diffused gaussian blurs */
