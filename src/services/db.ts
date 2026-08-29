@@ -22,6 +22,27 @@ export const db = new TMDBStreamerDB();
 
 let cachedSettings: UserSettings | null = null;
 
+export function getDefaultPerformanceMode(): boolean {
+  if (typeof window === 'undefined') return false;
+  const isBridgeTV = typeof (window as any).AndroidBridge?.isTVDevice === 'function'
+    ? (window as any).AndroidBridge.isTVDevice()
+    : false;
+  const ua = (typeof navigator !== 'undefined' ? navigator.userAgent : '').toLowerCase();
+  const isTVUserAgent =
+    ua.includes('smart-tv') ||
+    ua.includes('smarttv') ||
+    ua.includes('googletv') ||
+    ua.includes('android tv') ||
+    ua.includes('appletv') ||
+    ua.includes('hbbtv') ||
+    ua.includes('firetv') ||
+    ua.includes('mibox') ||
+    ua.includes('mitv') ||
+    ua.includes('crkey') ||
+    ua.includes('aft');
+  return isBridgeTV || isTVUserAgent;
+}
+
 // Defaults for Settings
 export const DEFAULT_SETTINGS: UserSettings = {
   id: 'current_settings',
@@ -45,6 +66,7 @@ export const DEFAULT_SETTINGS: UserSettings = {
   virtualCursorTimeout: 10,
   virtualCursorSpeed: 'normal',
   virtualCursorStyle: 'hbo_max',
+  performanceMode: getDefaultPerformanceMode(),
   updatedAt: Date.now()
 };
 
@@ -198,6 +220,10 @@ export const dbService = {
     }
     if (!settings.enabledResolvers || settings.enabledResolvers.length === 0) {
       settings.enabledResolvers = ['torbox', 'private_extractor', 'embed'];
+      await db.settings.put(settings);
+    }
+    if (settings.performanceMode === undefined) {
+      settings.performanceMode = getDefaultPerformanceMode();
       await db.settings.put(settings);
     }
     cachedSettings = settings;
