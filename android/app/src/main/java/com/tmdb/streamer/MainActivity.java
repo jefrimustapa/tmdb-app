@@ -660,19 +660,16 @@ public class MainActivity extends BridgeActivity {
                         webView.evaluateJavascript(
                             "(function() {" +
                             "  if (window.__tmdbVirtualCursorActive) return false;" +
-                            "  var header = document.querySelector('[data-watch-header=\"true\"]');" +
-                            "  var isHeaderFocused = !!window.__tmdbHeaderFocused || (header && header.contains(document.activeElement));" +
-                            "  if (isHeaderFocused) {" +
-                            "    var trigger = document.getElementById('watch-provider-trigger');" +
-                            "    if (trigger && document.activeElement !== trigger) {" +
-                            "      trigger.focus();" +
-                            "      return true;" +
-                            "    }" +
+                            "  var trigger = document.getElementById('watch-provider-trigger');" +
+                            "  if (trigger && document.activeElement !== trigger) {" +
+                            "    trigger.focus();" +
+                            "    return true;" +
                             "  }" +
                             "  return false;" +
                             "})();",
                             null
                         );
+                        return true;
                     }
                     return super.dispatchKeyEvent(event);
                 } else if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT) {
@@ -680,26 +677,16 @@ public class MainActivity extends BridgeActivity {
                         webView.evaluateJavascript(
                             "(function() {" +
                             "  if (window.__tmdbVirtualCursorActive) return false;" +
-                            "  var header = document.querySelector('[data-watch-header=\"true\"]');" +
-                            "  var openDropdown = header ? header.querySelector('[data-provider-dropdown-open=\"true\"]') : null;" +
-                            "  if (openDropdown) {" +
-                            "    window.dispatchEvent(new CustomEvent('tmdb_close_dropdowns'));" +
-                            "    var trigger = document.getElementById('watch-provider-trigger');" +
-                            "    if (trigger) { trigger.focus(); }" +
+                            "  var backBtn = document.getElementById('watch-back-btn');" +
+                            "  if (backBtn && document.activeElement !== backBtn) {" +
+                            "    backBtn.focus();" +
                             "    return true;" +
-                            "  }" +
-                            "  var isHeaderFocused = !!window.__tmdbHeaderFocused || (header && header.contains(document.activeElement));" +
-                            "  if (isHeaderFocused) {" +
-                            "    var backBtn = document.getElementById('watch-back-btn');" +
-                            "    if (backBtn && document.activeElement !== backBtn) {" +
-                            "      backBtn.focus();" +
-                            "      return true;" +
-                            "    }" +
                             "  }" +
                             "  return false;" +
                             "})();",
                             null
                         );
+                        return true;
                     }
                     return super.dispatchKeyEvent(event);
                 }
@@ -766,31 +753,12 @@ public class MainActivity extends BridgeActivity {
                         webView.evaluateJavascript(
                             "(function() {" +
                             "  if (window.__tmdbVirtualCursorActive) return false;" +
-                            "  var header = document.querySelector('[data-watch-header=\"true\"]');" +
-                            "  var openDropdown = header ? header.querySelector('[data-provider-dropdown-open=\"true\"]') : null;" +
-                            "  var isTrigger = document.activeElement && document.activeElement.id === 'watch-provider-trigger';" +
-                            "  if (isTrigger && !openDropdown) {" +
-                            "    if (typeof document.activeElement.click === 'function') {" +
-                            "      document.activeElement.click();" +
-                            "      return true;" +
-                            "    }" +
-                            "  }" +
-                            "  var isHeaderFocused = !!window.__tmdbHeaderFocused || (header && header.contains(document.activeElement));" +
-                            "  if (isHeaderFocused && !openDropdown && !isTrigger) {" +
-                            "    window.__tmdbHeaderFocused = false;" +
-                            "    if (document.activeElement && typeof document.activeElement.blur === 'function') {" +
-                            "      document.activeElement.blur();" +
-                            "    }" +
-                            "    var iframe = document.querySelector('iframe');" +
-                            "    if (iframe && typeof iframe.focus === 'function') {" +
-                            "      iframe.focus();" +
-                            "    }" +
-                            "    return true;" +
-                            "  }" +
-                            "  return false;" +
+                            "  window.dispatchEvent(new CustomEvent('tmdb_hide_header_and_focus_player'));" +
+                            "  return true;" +
                             "})();",
                             null
                         );
+                        return true;
                     }
                     return super.dispatchKeyEvent(event);
                 } else if (keyCode == KeyEvent.KEYCODE_BACK) {
