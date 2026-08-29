@@ -290,6 +290,22 @@ export const Details: React.FC = () => {
                     : `/watch/movie/${tmdbId}`
                 }
                 data-details-primary="true"
+                onClick={(e) => {
+                  e.preventDefault();
+                  const targetUrl = mediaType === 'tv'
+                    ? `/watch/tv/${tmdbId}?s=${lastWatched?.season || 1}&e=${lastWatched?.episode || 1}`
+                    : `/watch/movie/${tmdbId}`;
+                  navigate(targetUrl);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    const targetUrl = mediaType === 'tv'
+                      ? `/watch/tv/${tmdbId}?s=${lastWatched?.season || 1}&e=${lastWatched?.episode || 1}`
+                      : `/watch/movie/${tmdbId}`;
+                    navigate(targetUrl);
+                  }
+                }}
                 className="flex items-center gap-2.5 px-8 py-3.5 rounded-xl bg-gradient-to-r from-hbo-purple to-hbo-cyan text-white font-bold text-sm sm:text-base shadow-hbo-glow hover:scale-105 transition-all tv-focus-target"
               >
                 <Play className="w-5 h-5 fill-current" />

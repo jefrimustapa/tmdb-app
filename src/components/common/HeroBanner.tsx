@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Play, Info, Plus, Check } from 'lucide-react';
 import type { TMDBMediaItem } from '../../types/tmdb';
 import { tmdbImages } from '../../services/tmdb';
@@ -12,6 +12,7 @@ interface HeroBannerProps {
 }
 
 export const HeroBanner: React.FC<HeroBannerProps> = ({ items }) => {
+  const navigate = useNavigate();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isWatchlisted, setIsWatchlisted] = useState(false);
 
@@ -42,14 +43,20 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ items }) => {
     return () => observer.disconnect();
   }, []);
 
-  // Auto carousel rotate (only when visible in viewport)
+  const totalItems = items.length;
+  const isAutoPlayPaused = useRef(false);
+
   useEffect(() => {
-    if (items.length <= 1 || !isVisible) return;
+    if (totalItems <= 1 || !isVisible) return;
+
     const interval = setInterval(() => {
-      setCurrentIndex((prev) => (prev + 1) % Math.min(items.length, 5));
-    }, 9000);
+      if (!isAutoPlayPaused.current) {
+        setCurrentIndex((prevIndex) => (prevIndex + 1) % totalItems);
+      }
+    }, 8000);
+
     return () => clearInterval(interval);
-  }, [items, isVisible]);
+  }, [totalItems, isVisible]);
 
   const [isPerfMode, setIsPerfMode] = useState(() => 
     typeof document !== 'undefined' && document.documentElement.getAttribute('data-perf-mode') === 'true'
@@ -69,9 +76,10 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ items }) => {
   if (!featured) return null;
 
   const title = featured.title || featured.name || 'Featured Title';
+  const releaseDate = featured.release_date || featured.first_air_date;
+  const releaseYear = releaseDate ? new Date(releaseDate).getFullYear() : '';
   const mediaType: 'movie' | 'tv' = featured.media_type === 'tv' ? 'tv' : 'movie';
   const backdropUrl = tmdbImages.backdrop(featured.backdrop_path, isPerfMode ? 'w780' : 'original');
-  const releaseYear = (featured.release_date || featured.first_air_date || '').split('-')[0];
 
   const handleToggleWatchlist = async () => {
     const status = await dbService.toggleWatchlist({
@@ -81,18 +89,25 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ items }) => {
       posterPath: featured.poster_path,
       backdropPath: featured.backdrop_path,
       voteAverage: featured.vote_average,
-      releaseDate: featured.release_date || featured.first_air_date
+      releaseDate: releaseDate
     });
     setIsWatchlisted(status);
   };
 
   return (
-    <div ref={bannerRef} data-hero-banner="true" className="relative w-full h-[65vh] sm:h-[75vh] lg:h-[82vh] overflow-hidden bg-hbo-dark">
+    <div
+      ref={bannerRef}
+      data-hero-banner="true"
+      className="relative w-full h-[65vh] sm:h-[75vh] min-h-[460px] max-h-[750px] overflow-hidden bg-hbo-dark"
+      onMouseEnter={() => { isAutoPlayPaused.current = true; }}
+      onMouseLeave={() => { isAutoPlayPaused.current = false; }}
+    >
       {/* Background Backdrop Image */}
-      <div className="absolute inset-0">
+      <div className="absolute inset-0 select-none">
         <img
           src={backdropUrl}
           alt={title}
+          loading="eager"
           decoding="async"
           onError={(e) => tmdbImages.handleImgError(e, true)}
           className="w-full h-full object-cover object-center animate-fade-in transition-opacity duration-1000"
@@ -128,6 +143,16 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ items }) => {
           <Link
             to={`/watch/${mediaType}/${featured.id}`}
             data-hero-watch-now="true"
+            onClick={(e) => {
+              e.preventDefault();
+              navigate(`/watch/${mediaType}/${featured.id}`);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                navigate(`/watch/${mediaType}/${featured.id}`);
+              }
+            }}
             className="flex items-center gap-2.5 px-6 sm:px-8 py-3.5 rounded-xl bg-gradient-to-r from-hbo-purple to-hbo-cyan text-white font-bold text-sm sm:text-base shadow-hbo-glow hover:scale-105 transition-all tv-focus-target"
           >
             <Play className="w-5 h-5 fill-current" />
@@ -136,6 +161,16 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ items }) => {
 
           <Link
             to={`/details/${mediaType}/${featured.id}`}
+            onClick={(e) => {
+              e.preventDefault();
+              navigate(`/details/${mediaType}/${featured.id}`);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                navigate(`/details/${mediaType}/${featured.id}`);
+              }
+            }}
             className="flex items-center gap-2 px-5 sm:px-6 py-3.5 rounded-xl bg-white/15 hover:bg-white/25 text-white font-semibold text-sm sm:text-base backdrop-blur-md border border-white/20 transition-all hover:scale-105 tv-focus-target"
           >
             <Info className="w-5 h-5" />

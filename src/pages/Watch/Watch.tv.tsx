@@ -82,18 +82,23 @@ export const Watch: React.FC = () => {
     }
 
     const timeoutSec = headerTimeoutRef.current;
+    console.log('[TMDB Streamer] resetHeaderTimer called, timeoutSec:', timeoutSec);
     if (timeoutSec === 0) {
+      console.log('[TMDB Streamer] Header auto-hide disabled (timeoutSec = 0)');
       return;
     }
 
     const delayMs = (timeoutSec > 0 ? timeoutSec : 5) * 1000;
+    console.log('[TMDB Streamer] Scheduling header auto-hide in', delayMs, 'ms');
     hideTimerRef.current = setTimeout(() => {
       const isDropdownOpen = !!document.querySelector('[data-provider-dropdown-open="true"]');
       if (isDropdownOpen) {
+        console.log('[TMDB Streamer] Dropdown is open, extending header timer');
         resetHeaderTimer();
         return;
       }
 
+      console.log('[TMDB Streamer] >>> HIDING HEADER NOW (headerVisible = false) <<<');
       setHeaderVisible(false);
       window.dispatchEvent(new CustomEvent('tmdb_close_dropdowns'));
 
