@@ -18,7 +18,22 @@ export const MediaCard: React.FC<MediaCardProps> = ({ item, type, progress, onDe
   const mediaType: 'movie' | 'tv' = (type === 'tv' || item.media_type === 'tv' || (!item.title && !!item.name)) ? 'tv' : 'movie';
   const title = item.title || item.name || 'Untitled';
   const releaseYear = (item.release_date || item.first_air_date || '').split('-')[0];
-  const posterUrl = tmdbImages.poster(item.poster_path, 'w500');
+  const [isPerfMode, setIsPerfMode] = useState(() => 
+    typeof document !== 'undefined' && document.documentElement.getAttribute('data-perf-mode') === 'true'
+  );
+
+  useEffect(() => {
+    const handleSettings = (e: Event) => {
+      const custom = e as CustomEvent<any>;
+      if (custom.detail && typeof custom.detail.performanceMode === 'boolean') {
+        setIsPerfMode(custom.detail.performanceMode);
+      }
+    };
+    window.addEventListener('tmdb_settings_changed', handleSettings);
+    return () => window.removeEventListener('tmdb_settings_changed', handleSettings);
+  }, []);
+
+  const posterUrl = tmdbImages.poster(item.poster_path, isPerfMode ? 'w342' : 'w500');
 
   const [menuOpen, setMenuOpen] = useState(false);
   const [isLiked, setIsLiked] = useState(false);
@@ -26,12 +41,21 @@ export const MediaCard: React.FC<MediaCardProps> = ({ item, type, progress, onDe
   const menuRef = useRef<HTMLDivElement>(null);
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Lazy-load liked/watchlisted state only when menu is opened
   useEffect(() => {
+    if (!menuOpen) return;
     let active = true;
-    dbService.isLiked(item.id, mediaType).then((res) => {
-      if (active) setIsLiked(res);
+    Promise.all([
+      dbService.isLiked(item.id, mediaType),
+      dbService.isWatchlisted(item.id, mediaType)
+    ]).then(([liked, watchlisted]) => {
+      if (active) {
+        setIsLiked(liked);
+        setIsWatchlisted(watchlisted);
+      }
     });
-    }, [item.id, mediaType]);
+    return () => { active = false; };
+  }, [menuOpen, item.id, mediaType]);
 
   const cardRef = useRef<HTMLDivElement>(null);
 
@@ -156,6 +180,10 @@ export const MediaCard: React.FC<MediaCardProps> = ({ item, type, progress, onDe
     }
   };
 
+  const handleFocus = () => {
+    cardRef.current?.scrollIntoView({ inline: 'nearest', block: 'nearest', behavior: 'smooth' });
+  };
+
   return (
     <div
       ref={cardRef}
@@ -163,18 +191,20 @@ export const MediaCard: React.FC<MediaCardProps> = ({ item, type, progress, onDe
       role="button"
       aria-label={`View ${title}`}
       onKeyDown={handleKeyDown}
+      onFocus={handleFocus}
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
       onMouseDown={handleTouchStart}
       onMouseUp={handleTouchEnd}
       onClick={handleCardClick}
-      className="group relative flex-shrink-0 w-36 sm:w-44 md:w-48 lg:w-52 max-w-full rounded-xl overflow-hidden bg-hbo-card border border-hbo-border/40 transition-all duration-300 hover:scale-105 hover:border-hbo-purple-light hover:shadow-hbo-glow tv-focus-target cursor-pointer focus:outline-none"
+      className="group relative flex-shrink-0 w-36 sm:w-44 md:w-48 lg:w-52 max-w-full rounded-xl overflow-hidden bg-hbo-card border border-hbo-border/40 tv-focus-target cursor-pointer focus:outline-none transform-gpu"
     >
       <div className="block relative aspect-[2/3] w-full overflow-hidden bg-gray-900">
         <img
           src={posterUrl}
           alt={title}
           loading="lazy"
+          decoding="async"
           onError={tmdbImages.handleImgError}
           className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
         />

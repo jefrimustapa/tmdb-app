@@ -110,6 +110,9 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     dbService.getSettings().then((s) => {
       if (s) {
         setAdShieldEnabled(s.adBlockShield);
+        try {
+          (window as any).AndroidBridge?.setAdShieldEnabled?.(s.adBlockShield);
+        } catch {}
         const activeResolver = s.streamResolver || (s.directStreamMode ? 'private_extractor' : 'embed');
         setStreamResolver(activeResolver);
         setEnabledResolvers(s.enabledResolvers && s.enabledResolvers.length > 0 ? s.enabledResolvers : ['torbox', 'private_extractor', 'embed']);
@@ -212,6 +215,29 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       ? provider.getMovieUrl(tmdbId)
       : provider.getTVUrl(tmdbId, season, episode);
 
+  const lastSaveTimeRef = useRef<number>(0);
+
+  // Clean up media decoders and iframe resources on unmount
+  useEffect(() => {
+    return () => {
+      if (hlsRef.current) {
+        try { hlsRef.current.destroy(); } catch {}
+        hlsRef.current = null;
+      }
+      if (videoRef.current) {
+        try {
+          videoRef.current.pause();
+          videoRef.current.removeAttribute('src');
+          videoRef.current.load();
+        } catch {}
+      }
+      const iframe = document.querySelector<HTMLIFrameElement>('iframe');
+      if (iframe) {
+        try { iframe.src = 'about:blank'; } catch {}
+      }
+    };
+  }, []);
+
   // Listen for Native Android iframe / subframe playback state changes
   useEffect(() => {
     const handlePlaybackStateChanged = (e: any) => {
@@ -220,24 +246,33 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         if (isPlaying) {
           setIsLoading(false);
           setHasError(false);
+          setIsProbing(false);
+          if (autoCycleTimeoutRef.current) {
+            clearTimeout(autoCycleTimeoutRef.current);
+            autoCycleTimeoutRef.current = null;
+          }
         }
-        // If currentTime and duration are available from the media stream, record progress
+        // If currentTime and duration are available from the media stream, record progress (throttled to 10s to prevent flash storage wear)
         if (duration > 0 && currentTime > 0) {
+          const now = Date.now();
           const progressPercent = Math.min(100, Math.round((currentTime / duration) * 100));
-          dbService.saveWatchProgress({
-            tmdbId,
-            mediaType,
-            title,
-            posterPath,
-            backdropPath,
-            voteAverage,
-            season: mediaType === 'tv' ? season : undefined,
-            episode: mediaType === 'tv' ? episode : undefined,
-            episodeTitle: mediaType === 'tv' ? episodeTitle : undefined,
-            timestamp: Math.round(currentTime),
-            duration: Math.round(duration),
-            progressPercent
-          });
+          if (now - lastSaveTimeRef.current >= 10000 || progressPercent >= 95) {
+            lastSaveTimeRef.current = now;
+            dbService.saveWatchProgress({
+              tmdbId,
+              mediaType,
+              title,
+              posterPath,
+              backdropPath,
+              voteAverage,
+              season: mediaType === 'tv' ? season : undefined,
+              episode: mediaType === 'tv' ? episode : undefined,
+              episodeTitle: mediaType === 'tv' ? episodeTitle : undefined,
+              timestamp: Math.round(currentTime),
+              duration: Math.round(duration),
+              progressPercent
+            });
+          }
         }
       }
     };
@@ -611,7 +646,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           autoPlay
           playsInline
           muted={false}
-          className="w-full h-full object-contain bg-black"
+          className="w-full h-full object-contain bg-black transform-gpu will-change-transform"
           onLoadedData={() => setIsLoading(false)}
           onError={() => {
             if (enabledResolvers.includes('embed')) {
@@ -632,7 +667,8 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           key={`${streamUrl}-${iframeKey}-${adShieldEnabled}`}
           src={streamUrl}
           title={title}
-          className="w-full h-full border-0"
+          loading="eager"
+          className="w-full h-full border-0 transform-gpu will-change-transform"
           allowFullScreen
           allow="autoplay *; encrypted-media *; picture-in-picture *; fullscreen *"
           sandbox={

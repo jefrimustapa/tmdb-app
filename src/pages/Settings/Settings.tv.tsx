@@ -328,6 +328,36 @@ export const Settings: React.FC = () => {
           </div>
         </div>
 
+        {/* Display & Performance Mode */}
+        <div className="bg-hbo-card border border-hbo-border rounded-2xl p-5 sm:p-7 shadow-lg space-y-4">
+          <div className="flex items-start justify-between gap-4 flex-wrap sm:flex-nowrap">
+            <div className="pr-2">
+              <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                <h3 className="text-base sm:text-lg font-bold font-display text-white flex items-center gap-2.5">
+                  <Zap className="w-5 h-5 text-hbo-cyan flex-shrink-0" />
+                  <span>UI Performance Mode (Lite Graphics)</span>
+                </h3>
+                <span className="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-hbo-cyan/20 text-hbo-cyan border border-hbo-cyan/40">
+                  Recommended for TV
+                </span>
+              </div>
+              <p className="text-xs text-gray-400 leading-relaxed">
+                Disables GPU-heavy backdrop blurs, 4K image textures, and diffused glow shadows for smooth 60fps scrolling on low-power TV boxes (e.g. MiBox). Default is ON for TV.
+              </p>
+            </div>
+            <button
+              onClick={() => handleUpdate({ performanceMode: !(settings.performanceMode ?? true) })}
+              className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all tv-focus-target flex items-center gap-2 flex-shrink-0 ${
+                (settings.performanceMode ?? true)
+                  ? 'bg-hbo-cyan text-black shadow-hbo-glow'
+                  : 'bg-hbo-dark border border-hbo-border text-gray-400 hover:border-white/20'
+              }`}
+            >
+              {(settings.performanceMode ?? true) ? 'Enabled' : 'Disabled'}
+            </button>
+          </div>
+        </div>
+
         {/* TV Mode: On-Demand Virtual Cursor */}
         <div className="bg-hbo-card border border-hbo-border rounded-2xl p-5 sm:p-7 shadow-lg space-y-6">
           <div className="flex items-start justify-between gap-4 flex-wrap sm:flex-nowrap">

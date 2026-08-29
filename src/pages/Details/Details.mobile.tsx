@@ -172,7 +172,8 @@ export const Details: React.FC = () => {
   }
 
   const title = details.title || details.name || 'Untitled';
-  const backdropUrl = tmdbImages.backdrop(details.backdrop_path, 'original');
+  const isPerfMode = typeof document !== 'undefined' && document.documentElement.getAttribute('data-perf-mode') === 'true';
+  const backdropUrl = tmdbImages.backdrop(details.backdrop_path, isPerfMode ? 'w780' : 'original');
   const posterUrl = tmdbImages.poster(details.poster_path, 'w500');
   const releaseYear = (details.release_date || details.first_air_date || '').split('-')[0];
   const contentRating = extractContentRating(details);
@@ -184,6 +185,7 @@ export const Details: React.FC = () => {
         <img
           src={backdropUrl}
           alt={title}
+          decoding="async"
           onError={(e) => tmdbImages.handleImgError(e, true)}
           className="w-full h-full object-cover object-top opacity-45 sm:opacity-55 scale-105 transform"
         />
@@ -376,6 +378,8 @@ export const Details: React.FC = () => {
                   <img
                     src={tmdbImages.profile(actor.profile_path, 'w185')}
                     alt={actor.name}
+                    loading="lazy"
+                    decoding="async"
                     onError={tmdbImages.handleImgError}
                     className="w-12 h-12 rounded-full object-cover border border-hbo-border group-hover:border-hbo-cyan flex-shrink-0"
                   />

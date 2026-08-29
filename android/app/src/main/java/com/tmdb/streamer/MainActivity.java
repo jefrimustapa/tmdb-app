@@ -30,6 +30,8 @@ import androidx.core.content.FileProvider;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;
+import java.io.ByteArrayInputStream;
+import java.nio.charset.StandardCharsets;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.concurrent.Executors;
@@ -42,7 +44,41 @@ public class MainActivity extends BridgeActivity {
     private volatile boolean isDropdownOpen = false;
     private volatile boolean isVirtualCursorActive = false;
     private volatile boolean isSimulatingTouch = false;
+    private volatile boolean isAdShieldActive = true;
     private OrientationEventListener orientationListener;
+
+    private static final String[] AD_BLOCK_PATTERNS = new String[] {
+        "propellerads", "adsterra", "monetag", "exoclick", "popcash", "popads",
+        "juicyads", "clickadu", "trafficjunky", "trafficfactory", "tsyndicate",
+        "adservice", "doubleclick", "googlesyndication", "googleadservices",
+        "histats", "statcounter", "coinhive", "cpmstar", "hilltopads",
+        "adclick", "ad-delivery", "adform", "adkernel", "admarvel", "admixer",
+        "adnxs", "adroll", "adsystem", "adtrue", "adzerk",
+        "bidvertiser", "clickguard", "disqusads",
+        "infolinks", "media.net", "mgid", "outbrain", "revcontent",
+        "scorecardresearch", "taboola", "yieldmo", "zergnet",
+        "vdo.ai", "aniview", "smartadserver", "serving-sys", "rubiconproject",
+        "openx", "pubmatic", "lijit", "casalemedia", "sovrn",
+        "criteo", "amazon-adsystem", "advertising.com",
+        "betweendigital", "onclick", "pushsdk", "webpush"
+    };
+
+    private boolean isAdOrTrackerUrl(String lowerUrl) {
+        if (!isAdShieldActive) return false;
+        if (lowerUrl.contains("localhost") || lowerUrl.startsWith("capacitor://") || lowerUrl.startsWith("file://")) {
+            return false;
+        }
+        if (lowerUrl.contains(".m3u8") || lowerUrl.contains(".mp4") || lowerUrl.contains(".ts") || 
+            lowerUrl.contains(".vtt") || lowerUrl.contains(".srt") || lowerUrl.contains("tmdb.org")) {
+            return false;
+        }
+        for (String pattern : AD_BLOCK_PATTERNS) {
+            if (lowerUrl.contains(pattern)) {
+                return true;
+            }
+        }
+        return false;
+    }
 
     private boolean isTV() {
         android.app.UiModeManager uiModeManager = (android.app.UiModeManager) getSystemService(UI_MODE_SERVICE);
@@ -93,6 +129,11 @@ public class MainActivity extends BridgeActivity {
             // Enable HTML5 DOM & Database storage for modern player buffering (Hls.js, Plyr, JWPlayer)
             settings.setDomStorageEnabled(true);
             settings.setDatabaseEnabled(true);
+            settings.setCacheMode(WebSettings.LOAD_DEFAULT);
+            if (isTV() && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                // Disable offscreen pre-rasterization on TV to save GPU fill rate on Mali-450
+                settings.setOffscreenPreRaster(false);
+            }
             // Allow mixed content so HLS streams over http/https load smoothly
             settings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
             // Set modern Chrome mobile user agent to prevent 403 bot-blocking by embed providers
@@ -235,6 +276,12 @@ public class MainActivity extends BridgeActivity {
                 }
 
                 @JavascriptInterface
+                public void setAdShieldEnabled(boolean enabled) {
+                    isAdShieldActive = enabled;
+                    Log.i("TMDB_APP", "[AndroidBridge] setAdShieldEnabled: " + enabled);
+                }
+
+                @JavascriptInterface
                 public void downloadAndInstallApk(String downloadUrl, String apkFileName) {
                     Executors.newSingleThreadExecutor().execute(() -> {
                         try {
@@ -244,76 +291,64 @@ public class MainActivity extends BridgeActivity {
                             connection.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android) TMDBStreamer");
                             connection.setConnectTimeout(15000);
                             connection.setReadTimeout(30000);
-                            connection.setInstanceFollowRedirects(true);
                             connection.connect();
 
-                            int responseCode = connection.getResponseCode();
-                            if (responseCode == HttpURLConnection.HTTP_MOVED_TEMP || 
-                                responseCode == HttpURLConnection.HTTP_MOVED_PERM || 
-                                responseCode == HttpURLConnection.HTTP_SEE_OTHER ||
-                                responseCode == 307 || responseCode == 308) {
-                                String newUrl = connection.getHeaderField("Location");
-                                if (newUrl != null && !newUrl.isEmpty()) {
-                                    connection = (HttpURLConnection) new URL(newUrl).openConnection();
-                                    connection.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android) TMDBStreamer");
-                                    connection.connect();
-                                }
+                            if (connection.getResponseCode() != HttpURLConnection.HTTP_OK) {
+                                Log.e("TMDB_APP", "[Update] Server returned HTTP " + connection.getResponseCode() + " " + connection.getResponseMessage());
+                                return;
                             }
 
                             int fileLength = connection.getContentLength();
-                            File outputDir = getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS);
-                            if (outputDir == null) {
-                                outputDir = getFilesDir();
+                            File downloadDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
+                            if (!downloadDir.exists()) {
+                                downloadDir.mkdirs();
                             }
-                            if (!outputDir.exists()) {
-                                outputDir.mkdirs();
-                            }
-
-                            String cleanFileName = (apkFileName != null && !apkFileName.isEmpty()) ? apkFileName : "tmdb-update.apk";
-                            File apkFile = new File(outputDir, cleanFileName);
-                            if (apkFile.exists()) {
-                                apkFile.delete();
+                            File outputFile = new File(downloadDir, apkFileName);
+                            if (outputFile.exists()) {
+                                outputFile.delete();
                             }
 
                             InputStream input = connection.getInputStream();
-                            FileOutputStream output = new FileOutputStream(apkFile);
+                            FileOutputStream output = new FileOutputStream(outputFile);
 
                             byte[] data = new byte[8192];
                             long total = 0;
                             int count;
-                            int lastPercent = 0;
+                            long lastProgressUpdate = 0;
 
                             while ((count = input.read(data)) != -1) {
                                 total += count;
                                 output.write(data, 0, count);
 
-                                if (fileLength > 0) {
-                                    int percent = (int) ((total * 100) / fileLength);
-                                    if (percent != lastPercent && (percent % 5 == 0 || percent == 100)) {
-                                        lastPercent = percent;
-                                        runOnUiThread(() -> {
-                                            WebView wv = bridge.getWebView();
-                                            if (wv != null) {
-                                                String js = String.format("window.dispatchEvent(new CustomEvent('tmdb_update_download_progress', { detail: { percent: %d, status: 'Downloading (%d%%)...' } }));", percent, percent);
-                                                wv.evaluateJavascript(js, null);
-                                            }
-                                        });
-                                    }
+                                long now = System.currentTimeMillis();
+                                if (now - lastProgressUpdate > 300) {
+                                    lastProgressUpdate = now;
+                                    final int progress = fileLength > 0 ? (int) (total * 100 / fileLength) : -1;
+                                    final long currentTotal = total;
+                                    runOnUiThread(() -> {
+                                        WebView wv = bridge.getWebView();
+                                        if (wv != null) {
+                                            String js = String.format(
+                                                "window.dispatchEvent(new CustomEvent('tmdb_apk_download_progress', { detail: { progress: %d, total: %d, downloaded: %d } }));",
+                                                progress, fileLength, currentTotal
+                                            );
+                                            wv.evaluateJavascript(js, null);
+                                        }
+                                    });
                                 }
                             }
 
                             output.flush();
                             output.close();
                             input.close();
-
-                            Log.i("TMDB_APP", "[Update] Download completed: " + apkFile.getAbsolutePath() + " (" + apkFile.length() + " bytes)");
+                            Log.i("TMDB_APP", "[Update] APK downloaded successfully to: " + outputFile.getAbsolutePath());
 
                             runOnUiThread(() -> {
                                 WebView wv = bridge.getWebView();
                                 if (wv != null) {
-                                    wv.evaluateJavascript("window.dispatchEvent(new CustomEvent('tmdb_update_download_progress', { detail: { percent: 100, status: 'Launching installer...' } }));", null);
+                                    wv.evaluateJavascript("window.dispatchEvent(new CustomEvent('tmdb_apk_download_complete', { detail: { path: '" + outputFile.getAbsolutePath() + "' } }));", null);
                                 }
-                                promptInstallApk(apkFile);
+                                promptInstallApk(outputFile);
                             });
 
                         } catch (Exception e) {
@@ -321,8 +356,7 @@ public class MainActivity extends BridgeActivity {
                             runOnUiThread(() -> {
                                 WebView wv = bridge.getWebView();
                                 if (wv != null) {
-                                    String js = String.format("window.dispatchEvent(new CustomEvent('tmdb_update_download_progress', { detail: { percent: 0, status: 'Download failed: %s' } }));", e.getMessage() != null ? e.getMessage().replace("'", "\\'") : "Network error");
-                                    wv.evaluateJavascript(js, null);
+                                    wv.evaluateJavascript("window.dispatchEvent(new CustomEvent('tmdb_apk_download_error', { detail: { error: '" + e.getMessage() + "' } }));", null);
                                 }
                             });
                         }
@@ -330,7 +364,7 @@ public class MainActivity extends BridgeActivity {
                 }
             }, "AndroidBridge");
 
-            // Intercept and drop any child window or popup requests + forward console logs
+            // Handle alert, confirm, and multi-window popups
             webView.setWebChromeClient(new WebChromeClient() {
                 @Override
                 public boolean onCreateWindow(WebView view, boolean isDialog, boolean isUserGesture, Message resultMsg) {
@@ -396,6 +430,19 @@ public class MainActivity extends BridgeActivity {
                                 );
                                 view.evaluateJavascript(jsDispatch, null);
                             });
+                        }
+
+                        // Stealth 200 OK Ad/Tracker Interceptor (returns 0-byte dummy JS/CSS so anti-adblock detection never triggers)
+                        if (isAdOrTrackerUrl(lower)) {
+                            String mimeType = lower.contains(".css") ? "text/css" : "application/javascript";
+                            return new WebResourceResponse(
+                                mimeType,
+                                "UTF-8",
+                                200,
+                                "OK",
+                                new java.util.HashMap<>(),
+                                new ByteArrayInputStream("".getBytes(StandardCharsets.UTF_8))
+                            );
                         }
                     }
                     return super.shouldInterceptRequest(view, request);
@@ -537,6 +584,36 @@ public class MainActivity extends BridgeActivity {
             if (isTV() && isWatchPageActive) {
                 WebView webView = bridge.getWebView();
 
+                // If any dropdown is currently open on the Watch page, directly dispatch navigation events
+                if (isDropdownOpen) {
+                    if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
+                        if (webView != null) {
+                            webView.evaluateJavascript("window.dispatchEvent(new CustomEvent('tmdb_dropdown_nav', { detail: { direction: 'down' } }));", null);
+                        }
+                        return true;
+                    }
+                    if (keyCode == KeyEvent.KEYCODE_DPAD_UP) {
+                        if (webView != null) {
+                            webView.evaluateJavascript("window.dispatchEvent(new CustomEvent('tmdb_dropdown_nav', { detail: { direction: 'up' } }));", null);
+                        }
+                        return true;
+                    }
+                    if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER || keyCode == KeyEvent.KEYCODE_NUMPAD_ENTER) {
+                        if (webView != null) {
+                            webView.evaluateJavascript("window.dispatchEvent(new CustomEvent('tmdb_dropdown_select'));", null);
+                        }
+                        return true;
+                    }
+                    if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT || keyCode == KeyEvent.KEYCODE_BACK) {
+                        isDropdownOpen = false;
+                        if (webView != null) {
+                            webView.evaluateJavascript("window.dispatchEvent(new CustomEvent('tmdb_close_dropdowns'));", null);
+                        }
+                        return true;
+                    }
+                    return true;
+                }
+
                 // If Virtual Cursor is active, completely intercept D-Pad movement, OK clicks, and Back key
                 if (isVirtualCursorActive) {
                     if (keyCode == KeyEvent.KEYCODE_DPAD_UP || keyCode == KeyEvent.KEYCODE_DPAD_DOWN ||
@@ -585,17 +662,18 @@ public class MainActivity extends BridgeActivity {
                             "  if (window.__tmdbVirtualCursorActive) return false;" +
                             "  var header = document.querySelector('[data-watch-header=\"true\"]');" +
                             "  var isHeaderFocused = !!window.__tmdbHeaderFocused || (header && header.contains(document.activeElement));" +
-                            "  if (isHeaderFocused) {" +
-                            "    var trigger = document.getElementById('watch-provider-trigger');" +
-                            "    if (trigger && document.activeElement !== trigger) {" +
-                            "      trigger.focus();" +
-                            "      return true;" +
-                            "    }" +
+                            "  if (!isHeaderFocused) return false;" +
+                            "  var trigger = document.getElementById('watch-provider-trigger');" +
+                            "  if (trigger && document.activeElement !== trigger) {" +
+                            "    trigger.focus();" +
+                            "    window.dispatchEvent(new CustomEvent('tmdb_reset_header_timer'));" +
+                            "    return true;" +
                             "  }" +
                             "  return false;" +
                             "})();",
                             null
                         );
+                        return true;
                     }
                     return super.dispatchKeyEvent(event);
                 } else if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT) {
@@ -604,25 +682,19 @@ public class MainActivity extends BridgeActivity {
                             "(function() {" +
                             "  if (window.__tmdbVirtualCursorActive) return false;" +
                             "  var header = document.querySelector('[data-watch-header=\"true\"]');" +
-                            "  var openDropdown = header ? header.querySelector('[data-provider-dropdown-open=\"true\"]') : null;" +
-                            "  if (openDropdown) {" +
-                            "    window.dispatchEvent(new CustomEvent('tmdb_close_dropdowns'));" +
-                            "    var trigger = document.getElementById('watch-provider-trigger');" +
-                            "    if (trigger) { trigger.focus(); }" +
-                            "    return true;" +
-                            "  }" +
                             "  var isHeaderFocused = !!window.__tmdbHeaderFocused || (header && header.contains(document.activeElement));" +
-                            "  if (isHeaderFocused) {" +
-                            "    var backBtn = document.getElementById('watch-back-btn');" +
-                            "    if (backBtn && document.activeElement !== backBtn) {" +
-                            "      backBtn.focus();" +
-                            "      return true;" +
-                            "    }" +
+                            "  if (!isHeaderFocused) return false;" +
+                            "  var backBtn = document.getElementById('watch-back-btn');" +
+                            "  if (backBtn && document.activeElement !== backBtn) {" +
+                            "    backBtn.focus();" +
+                            "    window.dispatchEvent(new CustomEvent('tmdb_reset_header_timer'));" +
+                            "    return true;" +
                             "  }" +
                             "  return false;" +
                             "})();",
                             null
                         );
+                        return true;
                     }
                     return super.dispatchKeyEvent(event);
                 }
@@ -655,6 +727,18 @@ public class MainActivity extends BridgeActivity {
                                 "    }" +
                                 "    return true;" +
                                 "  }" +
+                                "  var active = document.activeElement;" +
+                                "  var isInteractive = active && active !== document.body && active !== document.documentElement && (" +
+                                "    active.tagName === 'BUTTON' || active.tagName === 'A' || active.tagName === 'INPUT' ||" +
+                                "    active.getAttribute('role') === 'button' || active.classList.contains('tv-focus-target') ||" +
+                                "    active.dataset?.watchHeaderItem === 'true' || active.dataset?.providerItem === 'true' || active.id === 'watch-provider-trigger'" +
+                                "  );" +
+                                "  if (isInteractive) {" +
+                                "    if (typeof active.click === 'function') {" +
+                                "      active.click();" +
+                                "      return true;" +
+                                "    }" +
+                                "  }" +
                                 "  var isHeaderFocused = !!window.__tmdbHeaderFocused;" +
                                 "  if (!isHeaderFocused) {" +
                                 "    if (%b) {" +
@@ -663,10 +747,6 @@ public class MainActivity extends BridgeActivity {
                                 "      if (typeof window.AndroidBridge !== 'undefined' && typeof window.AndroidBridge.simulateTouchAt === 'function') {" +
                                 "        window.AndroidBridge.simulateTouchAt(window.innerWidth / 2, window.innerHeight / 2);" +
                                 "      }" +
-                                "    }" +
-                                "  } else {" +
-                                "    if (document.activeElement && typeof document.activeElement.click === 'function') {" +
-                                "      document.activeElement.click();" +
                                 "    }" +
                                 "  }" +
                                 "  return false;" +
@@ -682,30 +762,16 @@ public class MainActivity extends BridgeActivity {
                             "(function() {" +
                             "  if (window.__tmdbVirtualCursorActive) return false;" +
                             "  var header = document.querySelector('[data-watch-header=\"true\"]');" +
-                            "  var openDropdown = header ? header.querySelector('[data-provider-dropdown-open=\"true\"]') : null;" +
-                            "  var isTrigger = document.activeElement && document.activeElement.id === 'watch-provider-trigger';" +
-                            "  if (isTrigger && !openDropdown) {" +
-                            "    if (typeof document.activeElement.click === 'function') {" +
-                            "      document.activeElement.click();" +
-                            "      return true;" +
-                            "    }" +
-                            "  }" +
                             "  var isHeaderFocused = !!window.__tmdbHeaderFocused || (header && header.contains(document.activeElement));" +
-                            "  if (isHeaderFocused && !openDropdown && !isTrigger) {" +
-                            "    window.__tmdbHeaderFocused = false;" +
-                            "    if (document.activeElement && typeof document.activeElement.blur === 'function') {" +
-                            "      document.activeElement.blur();" +
-                            "    }" +
-                            "    var iframe = document.querySelector('iframe');" +
-                            "    if (iframe && typeof iframe.focus === 'function') {" +
-                            "      iframe.focus();" +
-                            "    }" +
+                            "  if (isHeaderFocused) {" +
+                            "    window.dispatchEvent(new CustomEvent('tmdb_hide_header_and_focus_player'));" +
                             "    return true;" +
                             "  }" +
                             "  return false;" +
                             "})();",
                             null
                         );
+                        return true;
                     }
                     return super.dispatchKeyEvent(event);
                 } else if (keyCode == KeyEvent.KEYCODE_BACK) {
@@ -748,6 +814,32 @@ public class MainActivity extends BridgeActivity {
                         );
                         return true;
                     }
+                    return super.dispatchKeyEvent(event);
+                }
+            }
+        }
+
+        if (isTV() && !isWatchPageActive && event.getAction() == KeyEvent.ACTION_DOWN) {
+            int keyCode = event.getKeyCode();
+            if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER || keyCode == KeyEvent.KEYCODE_NUMPAD_ENTER) {
+                if (event.getRepeatCount() > 0) return true;
+                WebView webView = bridge.getWebView();
+                if (webView != null) {
+                    webView.evaluateJavascript(
+                        "(function() {" +
+                        "  var active = document.activeElement;" +
+                        "  console.log('[TMDB Streamer] Enter pressed! activeElement:', active ? (active.tagName + '#' + active.id + ' text: ' + (active.textContent || '').trim().substring(0, 30)) : 'null');" +
+                        "  if (active && active !== document.body && active !== document.documentElement) {" +
+                        "    if (typeof active.click === 'function') {" +
+                        "      active.click();" +
+                        "      return true;" +
+                        "    }" +
+                        "  }" +
+                        "  return false;" +
+                        "})()",
+                        null
+                    );
+                    return true;
                 }
             }
         }

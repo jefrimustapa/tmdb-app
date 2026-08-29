@@ -142,14 +142,22 @@ export const Search: React.FC = () => {
     return () => window.removeEventListener('scroll', handleScroll);
   }, [page, totalPages, query, isLoading, isLoadingMore, personInfo]);
 
+  const [debounceTimer, setDebounceTimer] = useState<ReturnType<typeof setTimeout> | null>(null);
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
     setQuery(val);
     setPersonInfo(null);
-    setSearchParams(val ? { q: val } : {});
+
+    if (debounceTimer) clearTimeout(debounceTimer);
+    const t = setTimeout(() => {
+      setSearchParams(val ? { q: val } : {});
+    }, 250);
+    setDebounceTimer(t);
   };
 
   const handleClear = () => {
+    if (debounceTimer) clearTimeout(debounceTimer);
     setQuery('');
     setPersonInfo(null);
     setResults([]);
