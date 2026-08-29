@@ -105,7 +105,10 @@ export const ProviderPickerTV: React.FC<ProviderPickerTVProps> = ({
   }, [isOpen]);
 
   useEffect(() => {
-    const handleCloseDropdown = () => setIsOpen(false);
+    const handleCloseDropdown = () => {
+      setIsOpen(false);
+      window.dispatchEvent(new CustomEvent('tmdb_reset_header_timer'));
+    };
     window.addEventListener('tmdb_close_dropdowns', handleCloseDropdown);
     return () => window.removeEventListener('tmdb_close_dropdowns', handleCloseDropdown);
   }, []);
@@ -113,6 +116,7 @@ export const ProviderPickerTV: React.FC<ProviderPickerTVProps> = ({
   const handleSelect = (provider: StreamProvider) => {
     onSelect(provider);
     setIsOpen(false);
+    window.dispatchEvent(new CustomEvent('tmdb_reset_header_timer'));
     setTimeout(() => {
       const triggerBtn = document.getElementById('watch-provider-trigger');
       if (triggerBtn) triggerBtn.focus();
@@ -135,7 +139,7 @@ export const ProviderPickerTV: React.FC<ProviderPickerTVProps> = ({
           } else if (e.key === 'ArrowDown') {
             if (!isOpen) {
               e.preventDefault();
-              setIsOpen(true);
+              window.dispatchEvent(new CustomEvent('tmdb_hide_header_and_focus_player'));
             }
           }
         }}

@@ -181,13 +181,37 @@ export const Watch: React.FC = () => {
       }, 30);
     };
 
+    const onResetHeaderTimer = () => {
+      resetHeaderTimer();
+    };
+    const onHideHeaderFocusPlayer = () => {
+      if (hideTimerRef.current) {
+        clearTimeout(hideTimerRef.current);
+        hideTimerRef.current = null;
+      }
+      setHeaderVisible(false);
+      window.dispatchEvent(new CustomEvent('tmdb_close_dropdowns'));
+      (window as any).__tmdbHeaderFocused = false;
+      if (document.activeElement && typeof (document.activeElement as HTMLElement).blur === 'function') {
+        (document.activeElement as HTMLElement).blur();
+      }
+      const iframe = document.querySelector<HTMLIFrameElement>('iframe');
+      if (iframe) {
+        try { iframe.focus(); } catch {}
+      }
+    };
+
     window.addEventListener('tmdb_exit_watch', onExitWatch);
     window.addEventListener('tmdb_show_header_focus_back', onShowHeaderFocusBack);
+    window.addEventListener('tmdb_reset_header_timer', onResetHeaderTimer);
+    window.addEventListener('tmdb_hide_header_and_focus_player', onHideHeaderFocusPlayer);
     (window as any).tmdbExitWatch = handleExitWatch;
     (window as any).__tmdbHeaderFocused = false;
     return () => {
       window.removeEventListener('tmdb_exit_watch', onExitWatch);
       window.removeEventListener('tmdb_show_header_focus_back', onShowHeaderFocusBack);
+      window.removeEventListener('tmdb_reset_header_timer', onResetHeaderTimer);
+      window.removeEventListener('tmdb_hide_header_and_focus_player', onHideHeaderFocusPlayer);
       delete (window as any).tmdbExitWatch;
       delete (window as any).__tmdbHeaderFocused;
     };
@@ -202,15 +226,20 @@ export const Watch: React.FC = () => {
       }
       const backBtn = document.getElementById('watch-back-btn');
       const trigger = document.getElementById('watch-provider-trigger');
-      if (e.key === 'ArrowRight' && (document.activeElement === backBtn || (window as any).__tmdbHeaderFocused)) {
-        if (trigger) {
+      if (e.key === 'ArrowRight') {
+        if (trigger && document.activeElement !== trigger) {
           e.preventDefault();
           trigger.focus();
         }
-      } else if (e.key === 'ArrowLeft' && document.activeElement === trigger) {
-        if (backBtn) {
+      } else if (e.key === 'ArrowLeft') {
+        if (backBtn && document.activeElement !== backBtn) {
           e.preventDefault();
           backBtn.focus();
+        }
+      } else if (e.key === 'ArrowDown') {
+        if (document.activeElement === backBtn || document.activeElement === trigger) {
+          e.preventDefault();
+          window.dispatchEvent(new CustomEvent('tmdb_hide_header_and_focus_player'));
         }
       }
     };
