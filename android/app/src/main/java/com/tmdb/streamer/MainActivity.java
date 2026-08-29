@@ -666,6 +666,7 @@ public class MainActivity extends BridgeActivity {
                             "  var trigger = document.getElementById('watch-provider-trigger');" +
                             "  if (trigger && document.activeElement !== trigger) {" +
                             "    trigger.focus();" +
+                            "    window.dispatchEvent(new CustomEvent('tmdb_reset_header_timer'));" +
                             "    return true;" +
                             "  }" +
                             "  return false;" +
@@ -686,6 +687,7 @@ public class MainActivity extends BridgeActivity {
                             "  var backBtn = document.getElementById('watch-back-btn');" +
                             "  if (backBtn && document.activeElement !== backBtn) {" +
                             "    backBtn.focus();" +
+                            "    window.dispatchEvent(new CustomEvent('tmdb_reset_header_timer'));" +
                             "    return true;" +
                             "  }" +
                             "  return false;" +

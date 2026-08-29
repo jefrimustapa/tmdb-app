@@ -107,7 +107,6 @@ export const ProviderPickerTV: React.FC<ProviderPickerTVProps> = ({
   useEffect(() => {
     const handleCloseDropdown = () => {
       setIsOpen(false);
-      window.dispatchEvent(new CustomEvent('tmdb_reset_header_timer'));
     };
     window.addEventListener('tmdb_close_dropdowns', handleCloseDropdown);
     return () => window.removeEventListener('tmdb_close_dropdowns', handleCloseDropdown);
