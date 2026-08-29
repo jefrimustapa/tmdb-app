@@ -318,29 +318,6 @@ export const Watch: React.FC = () => {
   const lastMousePosRef = React.useRef({ x: -1, y: -1 });
 
   useEffect(() => {
-    const handleKeyOrTouch = () => {
-      resetHeaderTimer();
-    };
-
-    const handleMouseMove = (e: MouseEvent) => {
-      if (
-        lastMousePosRef.current.x === -1 ||
-        Math.abs(e.clientX - lastMousePosRef.current.x) > 3 ||
-        Math.abs(e.clientY - lastMousePosRef.current.y) > 3
-      ) {
-        lastMousePosRef.current = { x: e.clientX, y: e.clientY };
-        resetHeaderTimer();
-      }
-    };
-
-    // Genuine user input listeners
-    window.addEventListener('keydown', handleKeyOrTouch, true);
-    window.addEventListener('touchstart', handleKeyOrTouch, true);
-    window.addEventListener('click', handleKeyOrTouch, true);
-    window.addEventListener('mousemove', handleMouseMove, true);
-    window.addEventListener('tmdb_screen_touched', handleKeyOrTouch);
-    window.addEventListener('tmdb_user_action', handleKeyOrTouch);
-
     resetHeaderTimer();
 
     return () => {
@@ -348,12 +325,6 @@ export const Watch: React.FC = () => {
         clearTimeout(hideTimerRef.current);
         hideTimerRef.current = null;
       }
-      window.removeEventListener('keydown', handleKeyOrTouch, true);
-      window.removeEventListener('touchstart', handleKeyOrTouch, true);
-      window.removeEventListener('click', handleKeyOrTouch, true);
-      window.removeEventListener('mousemove', handleMouseMove, true);
-      window.removeEventListener('tmdb_screen_touched', handleKeyOrTouch);
-      window.removeEventListener('tmdb_user_action', handleKeyOrTouch);
     };
   }, [resetHeaderTimer]);
 
@@ -373,9 +344,6 @@ export const Watch: React.FC = () => {
   return (
     <div
       className="relative w-screen h-screen min-h-screen bg-black overflow-hidden flex flex-col justify-start select-none"
-      onClick={resetHeaderTimer}
-      onTouchStart={resetHeaderTimer}
-      onMouseMove={resetHeaderTimer}
     >
       {/* Stream Player Area with Overlay Header */}
       <div className="relative w-full h-full flex-1 bg-black overflow-hidden group">

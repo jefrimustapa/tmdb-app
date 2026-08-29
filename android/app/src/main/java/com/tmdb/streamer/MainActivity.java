@@ -655,7 +655,20 @@ public class MainActivity extends BridgeActivity {
                     }
                 }
 
-                if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) {
+                if (keyCode == KeyEvent.KEYCODE_DPAD_UP) {
+                    if (webView != null) {
+                        webView.evaluateJavascript(
+                            "(function() {" +
+                            "  if (window.__tmdbVirtualCursorActive) return false;" +
+                            "  window.dispatchEvent(new CustomEvent('tmdb_show_header_focus_back'));" +
+                            "  return true;" +
+                            "})();",
+                            null
+                        );
+                        return true;
+                    }
+                    return super.dispatchKeyEvent(event);
+                } else if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) {
                     if (webView != null) {
                         webView.evaluateJavascript(
                             "(function() {" +
