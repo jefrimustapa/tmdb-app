@@ -111,19 +111,31 @@
   background-color: #0e0e1a !important;
 }
 
-/* 3. Crisp focus indicators without 30px diffused gaussian blurs */
+/* 3. Crisp focus indicators without zoom/resizing - Ring Only */
+[data-perf-mode="true"] .tv-focus-target,
 [data-perf-mode="true"] .tv-focus-target:focus,
 [data-perf-mode="true"] .tv-focus-target:focus-visible {
   outline: none !important;
   box-shadow: 0 0 0 3px #00f0ff !important;
-  transform: scale(1.04) translateZ(0);
-  transition: transform 0.12s ease-out, border-color 0.12s ease-out;
+  transform: none !important;
+  transition: none !important;
 }
 
-/* 4. Disable heavy multi-nested card hover zoom repaints */
+/* 4. Disable all scaling, resizing, and zoom transforms across all elements */
+[data-perf-mode="true"] .hover\:scale-105:hover,
+[data-perf-mode="true"] .hover\:scale-110:hover,
+[data-perf-mode="true"] .hover\:scale-\[1\.02\]:hover,
+[data-perf-mode="true"] .hover\:scale-105:focus,
+[data-perf-mode="true"] .hover\:scale-110:focus,
+[data-perf-mode="true"] .active\:scale-95:active,
+[data-perf-mode="true"] .active\:scale-90:active,
+[data-perf-mode="true"] .active\:scale-\[0\.98\]:active,
 [data-perf-mode="true"] .group:hover img,
-[data-perf-mode="true"] .group:focus img {
+[data-perf-mode="true"] .group:focus img,
+[data-perf-mode="true"] .group-hover\:scale-110,
+[data-perf-mode="true"] .group-hover\:scale-105 {
   transform: none !important;
+  transition: none !important;
 }
 
 /* 5. Render containment for smooth horizontal & vertical scrolling */
