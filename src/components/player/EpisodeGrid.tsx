@@ -109,6 +109,8 @@ export const EpisodeGrid: React.FC<EpisodeGridProps> = ({
                   <img
                     src={stillUrl}
                     alt={ep.name}
+                    loading="lazy"
+                    decoding="async"
                     onError={(e) => tmdbImages.handleImgError(e, true)}
                     className={`w-full h-full object-cover group-hover:scale-105 transition duration-300 ${
                       isUnaired ? 'grayscale contrast-75 brightness-75 opacity-60' : ''

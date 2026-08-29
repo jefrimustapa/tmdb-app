@@ -37,7 +37,12 @@ export const tmdbImages = {
 };
 
 const apiCache = new Map<string, { data: any; expiry: number }>();
-const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes in-memory cache
+const CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes in-memory cache for instant 0ms back-navigation
+
+// Clear cache on settings changes
+if (typeof window !== 'undefined') {
+  window.addEventListener('tmdb_settings_changed', () => apiCache.clear());
+}
 
 async function tmdbFetch<T>(endpoint: string, params: Record<string, string | number> = {}): Promise<T> {
   const settings = await dbService.getSettings();

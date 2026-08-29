@@ -18,7 +18,22 @@ export const MediaCard: React.FC<MediaCardProps> = ({ item, type, progress, onDe
   const mediaType: 'movie' | 'tv' = (type === 'tv' || item.media_type === 'tv' || (!item.title && !!item.name)) ? 'tv' : 'movie';
   const title = item.title || item.name || 'Untitled';
   const releaseYear = (item.release_date || item.first_air_date || '').split('-')[0];
-  const posterUrl = tmdbImages.poster(item.poster_path, 'w500');
+  const [isPerfMode, setIsPerfMode] = useState(() => 
+    typeof document !== 'undefined' && document.documentElement.getAttribute('data-perf-mode') === 'true'
+  );
+
+  useEffect(() => {
+    const handleSettings = (e: Event) => {
+      const custom = e as CustomEvent<any>;
+      if (custom.detail && typeof custom.detail.performanceMode === 'boolean') {
+        setIsPerfMode(custom.detail.performanceMode);
+      }
+    };
+    window.addEventListener('tmdb_settings_changed', handleSettings);
+    return () => window.removeEventListener('tmdb_settings_changed', handleSettings);
+  }, []);
+
+  const posterUrl = tmdbImages.poster(item.poster_path, isPerfMode ? 'w342' : 'w500');
 
   const [menuOpen, setMenuOpen] = useState(false);
   const [isLiked, setIsLiked] = useState(false);

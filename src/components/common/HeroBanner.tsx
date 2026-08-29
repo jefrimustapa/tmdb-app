@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { Play, Info, Plus, Check } from 'lucide-react';
 import type { TMDBMediaItem } from '../../types/tmdb';
@@ -23,14 +23,33 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ items }) => {
     dbService.isWatchlisted(featured.id, mediaType).then(setIsWatchlisted);
   }, [featured]);
 
-  // Auto carousel rotate
+  const bannerRef = useRef<HTMLDivElement>(null);
+  const [isVisible, setIsVisible] = useState(true);
+
+  // Pause carousel when scrolled out of view to save CPU/GPU cycles
   useEffect(() => {
-    if (items.length <= 1) return;
+    const el = bannerRef.current;
+    if (!el || typeof IntersectionObserver === 'undefined') return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        setIsVisible(entry.isIntersecting);
+      },
+      { threshold: 0.1 }
+    );
+
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  // Auto carousel rotate (only when visible in viewport)
+  useEffect(() => {
+    if (items.length <= 1 || !isVisible) return;
     const interval = setInterval(() => {
       setCurrentIndex((prev) => (prev + 1) % Math.min(items.length, 5));
     }, 9000);
     return () => clearInterval(interval);
-  }, [items]);
+  }, [items, isVisible]);
 
   const [isPerfMode, setIsPerfMode] = useState(() => 
     typeof document !== 'undefined' && document.documentElement.getAttribute('data-perf-mode') === 'true'
@@ -51,7 +70,7 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ items }) => {
 
   const title = featured.title || featured.name || 'Featured Title';
   const mediaType: 'movie' | 'tv' = featured.media_type === 'tv' ? 'tv' : 'movie';
-  const backdropUrl = tmdbImages.backdrop(featured.backdrop_path, isPerfMode ? 'w1280' : 'original');
+  const backdropUrl = tmdbImages.backdrop(featured.backdrop_path, isPerfMode ? 'w780' : 'original');
   const releaseYear = (featured.release_date || featured.first_air_date || '').split('-')[0];
 
   const handleToggleWatchlist = async () => {
@@ -68,7 +87,7 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ items }) => {
   };
 
   return (
-    <div data-hero-banner="true" className="relative w-full h-[65vh] sm:h-[75vh] lg:h-[82vh] overflow-hidden bg-hbo-dark">
+    <div ref={bannerRef} data-hero-banner="true" className="relative w-full h-[65vh] sm:h-[75vh] lg:h-[82vh] overflow-hidden bg-hbo-dark">
       {/* Background Backdrop Image */}
       <div className="absolute inset-0">
         <img
