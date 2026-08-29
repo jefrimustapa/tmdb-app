@@ -51,7 +51,7 @@ export const MediaRow: React.FC<MediaRowProps> = ({ title, subtitle, items, type
         {/* Horizontal Carousel */}
         <div
           ref={rowRef}
-          className="flex items-center gap-4 sm:gap-6 lg:gap-7 overflow-x-auto no-scrollbar py-3 px-2 scroll-smooth"
+          className="flex items-center gap-4 sm:gap-6 lg:gap-7 overflow-x-auto no-scrollbar py-3 px-2 scroll-smooth transform-gpu"
         >
           {items.map((item) => (
             <MediaCard key={item.id} item={item} type={type} />
