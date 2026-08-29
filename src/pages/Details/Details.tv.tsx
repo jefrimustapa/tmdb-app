@@ -378,6 +378,8 @@ export const Details: React.FC = () => {
                   <img
                     src={tmdbImages.profile(actor.profile_path, 'w185')}
                     alt={actor.name}
+                    loading="lazy"
+                    decoding="async"
                     onError={tmdbImages.handleImgError}
                     className="w-12 h-12 rounded-full object-cover border border-hbo-border group-hover:border-hbo-cyan flex-shrink-0"
                   />

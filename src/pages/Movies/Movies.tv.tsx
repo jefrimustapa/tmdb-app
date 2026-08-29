@@ -176,7 +176,7 @@ export const Movies: React.FC = () => {
           <SlidersHorizontal className="w-3.5 h-3.5 text-hbo-cyan" />
           <span>Filter by Streaming Platform Hub</span>
         </div>
-        <div className="flex items-center gap-2.5 sm:gap-3 overflow-x-auto no-scrollbar py-3 px-3.5 sm:px-4 -mx-2 sm:-mx-3 scroll-pl-4 scroll-pr-4">
+        <div className="flex items-center gap-2.5 overflow-x-auto no-scrollbar py-3 px-3.5 sm:px-4 -mx-2 sm:-mx-3 scroll-pl-4 scroll-pr-4 transform-gpu">
           <button
             onClick={() => updateFilters(selectedGenre, '')}
             className={`px-4 py-2.5 rounded-xl text-xs font-extrabold whitespace-nowrap transition-all border flex items-center gap-1.5 flex-shrink-0 tv-focus-target ${
@@ -214,7 +214,7 @@ export const Movies: React.FC = () => {
           <Filter className="w-3.5 h-3.5 text-hbo-purple-light" />
           <span>Filter by Genre</span>
         </div>
-        <div className="flex items-center gap-2.5 overflow-x-auto no-scrollbar py-3 px-3.5 sm:px-4 -mx-2 sm:-mx-3 scroll-pl-4 scroll-pr-4">
+        <div className="flex items-center gap-2.5 overflow-x-auto no-scrollbar py-3 px-3.5 sm:px-4 -mx-2 sm:-mx-3 scroll-pl-4 scroll-pr-4 transform-gpu">
           <button
             onClick={() => updateFilters('', selectedProvider)}
             className={`px-4 py-2 rounded-full text-xs font-extrabold whitespace-nowrap transition-all border flex items-center gap-1.5 flex-shrink-0 tv-focus-target ${
