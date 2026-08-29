@@ -719,6 +719,18 @@ public class MainActivity extends BridgeActivity {
                                 "    }" +
                                 "    return true;" +
                                 "  }" +
+                                "  var active = document.activeElement;" +
+                                "  var isInteractive = active && active !== document.body && active !== document.documentElement && (" +
+                                "    active.tagName === 'BUTTON' || active.tagName === 'A' || active.tagName === 'INPUT' ||" +
+                                "    active.getAttribute('role') === 'button' || active.classList.contains('tv-focus-target') ||" +
+                                "    active.dataset?.watchHeaderItem === 'true' || active.dataset?.providerItem === 'true' || active.id === 'watch-provider-trigger'" +
+                                "  );" +
+                                "  if (isInteractive) {" +
+                                "    if (typeof active.click === 'function') {" +
+                                "      active.click();" +
+                                "      return true;" +
+                                "    }" +
+                                "  }" +
                                 "  var isHeaderFocused = !!window.__tmdbHeaderFocused;" +
                                 "  if (!isHeaderFocused) {" +
                                 "    if (%b) {" +
@@ -727,10 +739,6 @@ public class MainActivity extends BridgeActivity {
                                 "      if (typeof window.AndroidBridge !== 'undefined' && typeof window.AndroidBridge.simulateTouchAt === 'function') {" +
                                 "        window.AndroidBridge.simulateTouchAt(window.innerWidth / 2, window.innerHeight / 2);" +
                                 "      }" +
-                                "    }" +
-                                "  } else {" +
-                                "    if (document.activeElement && typeof document.activeElement.click === 'function') {" +
-                                "      document.activeElement.click();" +
                                 "    }" +
                                 "  }" +
                                 "  return false;" +
