@@ -42,24 +42,6 @@ export const Watch: React.FC = () => {
 
   const [enabledResolvers, setEnabledResolvers] = useState<('embed' | 'private_extractor' | 'torbox')[]>(['torbox', 'private_extractor', 'embed']);
 
-  // Load default user settings for preferred provider and virtual cursor
-  useEffect(() => {
-    dbService.getSettings().then((s) => {
-      if (s) {
-        if (s.preferredProvider) setProviderId(s.preferredProvider);
-        if (s.streamHeaderTimeout !== undefined) setHeaderTimeoutSeconds(s.streamHeaderTimeout);
-        if (s.enabledResolvers && s.enabledResolvers.length > 0) setEnabledResolvers(s.enabledResolvers);
-        setCursorSettings({
-          enabled: s.virtualCursorEnabled ?? true,
-          clicks: s.virtualCursorClicks ?? 2,
-          timeout: s.virtualCursorTimeout ?? 10,
-          speed: s.virtualCursorSpeed ?? 'normal',
-          style: s.virtualCursorStyle ?? 'hbo_max'
-        });
-      }
-    });
-  }, []);
-
   useEffect(() => {
     if (!tmdbId) return;
 
@@ -87,8 +69,68 @@ export const Watch: React.FC = () => {
   const [serverIndex, setServerIndex] = useState(1);
   const [headerVisible, setHeaderVisible] = useState(true);
   const [headerTimeoutSeconds, setHeaderTimeoutSeconds] = useState(5);
+  const headerTimeoutRef = React.useRef(5);
   const [isPortrait, setIsPortrait] = useState(() => window.innerHeight > window.innerWidth);
   const hideTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const resetHeaderTimer = React.useCallback(() => {
+    setHeaderVisible(true);
+
+    if (hideTimerRef.current) {
+      clearTimeout(hideTimerRef.current);
+      hideTimerRef.current = null;
+    }
+
+    const timeoutSec = headerTimeoutRef.current;
+    if (timeoutSec === 0) {
+      return;
+    }
+
+    const delayMs = (timeoutSec > 0 ? timeoutSec : 5) * 1000;
+    hideTimerRef.current = setTimeout(() => {
+      const isDropdownOpen = !!document.querySelector('[data-provider-dropdown-open="true"]');
+      if (isDropdownOpen) {
+        resetHeaderTimer();
+        return;
+      }
+
+      setHeaderVisible(false);
+      window.dispatchEvent(new CustomEvent('tmdb_close_dropdowns'));
+
+      (window as any).__tmdbHeaderFocused = false;
+      if (document.activeElement && (document.activeElement.tagName === 'BUTTON' || (document.activeElement as HTMLElement).dataset?.watchHeaderItem === 'true')) {
+        (document.activeElement as HTMLElement).blur();
+      }
+      const iframe = document.querySelector<HTMLIFrameElement>('iframe');
+      if (iframe) {
+        try {
+          iframe.focus();
+        } catch {}
+      }
+    }, delayMs);
+  }, []);
+
+  // Load default user settings for preferred provider, timeout, and virtual cursor
+  useEffect(() => {
+    dbService.getSettings().then((s) => {
+      if (s) {
+        if (s.preferredProvider) setProviderId(s.preferredProvider);
+        if (s.streamHeaderTimeout !== undefined) {
+          setHeaderTimeoutSeconds(s.streamHeaderTimeout);
+          headerTimeoutRef.current = s.streamHeaderTimeout;
+        }
+        if (s.enabledResolvers && s.enabledResolvers.length > 0) setEnabledResolvers(s.enabledResolvers);
+        setCursorSettings({
+          enabled: s.virtualCursorEnabled ?? true,
+          clicks: s.virtualCursorClicks ?? 2,
+          timeout: s.virtualCursorTimeout ?? 10,
+          speed: s.virtualCursorSpeed ?? 'normal',
+          style: s.virtualCursorStyle ?? 'hbo_max'
+        });
+      }
+      resetHeaderTimer();
+    });
+  }, [resetHeaderTimer]);
 
   // Dynamically track portrait vs landscape across orientation changes and window resizes
   useEffect(() => {
@@ -109,53 +151,6 @@ export const Watch: React.FC = () => {
       window.removeEventListener('orientationchange', handleOrientation);
     };
   }, []);
-
-  // Load user settings for preferred provider and header auto-hide timeout
-  useEffect(() => {
-    dbService.getSettings().then((s) => {
-      const initialProvider = s?.topProviders?.[0] || s?.preferredProvider;
-      if (initialProvider) setProviderId(initialProvider);
-      if (s?.streamHeaderTimeout !== undefined) {
-        setHeaderTimeoutSeconds(s.streamHeaderTimeout);
-      }
-    });
-  }, []);
-
-  const resetHeaderTimer = React.useCallback(() => {
-    setHeaderVisible(true);
-
-    if (hideTimerRef.current) {
-      clearTimeout(hideTimerRef.current);
-      hideTimerRef.current = null;
-    }
-
-    // Do NOT auto-hide the header if the server dropdown is currently open
-    const isDropdownOpen = !!document.querySelector('[data-provider-dropdown-open="true"]');
-    if (isDropdownOpen) {
-      return;
-    }
-
-    if (headerTimeoutSeconds > 0) {
-      hideTimerRef.current = setTimeout(() => {
-        const checkDropdown = !!document.querySelector('[data-provider-dropdown-open="true"]');
-        if (checkDropdown) return;
-
-        setHeaderVisible(false);
-        window.dispatchEvent(new CustomEvent('tmdb_close_dropdowns'));
-
-        (window as any).__tmdbHeaderFocused = false;
-        if (document.activeElement && (document.activeElement.tagName === 'BUTTON' || (document.activeElement as HTMLElement).dataset?.watchHeaderItem === 'true')) {
-          (document.activeElement as HTMLElement).blur();
-        }
-        const iframe = document.querySelector<HTMLIFrameElement>('iframe');
-        if (iframe) {
-          try {
-            iframe.focus();
-          } catch {}
-        }
-      }, headerTimeoutSeconds * 1000);
-    }
-  }, [headerTimeoutSeconds]);
 
   // Robust exit watch navigation that cannot be trapped by iframe history
   const handleExitWatch = React.useCallback(() => {
