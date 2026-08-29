@@ -106,9 +106,10 @@ export const PlatformHubs: React.FC = () => {
             {/* Official Platform Logo */}
             <div className="flex-1 flex items-center justify-center py-1 sm:py-2">
               <img
-                src={tmdbImages.poster(platform.logoPath, 'w500')}
+                src={tmdbImages.poster(platform.logoPath, 'w185')}
                 alt={platform.name}
                 loading="lazy"
+                decoding="async"
                 className="w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 rounded-2xl object-cover shadow-md transition-transform duration-300 group-hover:scale-110"
               />
             </div>

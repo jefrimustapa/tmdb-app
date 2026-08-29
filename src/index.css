@@ -112,6 +112,18 @@
   contain-intrinsic-size: 320px;
 }
 
+/* 6. Isolated layout & style containment for TV settings cards */
+[data-perf-mode="true"] .tv-setting-card,
+[data-perf-mode="true"] [data-setting-section="true"] {
+  contain: layout style;
+}
+
+/* 7. Dedicated hardware compositing layer for horizontal content rails */
+[data-perf-mode="true"] [data-content-rail="true"] .overflow-x-auto {
+  transform: translateZ(0);
+  will-change: transform;
+}
+
 /* Smooth gradient overlays */
 .hero-gradient-overlay {
   background: linear-gradient(
