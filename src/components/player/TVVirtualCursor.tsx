@@ -485,11 +485,11 @@ export const TVVirtualCursor: React.FC<TVVirtualCursorProps> = ({
 
       {/* Virtual Cursor Pointer */}
       <div
-        className="absolute transition-transform duration-75 ease-out"
+        className="absolute transition-transform duration-75 ease-out will-change-transform transform-gpu"
         style={{
-          left: `${position.x}px`,
-          top: `${position.y}px`,
-          transform: 'translate(-3px, -3px)'
+          left: 0,
+          top: 0,
+          transform: `translate3d(${position.x - 3}px, ${position.y - 3}px, 0)`
         }}
       >
         {currentOption.renderSvg(isClicking)}
