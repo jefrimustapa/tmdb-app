@@ -111,8 +111,12 @@
   background-color: #0e0e1a !important;
 }
 
-/* 3. Crisp focus indicators without zoom/resizing - Ring Only */
-[data-perf-mode="true"] .tv-focus-target,
+/* 3. Crisp focus indicators without zoom/resizing - Ring Only on Focused Element */
+[data-perf-mode="true"] .tv-focus-target {
+  transform: none !important;
+  transition: none !important;
+}
+
 [data-perf-mode="true"] .tv-focus-target:focus,
 [data-perf-mode="true"] .tv-focus-target:focus-visible {
   outline: none !important;
