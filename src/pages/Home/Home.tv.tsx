@@ -58,14 +58,26 @@ export const Home: React.FC = () => {
       }
 
       try {
-        const [trendRes, popMRes, popTVRes, topRes, newMRes, newTVRes, histRes] = await Promise.all([
+        // Stage 1: Load Hero Billboard & Top 2 rails first for instant cold start
+        const [trendRes, popMRes, histRes] = await Promise.all([
           tmdbApi.getTrending('all', 'day'),
           tmdbApi.getPopularMovies(1),
+          dbService.getHistory(10)
+        ]);
+
+        if (!isMounted) return;
+
+        setTrending(trendRes.results || []);
+        setPopularMovies(popMRes.results || []);
+        setHistory(histRes || []);
+        setIsLoading(false);
+
+        // Stage 2: Load secondary lower rails in background without blocking viewport
+        const [popTVRes, topRes, newMRes, newTVRes] = await Promise.all([
           tmdbApi.getPopularTV(1),
           tmdbApi.getTopRatedMovies(1),
           tmdbApi.getNowPlayingMovies(1),
-          tmdbApi.getOnTheAirTV(1),
-          dbService.getHistory(10)
+          tmdbApi.getOnTheAirTV(1)
         ]);
 
         if (!isMounted) return;
@@ -83,13 +95,10 @@ export const Home: React.FC = () => {
 
         homeFeedCache = newCache;
 
-        setTrending(newCache.trending);
-        setPopularMovies(newCache.popularMovies);
         setPopularTV(newCache.popularTV);
         setTopRated(newCache.topRated);
         setNewReleaseMovies(newCache.newReleaseMovies);
         setNewReleaseTV(newCache.newReleaseTV);
-        setHistory(newCache.history);
       } catch (err) {
         console.error('Failed to load home feed:', err);
       } finally {
