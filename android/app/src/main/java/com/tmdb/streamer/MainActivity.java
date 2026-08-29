@@ -93,6 +93,11 @@ public class MainActivity extends BridgeActivity {
             // Enable HTML5 DOM & Database storage for modern player buffering (Hls.js, Plyr, JWPlayer)
             settings.setDomStorageEnabled(true);
             settings.setDatabaseEnabled(true);
+            settings.setCacheMode(WebSettings.LOAD_DEFAULT);
+            if (isTV() && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                // Disable offscreen pre-rasterization on TV to save GPU fill rate on Mali-450
+                settings.setOffscreenPreRaster(false);
+            }
             // Allow mixed content so HLS streams over http/https load smoothly
             settings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
             // Set modern Chrome mobile user agent to prevent 403 bot-blocking by embed providers
