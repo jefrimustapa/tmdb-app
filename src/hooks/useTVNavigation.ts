@@ -4,6 +4,13 @@ import { useLocation } from 'react-router-dom';
 /**
  * Spatial D-Pad navigation for Android TV remotes and keyboard arrow navigation
  */
+const getScrollBehavior = (): ScrollBehavior => {
+  if (typeof document !== 'undefined' && document.documentElement.getAttribute('data-perf-mode') === 'true') {
+    return 'auto';
+  }
+  return 'smooth';
+};
+
 export function useTVNavigation(isEnabled = true) {
   const location = useLocation();
 
@@ -59,7 +66,7 @@ export function useTVNavigation(isEnabled = true) {
 
       if (target) {
         target.focus();
-        target.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+        target.scrollIntoView({ behavior: getScrollBehavior(), block: 'nearest', inline: 'center' });
       }
     };
 
@@ -286,7 +293,7 @@ export function useTVNavigation(isEnabled = true) {
             if (bestTarget) {
               e.preventDefault();
               bestTarget.focus();
-              bestTarget.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+              bestTarget.scrollIntoView({ behavior: getScrollBehavior(), block: 'nearest', inline: 'center' });
               return;
             }
           } else {
@@ -305,7 +312,7 @@ export function useTVNavigation(isEnabled = true) {
                   if (targetToFocus) {
                     e.preventDefault();
                     targetToFocus.focus();
-                    targetToFocus.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+                    targetToFocus.scrollIntoView({ behavior: getScrollBehavior(), block: 'nearest', inline: 'center' });
                     return;
                   }
                 }
@@ -332,7 +339,7 @@ export function useTVNavigation(isEnabled = true) {
                   if (targetToFocus) {
                     e.preventDefault();
                     targetToFocus.focus();
-                    targetToFocus.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+                    targetToFocus.scrollIntoView({ behavior: getScrollBehavior(), block: 'nearest', inline: 'center' });
                     return;
                   }
                 }
@@ -355,7 +362,7 @@ export function useTVNavigation(isEnabled = true) {
               if (activeNav) {
                 e.preventDefault();
                 activeNav.focus();
-                activeNav.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+                activeNav.scrollIntoView({ behavior: getScrollBehavior(), block: 'nearest', inline: 'center' });
                 return;
               }
             }
@@ -434,14 +441,14 @@ export function useTVNavigation(isEnabled = true) {
           
           // If the focused element is within the Hero Billboard or Filter Section in Movies/Series, scroll immediately to top
           if (nextElement.closest('[data-hero-banner="true"]') !== null || nextElement.closest('[data-tv-filter-section="true"]') !== null) {
-            window.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
-            nextElement.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+            window.scrollTo({ top: 0, left: 0, behavior: getScrollBehavior() });
+            nextElement.scrollIntoView({ behavior: getScrollBehavior(), block: 'nearest', inline: 'center' });
           } else {
-            nextElement.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
+            nextElement.scrollIntoView({ behavior: getScrollBehavior(), block: 'center', inline: 'nearest' });
             setTimeout(() => {
               const r = nextElement?.getBoundingClientRect();
               if (r && r.bottom > window.innerHeight - 80) {
-                window.scrollBy({ top: r.bottom - window.innerHeight + 140, behavior: 'smooth' });
+                window.scrollBy({ top: r.bottom - window.innerHeight + 140, behavior: getScrollBehavior() });
               }
             }, 50);
           }
