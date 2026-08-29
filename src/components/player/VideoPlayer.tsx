@@ -243,6 +243,11 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         if (isPlaying) {
           setIsLoading(false);
           setHasError(false);
+          setIsProbing(false);
+          if (autoCycleTimeoutRef.current) {
+            clearTimeout(autoCycleTimeoutRef.current);
+            autoCycleTimeoutRef.current = null;
+          }
         }
         // If currentTime and duration are available from the media stream, record progress (throttled to 10s to prevent flash storage wear)
         if (duration > 0 && currentTime > 0) {
@@ -638,7 +643,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           autoPlay
           playsInline
           muted={false}
-          className="w-full h-full object-contain bg-black"
+          className="w-full h-full object-contain bg-black transform-gpu will-change-transform"
           onLoadedData={() => setIsLoading(false)}
           onError={() => {
             if (enabledResolvers.includes('embed')) {
@@ -659,7 +664,8 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           key={`${streamUrl}-${iframeKey}-${adShieldEnabled}`}
           src={streamUrl}
           title={title}
-          className="w-full h-full border-0"
+          loading="eager"
+          className="w-full h-full border-0 transform-gpu will-change-transform"
           allowFullScreen
           allow="autoplay *; encrypted-media *; picture-in-picture *; fullscreen *"
           sandbox={
