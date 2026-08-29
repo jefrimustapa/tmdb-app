@@ -584,21 +584,34 @@ public class MainActivity extends BridgeActivity {
             if (isTV() && isWatchPageActive) {
                 WebView webView = bridge.getWebView();
 
-                // If any dropdown is currently open on the Watch page, route D-Pad and Enter directly to the dropdown list
+                // If any dropdown is currently open on the Watch page, directly dispatch navigation events
                 if (isDropdownOpen) {
-                    if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER || keyCode == KeyEvent.KEYCODE_NUMPAD_ENTER) {
+                    if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
                         if (webView != null) {
-                            webView.evaluateJavascript(
-                                "if (document.activeElement && typeof document.activeElement.click === 'function') { document.activeElement.click(); }",
-                                null
-                            );
+                            webView.evaluateJavascript("window.dispatchEvent(new CustomEvent('tmdb_dropdown_nav', { detail: { direction: 'down' } }));", null);
                         }
                         return true;
                     }
-                    if (keyCode == KeyEvent.KEYCODE_DPAD_UP || keyCode == KeyEvent.KEYCODE_DPAD_DOWN ||
-                        keyCode == KeyEvent.KEYCODE_DPAD_LEFT || keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) {
-                        return super.dispatchKeyEvent(event);
+                    if (keyCode == KeyEvent.KEYCODE_DPAD_UP) {
+                        if (webView != null) {
+                            webView.evaluateJavascript("window.dispatchEvent(new CustomEvent('tmdb_dropdown_nav', { detail: { direction: 'up' } }));", null);
+                        }
+                        return true;
                     }
+                    if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER || keyCode == KeyEvent.KEYCODE_NUMPAD_ENTER) {
+                        if (webView != null) {
+                            webView.evaluateJavascript("window.dispatchEvent(new CustomEvent('tmdb_dropdown_select'));", null);
+                        }
+                        return true;
+                    }
+                    if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT || keyCode == KeyEvent.KEYCODE_BACK) {
+                        isDropdownOpen = false;
+                        if (webView != null) {
+                            webView.evaluateJavascript("window.dispatchEvent(new CustomEvent('tmdb_close_dropdowns'));", null);
+                        }
+                        return true;
+                    }
+                    return true;
                 }
 
                 // If Virtual Cursor is active, completely intercept D-Pad movement, OK clicks, and Back key
