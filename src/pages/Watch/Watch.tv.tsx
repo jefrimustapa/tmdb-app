@@ -230,11 +230,13 @@ export const Watch: React.FC = () => {
         if (trigger && document.activeElement !== trigger) {
           e.preventDefault();
           trigger.focus();
+          resetHeaderTimer();
         }
       } else if (e.key === 'ArrowLeft') {
         if (backBtn && document.activeElement !== backBtn) {
           e.preventDefault();
           backBtn.focus();
+          resetHeaderTimer();
         }
       } else if (e.key === 'ArrowDown') {
         if (document.activeElement === backBtn || document.activeElement === trigger) {
