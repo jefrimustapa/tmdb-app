@@ -26,22 +26,26 @@ export const ProviderPickerTV: React.FC<ProviderPickerTVProps> = ({
   const selectedProvider = getProviderById(currentProviderId);
   const shortServerName = selectedProvider.name.replace(/\s*\([^)]*\)/g, '').trim();
 
+  const selectedIndex = Math.max(0, STREAM_PROVIDERS.findIndex(p => p.id === currentProviderId));
+
   useEffect(() => {
     try {
       (window as any).AndroidBridge?.setDropdownOpen?.(isOpen);
     } catch {}
 
-    if (isOpen && dropdownRef.current) {
-      setTimeout(() => {
+    if (isOpen) {
+      const focusActiveBtn = () => {
         const activeBtn =
+          document.getElementById(`provider-item-${selectedIndex}`) ||
           dropdownRef.current?.querySelector<HTMLElement>('[data-provider-selected="true"]') ||
-          dropdownRef.current?.querySelector<HTMLElement>('[data-provider-item="true"]') ||
-          dropdownRef.current?.querySelector<HTMLElement>('.tv-focus-target');
+          dropdownRef.current?.querySelector<HTMLElement>('[data-provider-item="true"]');
         if (activeBtn) {
           activeBtn.focus();
           activeBtn.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
         }
-      }, 60);
+      };
+      setTimeout(focusActiveBtn, 10);
+      setTimeout(focusActiveBtn, 60);
     }
 
     return () => {
@@ -49,7 +53,7 @@ export const ProviderPickerTV: React.FC<ProviderPickerTVProps> = ({
         (window as any).AndroidBridge?.setDropdownOpen?.(false);
       } catch {}
     };
-  }, [isOpen]);
+  }, [isOpen, selectedIndex]);
 
   useEffect(() => {
     const handleCloseDropdown = () => setIsOpen(false);
