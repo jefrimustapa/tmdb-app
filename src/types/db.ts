@@ -85,5 +85,6 @@ export interface UserSettings {
   virtualCursorTimeout?: number; // Inactivity auto-hide in seconds (5, 10, 15, 30, 0 for never)
   virtualCursorSpeed?: 'slow' | 'normal' | 'fast'; // Cursor movement speed
   virtualCursorStyle?: VirtualCursorStyle; // Cursor style/appearance (10 options)
+  performanceMode?: boolean; // Lite graphics & fast 60fps rendering (Default: ON for TV, OFF for Mobile)
   updatedAt: number;
 }

@@ -32,11 +32,26 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ items }) => {
     return () => clearInterval(interval);
   }, [items]);
 
+  const [isPerfMode, setIsPerfMode] = useState(() => 
+    typeof document !== 'undefined' && document.documentElement.getAttribute('data-perf-mode') === 'true'
+  );
+
+  useEffect(() => {
+    const handleSettings = (e: Event) => {
+      const custom = e as CustomEvent<any>;
+      if (custom.detail && typeof custom.detail.performanceMode === 'boolean') {
+        setIsPerfMode(custom.detail.performanceMode);
+      }
+    };
+    window.addEventListener('tmdb_settings_changed', handleSettings);
+    return () => window.removeEventListener('tmdb_settings_changed', handleSettings);
+  }, []);
+
   if (!featured) return null;
 
   const title = featured.title || featured.name || 'Featured Title';
   const mediaType: 'movie' | 'tv' = featured.media_type === 'tv' ? 'tv' : 'movie';
-  const backdropUrl = tmdbImages.backdrop(featured.backdrop_path, 'original');
+  const backdropUrl = tmdbImages.backdrop(featured.backdrop_path, isPerfMode ? 'w1280' : 'original');
   const releaseYear = (featured.release_date || featured.first_air_date || '').split('-')[0];
 
   const handleToggleWatchlist = async () => {
@@ -59,6 +74,7 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ items }) => {
         <img
           src={backdropUrl}
           alt={title}
+          decoding="async"
           onError={(e) => tmdbImages.handleImgError(e, true)}
           className="w-full h-full object-cover object-center animate-fade-in transition-opacity duration-1000"
         />

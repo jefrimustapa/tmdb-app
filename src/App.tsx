@@ -17,12 +17,37 @@ import { useTVNavigation } from './hooks/useTVNavigation';
 import { useAndroidBackButton } from './hooks/useAndroidBackButton';
 
 import { useLocation } from 'react-router-dom';
+import { dbService } from './services/db';
 
 const AppContent: React.FC = () => {
   const { isTV, isMobile } = useDevice();
   useTVNavigation(isTV);
   const { showExitToast } = useAndroidBackButton();
   const location = useLocation();
+
+  // Synchronize Performance Mode attribute on document root (data-perf-mode="true")
+  React.useEffect(() => {
+    const syncPerfMode = (perfMode?: boolean) => {
+      if (typeof document === 'undefined') return;
+      if (perfMode) {
+        document.documentElement.setAttribute('data-perf-mode', 'true');
+      } else {
+        document.documentElement.removeAttribute('data-perf-mode');
+      }
+    };
+
+    dbService.getSettings().then(s => syncPerfMode(s.performanceMode));
+
+    const handleSettingsChanged = (e: Event) => {
+      const customEvent = e as CustomEvent<any>;
+      if (customEvent.detail && typeof customEvent.detail.performanceMode === 'boolean') {
+        syncPerfMode(customEvent.detail.performanceMode);
+      }
+    };
+
+    window.addEventListener('tmdb_settings_changed', handleSettingsChanged);
+    return () => window.removeEventListener('tmdb_settings_changed', handleSettingsChanged);
+  }, []);
 
   const isWatchPage = location.pathname.startsWith('/watch');
 
