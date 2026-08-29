@@ -30,6 +30,8 @@ import androidx.core.content.FileProvider;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;
+import java.io.ByteArrayInputStream;
+import java.nio.charset.StandardCharsets;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.concurrent.Executors;
@@ -42,7 +44,41 @@ public class MainActivity extends BridgeActivity {
     private volatile boolean isDropdownOpen = false;
     private volatile boolean isVirtualCursorActive = false;
     private volatile boolean isSimulatingTouch = false;
+    private volatile boolean isAdShieldActive = true;
     private OrientationEventListener orientationListener;
+
+    private static final String[] AD_BLOCK_PATTERNS = new String[] {
+        "propellerads", "adsterra", "monetag", "exoclick", "popcash", "popads",
+        "juicyads", "clickadu", "trafficjunky", "trafficfactory", "tsyndicate",
+        "adservice", "doubleclick", "googlesyndication", "googleadservices",
+        "histats", "statcounter", "coinhive", "cpmstar", "hilltopads",
+        "adclick", "ad-delivery", "adform", "adkernel", "admarvel", "admixer",
+        "adnxs", "adroll", "adsystem", "adtrue", "adzerk",
+        "bidvertiser", "clickguard", "disqusads",
+        "infolinks", "media.net", "mgid", "outbrain", "revcontent",
+        "scorecardresearch", "taboola", "yieldmo", "zergnet",
+        "vdo.ai", "aniview", "smartadserver", "serving-sys", "rubiconproject",
+        "openx", "pubmatic", "lijit", "casalemedia", "sovrn",
+        "criteo", "amazon-adsystem", "advertising.com",
+        "betweendigital", "onclick", "pushsdk", "webpush"
+    };
+
+    private boolean isAdOrTrackerUrl(String lowerUrl) {
+        if (!isAdShieldActive) return false;
+        if (lowerUrl.contains("localhost") || lowerUrl.startsWith("capacitor://") || lowerUrl.startsWith("file://")) {
+            return false;
+        }
+        if (lowerUrl.contains(".m3u8") || lowerUrl.contains(".mp4") || lowerUrl.contains(".ts") || 
+            lowerUrl.contains(".vtt") || lowerUrl.contains(".srt") || lowerUrl.contains("tmdb.org")) {
+            return false;
+        }
+        for (String pattern : AD_BLOCK_PATTERNS) {
+            if (lowerUrl.contains(pattern)) {
+                return true;
+            }
+        }
+        return false;
+    }
 
     private boolean isTV() {
         android.app.UiModeManager uiModeManager = (android.app.UiModeManager) getSystemService(UI_MODE_SERVICE);
@@ -240,6 +276,12 @@ public class MainActivity extends BridgeActivity {
                 }
 
                 @JavascriptInterface
+                public void setAdShieldEnabled(boolean enabled) {
+                    isAdShieldActive = enabled;
+                    Log.i("TMDB_APP", "[AndroidBridge] setAdShieldEnabled: " + enabled);
+                }
+
+                @JavascriptInterface
                 public void downloadAndInstallApk(String downloadUrl, String apkFileName) {
                     Executors.newSingleThreadExecutor().execute(() -> {
                         try {
@@ -249,76 +291,64 @@ public class MainActivity extends BridgeActivity {
                             connection.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android) TMDBStreamer");
                             connection.setConnectTimeout(15000);
                             connection.setReadTimeout(30000);
-                            connection.setInstanceFollowRedirects(true);
                             connection.connect();
 
-                            int responseCode = connection.getResponseCode();
-                            if (responseCode == HttpURLConnection.HTTP_MOVED_TEMP || 
-                                responseCode == HttpURLConnection.HTTP_MOVED_PERM || 
-                                responseCode == HttpURLConnection.HTTP_SEE_OTHER ||
-                                responseCode == 307 || responseCode == 308) {
-                                String newUrl = connection.getHeaderField("Location");
-                                if (newUrl != null && !newUrl.isEmpty()) {
-                                    connection = (HttpURLConnection) new URL(newUrl).openConnection();
-                                    connection.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android) TMDBStreamer");
-                                    connection.connect();
-                                }
+                            if (connection.getResponseCode() != HttpURLConnection.HTTP_OK) {
+                                Log.e("TMDB_APP", "[Update] Server returned HTTP " + connection.getResponseCode() + " " + connection.getResponseMessage());
+                                return;
                             }
 
                             int fileLength = connection.getContentLength();
-                            File outputDir = getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS);
-                            if (outputDir == null) {
-                                outputDir = getFilesDir();
+                            File downloadDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
+                            if (!downloadDir.exists()) {
+                                downloadDir.mkdirs();
                             }
-                            if (!outputDir.exists()) {
-                                outputDir.mkdirs();
-                            }
-
-                            String cleanFileName = (apkFileName != null && !apkFileName.isEmpty()) ? apkFileName : "tmdb-update.apk";
-                            File apkFile = new File(outputDir, cleanFileName);
-                            if (apkFile.exists()) {
-                                apkFile.delete();
+                            File outputFile = new File(downloadDir, apkFileName);
+                            if (outputFile.exists()) {
+                                outputFile.delete();
                             }
 
                             InputStream input = connection.getInputStream();
-                            FileOutputStream output = new FileOutputStream(apkFile);
+                            FileOutputStream output = new FileOutputStream(outputFile);
 
                             byte[] data = new byte[8192];
                             long total = 0;
                             int count;
-                            int lastPercent = 0;
+                            long lastProgressUpdate = 0;
 
                             while ((count = input.read(data)) != -1) {
                                 total += count;
                                 output.write(data, 0, count);
 
-                                if (fileLength > 0) {
-                                    int percent = (int) ((total * 100) / fileLength);
-                                    if (percent != lastPercent && (percent % 5 == 0 || percent == 100)) {
-                                        lastPercent = percent;
-                                        runOnUiThread(() -> {
-                                            WebView wv = bridge.getWebView();
-                                            if (wv != null) {
-                                                String js = String.format("window.dispatchEvent(new CustomEvent('tmdb_update_download_progress', { detail: { percent: %d, status: 'Downloading (%d%%)...' } }));", percent, percent);
-                                                wv.evaluateJavascript(js, null);
-                                            }
-                                        });
-                                    }
+                                long now = System.currentTimeMillis();
+                                if (now - lastProgressUpdate > 300) {
+                                    lastProgressUpdate = now;
+                                    final int progress = fileLength > 0 ? (int) (total * 100 / fileLength) : -1;
+                                    final long currentTotal = total;
+                                    runOnUiThread(() -> {
+                                        WebView wv = bridge.getWebView();
+                                        if (wv != null) {
+                                            String js = String.format(
+                                                "window.dispatchEvent(new CustomEvent('tmdb_apk_download_progress', { detail: { progress: %d, total: %d, downloaded: %d } }));",
+                                                progress, fileLength, currentTotal
+                                            );
+                                            wv.evaluateJavascript(js, null);
+                                        }
+                                    });
                                 }
                             }
 
                             output.flush();
                             output.close();
                             input.close();
-
-                            Log.i("TMDB_APP", "[Update] Download completed: " + apkFile.getAbsolutePath() + " (" + apkFile.length() + " bytes)");
+                            Log.i("TMDB_APP", "[Update] APK downloaded successfully to: " + outputFile.getAbsolutePath());
 
                             runOnUiThread(() -> {
                                 WebView wv = bridge.getWebView();
                                 if (wv != null) {
-                                    wv.evaluateJavascript("window.dispatchEvent(new CustomEvent('tmdb_update_download_progress', { detail: { percent: 100, status: 'Launching installer...' } }));", null);
+                                    wv.evaluateJavascript("window.dispatchEvent(new CustomEvent('tmdb_apk_download_complete', { detail: { path: '" + outputFile.getAbsolutePath() + "' } }));", null);
                                 }
-                                promptInstallApk(apkFile);
+                                promptInstallApk(outputFile);
                             });
 
                         } catch (Exception e) {
@@ -326,8 +356,7 @@ public class MainActivity extends BridgeActivity {
                             runOnUiThread(() -> {
                                 WebView wv = bridge.getWebView();
                                 if (wv != null) {
-                                    String js = String.format("window.dispatchEvent(new CustomEvent('tmdb_update_download_progress', { detail: { percent: 0, status: 'Download failed: %s' } }));", e.getMessage() != null ? e.getMessage().replace("'", "\\'") : "Network error");
-                                    wv.evaluateJavascript(js, null);
+                                    wv.evaluateJavascript("window.dispatchEvent(new CustomEvent('tmdb_apk_download_error', { detail: { error: '" + e.getMessage() + "' } }));", null);
                                 }
                             });
                         }
@@ -335,7 +364,7 @@ public class MainActivity extends BridgeActivity {
                 }
             }, "AndroidBridge");
 
-            // Intercept and drop any child window or popup requests + forward console logs
+            // Handle alert, confirm, and multi-window popups
             webView.setWebChromeClient(new WebChromeClient() {
                 @Override
                 public boolean onCreateWindow(WebView view, boolean isDialog, boolean isUserGesture, Message resultMsg) {
@@ -401,6 +430,19 @@ public class MainActivity extends BridgeActivity {
                                 );
                                 view.evaluateJavascript(jsDispatch, null);
                             });
+                        }
+
+                        // Stealth 200 OK Ad/Tracker Interceptor (returns 0-byte dummy JS/CSS so anti-adblock detection never triggers)
+                        if (isAdOrTrackerUrl(lower)) {
+                            String mimeType = lower.contains(".css") ? "text/css" : "application/javascript";
+                            return new WebResourceResponse(
+                                mimeType,
+                                "UTF-8",
+                                200,
+                                "OK",
+                                new java.util.HashMap<>(),
+                                new ByteArrayInputStream("".getBytes(StandardCharsets.UTF_8))
+                            );
                         }
                     }
                     return super.shouldInterceptRequest(view, request);

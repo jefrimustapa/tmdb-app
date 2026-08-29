@@ -110,6 +110,9 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     dbService.getSettings().then((s) => {
       if (s) {
         setAdShieldEnabled(s.adBlockShield);
+        try {
+          (window as any).AndroidBridge?.setAdShieldEnabled?.(s.adBlockShield);
+        } catch {}
         const activeResolver = s.streamResolver || (s.directStreamMode ? 'private_extractor' : 'embed');
         setStreamResolver(activeResolver);
         setEnabledResolvers(s.enabledResolvers && s.enabledResolvers.length > 0 ? s.enabledResolvers : ['torbox', 'private_extractor', 'embed']);
