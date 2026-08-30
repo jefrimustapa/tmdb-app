@@ -148,7 +148,7 @@ export const Home: React.FC = () => {
             <span className="w-1.5 h-5 bg-hbo-cyan rounded-full inline-block"></span>
             Continue Watching
           </h2>
-          <div className="flex items-center gap-3.5 overflow-x-auto no-scrollbar py-1.5 pl-2 pr-6 scroll-smooth transform-gpu snap-x snap-mandatory">
+          <div className="flex items-center gap-3.5 overflow-x-auto no-scrollbar py-3.5 pl-3.5 pr-8 -my-2 scroll-smooth transform-gpu snap-x snap-mandatory">
             {history.map((hist) => (
               <MediaCard
                 key={hist.id || `${hist.tmdbId}-${hist.mediaType}`}
