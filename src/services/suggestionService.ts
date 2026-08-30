@@ -8,78 +8,16 @@ export interface SuggestionResult {
 }
 
 /**
- * Resolves personalized suggestions based on user My Space activity with strict priority:
- * 1. Likes (Favorites)
- * 2. Watchlist
- * 3. Watch History
- * 4. Fallback (Top Rated / Trending when My Space is empty)
+ * Resolves personalized suggestions based on user watch history alone:
+ * 1. Watch History (Recent watched titles -> TMDB recommendations/similar)
+ * 2. Fallback (Top Rated / Trending when Watch History is empty)
  */
 export async function getPersonalizedSuggestions(): Promise<SuggestionResult> {
   try {
-    // 1. Priority 1: Likes
-    const likes = await dbService.getLikes();
-    if (likes && likes.length > 0) {
-      const seedItems = likes.slice(0, 3);
-      const recPromises = seedItems.map((seed) =>
-        tmdbApi.getRecommendations(seed.mediaType, seed.tmdbId)
-          .catch(() => tmdbApi.getSimilar(seed.mediaType, seed.tmdbId))
-          .catch(() => ({ results: [] as TMDBMediaItem[] }))
-      );
-      const recResults = await Promise.all(recPromises);
-      const combined = recResults.flatMap((r) => r.results || []);
-
-      const likedIds = new Set(likes.map((l) => `${l.tmdbId}-${l.mediaType}`));
-      const uniqueMap = new Map<number, TMDBMediaItem>();
-      for (const item of combined) {
-        const type = item.title ? 'movie' : 'tv';
-        const key = `${item.id}-${type}`;
-        if (!likedIds.has(key) && !uniqueMap.has(item.id)) {
-          uniqueMap.set(item.id, item);
-        }
-      }
-      const finalItems = Array.from(uniqueMap.values());
-      if (finalItems.length >= 4) {
-        return {
-          items: finalItems,
-          subtitle: 'Based on titles you liked and added to favorites'
-        };
-      }
-    }
-
-    // 2. Priority 2: Watchlist
-    const watchlist = await dbService.getWatchlist();
-    if (watchlist && watchlist.length > 0) {
-      const seedItems = watchlist.slice(0, 3);
-      const recPromises = seedItems.map((seed) =>
-        tmdbApi.getRecommendations(seed.mediaType, seed.tmdbId)
-          .catch(() => tmdbApi.getSimilar(seed.mediaType, seed.tmdbId))
-          .catch(() => ({ results: [] as TMDBMediaItem[] }))
-      );
-      const recResults = await Promise.all(recPromises);
-      const combined = recResults.flatMap((r) => r.results || []);
-
-      const watchlistIds = new Set(watchlist.map((w) => `${w.tmdbId}-${w.mediaType}`));
-      const uniqueMap = new Map<number, TMDBMediaItem>();
-      for (const item of combined) {
-        const type = item.title ? 'movie' : 'tv';
-        const key = `${item.id}-${type}`;
-        if (!watchlistIds.has(key) && !uniqueMap.has(item.id)) {
-          uniqueMap.set(item.id, item);
-        }
-      }
-      const finalItems = Array.from(uniqueMap.values());
-      if (finalItems.length >= 4) {
-        return {
-          items: finalItems,
-          subtitle: 'Based on titles saved to your watchlist'
-        };
-      }
-    }
-
-    // 3. Priority 3: Watch History
-    const history = await dbService.getHistory(5);
+    // 1. Watch History
+    const history = await dbService.getHistory(10);
     if (history && history.length > 0) {
-      const seedItems = history.slice(0, 3);
+      const seedItems = history.slice(0, 5);
       const recPromises = seedItems.map((seed) =>
         tmdbApi.getRecommendations(seed.mediaType, seed.tmdbId)
           .catch(() => tmdbApi.getSimilar(seed.mediaType, seed.tmdbId))
@@ -101,12 +39,12 @@ export async function getPersonalizedSuggestions(): Promise<SuggestionResult> {
       if (finalItems.length >= 4) {
         return {
           items: finalItems,
-          subtitle: 'Based on your recent viewing activity'
+          subtitle: 'Based on your watch history'
         };
       }
     }
 
-    // 4. Fallback: Top Rated / Acclaimed titles
+    // 2. Fallback: Top Rated / Acclaimed titles when watch history is empty
     const fallbackRes = await tmdbApi.getTopRatedMovies(1);
     return {
       items: fallbackRes.results || [],
