@@ -5,6 +5,7 @@ export interface WatchHistoryItem {
   title: string;
   posterPath: string | null;
   backdropPath: string | null;
+  stillPath?: string | null;
   voteAverage?: number;
   season?: number;
   episode?: number;

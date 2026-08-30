@@ -154,6 +154,10 @@ export const Library: React.FC = () => {
                   <MediaCard
                     item={convertToMediaItem(item)}
                     type={item.mediaType}
+                    season={item.season}
+                    episode={item.episode}
+                    episodeTitle={item.episodeTitle}
+                    stillPath={item.stillPath}
                     progress={item.progressPercent}
                     onDelete={() => {
                       dbService.removeFromHistory(item.tmdbId, item.mediaType);

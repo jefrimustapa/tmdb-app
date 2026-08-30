@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Play, Calendar, Star } from 'lucide-react';
+import { Play, Calendar, Star, Check } from 'lucide-react';
 import type { TMDBTVDetails, TMDBSeasonDetails } from '../../types/tmdb';
 import { tmdbApi, tmdbImages } from '../../services/tmdb';
+import { dbService } from '../../services/db';
+import type { WatchHistoryItem } from '../../types/db';
 
 interface EpisodeGridProps {
   tvDetails: TMDBTVDetails;
@@ -20,6 +22,7 @@ export const EpisodeGrid: React.FC<EpisodeGridProps> = ({
 }) => {
   const [selectedSeason, setSelectedSeason] = useState(currentSeason || 1);
   const [seasonData, setSeasonData] = useState<TMDBSeasonDetails | null>(null);
+  const [historyItem, setHistoryItem] = useState<WatchHistoryItem | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
   // Filter out season 0 (Specials) if needed or keep regular seasons
@@ -30,6 +33,15 @@ export const EpisodeGrid: React.FC<EpisodeGridProps> = ({
       setSelectedSeason(currentSeason);
     }
   }, [currentSeason]);
+
+  // Load history item for progress display
+  useEffect(() => {
+    let active = true;
+    dbService.getHistoryItem(tvDetails.id, 'tv').then((item) => {
+      if (active && item) setHistoryItem(item);
+    }).catch(() => {});
+    return () => { active = false; };
+  }, [tvDetails.id]);
 
   useEffect(() => {
     const fetchSeason = async () => {
@@ -92,6 +104,11 @@ export const EpisodeGrid: React.FC<EpisodeGridProps> = ({
                 })
               : 'Air Date TBD';
 
+            const isMatchHistory = Boolean(historyItem && historyItem.season === selectedSeason && historyItem.episode === ep.episode_number);
+            const isCompleted = Boolean(isMatchHistory && historyItem && historyItem.progressPercent >= 90);
+            const isResumable = Boolean(isMatchHistory && historyItem && historyItem.progressPercent > 3 && historyItem.progressPercent < 90);
+            const epProgress = isMatchHistory && historyItem ? historyItem.progressPercent : 0;
+
             return (
               <button
                 key={ep.id}
@@ -120,9 +137,17 @@ export const EpisodeGrid: React.FC<EpisodeGridProps> = ({
                     <div className="absolute top-1 left-1 px-1.5 py-0.5 rounded bg-black/85 text-[10px] font-extrabold uppercase tracking-wider text-yellow-400 border border-yellow-500/30 backdrop-blur-sm z-10">
                       Unaired
                     </div>
-                  ) : isPlaying && hasWatchedHistory ? (
+                  ) : isCompleted ? (
+                    <div className="absolute top-1 left-1 px-1.5 py-0.5 rounded bg-emerald-500 text-[10px] font-black uppercase tracking-wider text-black shadow-md z-10 flex items-center gap-1">
+                      <Check className="w-3 h-3 stroke-[3]" /> Watched
+                    </div>
+                  ) : isResumable ? (
                     <div className="absolute top-1 left-1 px-2 py-0.5 rounded bg-hbo-cyan text-[10px] font-black uppercase tracking-wider text-black shadow-md z-10">
                       Resume
+                    </div>
+                  ) : isPlaying && hasWatchedHistory ? (
+                    <div className="absolute top-1 left-1 px-2 py-0.5 rounded bg-hbo-cyan text-[10px] font-black uppercase tracking-wider text-black shadow-md z-10">
+                      Playing
                     </div>
                   ) : null}
                   <div className={`absolute inset-0 flex items-center justify-center bg-black/40 ${isPlaying ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} transition`}>
@@ -131,6 +156,16 @@ export const EpisodeGrid: React.FC<EpisodeGridProps> = ({
                   <div className="absolute bottom-1 right-1 px-1.5 py-0.5 rounded bg-black/80 text-[10px] font-bold text-gray-300">
                     Ep {ep.episode_number}
                   </div>
+
+                  {/* Progress Bar */}
+                  {epProgress > 0 && (
+                    <div className="absolute bottom-0 left-0 right-0 h-1 bg-black/80 z-10 overflow-hidden">
+                      <div
+                        className="h-full bg-gradient-to-r from-hbo-purple-light to-hbo-cyan"
+                        style={{ width: `${Math.min(100, Math.max(3, epProgress))}%` }}
+                      />
+                    </div>
+                  )}
                 </div>
 
                 {/* Episode Meta */}
