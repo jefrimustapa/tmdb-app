@@ -40,7 +40,7 @@
   }
 }
 
-/* TV & D-Pad spatial focus indicators - Ultra-fast hardware accelerated */
+/* TV & D-Pad spatial focus indicators - High Contrast & Standardized 2px Thickness */
 .tv-focus-target {
   will-change: transform;
   transition: transform 0.1s ease-out, border-color 0.1s ease-out, box-shadow 0.1s ease-out;
@@ -49,12 +49,13 @@
 .tv-focus-target:focus,
 .tv-focus-target:focus-visible {
   outline: none !important;
-  box-shadow: 0 0 0 3px #00f0ff, 0 0 14px rgba(0, 240, 255, 0.6) !important;
-  transform: scale(1.05) translateZ(0);
+  border-color: #00f0ff !important;
+  box-shadow: 0 0 0 2px #00f0ff, 0 0 10px rgba(0, 240, 255, 0.5) !important;
+  transform: scale(1.04) translateZ(0);
   z-index: 30;
 }
 
-/* In dropdown menus and tight lists, avoid expanding scale that clips left/right overflow & use thin 2px selector ring */
+/* In dropdown menus and tight lists, avoid expanding scale that clips left/right overflow & use identical 2px selector ring */
 [data-provider-dropdown-open] .tv-focus-target:focus,
 [data-provider-dropdown-open] .tv-focus-target:focus-visible,
 [data-priority-dropdown-container] .tv-focus-target:focus,
@@ -63,6 +64,7 @@
 [data-cursor-dropdown-container] .tv-focus-target:focus-visible {
   transform: none !important;
   outline: none !important;
+  border-color: #00f0ff !important;
   box-shadow: 0 0 0 2px #00f0ff, 0 0 8px rgba(0, 240, 255, 0.4) !important;
 }
 
@@ -116,16 +118,20 @@
   background-color: #0e0e1a !important;
 }
 
-/* 3. Crisp focus indicators without zoom/resizing - Ring Only on Focused Element */
+/* 3. Crisp focus indicators without zoom/resizing - Uniform 2px Ring Only on Focused Element */
 [data-perf-mode="true"] .tv-focus-target {
   transform: none !important;
   transition: none !important;
 }
 
 [data-perf-mode="true"] .tv-focus-target:focus,
-[data-perf-mode="true"] .tv-focus-target:focus-visible {
+[data-perf-mode="true"] .tv-focus-target:focus-visible,
+[data-perf-mode="true"] [data-provider-dropdown-open] .tv-focus-target:focus,
+[data-perf-mode="true"] [data-priority-dropdown-container] .tv-focus-target:focus,
+[data-perf-mode="true"] [data-cursor-dropdown-container] .tv-focus-target:focus {
   outline: none !important;
-  box-shadow: 0 0 0 3px #00f0ff !important;
+  border-color: #00f0ff !important;
+  box-shadow: 0 0 0 2px #00f0ff !important;
   transform: none !important;
   transition: none !important;
 }
