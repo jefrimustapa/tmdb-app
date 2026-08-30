@@ -7,8 +7,7 @@ import { Logo } from '../../components/common/Logo';
 import { APP_VERSION, APP_BUILD_NUMBER, APP_VERSION_FULL, APP_BUILD_CHANNEL, APP_CHANGELOG } from '../../version';
 import { updateService, type UpdateInfo } from '../../services/updateService';
 import { UpdateModal } from '../../components/common/UpdateModal';
-import { FormattedChangelog } from '../../components/common/FormattedChangelog';
-import { Settings as SettingsIcon, Tv2, Smartphone, Tablet, Monitor, ShieldCheck, Server, Database, Check, ShieldAlert, EyeOff, Lock, Zap, X, ArrowUpCircle, RefreshCw, Moon, Sparkles, AlertCircle, CalendarX, ChevronDown, MousePointer, Radio, FileText } from 'lucide-react';
+import { Settings as SettingsIcon, Tv2, Smartphone, Tablet, Monitor, ShieldCheck, Server, Database, Check, ShieldAlert, EyeOff, Lock, Zap, X, ArrowUpCircle, RefreshCw, Moon, Sparkles, AlertCircle, CalendarX, ChevronDown, MousePointer, Radio, FileText, SkipForward } from 'lucide-react';
 
 import { CURSOR_STYLES_LIST } from '../../components/player/TVVirtualCursor';
 
@@ -1160,6 +1159,77 @@ export const Settings: React.FC = () => {
               </>
             )}
           </button>
+        </div>
+
+        {/* Playback & Episode Navigation */}
+        <div className="bg-hbo-card border border-hbo-border rounded-2xl p-5 sm:p-6 space-y-5">
+          {/* Up Next Episode Popup at 90% */}
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex-1 min-w-0 pr-2">
+              <h3 className="text-base sm:text-lg font-bold font-display text-white flex items-center gap-2 mb-1">
+                <SkipForward className="w-5 h-5 text-hbo-cyan flex-shrink-0" />
+                <span>"Up Next" Episode Popup (at 90%)</span>
+              </h3>
+              <p className="text-xs text-gray-400">
+                Show an interactive countdown popup in the corner when a series episode reaches 90% progress for quick transition to the next episode.
+              </p>
+            </div>
+
+            <button
+              onClick={() => handleUpdate({ upNextPopup: settings.upNextPopup === false ? true : false })}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all tv-focus-target flex items-center gap-1.5 flex-shrink-0 border ${
+                settings.upNextPopup !== false
+                  ? 'bg-emerald-500/20 border-emerald-400 text-emerald-400'
+                  : 'bg-white/5 border-white/10 text-gray-400'
+              }`}
+            >
+              {settings.upNextPopup !== false ? (
+                <>
+                  <Check className="w-3.5 h-3.5 stroke-[2.5]" />
+                  <span>Enabled</span>
+                </>
+              ) : (
+                <>
+                  <X className="w-3.5 h-3.5 stroke-[2.5]" />
+                  <span>Disabled</span>
+                </>
+              )}
+            </button>
+          </div>
+
+          {/* Autoplay Next Episode */}
+          <div className="border-t border-hbo-border/60 pt-4 flex items-center justify-between gap-4">
+            <div className="flex-1 min-w-0 pr-2">
+              <h3 className="text-base sm:text-lg font-bold font-display text-white flex items-center gap-2 mb-1">
+                <Sparkles className="w-5 h-5 text-hbo-purple-light flex-shrink-0" />
+                <span>Auto-Play Next Episode</span>
+              </h3>
+              <p className="text-xs text-gray-400">
+                Automatically start playing the next episode when the countdown ends, without requiring manual remote input.
+              </p>
+            </div>
+
+            <button
+              onClick={() => handleUpdate({ autoplayNext: settings.autoplayNext === false ? true : false })}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all tv-focus-target flex items-center gap-1.5 flex-shrink-0 border ${
+                settings.autoplayNext !== false
+                  ? 'bg-emerald-500/20 border-emerald-400 text-emerald-400'
+                  : 'bg-white/5 border-white/10 text-gray-400'
+              }`}
+            >
+              {settings.autoplayNext !== false ? (
+                <>
+                  <Check className="w-3.5 h-3.5 stroke-[2.5]" />
+                  <span>Enabled</span>
+                </>
+              ) : (
+                <>
+                  <X className="w-3.5 h-3.5 stroke-[2.5]" />
+                  <span>Disabled</span>
+                </>
+              )}
+            </button>
+          </div>
         </div>
 
         {/* Software Updates & Release Channel */}

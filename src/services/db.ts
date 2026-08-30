@@ -50,6 +50,7 @@ export const DEFAULT_SETTINGS: UserSettings = {
   topProviders: ['vidlink', 'moviesapi', 'cinesrc'],
   deviceMode: 'auto',
   autoplayNext: true,
+  upNextPopup: true,
   adBlockShield: true,
   filterAdult: true,
   filterUnreleased: true,
