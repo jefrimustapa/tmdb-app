@@ -387,25 +387,18 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     };
   }, [recordProgress]);
 
-  // Listen for Cross-Origin Embed postMessage events (Native Injected Subframe Tracker, VidLink, PlayerJS, Plyr)
+  const lastPostMessageTimeRef = useRef<number>(0);
+
+  // Listen for Cross-Origin Embed postMessage events (VidLink, PlayerJS, Plyr)
   useEffect(() => {
     const handlePostMessage = (e: MessageEvent) => {
       try {
         const data = typeof e.data === 'string' ? JSON.parse(e.data) : e.data;
         if (!data) return;
 
-        // 1. Native Subframe HTML Injected Tracker (Approach A - 100% provider coverage)
-        if (data.type === 'TMDB_EMBED_PROGRESS') {
-          const current = data.currentTime ?? 0;
-          const dur = data.duration ?? 0;
-          if (current > 0) {
-            recordProgress(current, dur, data.ended === true);
-          }
-          return;
-        }
-
-        // 2. VidLink PLAYER_EVENT (event: 'timeupdate' | 'pause' | 'ended' | 'time')
+        // 1. VidLink PLAYER_EVENT (event: 'timeupdate' | 'pause' | 'ended' | 'time')
         if (data.type === 'PLAYER_EVENT' && data.data) {
+          lastPostMessageTimeRef.current = Date.now();
           const evt = data.data.event;
           const current = data.data.currentTime ?? data.data.seconds ?? 0;
           const dur = data.data.duration ?? data.data.totalDuration ?? 0;
@@ -415,8 +408,9 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           return;
         }
 
-        // 3. VidLink MEDIA_DATA dictionary
+        // 2. VidLink MEDIA_DATA dictionary
         if (data.type === 'MEDIA_DATA' && data.data) {
+          lastPostMessageTimeRef.current = Date.now();
           const item = data.data[tmdbId];
           if (item) {
             if (mediaType === 'tv' && item.show_progress && season && episode) {
@@ -432,8 +426,9 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           return;
         }
 
-        // 4. PlayerJS, Plyr, vidsrc, or standard event postMessages
+        // 3. PlayerJS, Plyr, vidsrc, or standard event postMessages
         if (data.event === 'timeupdate' || data.event === 'progress' || data.event === 'time') {
+          lastPostMessageTimeRef.current = Date.now();
           const current = data.currentTime ?? data.data?.currentTime ?? data.seconds ?? 0;
           const dur = data.duration ?? data.data?.duration ?? data.totalDuration ?? 0;
           if (current > 0) {
@@ -446,6 +441,26 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     window.addEventListener('message', handlePostMessage);
     return () => window.removeEventListener('message', handlePostMessage);
   }, [recordProgress, tmdbId, mediaType, season, episode]);
+
+  // Universal Fallback Elapsed Watch Session Ticker (For Sandboxed Embed Providers)
+  useEffect(() => {
+    if (playerMode !== 'embed' || hasError || allFailed) return;
+
+    const tickerInterval = setInterval(() => {
+      // If the window/document is hidden or paused in background, do not tick
+      if (typeof document !== 'undefined' && document.hidden) return;
+
+      // If we recently received real postMessage time within the last 20 seconds, defer to postMessage
+      if (Date.now() - lastPostMessageTimeRef.current < 20000) return;
+
+      // Otherwise, advance elapsed watch session time smoothly (10s increments)
+      const nextTime = (currentTimeRef.current || 0) + 10;
+      const fallbackDur = durationRef.current || (episodeRuntimeMinutes ? episodeRuntimeMinutes * 60 : 0);
+      recordProgress(nextTime, fallbackDur);
+    }, 10000);
+
+    return () => clearInterval(tickerInterval);
+  }, [playerMode, hasError, allFailed, recordProgress, episodeRuntimeMinutes]);
 
   // HLS Player attachment for direct streams
   useEffect(() => {
