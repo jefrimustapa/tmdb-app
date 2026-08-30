@@ -351,10 +351,9 @@ export const Details: React.FC = () => {
                         onClick={() => navigate(restartUrl)}
                         title="Restart from beginning"
                         aria-label="Restart from beginning"
-                        className="flex items-center gap-1.5 px-4 py-3.5 rounded-xl bg-white/10 hover:bg-white/20 text-gray-200 hover:text-white font-bold text-xs sm:text-sm border border-white/20 transition hover:scale-105 tv-focus-target"
+                        className="p-3.5 rounded-full bg-white/10 hover:bg-white/20 text-white border border-white/20 backdrop-blur-md transition-all hover:scale-105 tv-focus-target"
                       >
-                        <RotateCcw className="w-4 h-4 text-gray-300" />
-                        <span>Restart</span>
+                        <RotateCcw className="w-5 h-5 text-gray-200" />
                       </button>
                     )}
                   </>
