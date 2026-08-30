@@ -2,12 +2,13 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20260830-1502';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-stream-progress.20260830-1502';
+export const APP_BUILD_NUMBER = '20260830-1508';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-stream-progress.20260830-1508';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
 export const APP_BRANCH = 'feat-stream-progress';
 export const APP_CHANGELOG = `* fix(player): fix black screen on 90% and make Up Next popup configurable in settings
+* fix(player): fix black screen on 90% and make Up Next popup configurable in settings
 * fix(tv): wire series resume timestamp to watch navigation in details and episode grid
 * fix(player): wire resume timestamp across details, continue watching and player streamUrl
 * fix(player): add useMemo import in VideoPlayer.tsx
@@ -20,5 +21,4 @@ export const APP_CHANGELOG = `* fix(player): fix black screen on 90% and make Up
 * fix(watch): move nextEpisodeInfo hooks before conditional loading return to resolve React error #310
 * feat: stream progress tracking, episode thumbnail continue watching, and up next auto-advance
 * Merge pull request #41 from jefrimustapa/feat/app-icon-refresh
-* feat(branding): scale mobile launcher emblem to 90% and use centered icon-only TV banner
-* feat(launcher): remove outer circle from launcher icon and ensure Android TV launcher banner is refreshed across all densities`;
+* feat(branding): scale mobile launcher emblem to 90% and use centered icon-only TV banner`;
