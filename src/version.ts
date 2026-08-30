@@ -2,12 +2,13 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20260830-1338';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-stream-progress.20260830-1338';
+export const APP_BUILD_NUMBER = '20260830-1345';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-stream-progress.20260830-1345';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
 export const APP_BRANCH = 'feat-stream-progress';
-export const APP_CHANGELOG = `* feat(player): implement native Android WebView subframe HTML injection for 100% embed provider coverage
+export const APP_CHANGELOG = `* fix(native): ensure bridge.setWebViewClient registers custom subframe tracker on Android
+* feat(player): implement native Android WebView subframe HTML injection for 100% embed provider coverage
 * feat(player): add universal elapsed watch time fallback ticker for all 29 embed providers
 * fix(player): enhance VidLink PLAYER_EVENT and MEDIA_DATA postMessage stream progress tracking
 * fix(watch): move nextEpisodeInfo hooks before conditional loading return to resolve React error #310
@@ -20,5 +21,4 @@ export const APP_CHANGELOG = `* feat(player): implement native Android WebView s
 * feat(easter-egg): add scrollable structured changelog to build number easter egg screen
 * refactor(settings): remove duplicate installed version from software update card
 * fix(update): prevent false update triggers on newer local dev builds causing version downgrade rejection
-* feat(update): order changelogs from latest first and display full untruncated versions
-* Merge pull request #39 from jefrimustapa/feat/ui-improvements`;
+* feat(update): order changelogs from latest first and display full untruncated versions`;
