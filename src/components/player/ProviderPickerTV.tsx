@@ -130,18 +130,6 @@ export const ProviderPickerTV: React.FC<ProviderPickerTVProps> = ({
         data-provider-trigger="true"
         data-watch-header-item="true"
         tabIndex={0}
-        onKeyDown={(e) => {
-          if (e.key === 'ArrowLeft') {
-            e.preventDefault();
-            const backBtn = document.getElementById('watch-back-btn');
-            if (backBtn) backBtn.focus();
-          } else if (e.key === 'ArrowDown') {
-            if (!isOpen) {
-              e.preventDefault();
-              window.dispatchEvent(new CustomEvent('tmdb_hide_header_and_focus_player'));
-            }
-          }
-        }}
         className={`flex items-center gap-2 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl border backdrop-blur-md transition-all tv-focus-target ${
           isOpen
             ? 'bg-hbo-purple/40 border-hbo-cyan text-white shadow-hbo-glow'
