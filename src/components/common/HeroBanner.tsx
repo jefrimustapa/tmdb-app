@@ -56,17 +56,19 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ items }) => {
       const custom = e as CustomEvent<{ index: number; btnType?: 'play' | 'details' }>;
       if (custom.detail && typeof custom.detail.index === 'number') {
         const targetIdx = custom.detail.index;
-        if (targetIdx >= 0 && targetIdx < totalItems) {
+          // Reset scrollLeft to guarantee 0 drift before state update
+          if (bannerRef.current) bannerRef.current.scrollLeft = 0;
           isAutoPlayPaused.current = true;
           setCurrentIndex(targetIdx);
 
-          // Focus the target button on the new slide after state update
+          // Focus the target button on the new slide after state update without browser scrolling
           setTimeout(() => {
+            if (bannerRef.current) bannerRef.current.scrollLeft = 0;
             const btnType = custom.detail.btnType || 'play';
             const newBtn = bannerRef.current?.querySelector<HTMLElement>(
               `[data-hero-btn="${btnType}"][data-hero-index="${targetIdx}"]`
             );
-            newBtn?.focus();
+            newBtn?.focus({ preventScroll: true });
           }, 50);
         }
       }
@@ -132,10 +134,7 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ items }) => {
       {/* Continuous Full-Width Sliding Track */}
       <div
         className="flex transition-transform duration-700 ease-out h-full w-full transform-gpu"
-        style={{
-          transform: `translateX(-${currentIndex * (100 / Math.max(1, totalItems))}%)`,
-          width: `${totalItems * 100}%`
-        }}
+        style={{ transform: `translateX(-${currentIndex * 100}%)` }}
       >
         {displayItems.map((featured, idx) => {
           const title = featured.title || featured.name || 'Featured Title';
@@ -147,8 +146,7 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ items }) => {
           return (
             <div
               key={featured.id}
-              style={{ width: `${100 / totalItems}%` }}
-              className="h-full relative flex-shrink-0"
+              className="w-full min-w-full h-full relative flex-shrink-0"
             >
               {/* Background Backdrop Image */}
               <div className="absolute inset-0 select-none pointer-events-none">
