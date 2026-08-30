@@ -237,30 +237,59 @@ export const Watch: React.FC = () => {
         return;
       }
       const backBtn = document.getElementById('watch-back-btn');
+      const nextBtn = document.getElementById('watch-next-ep-btn');
       const trigger = document.getElementById('watch-provider-trigger');
+
+      const currentActive = document.activeElement;
+      const isHeaderActive = currentActive === backBtn || 
+                             currentActive === nextBtn || 
+                             currentActive === trigger;
+
+      if (!isHeaderActive) return;
+
       if (e.key === 'ArrowRight') {
-        if (trigger && document.activeElement !== trigger) {
-          e.preventDefault();
-          trigger.focus();
-          resetHeaderTimer();
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        if (currentActive === backBtn) {
+          if (nextBtn) {
+            nextBtn.focus();
+          } else if (trigger) {
+            trigger.focus();
+          }
+        } else if (currentActive === nextBtn) {
+          if (trigger) {
+            trigger.focus();
+          }
         }
+        resetHeaderTimer();
       } else if (e.key === 'ArrowLeft') {
-        if (backBtn && document.activeElement !== backBtn) {
-          e.preventDefault();
-          backBtn.focus();
-          resetHeaderTimer();
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        if (currentActive === trigger) {
+          if (nextBtn) {
+            nextBtn.focus();
+          } else if (backBtn) {
+            backBtn.focus();
+          }
+        } else if (currentActive === nextBtn) {
+          if (backBtn) {
+            backBtn.focus();
+          }
         }
+        resetHeaderTimer();
       } else if (e.key === 'ArrowDown') {
-        if (document.activeElement === backBtn || document.activeElement === trigger) {
-          e.preventDefault();
-          window.dispatchEvent(new CustomEvent('tmdb_hide_header_and_focus_player'));
-        }
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        window.dispatchEvent(new CustomEvent('tmdb_hide_header_and_focus_player'));
       }
     };
 
     window.addEventListener('keydown', handleTVHeaderNav, true);
     return () => window.removeEventListener('keydown', handleTVHeaderNav, true);
-  }, []);
+  }, [resetHeaderTimer]);
 
   // Multi-press OK listener for TV Virtual Cursor activation/toggle
   const okPressCountRef = React.useRef(0);
@@ -416,24 +445,6 @@ export const Watch: React.FC = () => {
               data-watch-header-item="true"
               aria-label="Back"
               tabIndex={0}
-              onKeyDown={(e) => {
-                if (e.key === 'ArrowRight') {
-                  e.preventDefault();
-                  const trigger = document.getElementById('watch-provider-trigger');
-                  if (trigger) {
-                    trigger.focus();
-                  }
-                } else if (e.key === 'ArrowDown') {
-                  e.preventDefault();
-                  (window as any).__tmdbHeaderFocused = false;
-                  setHeaderVisible(false);
-                  (document.getElementById('watch-back-btn') as HTMLElement)?.blur();
-                  const iframe = document.querySelector<HTMLIFrameElement>('iframe');
-                  if (iframe) {
-                    try { iframe.focus(); } catch {}
-                  }
-                }
-              }}
               className="p-2.5 rounded-full bg-black/70 hover:bg-black text-white border border-white/20 backdrop-blur-md transition hover:scale-110 flex-shrink-0 tv-focus-target"
               title="Go Back"
             >
@@ -458,11 +469,19 @@ export const Watch: React.FC = () => {
               <button
                 type="button"
                 onClick={handleNextEpisode}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === 'Select') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleNextEpisode();
+                  }
+                }}
                 id="watch-next-ep-btn"
                 data-watch-header-item="true"
+                tabIndex={0}
                 title={`Play Next: S${nextEpisodeInfo.season} E${nextEpisodeInfo.episode}`}
                 aria-label={`Play Next: S${nextEpisodeInfo.season} E${nextEpisodeInfo.episode}`}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-hbo-purple/60 hover:bg-hbo-purple text-hbo-cyan border border-hbo-cyan/30 text-xs font-bold transition hover:scale-105 tv-focus-target"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-hbo-purple/60 hover:bg-hbo-purple text-hbo-cyan border border-hbo-cyan/30 text-xs font-bold transition hover:scale-105 tv-focus-target focus:ring-2 focus:ring-hbo-cyan focus:bg-hbo-purple"
               >
                 <SkipForward className="w-3.5 h-3.5" />
                 <span className="hidden sm:inline">Next: S{nextEpisodeInfo.season} E{nextEpisodeInfo.episode}</span>
