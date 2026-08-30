@@ -27,8 +27,8 @@ const MediaRowComponent: React.FC<MediaRowProps> = ({ title, subtitle, items, ty
   if (!items || items.length === 0) return null;
 
   return (
-    <section className="relative my-6 sm:my-8 px-4 sm:px-8 group" data-content-rail="true">
-      <div className="flex items-end justify-between mb-3">
+    <section className="relative mb-7 sm:mb-9 w-full group" data-content-rail="true">
+      <div className="flex items-end justify-between mb-2.5 px-4 sm:px-8">
         <div>
           <h2 className="text-lg sm:text-2xl font-bold font-display text-white tracking-tight flex items-center gap-2">
             <span className="w-1.5 h-5 bg-gradient-to-b from-hbo-purple to-hbo-cyan rounded-full inline-block"></span>
@@ -39,11 +39,11 @@ const MediaRowComponent: React.FC<MediaRowProps> = ({ title, subtitle, items, ty
       </div>
 
       {/* Row Container with Navigation Buttons */}
-      <div className="relative">
+      <div className="relative w-full">
         {/* Left Scroll Button */}
         <button
           onClick={() => scroll('left')}
-          className="absolute -left-3 top-1/2 -translate-y-1/2 z-30 w-10 h-10 rounded-full bg-hbo-card/90 border border-hbo-border text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 hover:bg-hbo-purple hover:scale-110 shadow-lg hidden sm:flex"
+          className="absolute left-2 top-1/2 -translate-y-1/2 z-30 w-10 h-10 rounded-full bg-hbo-card/90 border border-hbo-border text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 hover:bg-hbo-purple hover:scale-110 shadow-lg hidden sm:flex"
           aria-label="Scroll left"
         >
           <ChevronLeft className="w-6 h-6" />
@@ -52,7 +52,7 @@ const MediaRowComponent: React.FC<MediaRowProps> = ({ title, subtitle, items, ty
         {/* Horizontal Carousel */}
         <div
           ref={rowRef}
-          className="flex items-center gap-3 overflow-x-auto no-scrollbar py-3 pl-2 pr-6 scroll-smooth transform-gpu"
+          className="flex items-center gap-3.5 overflow-x-auto no-scrollbar py-4 pl-4 sm:pl-8 pr-6 sm:pr-8 -my-2 scroll-smooth transform-gpu snap-x snap-mandatory scroll-pl-4 sm:scroll-pl-8"
         >
           {items.map((item) => (
             <MediaCard key={item.id} item={item} type={type} variant={variant} />
@@ -62,7 +62,7 @@ const MediaRowComponent: React.FC<MediaRowProps> = ({ title, subtitle, items, ty
         {/* Right Scroll Button */}
         <button
           onClick={() => scroll('right')}
-          className="absolute -right-3 top-1/2 -translate-y-1/2 z-30 w-10 h-10 rounded-full bg-hbo-card/90 border border-hbo-border text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 hover:bg-hbo-purple hover:scale-110 shadow-lg hidden sm:flex"
+          className="absolute right-2 top-1/2 -translate-y-1/2 z-30 w-10 h-10 rounded-full bg-hbo-card/90 border border-hbo-border text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 hover:bg-hbo-purple hover:scale-110 shadow-lg hidden sm:flex"
           aria-label="Scroll right"
         >
           <ChevronRight className="w-6 h-6" />

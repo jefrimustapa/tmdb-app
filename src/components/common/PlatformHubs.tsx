@@ -92,7 +92,7 @@ export const PLATFORMS: PlatformItem[] = [
 
 export const PlatformHubs: React.FC = () => {
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-8 -mt-6 sm:-mt-10 relative z-20">
+    <div className="w-full max-w-full px-4 sm:px-8 -mt-6 sm:-mt-10 relative z-20">
       <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-7 gap-3.5 sm:gap-5 md:gap-6">
         {PLATFORMS.map((platform) => (
           <Link

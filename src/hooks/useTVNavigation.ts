@@ -312,6 +312,63 @@ export function useTVNavigation(isEnabled = true) {
         // Candidate filtering rules:
         let candidateElements = focusableElements.filter(el => el !== currentFocused);
 
+        // Dedicated Hero Billboard Navigation (Full-Width Sliding Rail)
+        const heroBtn = currentFocused.closest('[data-hero-btn]');
+        if (heroBtn) {
+          const btnType = heroBtn.getAttribute('data-hero-btn'); // 'play' | 'details'
+          const currentSlideIdx = parseInt(heroBtn.getAttribute('data-hero-index') || '0', 10);
+          const heroBanner = document.querySelector('[data-hero-banner="true"]');
+          const totalSlides = parseInt(heroBanner?.getAttribute('data-total-slides') || '1', 10);
+
+          if (e.key === 'ArrowRight') {
+            e.preventDefault();
+            if (currentSlideIdx + 1 < totalSlides) {
+              window.dispatchEvent(new CustomEvent('tmdb_hero_slide_change', {
+                detail: { index: currentSlideIdx + 1, btnType }
+              }));
+            }
+            return;
+          } else if (e.key === 'ArrowLeft') {
+            e.preventDefault();
+            if (currentSlideIdx > 0) {
+              window.dispatchEvent(new CustomEvent('tmdb_hero_slide_change', {
+                detail: { index: currentSlideIdx - 1, btnType }
+              }));
+            } else {
+              // At leftmost slide (Card 0): move focus to navbar / sidebar
+              const navActive = document.querySelector<HTMLElement>('aside .tv-focus-target, [data-tv-nav="true"]');
+              navActive?.focus({ preventScroll: true });
+            }
+            return;
+          } else if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            if (btnType === 'play') {
+              const detailsBtn = heroBanner?.querySelector<HTMLElement>(
+                `[data-hero-btn="details"][data-hero-index="${currentSlideIdx}"]`
+              );
+              detailsBtn?.focus({ preventScroll: true });
+            } else {
+              // From details: move down to first card of next section (Continue watching / Trending now)
+              const firstRail = document.querySelector('[data-content-rail="true"]');
+              const firstCard = firstRail?.querySelector<HTMLElement>('.tv-focus-target');
+              if (firstCard) {
+                firstCard.focus({ preventScroll: true });
+                firstCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              }
+            }
+            return;
+          } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            if (btnType === 'details') {
+              const playBtn = heroBanner?.querySelector<HTMLElement>(
+                `[data-hero-btn="play"][data-hero-index="${currentSlideIdx}"]`
+              );
+              playBtn?.focus({ preventScroll: true });
+            }
+            return;
+          }
+        }
+
         if (isCurrentInNav && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
           // Linear navigation inside Sidebar
           const allNav = Array.from(document.querySelectorAll<HTMLElement>('aside .tv-focus-target, [data-tv-nav="true"]'))
@@ -379,24 +436,33 @@ export function useTVNavigation(isEnabled = true) {
                   
                   if (targetToFocus) {
                     e.preventDefault();
-                    targetToFocus.focus();
+                    targetToFocus.focus({ preventScroll: true });
 
-                    // Exact HBO Max Fixed-Anchor Sliding Rail Navigation
+                    // HBO Max / Android TV Sliding Rail Carousel
+                    // Keep focus ring anchored at the left viewing slot while sliding the track
                     const rail = targetToFocus.closest('[data-content-rail="true"]');
-                    if (rail) {
-                      const scrollContainer = rail.querySelector<HTMLElement>('.overflow-x-auto') || rail;
-                      const cardWidth = targetToFocus.offsetWidth;
-                      const gap = 12; // gap-3 (12px)
-                      const step = cardWidth + gap;
+                    const scrollContainer = rail?.querySelector<HTMLElement>('.overflow-x-auto') || 
+                                            (currentRow?.classList.contains('overflow-x-auto') ? currentRow : null);
+
+                    if (scrollContainer) {
                       const nextCardIdx = rowSiblings.indexOf(nextSibling);
-                      if (nextCardIdx >= 0) {
+                      if (nextCardIdx === 0) {
                         scrollContainer.scrollTo({
-                          left: nextCardIdx * step,
+                          left: 0,
+                          behavior: e.repeat ? 'auto' : getScrollBehavior()
+                        });
+                      } else {
+                        // Left peek offset allows previous card to peek on the left edge (~70-80px)
+                        const leftPeekOffset = 80;
+                        const targetOffset = targetToFocus.offsetLeft;
+                        const desiredScrollLeft = targetOffset - leftPeekOffset;
+                        scrollContainer.scrollTo({
+                          left: Math.max(0, desiredScrollLeft),
                           behavior: e.repeat ? 'auto' : getScrollBehavior()
                         });
                       }
                     } else {
-                      targetToFocus.scrollIntoView({ behavior: e.repeat ? 'auto' : getScrollBehavior(), block: 'nearest', inline: 'center' });
+                      targetToFocus.scrollIntoView({ behavior: e.repeat ? 'auto' : getScrollBehavior(), block: 'nearest', inline: 'nearest' });
                     }
                     return;
                   }
@@ -429,24 +495,31 @@ export function useTVNavigation(isEnabled = true) {
                   
                   if (targetToFocus) {
                     e.preventDefault();
-                    targetToFocus.focus();
+                    targetToFocus.focus({ preventScroll: true });
 
-                    // Exact HBO Max Fixed-Anchor Sliding Rail Navigation
+                    // HBO Max / Android TV Sliding Rail Carousel
                     const rail = targetToFocus.closest('[data-content-rail="true"]');
-                    if (rail) {
-                      const scrollContainer = rail.querySelector<HTMLElement>('.overflow-x-auto') || rail;
-                      const cardWidth = targetToFocus.offsetWidth;
-                      const gap = 12; // gap-3 (12px)
-                      const step = cardWidth + gap;
+                    const scrollContainer = rail?.querySelector<HTMLElement>('.overflow-x-auto') || 
+                                            (currentRow?.classList.contains('overflow-x-auto') ? currentRow : null);
+
+                    if (scrollContainer) {
                       const prevCardIdx = rowSiblings.indexOf(prevSibling);
-                      if (prevCardIdx >= 0) {
+                      if (prevCardIdx === 0) {
                         scrollContainer.scrollTo({
-                          left: prevCardIdx * step,
+                          left: 0,
+                          behavior: e.repeat ? 'auto' : getScrollBehavior()
+                        });
+                      } else {
+                        const leftPeekOffset = 80;
+                        const targetOffset = targetToFocus.offsetLeft;
+                        const desiredScrollLeft = targetOffset - leftPeekOffset;
+                        scrollContainer.scrollTo({
+                          left: Math.max(0, desiredScrollLeft),
                           behavior: e.repeat ? 'auto' : getScrollBehavior()
                         });
                       }
                     } else {
-                      targetToFocus.scrollIntoView({ behavior: e.repeat ? 'auto' : getScrollBehavior(), block: 'nearest', inline: 'center' });
+                      targetToFocus.scrollIntoView({ behavior: e.repeat ? 'auto' : getScrollBehavior(), block: 'nearest', inline: 'nearest' });
                     }
                     return;
                   }
@@ -528,36 +601,47 @@ export function useTVNavigation(isEnabled = true) {
           }
         }
 
-        // Special fallback when moving ArrowUp from top row of catalog / grid cards to filter buttons
+        // Special fallback when moving ArrowUp from top row of catalog / grid cards to filter buttons or Hero Billboard
         if (e.key === 'ArrowUp' && !nextElement && !isCurrentInNav) {
-          const filterSections = document.querySelectorAll<HTMLElement>('[data-tv-filter-section="true"]');
-          if (filterSections.length > 0) {
-            const filterButtons = Array.from(document.querySelectorAll<HTMLElement>('[data-tv-filter-section="true"] .tv-focus-target'))
-              .filter(el => el.offsetParent !== null && !el.hasAttribute('disabled'));
-            if (filterButtons.length > 0) {
-              let bestFilter = filterButtons[0];
-              let bestXDist = Infinity;
-              for (const fb of filterButtons) {
-                const r = fb.getBoundingClientRect();
-                const xDist = Math.abs((r.left + r.width / 2) - (currentRect.left + currentRect.width / 2));
-                if (xDist < bestXDist) {
-                  bestXDist = xDist;
-                  bestFilter = fb;
+          const heroBanner = document.querySelector('[data-hero-banner="true"]');
+          if (heroBanner) {
+            const activeDetailsBtn = heroBanner.querySelector<HTMLElement>('[data-hero-btn="details"][tabindex="0"]') ||
+                                    heroBanner.querySelector<HTMLElement>('[data-hero-btn="details"]');
+            if (activeDetailsBtn) {
+              nextElement = activeDetailsBtn;
+            }
+          }
+
+          if (!nextElement) {
+            const filterSections = document.querySelectorAll<HTMLElement>('[data-tv-filter-section="true"]');
+            if (filterSections.length > 0) {
+              const filterButtons = Array.from(document.querySelectorAll<HTMLElement>('[data-tv-filter-section="true"] .tv-focus-target'))
+                .filter(el => el.offsetParent !== null && !el.hasAttribute('disabled'));
+              if (filterButtons.length > 0) {
+                let bestFilter = filterButtons[0];
+                let bestXDist = Infinity;
+                for (const fb of filterButtons) {
+                  const r = fb.getBoundingClientRect();
+                  const xDist = Math.abs((r.left + r.width / 2) - (currentRect.left + currentRect.width / 2));
+                  if (xDist < bestXDist) {
+                    bestXDist = xDist;
+                    bestFilter = fb;
+                  }
                 }
+                nextElement = bestFilter;
               }
-              nextElement = bestFilter;
             }
           }
         }
 
         if (nextElement) {
           e.preventDefault();
-          nextElement.focus();
+          nextElement.focus({ preventScroll: true });
           
           // If the focused element is within the Hero Billboard or Filter Section in Movies/Series, scroll immediately to top
           if (nextElement.closest('[data-hero-banner="true"]') !== null || nextElement.closest('[data-tv-filter-section="true"]') !== null) {
             window.scrollTo({ top: 0, left: 0, behavior: getScrollBehavior() });
-            nextElement.scrollIntoView({ behavior: e.repeat ? 'auto' : getScrollBehavior(), block: 'nearest', inline: 'center' });
+            nextElement.scrollIntoView({ behavior: e.repeat ? 'auto' : getScrollBehavior(), block: 'nearest', inline: 'nearest' });
           } else {
             nextElement.scrollIntoView({ behavior: e.repeat ? 'auto' : getScrollBehavior(), block: 'center', inline: 'nearest' });
             setTimeout(() => {
@@ -570,7 +654,7 @@ export function useTVNavigation(isEnabled = true) {
         } else {
           // Boundary reached (e.g. at the bottom of the page or end of a row)
           e.preventDefault();
-          currentFocused.focus();
+          currentFocused.focus({ preventScroll: true });
         }
       } else if (e.key === 'Enter' || e.key === ' ' || e.keyCode === 13 || e.keyCode === 23 || e.keyCode === 66) {
         // TV D-Pad Center / OK button
