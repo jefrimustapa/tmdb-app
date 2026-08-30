@@ -27,6 +27,7 @@ export interface UpdateInfo {
   publishedAt: string;
   apkUrl: string | null;
   apkName: string;
+  apkSizeFormatted?: string;
   isNightly: boolean;
   isPrerelease: boolean;
   htmlUrl: string;
@@ -69,6 +70,7 @@ export const updateService = {
           publishedAt: '',
           apkUrl: null,
           apkName: '',
+          apkSizeFormatted: undefined,
           isNightly: false,
           isPrerelease: false,
           htmlUrl: 'https://github.com/jefrimustapa/tmdb-app/releases'
@@ -92,6 +94,7 @@ export const updateService = {
           publishedAt: '',
           apkUrl: null,
           apkName: '',
+          apkSizeFormatted: undefined,
           isNightly: false,
           isPrerelease: false,
           htmlUrl: 'https://github.com/jefrimustapa/tmdb-app/releases'
@@ -108,6 +111,7 @@ export const updateService = {
       const apkAsset = apkAssets[0];
       const apkUrl = apkAsset ? apkAsset.browser_download_url : null;
       const apkName = apkAsset ? apkAsset.name : `tmdb-stream-v${cleanTag}.apk`;
+      const apkSizeFormatted = apkAsset?.size ? `${(apkAsset.size / (1024 * 1024)).toFixed(1)} MB` : undefined;
 
       // Determine if it is actually newer than current build
       let hasUpdate = false;
@@ -145,15 +149,35 @@ export const updateService = {
         }
       }
 
+      // Aggregate release notes in chronological descending order (latest release first)
+      const releaseNotesSections: string[] = [];
+      for (const rel of eligibleReleases) {
+        if (rel.body && rel.body.trim()) {
+          const relDate = rel.published_at ? new Date(rel.published_at).toLocaleDateString() : '';
+          const relTitle = rel.name && rel.name !== rel.tag_name ? `${rel.name} (${rel.tag_name})` : rel.tag_name;
+          const header = `📦 ${relTitle}${relDate ? ` • ${relDate}` : ''}`;
+          releaseNotesSections.push(`${header}\n${rel.body.trim()}`);
+        }
+        // Stop after 3 recent releases to keep modal concise or when hitting current installed version
+        if (releaseNotesSections.length >= 3 || APP_VERSION_FULL.includes(rel.tag_name.replace(/^v/, ''))) {
+          break;
+        }
+      }
+
+      const releaseNotes = releaseNotesSections.length > 0
+        ? releaseNotesSections.join('\n\n━━━━━━━━━━━━━━━━━━━━\n\n')
+        : (latest.body || 'Bug fixes, performance improvements, and media streaming updates.');
+
       return {
         hasUpdate,
         currentVersion: APP_VERSION_FULL,
         latestVersion: cleanTag,
         releaseName: latest.name || latest.tag_name,
-        releaseNotes: latest.body || 'No release notes provided.',
+        releaseNotes,
         publishedAt: latest.published_at ? new Date(latest.published_at).toLocaleDateString() : '',
         apkUrl,
         apkName,
+        apkSizeFormatted,
         isNightly,
         isPrerelease: latest.prerelease,
         htmlUrl: latest.html_url

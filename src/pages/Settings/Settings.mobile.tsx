@@ -768,6 +768,12 @@ export const Settings: React.FC = () => {
             </button>
           </div>
 
+          {/* Current Installed Version Badge (Full Display) */}
+          <div className="flex flex-wrap items-center justify-between gap-2 p-3 bg-hbo-dark/80 rounded-xl border border-hbo-border/60 text-xs font-mono">
+            <span className="text-gray-400 font-sans font-bold">Installed Version:</span>
+            <span className="text-gray-200 font-bold break-all">{APP_VERSION_FULL}</span>
+          </div>
+
           {/* Update Status Banner if already checked */}
           {updateInfo && (
             <div className={`p-3.5 rounded-xl border flex items-center justify-between gap-3 text-xs ${
@@ -781,14 +787,16 @@ export const Settings: React.FC = () => {
                 ) : (
                   <Check className="w-4 h-4 text-emerald-400 flex-shrink-0" />
                 )}
-                <span className="truncate">
-                  {updateInfo.hasUpdate ? `Update Available: v${updateInfo.latestVersion}` : 'You are on the latest build'}
+                <span className="break-all font-mono">
+                  {updateInfo.hasUpdate 
+                    ? `Update Available: v${updateInfo.latestVersion}${updateInfo.apkSizeFormatted ? ` (${updateInfo.apkSizeFormatted})` : ''}` 
+                    : 'You are on the latest build'}
                 </span>
               </div>
               {updateInfo.hasUpdate && (
                 <button
                   onClick={() => setShowUpdateModal(true)}
-                  className="px-3 py-1 bg-hbo-cyan text-black font-bold rounded-lg hover:bg-hbo-cyan/90 text-xs tv-focus-target"
+                  className="px-3 py-1.5 bg-hbo-cyan text-black font-bold rounded-lg hover:bg-hbo-cyan/90 text-xs tv-focus-target flex-shrink-0"
                 >
                   View Update
                 </button>
