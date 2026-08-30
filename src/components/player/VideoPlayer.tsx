@@ -241,18 +241,23 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
   // Unified progress recorder (Throttled to 10s to guarantee 0% CPU & I/O overhead on TV)
   const recordProgress = useCallback((currentSec: number, totalDurationSec: number, force = false) => {
-    if (totalDurationSec <= 0 && episodeRuntimeMinutes) {
+    if ((!totalDurationSec || totalDurationSec <= 0) && episodeRuntimeMinutes) {
       totalDurationSec = episodeRuntimeMinutes * 60;
     }
-    if (totalDurationSec <= 0 && durationRef.current > 0) {
+    if ((!totalDurationSec || totalDurationSec <= 0) && durationRef.current > 0) {
       totalDurationSec = durationRef.current;
     }
-    if (totalDurationSec <= 0 || currentSec < 0) return;
+    if (currentSec < 0) return;
 
     currentTimeRef.current = currentSec;
-    durationRef.current = totalDurationSec;
+    if (totalDurationSec > 0) {
+      durationRef.current = totalDurationSec;
+    }
 
-    const progressPercent = Math.min(100, Math.round((currentSec / totalDurationSec) * 100));
+    const effectiveDuration = totalDurationSec > 0 ? totalDurationSec : durationRef.current;
+    const progressPercent = effectiveDuration > 0
+      ? Math.min(100, Math.round((currentSec / effectiveDuration) * 100))
+      : 0;
     const now = Date.now();
 
     // Check for Up Next trigger on TV Series (>= 90% or within last 75 seconds)
@@ -388,7 +393,37 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       try {
         const data = typeof e.data === 'string' ? JSON.parse(e.data) : e.data;
         if (!data) return;
-        if (data.type === 'MEDIA_DATA' || data.event === 'timeupdate' || data.event === 'progress') {
+
+        // 1. VidLink PLAYER_EVENT (event: 'timeupdate' | 'pause' | 'ended' | 'time')
+        if (data.type === 'PLAYER_EVENT' && data.data) {
+          const evt = data.data.event;
+          const current = data.data.currentTime ?? data.data.seconds ?? 0;
+          const dur = data.data.duration ?? data.data.totalDuration ?? 0;
+          if (current > 0) {
+            recordProgress(current, dur, evt === 'ended');
+          }
+          return;
+        }
+
+        // 2. VidLink MEDIA_DATA dictionary
+        if (data.type === 'MEDIA_DATA' && data.data) {
+          const item = data.data[tmdbId];
+          if (item) {
+            if (mediaType === 'tv' && item.show_progress && season && episode) {
+              const epKey = `s${season}e${episode}`;
+              const epProgress = item.show_progress[epKey]?.progress;
+              if (epProgress && epProgress.watched > 0) {
+                recordProgress(epProgress.watched, epProgress.duration || 0);
+              }
+            } else if (item.progress && item.progress.watched > 0) {
+              recordProgress(item.progress.watched, item.progress.duration || 0);
+            }
+          }
+          return;
+        }
+
+        // 3. PlayerJS, Plyr, vidsrc, or standard event postMessages
+        if (data.event === 'timeupdate' || data.event === 'progress' || data.event === 'time') {
           const current = data.currentTime ?? data.data?.currentTime ?? data.seconds ?? 0;
           const dur = data.duration ?? data.data?.duration ?? data.totalDuration ?? 0;
           if (current > 0) {
@@ -400,7 +435,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
     window.addEventListener('message', handlePostMessage);
     return () => window.removeEventListener('message', handlePostMessage);
-  }, [recordProgress]);
+  }, [recordProgress, tmdbId, mediaType, season, episode]);
 
   // HLS Player attachment for direct streams
   useEffect(() => {

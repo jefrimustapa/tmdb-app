@@ -508,7 +508,7 @@ export const Watch: React.FC = () => {
             season={seasonParam}
             episode={episodeParam}
             episodeTitle={currentEpisode?.name}
-            episodeRuntimeMinutes={currentEpisode?.runtime}
+            episodeRuntimeMinutes={mediaType === 'movie' ? ('runtime' in details ? details.runtime : undefined) : currentEpisode?.runtime}
             providerId={providerId}
             onProviderChange={(p) => setProviderId(p.id)}
             onProbingStatusChange={(probing, idx) => {
