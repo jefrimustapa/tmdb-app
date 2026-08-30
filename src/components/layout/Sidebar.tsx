@@ -37,7 +37,7 @@ export const Sidebar: React.FC = () => {
           <Logo size="md" showText={false} className="lg:hidden flex justify-center" />
         </div>
 
-        <nav className="space-y-1.5">
+        <nav className="space-y-1.5 relative">
           {links.map((link) => {
             const Icon = link.icon;
             return (
@@ -50,15 +50,29 @@ export const Sidebar: React.FC = () => {
                   navigate(link.path);
                 }}
                 className={({ isActive }) =>
-                  `flex items-center justify-center lg:justify-start gap-3.5 px-3 py-3 rounded-xl font-semibold text-sm transition-all tv-focus-target ${
+                  `group relative flex items-center justify-center lg:justify-start gap-3.5 px-3 py-3 rounded-xl font-semibold text-sm transition-all tv-focus-target ${
                     isActive
-                      ? 'bg-white/10 text-white'
-                      : 'text-gray-400 hover:text-white hover:bg-white/5'
+                      ? 'text-white'
+                      : 'text-gray-400 hover:text-white'
                   }`
                 }
               >
-                <Icon className="w-5 h-5 flex-shrink-0" />
-                <span className="hidden lg:inline">{link.label}</span>
+                {({ isActive }) => (
+                  <>
+                    {/* Active Page Indicator Bar (HBO Purple) */}
+                    {isActive && (
+                      <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-4 rounded-r-full bg-hbo-purple-light shadow-[0_0_8px_rgba(144,85,255,0.9)] pointer-events-none" />
+                    )}
+                    <Icon className={`w-5 h-5 flex-shrink-0 transition-all duration-150 tv-nav-icon ${
+                      isActive ? 'text-white' : 'text-gray-400 group-hover:text-white'
+                    }`} />
+                    <span className={`hidden lg:inline transition-colors duration-150 tv-nav-label ${
+                      isActive ? 'text-white font-bold' : 'text-gray-400 group-hover:text-white'
+                    }`}>
+                      {link.label}
+                    </span>
+                  </>
+                )}
               </NavLink>
             );
           })}
