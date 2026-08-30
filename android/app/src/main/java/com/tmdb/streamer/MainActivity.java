@@ -80,6 +80,129 @@ public class MainActivity extends BridgeActivity {
         return false;
     }
 
+    private boolean isPotentialEmbedHtmlRequest(WebResourceRequest request, String lowerUrl) {
+        if (lowerUrl.contains("localhost") || lowerUrl.startsWith("capacitor://") || lowerUrl.startsWith("file://")) {
+            return false;
+        }
+        if (lowerUrl.contains(".m3u8") || lowerUrl.contains(".mp4") || lowerUrl.contains(".ts") || 
+            lowerUrl.contains(".vtt") || lowerUrl.contains(".srt") || lowerUrl.contains(".jpg") ||
+            lowerUrl.contains(".jpeg") || lowerUrl.contains(".png") || lowerUrl.contains(".webp") ||
+            lowerUrl.contains(".svg") || lowerUrl.contains(".woff") || lowerUrl.contains(".woff2") ||
+            lowerUrl.contains(".ttf") || lowerUrl.contains(".css") || lowerUrl.contains(".js") ||
+            lowerUrl.contains(".json")) {
+            return false;
+        }
+        if (request.getRequestHeaders() != null) {
+            String accept = request.getRequestHeaders().get("Accept");
+            if (accept != null && accept.toLowerCase().contains("text/html")) {
+                return true;
+            }
+        }
+        return lowerUrl.contains("embed") || lowerUrl.contains("player") || lowerUrl.contains("movie") ||
+               lowerUrl.contains("tv") || lowerUrl.contains("watch") || lowerUrl.contains("vidlink") ||
+               lowerUrl.contains("moviesapi") || lowerUrl.contains("cinesrc") || lowerUrl.contains("cinezo") ||
+               lowerUrl.contains("peestream") || lowerUrl.contains("videasy") || lowerUrl.contains("vidzee") ||
+               lowerUrl.contains("vidsrc") || lowerUrl.contains("2embed") || lowerUrl.contains("mapple") ||
+               lowerUrl.contains("flaxmovies") || lowerUrl.contains("111movies");
+    }
+
+    private WebResourceResponse interceptAndInjectTrackingScript(WebResourceRequest request, String targetUrl) {
+        try {
+            Log.i("TMDB_APP", "[SubframeTracker] Intercepting embed subframe: " + targetUrl);
+            URL url = new URL(targetUrl);
+            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+            conn.setConnectTimeout(5000);
+            conn.setReadTimeout(5000);
+            conn.setRequestMethod(request.getMethod() != null ? request.getMethod() : "GET");
+            conn.setInstanceFollowRedirects(true);
+
+            String cookies = android.webkit.CookieManager.getInstance().getCookie(targetUrl);
+            if (cookies != null && !cookies.isEmpty()) {
+                conn.setRequestProperty("Cookie", cookies);
+            }
+
+            if (request.getRequestHeaders() != null) {
+                for (java.util.Map.Entry<String, String> header : request.getRequestHeaders().entrySet()) {
+                    String key = header.getKey();
+                    if (!key.equalsIgnoreCase("Host") && !key.equalsIgnoreCase("Accept-Encoding") && !key.equalsIgnoreCase("Cookie")) {
+                        conn.setRequestProperty(key, header.getValue());
+                    }
+                }
+            }
+            conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Mobile Safari/537.36");
+
+            int responseCode = conn.getResponseCode();
+            if (responseCode >= 300 && responseCode < 400) {
+                return null;
+            }
+
+            String contentType = conn.getContentType();
+            if (contentType == null || !contentType.toLowerCase().contains("text/html")) {
+                return null;
+            }
+
+            InputStream in = conn.getInputStream();
+            java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+            byte[] buffer = new byte[4096];
+            int bytesRead;
+            while ((bytesRead = in.read(buffer)) != -1) {
+                out.write(buffer, 0, bytesRead);
+            }
+            in.close();
+
+            String html = out.toString("UTF-8");
+            String trackingScript = 
+                "<script id=\"tmdb-subframe-tracker\">" +
+                "(function(){" +
+                "  if(window.__tmdb_tracked)return;window.__tmdb_tracked=true;" +
+                "  function scanAndHook(){" +
+                "    var vids=document.querySelectorAll('video');" +
+                "    for(var i=0;i<vids.length;i++){" +
+                "      var v=vids[i];" +
+                "      if(!v.__tmdb_hooked){" +
+                "        v.__tmdb_hooked=true;" +
+                "        function emit(){" +
+                "          if(v.duration>0){" +
+                "            try{" +
+                "              window.top.postMessage({type:'TMDB_EMBED_PROGRESS',currentTime:v.currentTime,duration:v.duration,paused:v.paused,ended:v.ended},'*');" +
+                "            }catch(e){}" +
+                "            try{" +
+                "              if(window.AndroidBridge && window.AndroidBridge.onNativePlaybackState){" +
+                "                window.AndroidBridge.onNativePlaybackState(!v.paused&&!v.ended,v.currentTime,v.duration);" +
+                "              }" +
+                "            }catch(e){}" +
+                "          }" +
+                "        }" +
+                "        v.addEventListener('timeupdate',emit);" +
+                "        v.addEventListener('pause',emit);" +
+                "        v.addEventListener('play',emit);" +
+                "        v.addEventListener('ended',emit);" +
+                "        v.addEventListener('seeked',emit);" +
+                "      }" +
+                "    }" +
+                "  }" +
+                "  setInterval(scanAndHook,1000);" +
+                "  scanAndHook();" +
+                "})();" +
+                "</script>";
+
+            String modifiedHtml;
+            if (html.contains("</head>")) {
+                modifiedHtml = html.replace("</head>", trackingScript + "</head>");
+            } else if (html.contains("<body")) {
+                modifiedHtml = html.replace("<body", trackingScript + "<body");
+            } else {
+                modifiedHtml = trackingScript + html;
+            }
+
+            byte[] modifiedBytes = modifiedHtml.getBytes(StandardCharsets.UTF_8);
+            return new WebResourceResponse("text/html", "UTF-8", new ByteArrayInputStream(modifiedBytes));
+        } catch (Exception e) {
+            Log.w("TMDB_APP", "[SubframeTracker] Fallback to normal load: " + e.getMessage());
+            return null;
+        }
+    }
+
     private boolean isTV() {
         android.app.UiModeManager uiModeManager = (android.app.UiModeManager) getSystemService(UI_MODE_SERVICE);
         return uiModeManager != null && uiModeManager.getCurrentModeType() == android.content.res.Configuration.UI_MODE_TYPE_TELEVISION;
@@ -138,6 +261,34 @@ public class MainActivity extends BridgeActivity {
             settings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
             // Set modern Chrome mobile user agent to prevent 403 bot-blocking by embed providers
             settings.setUserAgentString("Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Mobile Safari/537.36");
+
+            // Attach Custom BridgeWebViewClient with AdBlock & Subframe Tracking Script Injection
+            webView.setWebViewClient(new BridgeWebViewClient(this.bridge) {
+                @Override
+                public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
+                    if (request == null || request.getUrl() == null) {
+                        return super.shouldInterceptRequest(view, request);
+                    }
+
+                    String url = request.getUrl().toString();
+                    String lowerUrl = url.toLowerCase();
+
+                    // 1. AdBlock Shield: Block known ad/tracker scripts & domains
+                    if (isAdOrTrackerUrl(lowerUrl)) {
+                        return new WebResourceResponse("text/plain", "UTF-8", new ByteArrayInputStream("".getBytes(StandardCharsets.UTF_8)));
+                    }
+
+                    // 2. Subframe HTML tracking injection for any embed iframe
+                    if (!request.isForMainFrame() && isPotentialEmbedHtmlRequest(request, lowerUrl)) {
+                        WebResourceResponse injectedResponse = interceptAndInjectTrackingScript(request, url);
+                        if (injectedResponse != null) {
+                            return injectedResponse;
+                        }
+                    }
+
+                    return super.shouldInterceptRequest(view, request);
+                }
+            });
 
             // Register JS Bridge
             webView.addJavascriptInterface(new Object() {
