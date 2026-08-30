@@ -717,11 +717,24 @@ public class MainActivity extends BridgeActivity {
                             "  var header = document.querySelector('[data-watch-header=\"true\"]');" +
                             "  var isHeaderFocused = !!window.__tmdbHeaderFocused || (header && header.contains(document.activeElement));" +
                             "  if (!isHeaderFocused) return false;" +
+                            "  var backBtn = document.getElementById('watch-back-btn');" +
+                            "  var nextBtn = document.getElementById('watch-next-ep-btn');" +
                             "  var trigger = document.getElementById('watch-provider-trigger');" +
-                            "  if (trigger && document.activeElement !== trigger) {" +
-                            "    trigger.focus();" +
+                            "  var active = document.activeElement;" +
+                            "  if (active === backBtn) {" +
+                            "    if (nextBtn) {" +
+                            "      nextBtn.focus();" +
+                            "    } else if (trigger) {" +
+                            "      trigger.focus();" +
+                            "    }" +
                             "    window.dispatchEvent(new CustomEvent('tmdb_reset_header_timer'));" +
                             "    return true;" +
+                            "  } else if (active === nextBtn) {" +
+                            "    if (trigger) {" +
+                            "      trigger.focus();" +
+                            "      window.dispatchEvent(new CustomEvent('tmdb_reset_header_timer'));" +
+                            "      return true;" +
+                            "    }" +
                             "  }" +
                             "  return false;" +
                             "})();",
@@ -739,10 +752,23 @@ public class MainActivity extends BridgeActivity {
                             "  var isHeaderFocused = !!window.__tmdbHeaderFocused || (header && header.contains(document.activeElement));" +
                             "  if (!isHeaderFocused) return false;" +
                             "  var backBtn = document.getElementById('watch-back-btn');" +
-                            "  if (backBtn && document.activeElement !== backBtn) {" +
-                            "    backBtn.focus();" +
+                            "  var nextBtn = document.getElementById('watch-next-ep-btn');" +
+                            "  var trigger = document.getElementById('watch-provider-trigger');" +
+                            "  var active = document.activeElement;" +
+                            "  if (active === trigger) {" +
+                            "    if (nextBtn) {" +
+                            "      nextBtn.focus();" +
+                            "    } else if (backBtn) {" +
+                            "      backBtn.focus();" +
+                            "    }" +
                             "    window.dispatchEvent(new CustomEvent('tmdb_reset_header_timer'));" +
                             "    return true;" +
+                            "  } else if (active === nextBtn) {" +
+                            "    if (backBtn) {" +
+                            "      backBtn.focus();" +
+                            "      window.dispatchEvent(new CustomEvent('tmdb_reset_header_timer'));" +
+                            "      return true;" +
+                            "    }" +
                             "  }" +
                             "  return false;" +
                             "})();",

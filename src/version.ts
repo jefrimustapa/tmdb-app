@@ -2,12 +2,13 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20260830-1635';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-stream-progress.20260830-1635';
+export const APP_BUILD_NUMBER = '20260830-1641';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-stream-progress.20260830-1641';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
 export const APP_BRANCH = 'feat-stream-progress';
-export const APP_CHANGELOG = `* fix(build): resolve syntax error in VideoPlayer and verify live installation on TV
+export const APP_CHANGELOG = `* fix(watch): enable seamless D-pad remote navigation across header back, next episode, and server picker
+* fix(build): resolve syntax error in VideoPlayer and verify live installation on TV
 * feat(settings): disable TorBox & Private Extractor by default and update trigger % to 80-100% (5% step)
 * refactor(settings): unify Up Next popup into Auto-Play Next Episode setting
 * fix(navigation): resolve spatial focus lock on Home page hero banner and content rails
@@ -20,5 +21,4 @@ export const APP_CHANGELOG = `* fix(build): resolve syntax error in VideoPlayer 
 * fix(tv): wire series resume timestamp to watch navigation in details and episode grid
 * fix(player): wire resume timestamp across details, continue watching and player streamUrl
 * fix(player): add useMemo import in VideoPlayer.tsx
-* fix(player): pass resume start offset to streamUrl and dispatch iframe seek commands
-* feat(player): restore universal elapsed watch session ticker and clean up native subframe injection`;
+* fix(player): pass resume start offset to streamUrl and dispatch iframe seek commands`;
