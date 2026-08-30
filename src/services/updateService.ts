@@ -127,14 +127,8 @@ export const updateService = {
         if (tagDate > localDate) {
           hasUpdate = true;
         } else if (tagDate === localDate) {
-          if (APP_BUILD_CHANNEL === 'dev') {
-            hasUpdate = true;
-          } else if (APP_BUILD_CHANNEL !== 'nightly' || !APP_VERSION_FULL.includes(cleanTag)) {
-            hasUpdate = true;
-          }
-        } else {
-          // If local is on an unreleased dev build, allow upgrading to official published nightly
-          if (APP_BUILD_CHANNEL === 'dev') {
+          // If on official nightly, check if the cleanTag or asset run number is different
+          if (APP_BUILD_CHANNEL === 'nightly' && !APP_VERSION_FULL.includes(cleanTag)) {
             hasUpdate = true;
           }
         }
@@ -142,10 +136,8 @@ export const updateService = {
         const versionDiff = compareVersions(cleanTag, APP_VERSION);
         if (versionDiff > 0) {
           hasUpdate = true;
-        } else if (versionDiff === 0) {
-          if (APP_BUILD_CHANNEL === 'dev' || !APP_VERSION_FULL.includes(cleanTag)) {
-            hasUpdate = true;
-          }
+        } else if (versionDiff === 0 && APP_BUILD_CHANNEL !== 'dev' && !APP_VERSION_FULL.includes(cleanTag)) {
+          hasUpdate = true;
         }
       }
 
