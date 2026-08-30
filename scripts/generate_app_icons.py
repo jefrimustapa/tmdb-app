@@ -105,10 +105,10 @@ def generate_all_icons():
         mipmap_dir = os.path.join(res_dir, f'mipmap-{density}')
         os.makedirs(mipmap_dir, exist_ok=True)
         
-        # 3a. ic_launcher.png (Dark solid background with bold centered TMDB emblem)
+        # 3a. ic_launcher.png (Dark solid background with bold centered TMDB emblem at 90% scale)
         launcher_bg = Image.new('RGBA', (icon_sz, icon_sz), (7, 5, 14, 255))
-        # Emblem sized to ~76% width
-        e_w = int(icon_sz * 0.76)
+        # Emblem sized to ~68% width (90% of previous 76%)
+        e_w = int(icon_sz * 0.684)
         e_h = int(e_w * (master_emblem.height / master_emblem.width))
         scaled_e = master_emblem.resize((e_w, e_h), Image.Resampling.LANCZOS)
         e_x = (icon_sz - e_w) // 2
@@ -124,9 +124,9 @@ def generate_all_icons():
         launcher_round.paste(launcher_bg, (0, 0), mask=round_mask)
         launcher_round.save(os.path.join(mipmap_dir, 'ic_launcher_round.png'))
         
-        # 3c. ic_launcher_foreground.png (for adaptive icons, centered in safe 66% viewport)
+        # 3c. ic_launcher_foreground.png (for adaptive icons, 90% of previous 65% = 58.5% safe viewport)
         fg_img = Image.new('RGBA', (fg_sz, fg_sz), (0, 0, 0, 0))
-        fg_w = int(fg_sz * 0.65)
+        fg_w = int(fg_sz * 0.585)
         fg_h = int(fg_w * (master_emblem.height / master_emblem.width))
         scaled_fg = master_emblem.resize((fg_w, fg_h), Image.Resampling.LANCZOS)
         fg_x = (fg_sz - fg_w) // 2
@@ -134,7 +134,7 @@ def generate_all_icons():
         fg_img.paste(scaled_fg, (fg_x, fg_y), mask=scaled_fg)
         fg_img.save(os.path.join(mipmap_dir, 'ic_launcher_foreground.png'))
 
-    print('[IconGen] Saved Android mipmap launcher icons without outer circle!')
+    print('[IconGen] Saved Android mipmap launcher icons (90% scaled, no outer circle)!')
 
     # 4. Generate Splash Screens
     def create_splash(width, height):
@@ -173,14 +173,11 @@ def generate_all_icons():
         splash.paste(scaled_icon, (icon_x, icon_y), mask=scaled_icon)
 
         # Draw "TMDB STREAMER" & "CINEMATIC STREAMING CATALOG"
-        # We use a built-in clean vector render or PIL default font / shapes
         draw_sp = ImageDraw.Draw(splash)
         
         # Text positioning below icon
         text_y = icon_y + icon_dim + int(min(width, height) * 0.04)
         
-        # For universal compatibility across environments without external TTF dependencies,
-        # we render clean text
         try:
             font_size_main = max(14, int(min(width, height) * 0.045))
             font_size_sub = max(9, int(font_size_main * 0.45))
@@ -230,16 +227,16 @@ def generate_all_icons():
 
     print('[IconGen] Saved all Android landscape & portrait splash screens!')
 
-    # 5. Generate Android TV Banner (320x180 and 640x360)
+    # 5. Generate Android TV Banner (Icon-only centered, no text)
     def create_tv_banner(width, height):
         banner = Image.new('RGBA', (width, height), (9, 9, 18, 255))
         
-        # Ambient glow
-        glow_radius = int(height * 0.7)
+        # Ambient radial glow in center
+        glow_radius = int(height * 0.8)
         glow = Image.new('RGBA', (glow_radius * 2, glow_radius * 2), (0, 0, 0, 0))
         glow_draw = ImageDraw.Draw(glow)
         for i in range(glow_radius, 0, -4):
-            alpha = int(45 * (1 - i / glow_radius)**1.5)
+            alpha = int(50 * (1 - i / glow_radius)**1.5)
             r_col = int(144 * (1 - i / glow_radius) + 103 * (i / glow_radius))
             g_col = int(85 * (1 - i / glow_radius) + 58 * (i / glow_radius))
             b_col = int(255)
@@ -250,29 +247,13 @@ def generate_all_icons():
         glow = glow.filter(ImageFilter.GaussianBlur(15))
         banner.paste(glow, ((width - glow.width) // 2, (height - glow.height) // 2), mask=glow)
 
-        # Icon on left
-        icon_sz = int(height * 0.52)
+        # Centered circular TMDB icon (no text)
+        icon_sz = int(height * 0.70)
         scaled_icon = master_icon.resize((icon_sz, icon_sz), Image.Resampling.LANCZOS)
         
-        icon_x = int(width * 0.08)
+        icon_x = (width - icon_sz) // 2
         icon_y = (height - icon_sz) // 2
         banner.paste(scaled_icon, (icon_x, icon_y), mask=scaled_icon)
-
-        # Text on right
-        draw_bn = ImageDraw.Draw(banner)
-        try:
-            f_size = max(11, int(height * 0.115))
-            f_sub = max(7, int(f_size * 0.42))
-            font_b_main = ImageFont.truetype("arialbd.ttf", f_size)
-            font_b_sub = ImageFont.truetype("arial.ttf", f_sub)
-        except Exception:
-            font_b_main = ImageFont.load_default()
-            font_b_sub = ImageFont.load_default()
-
-        text_x = icon_x + icon_sz + int(width * 0.045)
-        text_y = icon_y + int(icon_sz * 0.22)
-        draw_bn.text((text_x, text_y), "TMDB STREAMER", fill=(255, 255, 255, 255), font=font_b_main)
-        draw_bn.text((text_x, text_y + int(f_size * 1.35)), "CINEMATIC STREAMING", fill=(0, 210, 255, 220), font=font_b_sub)
 
         return banner
 
