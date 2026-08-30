@@ -1,6 +1,6 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, memo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Play, Heart, Bookmark, MoreVertical, Info, Check, Trash2 } from 'lucide-react';
+import { Play, Heart, Bookmark, MoreVertical, Trash2 } from 'lucide-react';
 import type { TMDBMediaItem } from '../../types/tmdb';
 import { tmdbImages } from '../../services/tmdb';
 import { RatingBadge } from './RatingBadge';
@@ -9,15 +9,29 @@ import { dbService } from '../../services/db';
 interface MediaCardProps {
   item: TMDBMediaItem;
   type?: 'movie' | 'tv';
+  variant?: 'poster' | 'landscape';
+  season?: number;
+  episode?: number;
+  episodeTitle?: string;
   progress?: number;
   onDelete?: () => void;
 }
 
-export const MediaCard: React.FC<MediaCardProps> = ({ item, type, progress, onDelete }) => {
+const MediaCardComponent: React.FC<MediaCardProps> = ({
+  item,
+  type,
+  variant = 'poster',
+  season,
+  episode,
+  episodeTitle,
+  progress,
+  onDelete
+}) => {
   const navigate = useNavigate();
   const mediaType: 'movie' | 'tv' = (type === 'tv' || item.media_type === 'tv' || (!item.title && !!item.name)) ? 'tv' : 'movie';
   const title = item.title || item.name || 'Untitled';
   const releaseYear = (item.release_date || item.first_air_date || '').split('-')[0];
+
   const [isPerfMode, setIsPerfMode] = useState(() => 
     typeof document !== 'undefined' && document.documentElement.getAttribute('data-perf-mode') === 'true'
   );
@@ -33,13 +47,16 @@ export const MediaCard: React.FC<MediaCardProps> = ({ item, type, progress, onDe
     return () => window.removeEventListener('tmdb_settings_changed', handleSettings);
   }, []);
 
-  const posterUrl = tmdbImages.poster(item.poster_path, isPerfMode ? 'w342' : 'w500');
+  const imageUrl = variant === 'landscape'
+    ? tmdbImages.backdrop(item.backdrop_path || item.poster_path, isPerfMode ? 'w300' : 'w1280')
+    : tmdbImages.poster(item.poster_path, isPerfMode ? 'w185' : 'w500');
 
   const [menuOpen, setMenuOpen] = useState(false);
   const [isLiked, setIsLiked] = useState(false);
   const [isWatchlisted, setIsWatchlisted] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cardRef = useRef<HTMLDivElement>(null);
 
   // Lazy-load liked/watchlisted state only when menu is opened
   useEffect(() => {
@@ -57,8 +74,6 @@ export const MediaCard: React.FC<MediaCardProps> = ({ item, type, progress, onDe
     return () => { active = false; };
   }, [menuOpen, item.id, mediaType]);
 
-  const cardRef = useRef<HTMLDivElement>(null);
-
   // Listen for TV long press custom event
   useEffect(() => {
     const cardEl = cardRef.current;
@@ -71,7 +86,7 @@ export const MediaCard: React.FC<MediaCardProps> = ({ item, type, progress, onDe
     return () => cardEl.removeEventListener('tv_long_press', handleTvLongPress);
   }, []);
 
-  // Close menu on click outside
+  // Close menu on click outside only when menu is open
   useEffect(() => {
     if (!menuOpen) return;
     const handleClickOutside = (e: MouseEvent | TouchEvent) => {
@@ -87,11 +102,22 @@ export const MediaCard: React.FC<MediaCardProps> = ({ item, type, progress, onDe
     };
   }, [menuOpen]);
 
-  const handleCardClick = (e?: React.MouseEvent) => {
+  const handleCardClick = () => {
     if (menuOpen) {
       setMenuOpen(false);
       return;
     }
+
+    if (variant === 'landscape') {
+      // One-click instant resume
+      if (mediaType === 'tv' && season && episode) {
+        navigate(`/watch/tv/${item.id}?s=${season}&e=${episode}`);
+      } else {
+        navigate(`/watch/${mediaType}/${item.id}`);
+      }
+      return;
+    }
+
     navigate(`/details/${mediaType}/${item.id}`);
   };
 
@@ -105,7 +131,11 @@ export const MediaCard: React.FC<MediaCardProps> = ({ item, type, progress, onDe
     e.preventDefault();
     e.stopPropagation();
     setMenuOpen(false);
-    navigate(`/watch/${mediaType}/${item.id}`);
+    if (mediaType === 'tv' && season && episode) {
+      navigate(`/watch/tv/${item.id}?s=${season}&e=${episode}`);
+    } else {
+      navigate(`/watch/${mediaType}/${item.id}`);
+    }
   };
 
   const handleDetails = (e: React.MouseEvent) => {
@@ -154,7 +184,6 @@ export const MediaCard: React.FC<MediaCardProps> = ({ item, type, progress, onDe
     if (onDelete) onDelete();
   };
 
-  // Long press handler for Android TV / D-pad / Touch
   const handleTouchStart = () => {
     longPressTimerRef.current = setTimeout(() => {
       setMenuOpen(true);
@@ -180,9 +209,7 @@ export const MediaCard: React.FC<MediaCardProps> = ({ item, type, progress, onDe
     }
   };
 
-  const handleFocus = () => {
-    cardRef.current?.scrollIntoView({ inline: 'nearest', block: 'nearest', behavior: 'smooth' });
-  };
+  const isLandscape = variant === 'landscape';
 
   return (
     <div
@@ -191,28 +218,42 @@ export const MediaCard: React.FC<MediaCardProps> = ({ item, type, progress, onDe
       role="button"
       aria-label={`View ${title}`}
       onKeyDown={handleKeyDown}
-      onFocus={handleFocus}
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
       onMouseDown={handleTouchStart}
       onMouseUp={handleTouchEnd}
       onClick={handleCardClick}
-      className="group relative flex-shrink-0 w-36 sm:w-44 md:w-48 lg:w-52 max-w-full rounded-xl overflow-hidden bg-hbo-card border border-hbo-border/40 tv-focus-target cursor-pointer focus:outline-none transform-gpu"
+      className={`group relative flex-shrink-0 rounded-xl overflow-hidden bg-hbo-card border border-hbo-border/40 tv-focus-target cursor-pointer focus:outline-none transform-gpu ${
+        isLandscape
+          ? 'w-[164px] sm:w-[172px] lg:w-[176px] max-w-[180px]'
+          : 'w-[130px] sm:w-[140px] lg:w-[144px] max-w-[148px]'
+      }`}
     >
-      <div className="block relative aspect-[2/3] w-full overflow-hidden bg-gray-900">
+      <div className={`block relative w-full overflow-hidden bg-gray-900 ${
+        isLandscape ? 'aspect-video' : 'aspect-[2/3]'
+      }`}>
         <img
-          src={posterUrl}
+          src={imageUrl}
           alt={title}
           loading="lazy"
           decoding="async"
-          onError={tmdbImages.handleImgError}
-          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+          onError={(e) => tmdbImages.handleImgError(e, isLandscape)}
+          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
         />
 
-        {/* Rating badge */}
-        <div className="absolute top-2 left-2 z-10">
-          <RatingBadge score={item.vote_average} />
-        </div>
+        {/* Pure Play Icon on Bottom-Left Corner for Landscape Continue Watching Cards */}
+        {isLandscape && (
+          <div className="absolute bottom-2 left-2.5 z-10 pointer-events-none flex items-center">
+            <Play className="w-4 h-4 text-white fill-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)] transition-all duration-200 group-hover:scale-110 group-focus:scale-110 group-hover:text-hbo-cyan group-focus:text-hbo-cyan group-hover:fill-hbo-cyan group-focus:fill-hbo-cyan" />
+          </div>
+        )}
+
+        {/* Rating badge for poster cards */}
+        {!isLandscape && item.vote_average > 0 && (
+          <div className="absolute top-2 left-2 z-10">
+            <RatingBadge score={item.vote_average} />
+          </div>
+        )}
 
         {/* 3-Vertical-Dots Consolidated Menu Trigger Button */}
         <div className="absolute top-2 right-2 z-20" ref={menuRef}>
@@ -225,7 +266,7 @@ export const MediaCard: React.FC<MediaCardProps> = ({ item, type, progress, onDe
             <MoreVertical className="w-4 h-4 text-white" />
           </button>
 
-          {/* Consolidated Menu Popup - Vertical Icon Only */}
+          {/* Consolidated Menu Popup */}
           {menuOpen && (
             <div
               onClick={(e) => e.stopPropagation()}
@@ -272,12 +313,12 @@ export const MediaCard: React.FC<MediaCardProps> = ({ item, type, progress, onDe
                 <Bookmark className={`w-4 h-4 ${isWatchlisted ? 'fill-current' : ''}`} />
               </button>
 
-              {/* Optional Delete Icon (for My Space) */}
+              {/* Optional Delete Icon */}
               {onDelete && (
                 <button
                   type="button"
                   onClick={handleDelete}
-                  title="Remove from My Space"
+                  title="Remove"
                   aria-label="Remove"
                   className="w-9 h-9 rounded-xl bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/40 flex items-center justify-center transition hover:scale-105 tv-focus-target"
                 >
@@ -288,8 +329,8 @@ export const MediaCard: React.FC<MediaCardProps> = ({ item, type, progress, onDe
           )}
         </div>
 
-        {/* Watch Progress Bar */}
-        {progress !== undefined && progress > 0 && (
+        {/* Progress Bar for Standard Posters (Omitted for Landscape continue watching) */}
+        {!isLandscape && progress !== undefined && progress > 0 && (
           <div className="absolute bottom-0 left-0 right-0 h-1.5 bg-black/60 z-10">
             <div
               className="h-full bg-gradient-to-r from-hbo-purple-light to-hbo-cyan"
@@ -299,18 +340,28 @@ export const MediaCard: React.FC<MediaCardProps> = ({ item, type, progress, onDe
         )}
       </div>
 
-      {/* Static title footer for clear visibility on TV / Mobile */}
+      {/* Title & Metadata Footer */}
       <div className="p-2.5">
-        <h4 className="text-xs sm:text-sm font-semibold text-gray-100 line-clamp-1 group-hover:text-hbo-cyan transition-colors">
+        <h4 className="text-xs sm:text-sm font-bold text-white line-clamp-1 group-hover:text-hbo-cyan transition-colors">
           {title}
         </h4>
-        <div className="flex items-center justify-between mt-1 text-[11px] text-gray-400">
-          <span>{releaseYear || mediaType.toUpperCase()}</span>
-          <span className="uppercase text-[10px] font-bold px-1.5 py-0.5 rounded bg-hbo-purple/20 text-hbo-purple-light border border-hbo-purple/30">
-            {mediaType === 'movie' ? 'Film' : 'Series'}
-          </span>
-        </div>
+        {isLandscape ? (
+          <p className="text-[11px] sm:text-xs text-gray-400 truncate mt-0.5">
+            {mediaType === 'tv' && season && episode
+              ? `S${season} : E${episode}${episodeTitle ? ` • ${episodeTitle}` : ''}`
+              : (releaseYear ? `${releaseYear} • Film` : 'Film')}
+          </p>
+        ) : (
+          <div className="flex items-center justify-between mt-1 text-[11px] text-gray-400">
+            <span>{releaseYear || mediaType.toUpperCase()}</span>
+            <span className="uppercase text-[10px] font-bold px-1.5 py-0.5 rounded bg-hbo-purple/20 text-hbo-purple-light border border-hbo-purple/30">
+              {mediaType === 'movie' ? 'Film' : 'Series'}
+            </span>
+          </div>
+        )}
       </div>
     </div>
   );
 };
+
+export const MediaCard = memo(MediaCardComponent);

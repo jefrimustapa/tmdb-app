@@ -148,7 +148,7 @@ export const Library: React.FC = () => {
       {activeTab === 'history' && (
         <div>
           {history.length > 0 ? (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3.5 sm:gap-5 lg:gap-6 py-2 px-1">
+            <div className="grid grid-cols-5 gap-3.5 sm:gap-4 py-2 px-1">
               {history.map((item) => (
                 <div key={`${item.tmdbId}-${item.mediaType}`} className="flex justify-center">
                   <MediaCard
@@ -176,7 +176,7 @@ export const Library: React.FC = () => {
       {activeTab === 'likes' && (
         <div>
           {likes.length > 0 ? (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3.5 sm:gap-5 lg:gap-6 py-2 px-1">
+            <div className="grid grid-cols-5 gap-3.5 sm:gap-4 py-2 px-1">
               {likes.map((item) => (
                 <div key={`${item.tmdbId}-${item.mediaType}`} className="flex justify-center">
                   <MediaCard
@@ -203,7 +203,7 @@ export const Library: React.FC = () => {
       {activeTab === 'watchlist' && (
         <div>
           {watchlist.length > 0 ? (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3.5 sm:gap-5 lg:gap-6 py-2 px-1">
+            <div className="grid grid-cols-5 gap-3.5 sm:gap-4 py-2 px-1">
               {watchlist.map((item) => (
                 <div key={`${item.tmdbId}-${item.mediaType}`} className="flex justify-center">
                   <MediaCard

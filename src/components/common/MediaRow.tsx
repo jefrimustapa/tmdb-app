@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, memo } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import type { TMDBMediaItem } from '../../types/tmdb';
 import { MediaCard } from './MediaCard';
@@ -8,9 +8,10 @@ interface MediaRowProps {
   subtitle?: string;
   items: TMDBMediaItem[];
   type?: 'movie' | 'tv';
+  variant?: 'poster' | 'landscape';
 }
 
-export const MediaRow: React.FC<MediaRowProps> = ({ title, subtitle, items, type }) => {
+const MediaRowComponent: React.FC<MediaRowProps> = ({ title, subtitle, items, type, variant = 'poster' }) => {
   const rowRef = useRef<HTMLDivElement>(null);
 
   const scroll = (direction: 'left' | 'right') => {
@@ -51,10 +52,10 @@ export const MediaRow: React.FC<MediaRowProps> = ({ title, subtitle, items, type
         {/* Horizontal Carousel */}
         <div
           ref={rowRef}
-          className="flex items-center gap-4 sm:gap-6 lg:gap-7 overflow-x-auto no-scrollbar py-3 px-2 scroll-smooth transform-gpu"
+          className="flex items-center gap-3 overflow-x-auto no-scrollbar py-3 pl-2 pr-6 scroll-smooth transform-gpu"
         >
           {items.map((item) => (
-            <MediaCard key={item.id} item={item} type={type} />
+            <MediaCard key={item.id} item={item} type={type} variant={variant} />
           ))}
         </div>
 
@@ -70,3 +71,5 @@ export const MediaRow: React.FC<MediaRowProps> = ({ title, subtitle, items, type
     </section>
   );
 };
+
+export const MediaRow = memo(MediaRowComponent);
