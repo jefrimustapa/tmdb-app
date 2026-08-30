@@ -145,10 +145,12 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ items }) => {
     >
       {/* Continuous Full-Width Sliding Track */}
       <div
-        className="flex h-full transition-transform duration-700 ease-out transform-gpu"
+        className="flex h-full transition-transform duration-350 ease-out transform-gpu will-change-transform"
         style={{
           width: `${totalItems * 100}%`,
-          transform: `translate3d(-${(currentIndex * 100) / totalItems}%, 0, 0)`
+          transform: `translate3d(-${(currentIndex * 100) / totalItems}%, 0, 0)`,
+          willChange: 'transform',
+          backfaceVisibility: 'hidden'
         }}
       >
         {displayItems.map((featured, idx) => {
@@ -156,12 +158,16 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ items }) => {
           const releaseDate = featured.release_date || featured.first_air_date;
           const releaseYear = releaseDate ? new Date(releaseDate).getFullYear() : '';
           const mediaType: 'movie' | 'tv' = featured.media_type === 'tv' ? 'tv' : 'movie';
-          const backdropUrl = tmdbImages.backdrop(featured.backdrop_path, isPerfMode ? 'w780' : 'original');
+          const backdropUrl = tmdbImages.backdrop(featured.backdrop_path, isPerfMode ? 'w780' : 'w1280');
+          const isNearby = Math.abs(idx - currentIndex) <= 1;
 
           return (
             <div
               key={featured.id}
-              style={{ width: `${100 / totalItems}%` }}
+              style={{
+                width: `${100 / totalItems}%`,
+                contentVisibility: isNearby ? 'visible' : 'hidden'
+              }}
               className="h-full relative flex-shrink-0 overflow-hidden"
             >
               {/* Background Backdrop Image */}
@@ -184,7 +190,7 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ items }) => {
               <div className="relative z-10 h-full w-full px-6 sm:px-12 flex flex-col justify-end pb-12 sm:pb-16 max-w-3xl">
                 {/* Brand Tag & Meta */}
                 <div className="flex items-center gap-2.5 mb-2 flex-wrap">
-                  <span className="px-2.5 py-0.5 rounded-full bg-hbo-purple/60 border border-hbo-purple-light text-white text-xs font-bold uppercase tracking-wider backdrop-blur-md">
+                  <span className="px-2.5 py-0.5 rounded-full bg-hbo-purple/90 border border-hbo-purple-light text-white text-xs font-bold uppercase tracking-wider">
                     {mediaType === 'movie' ? 'FILM' : 'SERIES'}
                   </span>
                   <RatingBadge score={featured.vote_average} size="md" />
@@ -192,12 +198,12 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ items }) => {
                 </div>
 
                 {/* Scaled Refined Title */}
-                <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black font-display text-white tracking-tight leading-snug mb-2 drop-shadow-lg line-clamp-2">
+                <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black font-display text-white tracking-tight leading-snug mb-2 drop-shadow-md line-clamp-2">
                   {title}
                 </h1>
 
                 {/* Overview */}
-                <p className="text-xs sm:text-sm text-gray-300 line-clamp-3 mb-4 max-w-xl leading-relaxed drop-shadow-md">
+                <p className="text-xs sm:text-sm text-gray-300 line-clamp-3 mb-4 max-w-xl leading-relaxed drop-shadow-sm">
                   {featured.overview}
                 </p>
 
@@ -239,7 +245,7 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ items }) => {
                         navigate(`/details/${mediaType}/${featured.id}`);
                       }
                     }}
-                    className="flex items-center gap-2 px-4 sm:px-5 py-2 rounded-xl bg-white/15 hover:bg-white/25 text-white font-semibold text-xs sm:text-sm backdrop-blur-md border border-white/20 transition-all hover:scale-105 tv-focus-target"
+                    className="flex items-center gap-2 px-4 sm:px-5 py-2 rounded-xl bg-white/20 hover:bg-white/30 text-white font-semibold text-xs sm:text-sm border border-white/25 transition-all hover:scale-105 tv-focus-target"
                   >
                     <Info className="w-4 h-4" />
                     <span>Details</span>
