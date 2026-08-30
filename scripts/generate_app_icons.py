@@ -1,6 +1,7 @@
 import os
 import io
 import base64
+import numpy as np
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
 
 def generate_all_icons():
@@ -63,7 +64,34 @@ def generate_all_icons():
 
     print('[IconGen] Saved public web icons & favicon.svg!')
 
-    # 3. Save Android mipmap launcher icons
+    # 2.5 Extract pure TMDB Emblem (TM ▶ B) without outer circle for Launcher
+    # Emblem is inside radius < 240 from center (516.5, 490.0)
+    arr = np.array(img)
+    y, x = np.ogrid[:arr.shape[0], :arr.shape[1]]
+    dist = np.sqrt((x - cx)**2 + (y - cy)**2)
+    inside_ring = dist < 242
+
+    r_ch = arr[:, :, 0].astype(float)
+    g_ch = arr[:, :, 1].astype(float)
+    b_ch = arr[:, :, 2].astype(float)
+    brightness = np.maximum.reduce([r_ch, g_ch, b_ch])
+
+    alpha = np.clip((brightness - 35) / 30.0 * 255.0, 0, 255).astype(np.uint8)
+    alpha[~inside_ring] = 0
+
+    emblem_arr = arr.copy()
+    emblem_arr[:, :, 3] = alpha
+    emblem_full = Image.fromarray(emblem_arr)
+
+    coords = np.argwhere(alpha > 30)
+    y_min, x_min = coords.min(axis=0)
+    y_max, x_max = coords.max(axis=0)
+    emblem_cropped = emblem_full.crop((x_min, y_min, x_max, y_max))
+
+    # Master emblem
+    master_emblem = emblem_cropped
+
+    # 3. Save Android mipmap launcher icons (WITHOUT outer circle)
     res_dir = 'D:/ai_project/tmdb_stream/android/app/src/main/res'
     densities = {
         'mdpi': (48, 108),
@@ -77,20 +105,36 @@ def generate_all_icons():
         mipmap_dir = os.path.join(res_dir, f'mipmap-{density}')
         os.makedirs(mipmap_dir, exist_ok=True)
         
-        # ic_launcher.png & ic_launcher_round.png
-        icon_img = master_icon.resize((icon_sz, icon_sz), Image.Resampling.LANCZOS)
-        icon_img.save(os.path.join(mipmap_dir, 'ic_launcher.png'))
-        icon_img.save(os.path.join(mipmap_dir, 'ic_launcher_round.png'))
+        # 3a. ic_launcher.png (Dark solid background with bold centered TMDB emblem)
+        launcher_bg = Image.new('RGBA', (icon_sz, icon_sz), (7, 5, 14, 255))
+        # Emblem sized to ~76% width
+        e_w = int(icon_sz * 0.76)
+        e_h = int(e_w * (master_emblem.height / master_emblem.width))
+        scaled_e = master_emblem.resize((e_w, e_h), Image.Resampling.LANCZOS)
+        e_x = (icon_sz - e_w) // 2
+        e_y = (icon_sz - e_h) // 2
+        launcher_bg.paste(scaled_e, (e_x, e_y), mask=scaled_e)
+        launcher_bg.save(os.path.join(mipmap_dir, 'ic_launcher.png'))
         
-        # ic_launcher_foreground.png (safe zone is ~68% of canvas for adaptive icons)
+        # 3b. ic_launcher_round.png
+        round_mask = Image.new('L', (icon_sz, icon_sz), 0)
+        r_draw = ImageDraw.Draw(round_mask)
+        r_draw.ellipse((0, 0, icon_sz - 1, icon_sz - 1), fill=255)
+        launcher_round = Image.new('RGBA', (icon_sz, icon_sz), (0, 0, 0, 0))
+        launcher_round.paste(launcher_bg, (0, 0), mask=round_mask)
+        launcher_round.save(os.path.join(mipmap_dir, 'ic_launcher_round.png'))
+        
+        # 3c. ic_launcher_foreground.png (for adaptive icons, centered in safe 66% viewport)
         fg_img = Image.new('RGBA', (fg_sz, fg_sz), (0, 0, 0, 0))
-        inner_sz = int(fg_sz * 0.68)
-        scaled_icon = master_icon.resize((inner_sz, inner_sz), Image.Resampling.LANCZOS)
-        offset = (fg_sz - inner_sz) // 2
-        fg_img.paste(scaled_icon, (offset, offset), mask=scaled_icon)
+        fg_w = int(fg_sz * 0.65)
+        fg_h = int(fg_w * (master_emblem.height / master_emblem.width))
+        scaled_fg = master_emblem.resize((fg_w, fg_h), Image.Resampling.LANCZOS)
+        fg_x = (fg_sz - fg_w) // 2
+        fg_y = (fg_sz - fg_h) // 2
+        fg_img.paste(scaled_fg, (fg_x, fg_y), mask=scaled_fg)
         fg_img.save(os.path.join(mipmap_dir, 'ic_launcher_foreground.png'))
 
-    print('[IconGen] Saved Android mipmap launcher icons!')
+    print('[IconGen] Saved Android mipmap launcher icons without outer circle!')
 
     # 4. Generate Splash Screens
     def create_splash(width, height):
@@ -232,14 +276,25 @@ def generate_all_icons():
 
         return banner
 
-    tv_banner_dir = os.path.join(res_dir, 'drawable')
-    tv_banner_xhdpi_dir = os.path.join(res_dir, 'drawable-xhdpi')
-    os.makedirs(tv_banner_dir, exist_ok=True)
-    os.makedirs(tv_banner_xhdpi_dir, exist_ok=True)
-    
-    create_tv_banner(320, 180).save(os.path.join(tv_banner_dir, 'tv_banner.png'))
-    create_tv_banner(640, 360).save(os.path.join(tv_banner_xhdpi_dir, 'tv_banner.png'))
-    print('[IconGen] Saved Android TV Leanback Banners!')
+    tv_drawable_dirs = [
+        'drawable',
+        'drawable-mdpi',
+        'drawable-hdpi',
+        'drawable-xhdpi',
+        'drawable-xxhdpi',
+        'drawable-xxxhdpi',
+        'drawable-tvdpi',
+        'drawable-nodpi',
+    ]
+
+    for d in tv_drawable_dirs:
+        dir_path = os.path.join(res_dir, d)
+        os.makedirs(dir_path, exist_ok=True)
+        # Use 640x360 for high densities, 320x180 for standard
+        w, h = (640, 360) if ('xhdpi' in d or 'xxhdpi' in d or 'xxxhdpi' in d or 'nodpi' in d) else (320, 180)
+        create_tv_banner(w, h).save(os.path.join(dir_path, 'tv_banner.png'))
+
+    print('[IconGen] Saved Android TV Leanback Banners across all densities!')
 
 if __name__ == '__main__':
     generate_all_icons()
