@@ -27,8 +27,8 @@ const MediaRowComponent: React.FC<MediaRowProps> = ({ title, subtitle, items, ty
   if (!items || items.length === 0) return null;
 
   return (
-    <section className="relative my-6 sm:my-8 px-4 sm:px-8 group" data-content-rail="true">
-      <div className="flex items-end justify-between mb-3">
+    <section className="relative mb-7 sm:mb-9 px-4 sm:px-8 group" data-content-rail="true">
+      <div className="flex items-end justify-between mb-2.5">
         <div>
           <h2 className="text-lg sm:text-2xl font-bold font-display text-white tracking-tight flex items-center gap-2">
             <span className="w-1.5 h-5 bg-gradient-to-b from-hbo-purple to-hbo-cyan rounded-full inline-block"></span>
@@ -52,7 +52,7 @@ const MediaRowComponent: React.FC<MediaRowProps> = ({ title, subtitle, items, ty
         {/* Horizontal Carousel */}
         <div
           ref={rowRef}
-          className="flex items-center gap-3 overflow-x-auto no-scrollbar py-3 pl-2 pr-6 scroll-smooth transform-gpu"
+          className="flex items-center gap-3.5 overflow-x-auto no-scrollbar py-1.5 pl-2 pr-6 scroll-smooth transform-gpu"
         >
           {items.map((item) => (
             <MediaCard key={item.id} item={item} type={type} variant={variant} />

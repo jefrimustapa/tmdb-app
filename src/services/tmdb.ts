@@ -167,6 +167,12 @@ export const tmdbApi = {
   getSeasonDetails: (tvId: number, seasonNumber: number) =>
     tmdbFetch<TMDBSeasonDetails>(`/tv/${tvId}/season/${seasonNumber}`),
 
+  // Recommendations & Similar
+  getRecommendations: (type: 'movie' | 'tv', id: number, page = 1) =>
+    tmdbFetch<TMDBResponse<TMDBMediaItem>>(`/${type}/${id}/recommendations`, { page }),
+  getSimilar: (type: 'movie' | 'tv', id: number, page = 1) =>
+    tmdbFetch<TMDBResponse<TMDBMediaItem>>(`/${type}/${id}/similar`, { page }),
+
   // Discovery & Filtering
   discoverMovies: (params: {
     with_genres?: string;
