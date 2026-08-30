@@ -306,7 +306,7 @@ export const Details: React.FC = () => {
                   ? Math.max(1, Math.round((watchProgress.duration - watchProgress.timestamp) / 60))
                   : 0;
 
-                const targetResumeTime = isResumable ? (mediaType === 'tv' ? (lastWatched?.timestamp || 0) : (watchProgress?.timestamp || 0)) : 0;
+                const targetResumeTime = isResumable ? (watchProgress?.timestamp || 0) : 0;
 
                 const watchUrl = mediaType === 'tv'
                   ? `/watch/tv/${tmdbId}?s=${lastWatched?.season || 1}&e=${lastWatched?.episode || 1}${targetResumeTime > 0 ? `&t=${targetResumeTime}` : ''}`
@@ -412,8 +412,10 @@ export const Details: React.FC = () => {
               currentEpisode={lastWatched?.episode || 1}
               hasWatchedHistory={Boolean(lastWatched)}
               onSelectEpisode={(s, e) => {
+                const isCurrentEp = Boolean(lastWatched && lastWatched.season === s && lastWatched.episode === e);
+                const epTime = (isCurrentEp && watchProgress && watchProgress.timestamp > 15) ? watchProgress.timestamp : 0;
                 setLastWatched({ season: s, episode: e });
-                navigate(`/watch/tv/${tmdbId}?s=${s}&e=${e}`);
+                navigate(`/watch/tv/${tmdbId}?s=${s}&e=${e}${epTime > 0 ? `&t=${epTime}` : ''}`);
               }}
             />
           </div>
