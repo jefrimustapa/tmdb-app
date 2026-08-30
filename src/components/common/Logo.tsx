@@ -24,34 +24,15 @@ export const Logo: React.FC<LogoProps> = ({ size = 'md', showText = true, classN
 
   return (
     <div className={`inline-flex items-center gap-2.5 select-none pointer-events-none ${className}`} aria-hidden="true">
-      {/* HBO-styled TMDB vector icon */}
-      <div className={`relative ${iconSizes[size]}`}>
-        <svg viewBox="0 0 100 100" className="w-full h-full drop-shadow-[0_0_12px_rgba(144,85,255,0.6)]">
-          <defs>
-            <linearGradient id="logoHboGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stopColor="#673ab7" />
-              <stop offset="50%" stopColor="#9055ff" />
-              <stop offset="100%" stopColor="#00d2ff" />
-            </linearGradient>
-            <radialGradient id="logoBullseye" cx="50%" cy="50%" r="50%">
-              <stop offset="0%" stopColor="#00d2ff" />
-              <stop offset="100%" stopColor="#9055ff" />
-            </radialGradient>
-          </defs>
-          {/* Outer Circle Container */}
-          <circle cx="50" cy="50" r="48" fill="#0d0d17" stroke="#23233a" strokeWidth="3" />
-          <circle cx="50" cy="50" r="43" fill="none" stroke="url(#logoHboGrad)" strokeWidth="3.5" opacity="0.9" />
-          
-          {/* 'T' Character */}
-          <path d="M 18 34 L 36 34 M 27 34 L 27 66" stroke="#ffffff" strokeWidth="7" strokeLinecap="round" />
-          
-          {/* 'M' Character */}
-          <path d="M 42 34 L 42 66 L 50 48 L 58 66 L 58 34" fill="none" stroke="#ffffff" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round" />
-          
-          {/* 'O'/'D' HBO Target Bullseye Emblem */}
-          <circle cx="76" cy="50" r="14" fill="none" stroke="url(#logoHboGrad)" strokeWidth="5" />
-          <circle cx="76" cy="50" r="5.5" fill="url(#logoBullseye)" />
-        </svg>
+      {/* New Circular TMDB Icon */}
+      <div className={`relative ${iconSizes[size]} flex-shrink-0 flex items-center justify-center`}>
+        <img
+          src="/icon.png"
+          alt="TMDB Streamer"
+          className="w-full h-full object-contain rounded-full drop-shadow-[0_0_12px_rgba(144,85,255,0.6)]"
+          loading="eager"
+          decoding="async"
+        />
       </div>
 
       {showText && (
