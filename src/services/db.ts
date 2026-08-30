@@ -51,6 +51,8 @@ export const DEFAULT_SETTINGS: UserSettings = {
   deviceMode: 'auto',
   autoplayNext: true,
   upNextPopup: true,
+  upNextTriggerPercent: 90,
+  upNextTimeout: 10,
   adBlockShield: true,
   filterAdult: true,
   filterUnreleased: true,
