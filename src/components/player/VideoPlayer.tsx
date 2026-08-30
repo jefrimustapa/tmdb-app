@@ -165,6 +165,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         }
         if (s.topProviders && s.topProviders.length >= 3) {
           setTopProviders(s.topProviders);
+        }
         if (typeof s.autoplayNext === 'boolean') {
           setAutoplayNextEnabled(s.autoplayNext);
           autoplayNextEnabledRef.current = s.autoplayNext;
