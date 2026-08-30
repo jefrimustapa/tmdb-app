@@ -337,7 +337,7 @@ export function useTVNavigation(isEnabled = true) {
             } else {
               // At leftmost slide (Card 0): move focus to navbar / sidebar
               const navActive = document.querySelector<HTMLElement>('aside .tv-focus-target, [data-tv-nav="true"]');
-              navActive?.focus();
+              navActive?.focus({ preventScroll: true });
             }
             return;
           } else if (e.key === 'ArrowDown') {
@@ -346,13 +346,13 @@ export function useTVNavigation(isEnabled = true) {
               const detailsBtn = heroBanner?.querySelector<HTMLElement>(
                 `[data-hero-btn="details"][data-hero-index="${currentSlideIdx}"]`
               );
-              detailsBtn?.focus();
+              detailsBtn?.focus({ preventScroll: true });
             } else {
               // From details: move down to first card of next section (Continue watching / Trending now)
               const firstRail = document.querySelector('[data-content-rail="true"]');
               const firstCard = firstRail?.querySelector<HTMLElement>('.tv-focus-target');
               if (firstCard) {
-                firstCard.focus();
+                firstCard.focus({ preventScroll: true });
                 firstCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
               }
             }
@@ -363,7 +363,7 @@ export function useTVNavigation(isEnabled = true) {
               const playBtn = heroBanner?.querySelector<HTMLElement>(
                 `[data-hero-btn="play"][data-hero-index="${currentSlideIdx}"]`
               );
-              playBtn?.focus();
+              playBtn?.focus({ preventScroll: true });
             }
             return;
           }
@@ -438,22 +438,30 @@ export function useTVNavigation(isEnabled = true) {
                     e.preventDefault();
                     targetToFocus.focus();
 
-                    // Exact HBO Max Fixed-Anchor Sliding Rail Navigation
+                    // Smart edge viewport rail scrolling
                     const rail = targetToFocus.closest('[data-content-rail="true"]');
-                    if (rail) {
-                      const scrollContainer = rail.querySelector<HTMLElement>('.overflow-x-auto') || rail;
-                      const cardWidth = targetToFocus.offsetWidth;
-                      const gap = 12; // gap-3 (12px)
-                      const step = cardWidth + gap;
-                      const nextCardIdx = rowSiblings.indexOf(nextSibling);
-                      if (nextCardIdx >= 0) {
-                        scrollContainer.scrollTo({
-                          left: nextCardIdx * step,
+                    const scrollContainer = rail?.querySelector<HTMLElement>('.overflow-x-auto') || 
+                                            (currentRow?.classList.contains('overflow-x-auto') ? currentRow : null);
+
+                    if (scrollContainer) {
+                      const containerRect = scrollContainer.getBoundingClientRect();
+                      const cardRect = targetToFocus.getBoundingClientRect();
+
+                      if (cardRect.right > containerRect.right - 24) {
+                        const scrollDelta = cardRect.right - containerRect.right + 48;
+                        scrollContainer.scrollBy({
+                          left: scrollDelta,
+                          behavior: e.repeat ? 'auto' : getScrollBehavior()
+                        });
+                      } else if (cardRect.left < containerRect.left + 24) {
+                        const scrollDelta = cardRect.left - containerRect.left - 24;
+                        scrollContainer.scrollBy({
+                          left: scrollDelta,
                           behavior: e.repeat ? 'auto' : getScrollBehavior()
                         });
                       }
                     } else {
-                      targetToFocus.scrollIntoView({ behavior: e.repeat ? 'auto' : getScrollBehavior(), block: 'nearest', inline: 'center' });
+                      targetToFocus.scrollIntoView({ behavior: e.repeat ? 'auto' : getScrollBehavior(), block: 'nearest', inline: 'nearest' });
                     }
                     return;
                   }
@@ -488,22 +496,31 @@ export function useTVNavigation(isEnabled = true) {
                     e.preventDefault();
                     targetToFocus.focus();
 
-                    // Exact HBO Max Fixed-Anchor Sliding Rail Navigation
+                    // Smart edge viewport rail scrolling
                     const rail = targetToFocus.closest('[data-content-rail="true"]');
-                    if (rail) {
-                      const scrollContainer = rail.querySelector<HTMLElement>('.overflow-x-auto') || rail;
-                      const cardWidth = targetToFocus.offsetWidth;
-                      const gap = 12; // gap-3 (12px)
-                      const step = cardWidth + gap;
+                    const scrollContainer = rail?.querySelector<HTMLElement>('.overflow-x-auto') || 
+                                            (currentRow?.classList.contains('overflow-x-auto') ? currentRow : null);
+
+                    if (scrollContainer) {
                       const prevCardIdx = rowSiblings.indexOf(prevSibling);
-                      if (prevCardIdx >= 0) {
+                      if (prevCardIdx === 0) {
                         scrollContainer.scrollTo({
-                          left: prevCardIdx * step,
+                          left: 0,
                           behavior: e.repeat ? 'auto' : getScrollBehavior()
                         });
+                      } else {
+                        const containerRect = scrollContainer.getBoundingClientRect();
+                        const cardRect = targetToFocus.getBoundingClientRect();
+                        if (cardRect.left < containerRect.left + 24) {
+                          const scrollDelta = cardRect.left - containerRect.left - 48;
+                          scrollContainer.scrollBy({
+                            left: scrollDelta,
+                            behavior: e.repeat ? 'auto' : getScrollBehavior()
+                          });
+                        }
                       }
                     } else {
-                      targetToFocus.scrollIntoView({ behavior: e.repeat ? 'auto' : getScrollBehavior(), block: 'nearest', inline: 'center' });
+                      targetToFocus.scrollIntoView({ behavior: e.repeat ? 'auto' : getScrollBehavior(), block: 'nearest', inline: 'nearest' });
                     }
                     return;
                   }
@@ -620,12 +637,12 @@ export function useTVNavigation(isEnabled = true) {
 
         if (nextElement) {
           e.preventDefault();
-          nextElement.focus();
+          nextElement.focus({ preventScroll: true });
           
           // If the focused element is within the Hero Billboard or Filter Section in Movies/Series, scroll immediately to top
           if (nextElement.closest('[data-hero-banner="true"]') !== null || nextElement.closest('[data-tv-filter-section="true"]') !== null) {
             window.scrollTo({ top: 0, left: 0, behavior: getScrollBehavior() });
-            nextElement.scrollIntoView({ behavior: e.repeat ? 'auto' : getScrollBehavior(), block: 'nearest', inline: 'center' });
+            nextElement.scrollIntoView({ behavior: e.repeat ? 'auto' : getScrollBehavior(), block: 'nearest', inline: 'nearest' });
           } else {
             nextElement.scrollIntoView({ behavior: e.repeat ? 'auto' : getScrollBehavior(), block: 'center', inline: 'nearest' });
             setTimeout(() => {
@@ -638,7 +655,7 @@ export function useTVNavigation(isEnabled = true) {
         } else {
           // Boundary reached (e.g. at the bottom of the page or end of a row)
           e.preventDefault();
-          currentFocused.focus();
+          currentFocused.focus({ preventScroll: true });
         }
       } else if (e.key === 'Enter' || e.key === ' ' || e.keyCode === 13 || e.keyCode === 23 || e.keyCode === 66) {
         // TV D-Pad Center / OK button
