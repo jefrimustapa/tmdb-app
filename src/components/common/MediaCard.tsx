@@ -223,7 +223,7 @@ const MediaCardComponent: React.FC<MediaCardProps> = ({
       onMouseDown={handleTouchStart}
       onMouseUp={handleTouchEnd}
       onClick={handleCardClick}
-      className={`group relative flex-shrink-0 rounded-xl overflow-hidden bg-hbo-card border border-hbo-border/40 tv-focus-target cursor-pointer focus:outline-none transform-gpu ${
+      className={`group relative flex-shrink-0 snap-start rounded-xl overflow-hidden bg-hbo-card border border-hbo-border/40 tv-focus-target cursor-pointer focus:outline-none transform-gpu ${
         isLandscape
           ? 'w-[164px] sm:w-[172px] lg:w-[176px] max-w-[180px]'
           : 'w-[130px] sm:w-[140px] lg:w-[144px] max-w-[148px]'
