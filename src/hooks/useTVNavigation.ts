@@ -244,6 +244,57 @@ export function useTVNavigation(isEnabled = true) {
       let minDistance = Infinity;
 
       if (e.key === 'ArrowRight' || e.key === 'ArrowLeft' || e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        // Trap navigation inside active modal dialog if present
+        const activeModal = document.querySelector<HTMLElement>('[data-modal-container="true"], [role="dialog"]');
+        if (activeModal && (activeModal.contains(currentFocused) || currentFocused === document.body)) {
+          const modalCloseBtn = activeModal.querySelector<HTMLElement>('[data-modal-close="true"]');
+          const modalScrollBox = activeModal.querySelector<HTMLElement>('[data-modal-scroll="true"]');
+          const modalInstallBtn = activeModal.querySelector<HTMLElement>('[data-modal-install="true"]');
+          const modalLaterBtn = activeModal.querySelector<HTMLElement>('[data-modal-later="true"]');
+
+          const isClose = currentFocused === modalCloseBtn;
+          const isScroll = currentFocused === modalScrollBox;
+          const isInstall = currentFocused === modalInstallBtn;
+          const isLater = currentFocused === modalLaterBtn;
+
+          if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            if (isClose) {
+              if (modalScrollBox) modalScrollBox.focus();
+              else if (modalInstallBtn && !modalInstallBtn.hasAttribute('disabled')) modalInstallBtn.focus();
+              else if (modalLaterBtn) modalLaterBtn.focus();
+            } else if (isScroll) {
+              if (modalInstallBtn && !modalInstallBtn.hasAttribute('disabled')) {
+                modalInstallBtn.focus();
+              } else if (modalLaterBtn) {
+                modalLaterBtn.focus();
+              }
+            }
+            return;
+          } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            if (isInstall || isLater) {
+              if (modalScrollBox) modalScrollBox.focus();
+              else if (modalCloseBtn) modalCloseBtn.focus();
+            } else if (isScroll) {
+              if (modalCloseBtn) modalCloseBtn.focus();
+            }
+            return;
+          } else if (e.key === 'ArrowRight') {
+            e.preventDefault();
+            if (isInstall && modalLaterBtn) {
+              modalLaterBtn.focus();
+            }
+            return;
+          } else if (e.key === 'ArrowLeft') {
+            e.preventDefault();
+            if (isLater && modalInstallBtn && !modalInstallBtn.hasAttribute('disabled')) {
+              modalInstallBtn.focus();
+            }
+            return;
+          }
+        }
+
         const isCurrentInNav = currentFocused.closest('aside') !== null || currentFocused.getAttribute('data-tv-nav') === 'true';
 
         // Separate elements into main page content vs sidebar/nav elements
