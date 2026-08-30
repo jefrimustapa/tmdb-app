@@ -436,27 +436,28 @@ export function useTVNavigation(isEnabled = true) {
                   
                   if (targetToFocus) {
                     e.preventDefault();
-                    targetToFocus.focus();
+                    targetToFocus.focus({ preventScroll: true });
 
-                    // Smart edge viewport rail scrolling
+                    // HBO Max / Android TV Sliding Rail Carousel
+                    // Keep focus ring anchored at the left viewing slot while sliding the track
                     const rail = targetToFocus.closest('[data-content-rail="true"]');
                     const scrollContainer = rail?.querySelector<HTMLElement>('.overflow-x-auto') || 
                                             (currentRow?.classList.contains('overflow-x-auto') ? currentRow : null);
 
                     if (scrollContainer) {
-                      const containerRect = scrollContainer.getBoundingClientRect();
-                      const cardRect = targetToFocus.getBoundingClientRect();
-
-                      if (cardRect.right > containerRect.right - 24) {
-                        const scrollDelta = cardRect.right - containerRect.right + 48;
-                        scrollContainer.scrollBy({
-                          left: scrollDelta,
+                      const nextCardIdx = rowSiblings.indexOf(nextSibling);
+                      if (nextCardIdx === 0) {
+                        scrollContainer.scrollTo({
+                          left: 0,
                           behavior: e.repeat ? 'auto' : getScrollBehavior()
                         });
-                      } else if (cardRect.left < containerRect.left + 24) {
-                        const scrollDelta = cardRect.left - containerRect.left - 24;
-                        scrollContainer.scrollBy({
-                          left: scrollDelta,
+                      } else {
+                        // Left peek offset allows previous card to peek on the left edge (~70-80px)
+                        const leftPeekOffset = 80;
+                        const targetOffset = targetToFocus.offsetLeft;
+                        const desiredScrollLeft = targetOffset - leftPeekOffset;
+                        scrollContainer.scrollTo({
+                          left: Math.max(0, desiredScrollLeft),
                           behavior: e.repeat ? 'auto' : getScrollBehavior()
                         });
                       }
@@ -494,9 +495,9 @@ export function useTVNavigation(isEnabled = true) {
                   
                   if (targetToFocus) {
                     e.preventDefault();
-                    targetToFocus.focus();
+                    targetToFocus.focus({ preventScroll: true });
 
-                    // Smart edge viewport rail scrolling
+                    // HBO Max / Android TV Sliding Rail Carousel
                     const rail = targetToFocus.closest('[data-content-rail="true"]');
                     const scrollContainer = rail?.querySelector<HTMLElement>('.overflow-x-auto') || 
                                             (currentRow?.classList.contains('overflow-x-auto') ? currentRow : null);
@@ -509,15 +510,13 @@ export function useTVNavigation(isEnabled = true) {
                           behavior: e.repeat ? 'auto' : getScrollBehavior()
                         });
                       } else {
-                        const containerRect = scrollContainer.getBoundingClientRect();
-                        const cardRect = targetToFocus.getBoundingClientRect();
-                        if (cardRect.left < containerRect.left + 24) {
-                          const scrollDelta = cardRect.left - containerRect.left - 48;
-                          scrollContainer.scrollBy({
-                            left: scrollDelta,
-                            behavior: e.repeat ? 'auto' : getScrollBehavior()
-                          });
-                        }
+                        const leftPeekOffset = 80;
+                        const targetOffset = targetToFocus.offsetLeft;
+                        const desiredScrollLeft = targetOffset - leftPeekOffset;
+                        scrollContainer.scrollTo({
+                          left: Math.max(0, desiredScrollLeft),
+                          behavior: e.repeat ? 'auto' : getScrollBehavior()
+                        });
                       }
                     } else {
                       targetToFocus.scrollIntoView({ behavior: e.repeat ? 'auto' : getScrollBehavior(), block: 'nearest', inline: 'nearest' });
