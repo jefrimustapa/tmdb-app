@@ -142,7 +142,7 @@ export const ProviderPickerTV: React.FC<ProviderPickerTVProps> = ({
             }
           }
         }}
-        className={`flex items-center gap-2 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl border backdrop-blur-md transition-all tv-focus-target focus:outline-none focus:border-hbo-cyan focus:ring-2 focus:ring-hbo-cyan ${
+        className={`flex items-center gap-2 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl border backdrop-blur-md transition-all tv-focus-target ${
           isOpen
             ? 'bg-hbo-purple/40 border-hbo-cyan text-white shadow-hbo-glow'
             : 'bg-black/60 hover:bg-black/80 border-white/20 text-gray-200 hover:text-white'

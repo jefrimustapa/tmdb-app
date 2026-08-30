@@ -470,15 +470,23 @@ export const Settings: React.FC = () => {
 
             <button
               onClick={() => handleUpdate({ filterAdult: settings.filterAdult === false ? true : false })}
-              className={`flex-shrink-0 w-12 h-6 rounded-full transition-colors relative tv-focus-target ${
-                settings.filterAdult !== false ? 'bg-amber-500' : 'bg-gray-700'
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all tv-focus-target flex items-center gap-1.5 flex-shrink-0 border ${
+                settings.filterAdult !== false
+                  ? 'bg-emerald-500/20 border-emerald-400 text-emerald-400'
+                  : 'bg-white/5 border-white/10 text-gray-400'
               }`}
             >
-              <div
-                className={`w-5 h-5 rounded-full bg-white transition-transform transform ${
-                  settings.filterAdult !== false ? 'translate-x-6' : 'translate-x-0.5'
-                }`}
-              />
+              {settings.filterAdult !== false ? (
+                <>
+                  <Check className="w-3.5 h-3.5 stroke-[2.5]" />
+                  <span>Enabled</span>
+                </>
+              ) : (
+                <>
+                  <X className="w-3.5 h-3.5 stroke-[2.5]" />
+                  <span>Disabled</span>
+                </>
+              )}
             </button>
           </div>
 
@@ -496,15 +504,23 @@ export const Settings: React.FC = () => {
 
             <button
               onClick={() => handleUpdate({ filterUnreleased: settings.filterUnreleased === false ? true : false })}
-              className={`flex-shrink-0 w-12 h-6 rounded-full transition-colors relative tv-focus-target ${
-                settings.filterUnreleased !== false ? 'bg-hbo-cyan' : 'bg-gray-700'
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all tv-focus-target flex items-center gap-1.5 flex-shrink-0 border ${
+                settings.filterUnreleased !== false
+                  ? 'bg-emerald-500/20 border-emerald-400 text-emerald-400'
+                  : 'bg-white/5 border-white/10 text-gray-400'
               }`}
             >
-              <div
-                className={`w-5 h-5 rounded-full bg-white transition-transform transform ${
-                  settings.filterUnreleased !== false ? 'translate-x-6' : 'translate-x-0.5'
-                }`}
-              />
+              {settings.filterUnreleased !== false ? (
+                <>
+                  <Check className="w-3.5 h-3.5 stroke-[2.5]" />
+                  <span>Enabled</span>
+                </>
+              ) : (
+                <>
+                  <X className="w-3.5 h-3.5 stroke-[2.5]" />
+                  <span>Disabled</span>
+                </>
+              )}
             </button>
           </div>
 
@@ -709,15 +725,23 @@ export const Settings: React.FC = () => {
           <button
             onClick={() => handleUpdate({ adBlockShield: !settings.adBlockShield })}
             data-settings-bottom="true"
-            className={`flex-shrink-0 w-12 h-6 rounded-full transition-colors relative tv-focus-target ${
-              settings.adBlockShield ? 'bg-hbo-purple-light' : 'bg-gray-700'
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all tv-focus-target flex items-center gap-1.5 flex-shrink-0 border ${
+              settings.adBlockShield
+                ? 'bg-emerald-500/20 border-emerald-400 text-emerald-400'
+                : 'bg-white/5 border-white/10 text-gray-400'
             }`}
           >
-            <div
-              className={`w-5 h-5 rounded-full bg-white transition-transform transform ${
-                settings.adBlockShield ? 'translate-x-6' : 'translate-x-0.5'
-              }`}
-            />
+            {settings.adBlockShield ? (
+              <>
+                <Check className="w-3.5 h-3.5 stroke-[2.5]" />
+                <span>Enabled</span>
+              </>
+            ) : (
+              <>
+                <X className="w-3.5 h-3.5 stroke-[2.5]" />
+                <span>Disabled</span>
+              </>
+            )}
           </button>
         </div>
 
@@ -793,15 +817,23 @@ export const Settings: React.FC = () => {
 
             <button
               onClick={() => handleUpdate({ includeNightlyUpdates: !settings.includeNightlyUpdates })}
-              className={`flex-shrink-0 w-12 h-6 rounded-full transition-colors relative tv-focus-target ${
-                settings.includeNightlyUpdates ? 'bg-hbo-cyan' : 'bg-gray-700'
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all tv-focus-target flex items-center gap-1.5 flex-shrink-0 border ${
+                settings.includeNightlyUpdates
+                  ? 'bg-emerald-500/20 border-emerald-400 text-emerald-400'
+                  : 'bg-white/5 border-white/10 text-gray-400'
               }`}
             >
-              <div
-                className={`w-5 h-5 rounded-full bg-white transition-transform transform ${
-                  settings.includeNightlyUpdates ? 'translate-x-6' : 'translate-x-0.5'
-                }`}
-              />
+              {settings.includeNightlyUpdates ? (
+                <>
+                  <Check className="w-3.5 h-3.5 stroke-[2.5]" />
+                  <span>Enabled</span>
+                </>
+              ) : (
+                <>
+                  <X className="w-3.5 h-3.5 stroke-[2.5]" />
+                  <span>Disabled</span>
+                </>
+              )}
             </button>
           </div>
         </div>
