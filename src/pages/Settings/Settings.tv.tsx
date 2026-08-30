@@ -1232,7 +1232,7 @@ export const Settings: React.FC = () => {
             </button>
           </div>
 
-          {/* Popup Trigger Percentage Slider (10% Steps) */}
+          {/* Popup Trigger Percentage (10% Step Buttons) */}
           <div className="border-t border-hbo-border/60 pt-4">
             <div className="flex items-center justify-between mb-2">
               <h4 className="text-xs font-bold text-gray-300 uppercase tracking-wider flex items-center gap-2">
@@ -1243,74 +1243,31 @@ export const Settings: React.FC = () => {
                 {settings.upNextTriggerPercent || 90}% Progress
               </span>
             </div>
-            <p className="text-xs text-gray-400 mb-4">
-              Adjust the slider in 10% steps to set the playback completion percentage threshold at which the "Up Next" popup appears.
+            <p className="text-xs text-gray-400 mb-3">
+              Select the playback completion percentage threshold when the "Up Next" popup should appear.
             </p>
 
-            <div className="bg-hbo-dark/60 border border-hbo-border rounded-xl p-4 space-y-3">
-              {/* Interactive Range Slider with Minus / Plus Steppers for TV & Touch */}
-              <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={() => {
-                    const current = settings.upNextTriggerPercent || 90;
-                    const next = Math.max(10, current - 10);
-                    handleUpdate({ upNextTriggerPercent: next });
-                  }}
-                  disabled={(settings.upNextTriggerPercent || 90) <= 10}
-                  className="px-3 py-1.5 rounded-lg bg-hbo-card border border-hbo-border flex items-center justify-center text-white font-bold text-xs tv-focus-target hover:bg-hbo-hover disabled:opacity-40 disabled:pointer-events-none transition-all flex-shrink-0"
-                  title="-10%"
-                >
-                  -10%
-                </button>
-
-                <div className="flex-1 relative flex items-center">
-                  <input
-                    type="range"
-                    min="10"
-                    max="90"
-                    step="10"
-                    value={settings.upNextTriggerPercent || 90}
-                    onChange={(e) => handleUpdate({ upNextTriggerPercent: Number(e.target.value) })}
-                    className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-hbo-cyan tv-focus-target"
-                  />
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    const current = settings.upNextTriggerPercent || 90;
-                    const next = Math.min(90, current + 10);
-                    handleUpdate({ upNextTriggerPercent: next });
-                  }}
-                  disabled={(settings.upNextTriggerPercent || 90) >= 90}
-                  className="px-3 py-1.5 rounded-lg bg-hbo-card border border-hbo-border flex items-center justify-center text-white font-bold text-xs tv-focus-target hover:bg-hbo-hover disabled:opacity-40 disabled:pointer-events-none transition-all flex-shrink-0"
-                  title="+10%"
-                >
-                  +10%
-                </button>
-              </div>
-
-              {/* Step indicator ticks */}
-              <div className="flex justify-between items-center px-1 text-[11px] text-gray-400 font-mono">
-                {[10, 20, 30, 40, 50, 60, 70, 80, 90].map((val) => {
-                  const isSelected = (settings.upNextTriggerPercent || 90) === val;
-                  return (
-                    <button
-                      key={val}
-                      type="button"
-                      onClick={() => handleUpdate({ upNextTriggerPercent: val })}
-                      className={`px-1.5 py-0.5 rounded transition-all tv-focus-target ${
-                        isSelected
-                          ? 'text-hbo-cyan font-bold bg-hbo-purple/40 border border-hbo-cyan/40 scale-110'
-                          : 'text-gray-400 hover:text-white'
-                      }`}
-                    >
-                      {val}%
-                    </button>
-                  );
-                })}
-              </div>
+            <div className="grid grid-cols-3 sm:grid-cols-5 md:grid-cols-9 gap-2">
+              {[10, 20, 30, 40, 50, 60, 70, 80, 90].map((percent) => {
+                const isSelected = (settings.upNextTriggerPercent || 90) === percent;
+                return (
+                  <button
+                    key={percent}
+                    type="button"
+                    onClick={() => handleUpdate({ upNextTriggerPercent: percent })}
+                    className={`py-3 px-2 rounded-xl border text-center transition-all tv-focus-target flex flex-col items-center justify-center gap-1 ${
+                      isSelected
+                        ? 'bg-hbo-purple/40 border-hbo-cyan text-white font-bold shadow-lg ring-1 ring-hbo-cyan/50'
+                        : 'bg-hbo-dark/60 border-hbo-border hover:bg-hbo-hover hover:border-white/20 text-gray-300'
+                    }`}
+                  >
+                    <span className="text-sm sm:text-base font-bold text-white leading-none">{percent}%</span>
+                    <span className={`text-[10px] ${isSelected ? 'text-hbo-cyan font-semibold' : 'text-gray-500'}`}>
+                      {percent === 90 ? 'Default' : percent <= 50 ? 'Early' : 'Late'}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
           </div>
 
