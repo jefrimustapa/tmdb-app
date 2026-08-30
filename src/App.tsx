@@ -18,12 +18,15 @@ import { useAndroidBackButton } from './hooks/useAndroidBackButton';
 
 import { useLocation } from 'react-router-dom';
 import { dbService } from './services/db';
+import { updateService, type UpdateInfo } from './services/updateService';
+import { UpdateModal } from './components/common/UpdateModal';
 
 const AppContent: React.FC = () => {
   const { isTV, isMobile } = useDevice();
   useTVNavigation(isTV);
   const { showExitToast } = useAndroidBackButton();
   const location = useLocation();
+  const [startupUpdateInfo, setStartupUpdateInfo] = React.useState<UpdateInfo | null>(null);
 
   // Synchronize Performance Mode attribute on document root (data-perf-mode="true")
   React.useEffect(() => {
@@ -47,6 +50,29 @@ const AppContent: React.FC = () => {
 
     window.addEventListener('tmdb_settings_changed', handleSettingsChanged);
     return () => window.removeEventListener('tmdb_settings_changed', handleSettingsChanged);
+  }, []);
+
+  // Graceful auto-check for software updates on app startup (if enabled in settings)
+  React.useEffect(() => {
+    let isMounted = true;
+    const timer = setTimeout(async () => {
+      try {
+        const settings = await dbService.getSettings();
+        if (settings.autoUpdateCheck !== false) {
+          const info = await updateService.checkForUpdates(settings.includeNightlyUpdates ?? false);
+          if (isMounted && info && info.hasUpdate) {
+            setStartupUpdateInfo(info);
+          }
+        }
+      } catch (err) {
+        console.warn('[AutoUpdate] Startup check skipped or offline:', err);
+      }
+    }, 2500);
+
+    return () => {
+      isMounted = false;
+      clearTimeout(timer);
+    };
   }, []);
 
   const isWatchPage = location.pathname.startsWith('/watch');
@@ -78,6 +104,14 @@ const AppContent: React.FC = () => {
 
       {/* Bottom Navigation for Mobile (Hidden on watch page) */}
       {!isWatchPage && <MobileBottomNav />}
+
+      {/* Automatic Startup Software Update Modal */}
+      {startupUpdateInfo && (
+        <UpdateModal
+          updateInfo={startupUpdateInfo}
+          onClose={() => setStartupUpdateInfo(null)}
+        />
+      )}
 
       {/* Android Back Exit Toast */}
       {showExitToast && (

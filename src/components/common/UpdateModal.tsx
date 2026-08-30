@@ -56,12 +56,22 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({ updateInfo, onClose })
       }
     };
 
+    // Listen to Escape / remote Back keyboard event
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        onClose();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('tmdb_update_download_progress', handleProgress);
     return () => {
       clearTimeout(timer);
+      window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('tmdb_update_download_progress', handleProgress);
     };
-  }, []);
+  }, [onClose]);
 
   const handleInstall = () => {
     if (!updateInfo.apkUrl) {
@@ -80,6 +90,7 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({ updateInfo, onClose })
       <div className="bg-hbo-card border border-hbo-border rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl shadow-hbo-purple/40 relative flex flex-col max-h-[90vh]">
         {/* Close Button */}
         <button
+          data-modal-close="true"
           onClick={onClose}
           className="absolute top-5 right-5 p-2.5 rounded-full bg-white/10 hover:bg-white/20 text-gray-400 hover:text-white transition-all tv-focus-target focus:outline-none focus:ring-2 focus:ring-hbo-cyan"
           aria-label="Close"
@@ -175,6 +186,7 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({ updateInfo, onClose })
           </button>
 
           <button
+            data-modal-close="true"
             onClick={onClose}
             disabled={downloading}
             className="px-4 py-3 rounded-xl bg-white/10 hover:bg-white/20 text-gray-300 hover:text-white text-sm font-bold transition-all tv-focus-target focus:ring-2 focus:ring-gray-400"
