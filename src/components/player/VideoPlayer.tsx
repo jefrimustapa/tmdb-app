@@ -222,7 +222,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         setExtractionFailed(true);
         setIsExtracting(false);
       }
-    }
+    };
 
     executeStreamResolution();
 
@@ -231,11 +231,24 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     };
   }, [enabledResolvers, tmdbId, title, mediaType, season, episode, directStreamApiUrl, torboxApiKey]);
 
+  const [resumeTimestamp, setResumeTimestamp] = useState<number>(initialTimestamp || 0);
+
   const provider = getProviderById(providerId);
-  const streamUrl =
+  const baseStreamUrl =
     mediaType === 'movie'
       ? provider.getMovieUrl(tmdbId)
       : provider.getTVUrl(tmdbId, season, episode);
+
+  const streamUrl = useMemo(() => {
+    if (!baseStreamUrl) return '';
+    if (resumeTimestamp <= 0) return baseStreamUrl;
+
+    const sep = baseStreamUrl.includes('?') ? '&' : '?';
+    if (provider.id === 'vidlink') {
+      return `${baseStreamUrl}${sep}start=${resumeTimestamp}`;
+    }
+    return `${baseStreamUrl}${sep}start=${resumeTimestamp}&t=${resumeTimestamp}&time=${resumeTimestamp}#t=${resumeTimestamp}`;
+  }, [baseStreamUrl, resumeTimestamp, provider.id]);
 
   const lastSaveTimeRef = useRef<number>(0);
 
@@ -548,11 +561,14 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       const existing = await dbService.getHistoryItem(tmdbId, mediaType);
       const isSameEpisode = mediaType === 'tv' ? (existing?.season === season && existing?.episode === episode) : true;
       
-      const targetTimestamp = initialTimestamp > 0 
+      const targetTimestamp = (initialTimestamp !== undefined && initialTimestamp >= 0)
         ? initialTimestamp 
         : (isSameEpisode && existing ? existing.timestamp : 0);
       
       currentTimeRef.current = targetTimestamp;
+      if (targetTimestamp > 0) {
+        setResumeTimestamp(targetTimestamp);
+      }
 
       // Provisional duration from metadata
       const provisionalDuration = (episodeRuntimeMinutes ? episodeRuntimeMinutes * 60 : 0) || (existing?.duration || 0);
@@ -672,6 +688,14 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             iframe.contentWindow.postMessage(JSON.stringify({ type: 'unmute' }), '*');
             iframe.contentWindow.postMessage(JSON.stringify({ method: 'setMuted', value: false }), '*');
             iframe.contentWindow.postMessage(JSON.stringify({ method: 'setVolume', value: 1 }), '*');
+
+            if (resumeTimestamp > 0) {
+              iframe.contentWindow.postMessage({ type: 'SEEK', data: { time: resumeTimestamp } }, '*');
+              iframe.contentWindow.postMessage({ event: 'seek', time: resumeTimestamp }, '*');
+              iframe.contentWindow.postMessage({ type: 'seek', time: resumeTimestamp }, '*');
+              iframe.contentWindow.postMessage(JSON.stringify({ type: 'seek', time: resumeTimestamp }), '*');
+              iframe.contentWindow.postMessage(JSON.stringify({ event: 'command', func: 'seekTo', args: [resumeTimestamp, true] }), '*');
+            }
           } catch {
             // ignore cross-origin postMessage restrictions
           }

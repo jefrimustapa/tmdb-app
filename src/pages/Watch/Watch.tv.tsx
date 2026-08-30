@@ -17,6 +17,7 @@ export const Watch: React.FC = () => {
 
   const seasonParam = parseInt(searchParams.get('s') || '1', 10);
   const episodeParam = parseInt(searchParams.get('e') || '1', 10);
+  const timestampParam = searchParams.has('t') ? parseInt(searchParams.get('t') || '0', 10) : undefined;
 
   const [details, setDetails] = useState<TMDBMovieDetails | TMDBTVDetails | null>(null);
   const [seasonDetails, setSeasonDetails] = useState<TMDBSeasonDetails | null>(null);
@@ -510,6 +511,7 @@ export const Watch: React.FC = () => {
             episodeTitle={currentEpisode?.name}
             episodeRuntimeMinutes={mediaType === 'movie' ? ('runtime' in details ? details.runtime : undefined) : currentEpisode?.runtime}
             providerId={providerId}
+            initialTimestamp={timestampParam}
             onProviderChange={(p) => setProviderId(p.id)}
             onProbingStatusChange={(probing, idx) => {
               setIsProbing(probing);
