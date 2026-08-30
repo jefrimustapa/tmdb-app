@@ -61,6 +61,7 @@ export const DEFAULT_SETTINGS: UserSettings = {
   torboxApiKey: 'fd12d8fe-2429-43eb-bcb3-1a3d2dfeb5f9',
   streamHeaderTimeout: 5,
   includeNightlyUpdates: false,
+  autoUpdateCheck: true,
   virtualCursorEnabled: true,
   virtualCursorClicks: 2,
   virtualCursorTimeout: 10,
