@@ -92,23 +92,12 @@ public class MainActivity extends BridgeActivity {
             lowerUrl.contains(".json")) {
             return false;
         }
-        if (request.getRequestHeaders() != null) {
-            String accept = request.getRequestHeaders().get("Accept");
-            if (accept != null && accept.toLowerCase().contains("text/html")) {
-                return true;
-            }
-        }
-        return lowerUrl.contains("embed") || lowerUrl.contains("player") || lowerUrl.contains("movie") ||
-               lowerUrl.contains("tv") || lowerUrl.contains("watch") || lowerUrl.contains("vidlink") ||
-               lowerUrl.contains("moviesapi") || lowerUrl.contains("cinesrc") || lowerUrl.contains("cinezo") ||
-               lowerUrl.contains("peestream") || lowerUrl.contains("videasy") || lowerUrl.contains("vidzee") ||
-               lowerUrl.contains("vidsrc") || lowerUrl.contains("2embed") || lowerUrl.contains("mapple") ||
-               lowerUrl.contains("flaxmovies") || lowerUrl.contains("111movies");
+        return true;
     }
 
     private WebResourceResponse interceptAndInjectTrackingScript(WebResourceRequest request, String targetUrl) {
         try {
-            Log.i("TMDB_APP", "[SubframeTracker] Intercepting embed subframe: " + targetUrl);
+            Log.i("TMDB_APP", "[SubframeTracker] Intercepting subframe candidate: " + targetUrl);
             URL url = new URL(targetUrl);
             HttpURLConnection conn = (HttpURLConnection) url.openConnection();
             conn.setConnectTimeout(5000);
@@ -155,12 +144,14 @@ public class MainActivity extends BridgeActivity {
                 "<script id=\"tmdb-subframe-tracker\">" +
                 "(function(){" +
                 "  if(window.__tmdb_tracked)return;window.__tmdb_tracked=true;" +
+                "  console.log('[TMDB Subframe] Injected successfully into:', window.location.href);" +
                 "  function scanAndHook(){" +
                 "    var vids=document.querySelectorAll('video');" +
                 "    for(var i=0;i<vids.length;i++){" +
                 "      var v=vids[i];" +
                 "      if(!v.__tmdb_hooked){" +
                 "        v.__tmdb_hooked=true;" +
+                "        console.log('[TMDB Subframe] Video element hooked, duration:', v.duration);" +
                 "        function emit(){" +
                 "          if(v.duration>0){" +
                 "            try{" +
@@ -195,6 +186,7 @@ public class MainActivity extends BridgeActivity {
                 modifiedHtml = trackingScript + html;
             }
 
+            Log.i("TMDB_APP", "[SubframeTracker] Successfully injected tracking script into: " + targetUrl);
             byte[] modifiedBytes = modifiedHtml.getBytes(StandardCharsets.UTF_8);
             return new WebResourceResponse("text/html", "UTF-8", new ByteArrayInputStream(modifiedBytes));
         } catch (Exception e) {
@@ -263,7 +255,7 @@ public class MainActivity extends BridgeActivity {
             settings.setUserAgentString("Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Mobile Safari/537.36");
 
             // Attach Custom BridgeWebViewClient with AdBlock & Subframe Tracking Script Injection
-            webView.setWebViewClient(new BridgeWebViewClient(this.bridge) {
+            BridgeWebViewClient customClient = new BridgeWebViewClient(this.bridge) {
                 @Override
                 public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
                     if (request == null || request.getUrl() == null) {
@@ -288,7 +280,10 @@ public class MainActivity extends BridgeActivity {
 
                     return super.shouldInterceptRequest(view, request);
                 }
-            });
+            };
+
+            this.bridge.setWebViewClient(customClient);
+            webView.setWebViewClient(customClient);
 
             // Register JS Bridge
             webView.addJavascriptInterface(new Object() {
