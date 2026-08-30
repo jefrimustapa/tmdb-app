@@ -1023,7 +1023,7 @@ export const Settings: React.FC = () => {
             ].map((resOption) => {
               const currentEnabled = settings.enabledResolvers && settings.enabledResolvers.length > 0
                 ? settings.enabledResolvers
-                : ['torbox', 'private_extractor', 'embed'];
+                : ['embed'];
               const isEnabled = currentEnabled.includes(resOption.id);
 
               return (
@@ -1198,7 +1198,7 @@ export const Settings: React.FC = () => {
             </button>
           </div>
 
-          {/* Popup Trigger Percentage (10% Step Buttons) */}
+          {/* Popup Trigger Percentage (80% - 100% with 5% Step Buttons) */}
           <div className="border-t border-hbo-border/60 pt-4">
             <div className="flex items-center justify-between mb-2">
               <h4 className="text-xs font-bold text-gray-300 uppercase tracking-wider flex items-center gap-2">
@@ -1213,23 +1213,29 @@ export const Settings: React.FC = () => {
               Select the playback completion percentage threshold when the "Up Next" popup should appear.
             </p>
 
-            <div className="grid grid-cols-3 sm:grid-cols-5 md:grid-cols-9 gap-2">
-              {[10, 20, 30, 40, 50, 60, 70, 80, 90].map((percent) => {
-                const isSelected = (settings.upNextTriggerPercent || 90) === percent;
+            <div className="grid grid-cols-5 gap-3">
+              {[
+                { percent: 80, label: '80%', desc: 'Early Credits' },
+                { percent: 85, label: '85%', desc: 'Mid Credits' },
+                { percent: 90, label: '90%', desc: 'Default' },
+                { percent: 95, label: '95%', desc: 'End Credits' },
+                { percent: 100, label: '100%', desc: 'Episode End' },
+              ].map((opt) => {
+                const isSelected = (settings.upNextTriggerPercent || 90) === opt.percent;
                 return (
                   <button
-                    key={percent}
+                    key={opt.percent}
                     type="button"
-                    onClick={() => handleUpdate({ upNextTriggerPercent: percent })}
-                    className={`py-3 px-2 rounded-xl border text-center transition-all tv-focus-target flex flex-col items-center justify-center gap-1 ${
+                    onClick={() => handleUpdate({ upNextTriggerPercent: opt.percent })}
+                    className={`py-3.5 px-3 rounded-xl border text-center transition-all tv-focus-target flex flex-col items-center justify-center gap-1 ${
                       isSelected
                         ? 'bg-hbo-purple/40 border-hbo-cyan text-white font-bold shadow-lg ring-1 ring-hbo-cyan/50'
                         : 'bg-hbo-dark/60 border-hbo-border hover:bg-hbo-hover hover:border-white/20 text-gray-300'
                     }`}
                   >
-                    <span className="text-sm sm:text-base font-bold text-white leading-none">{percent}%</span>
+                    <span className="text-base sm:text-lg font-bold text-white leading-none">{opt.label}</span>
                     <span className={`text-[10px] ${isSelected ? 'text-hbo-cyan font-semibold' : 'text-gray-500'}`}>
-                      {percent === 90 ? 'Default' : percent <= 50 ? 'Early' : 'Late'}
+                      {opt.desc}
                     </span>
                   </button>
                 );

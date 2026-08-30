@@ -24,7 +24,7 @@ export const Watch: React.FC = () => {
   const tmdbId = parseInt(id || '0', 10);
   const mediaType = (type === 'tv' ? 'tv' : 'movie') as 'movie' | 'tv';
 
-  const [enabledResolvers, setEnabledResolvers] = useState<('embed' | 'private_extractor' | 'torbox')[]>(['torbox', 'private_extractor', 'embed']);
+  const [enabledResolvers, setEnabledResolvers] = useState<('embed' | 'private_extractor' | 'torbox')[]>(['embed']);
 
   // Load default user settings for preferred provider
   useEffect(() => {

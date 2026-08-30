@@ -64,7 +64,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showControls, setShowControls] = useState(true);
   const [topProviders, setTopProviders] = useState<string[]>(['vidlink', 'moviesapi', 'cinesrc']);
-  const [enabledResolvers, setEnabledResolvers] = useState<StreamResolverType[]>(['torbox', 'private_extractor', 'embed']);
+  const [enabledResolvers, setEnabledResolvers] = useState<StreamResolverType[]>(['embed']);
 
   // Up Next state
   const [showUpNext, setShowUpNext] = useState(false);
@@ -156,7 +156,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         } catch {}
         const activeResolver = s.streamResolver || (s.directStreamMode ? 'private_extractor' : 'embed');
         setStreamResolver(activeResolver);
-        setEnabledResolvers(s.enabledResolvers && s.enabledResolvers.length > 0 ? s.enabledResolvers : ['torbox', 'private_extractor', 'embed']);
+        setEnabledResolvers(s.enabledResolvers && s.enabledResolvers.length > 0 ? s.enabledResolvers : ['embed']);
         if (s.directStreamApiUrl) {
           setDirectStreamApiUrl(s.directStreamApiUrl);
         }
