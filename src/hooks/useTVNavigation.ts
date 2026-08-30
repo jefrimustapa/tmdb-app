@@ -11,6 +11,8 @@ const getScrollBehavior = (): ScrollBehavior => {
   return 'smooth';
 };
 
+let lastFocusedContentEl: HTMLElement | null = null;
+
 export function useTVNavigation(isEnabled = true) {
   const location = useLocation();
 
@@ -19,6 +21,7 @@ export function useTVNavigation(isEnabled = true) {
     if (!isEnabled) return;
 
     const setInitialFocus = () => {
+      lastFocusedContentEl = null;
       const pathname = location.pathname;
       const mainContent = document.querySelector('main');
       let target: HTMLElement | null = null;
@@ -194,18 +197,26 @@ export function useTVNavigation(isEnabled = true) {
         }
       }
 
+      // Fast-path D-Pad key-repeat throttling during rapid hold
+      const now = performance.now();
+      if (e.repeat && ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+        if (now - (window as any).__tmdbLastNavTime < 65) {
+          e.preventDefault();
+          return;
+        }
+      }
+      (window as any).__tmdbLastNavTime = now;
+
       // In TV mode, all intended spatial focus items are explicitly tagged with .tv-focus-target
       const focusableSelectors = '.tv-focus-target';
 
+      // Fast-path visibility filter: eliminates expensive getComputedStyle reflows
       const focusableElements = Array.from(
         document.querySelectorAll<HTMLElement>(focusableSelectors)
       ).filter(el => {
-        const style = window.getComputedStyle(el);
-        const rect = el.getBoundingClientRect();
-        return style.display !== 'none' && 
-               style.visibility !== 'hidden' && 
+        return el.offsetParent !== null && 
                !el.hasAttribute('disabled') &&
-               (rect.width > 0 || rect.height > 0);
+               el.getAttribute('aria-hidden') !== 'true';
       });
 
       if (focusableElements.length === 0) return;
@@ -253,11 +264,7 @@ export function useTVNavigation(isEnabled = true) {
         if (isCurrentInNav && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
           // Linear navigation inside Sidebar
           const allNav = Array.from(document.querySelectorAll<HTMLElement>('aside .tv-focus-target, [data-tv-nav="true"]'))
-            .filter(el => {
-              const style = window.getComputedStyle(el);
-              const rect = el.getBoundingClientRect();
-              return style.display !== 'none' && style.visibility !== 'hidden' && (rect.width > 0 || rect.height > 0);
-            });
+            .filter(el => el.offsetParent !== null && !el.hasAttribute('disabled'));
           const currNavIdx = allNav.indexOf(currentFocused);
           if (currNavIdx !== -1) {
             e.preventDefault();
@@ -277,7 +284,15 @@ export function useTVNavigation(isEnabled = true) {
           candidateElements = pageElements;
         } else if (e.key === 'ArrowRight') {
           if (isCurrentInNav) {
-            // Directly focus the most appropriate page element (closest Y or first in main)
+            // HBO Max Memory Anchor (Item 4): restore focus to exact last-focused card
+            if (lastFocusedContentEl && document.body.contains(lastFocusedContentEl) && lastFocusedContentEl.offsetParent !== null) {
+              e.preventDefault();
+              lastFocusedContentEl.focus();
+              lastFocusedContentEl.scrollIntoView({ behavior: e.repeat ? 'auto' : getScrollBehavior(), block: 'nearest', inline: 'nearest' });
+              return;
+            }
+
+            // Fallback: Directly focus the most appropriate page element (closest Y or first in main)
             const mainContent = document.querySelector('main');
             const mainPageElements = pageElements.filter(el => mainContent?.contains(el));
             let bestTarget = mainPageElements[0] || pageElements[0];
@@ -293,13 +308,15 @@ export function useTVNavigation(isEnabled = true) {
             if (bestTarget) {
               e.preventDefault();
               bestTarget.focus();
-              bestTarget.scrollIntoView({ behavior: getScrollBehavior(), block: 'nearest', inline: 'center' });
+              bestTarget.scrollIntoView({ behavior: e.repeat ? 'auto' : getScrollBehavior(), block: 'nearest', inline: 'center' });
               return;
             }
           } else {
             // In content viewport: if currently in a horizontal row/container, check for sibling items
             const currentRow = currentFocused.parentElement;
-            if (currentRow) {
+            const isInsideRail = currentFocused.closest('[data-content-rail="true"]') !== null || 
+                                currentRow?.classList.contains('overflow-x-auto');
+            if (currentRow && isInsideRail) {
               const rowSiblings = Array.from(currentRow.children) as HTMLElement[];
               const currentIdx = rowSiblings.indexOf(currentFocused);
               if (currentIdx >= 0 && currentIdx + 1 < rowSiblings.length) {
@@ -312,11 +329,32 @@ export function useTVNavigation(isEnabled = true) {
                   if (targetToFocus) {
                     e.preventDefault();
                     targetToFocus.focus();
-                    targetToFocus.scrollIntoView({ behavior: getScrollBehavior(), block: 'nearest', inline: 'center' });
+
+                    // Exact HBO Max Fixed-Anchor Sliding Rail Navigation
+                    const rail = targetToFocus.closest('[data-content-rail="true"]');
+                    if (rail) {
+                      const scrollContainer = rail.querySelector<HTMLElement>('.overflow-x-auto') || rail;
+                      const cardWidth = targetToFocus.offsetWidth;
+                      const gap = 12; // gap-3 (12px)
+                      const step = cardWidth + gap;
+                      const nextCardIdx = rowSiblings.indexOf(nextSibling);
+                      if (nextCardIdx >= 0) {
+                        scrollContainer.scrollTo({
+                          left: nextCardIdx * step,
+                          behavior: e.repeat ? 'auto' : getScrollBehavior()
+                        });
+                      }
+                    } else {
+                      targetToFocus.scrollIntoView({ behavior: e.repeat ? 'auto' : getScrollBehavior(), block: 'nearest', inline: 'center' });
+                    }
                     return;
                   }
                 }
               }
+
+              // At the end of the row (last card): hard boundary lock (never jump to other sections)
+              e.preventDefault();
+              return;
             }
           }
         } else if (e.key === 'ArrowLeft') {
@@ -326,7 +364,9 @@ export function useTVNavigation(isEnabled = true) {
           } else {
             // In content viewport: check previous sibling in horizontal row first
             const currentRow = currentFocused.parentElement;
-            if (currentRow) {
+            const isInsideRail = currentFocused.closest('[data-content-rail="true"]') !== null || 
+                                currentRow?.classList.contains('overflow-x-auto');
+            if (currentRow && isInsideRail) {
               const rowSiblings = Array.from(currentRow.children) as HTMLElement[];
               const currentIdx = rowSiblings.indexOf(currentFocused);
               if (currentIdx > 0) {
@@ -339,14 +379,37 @@ export function useTVNavigation(isEnabled = true) {
                   if (targetToFocus) {
                     e.preventDefault();
                     targetToFocus.focus();
-                    targetToFocus.scrollIntoView({ behavior: getScrollBehavior(), block: 'nearest', inline: 'center' });
+
+                    // Exact HBO Max Fixed-Anchor Sliding Rail Navigation
+                    const rail = targetToFocus.closest('[data-content-rail="true"]');
+                    if (rail) {
+                      const scrollContainer = rail.querySelector<HTMLElement>('.overflow-x-auto') || rail;
+                      const cardWidth = targetToFocus.offsetWidth;
+                      const gap = 12; // gap-3 (12px)
+                      const step = cardWidth + gap;
+                      const prevCardIdx = rowSiblings.indexOf(prevSibling);
+                      if (prevCardIdx >= 0) {
+                        scrollContainer.scrollTo({
+                          left: prevCardIdx * step,
+                          behavior: e.repeat ? 'auto' : getScrollBehavior()
+                        });
+                      }
+                    } else {
+                      targetToFocus.scrollIntoView({ behavior: e.repeat ? 'auto' : getScrollBehavior(), block: 'nearest', inline: 'center' });
+                    }
                     return;
                   }
                 }
               }
+
+              // During rapid hold (fast scroll), stop cleanly at Card #1 without jumping into sidebar accidentally
+              if (e.repeat) {
+                e.preventDefault();
+                return;
+              }
             }
 
-            // For leftmost card/content element: only jump to nav if no valid page element is to the left
+            // For leftmost card/content element (Item 1): save to Memory Anchor (Item 4) & jump to Active Route (Item 2)
             const hasLeftPageCandidates = pageElements.some(el => {
               const r = el.getBoundingClientRect();
               return r.right <= currentRect.left + 20 && r.left < currentRect.left - 10;
@@ -355,14 +418,20 @@ export function useTVNavigation(isEnabled = true) {
             if (hasLeftPageCandidates) {
               candidateElements = pageElements;
             } else {
-              // Moving from content viewport into navbar: focus active link or Y-closest nav element
-              const activeNav = document.querySelector<HTMLElement>('aside a.active, nav a.active') ||
-                                document.querySelector<HTMLElement>(`aside a[href="${location.pathname}"], nav a[href="${location.pathname}"]`) ||
+              // Item 4: Save memory anchor
+              lastFocusedContentEl = currentFocused;
+
+              // Item 2: Focus active route link in navbar dynamically
+              const currentPath = window.location.pathname;
+              const activeNav = document.querySelector<HTMLElement>('aside a[data-active-route="true"]') ||
+                                document.querySelector<HTMLElement>('aside a.active, nav a.active') ||
+                                document.querySelector<HTMLElement>(`aside a[data-nav-path="${currentPath}"]`) ||
+                                document.querySelector<HTMLElement>(`aside a[href="${currentPath}"]`) ||
                                 navElements[0];
               if (activeNav) {
                 e.preventDefault();
                 activeNav.focus();
-                activeNav.scrollIntoView({ behavior: getScrollBehavior(), block: 'nearest', inline: 'center' });
+                activeNav.scrollIntoView({ behavior: e.repeat ? 'auto' : getScrollBehavior(), block: 'nearest', inline: 'center' });
                 return;
               }
             }
@@ -412,14 +481,9 @@ export function useTVNavigation(isEnabled = true) {
         if (e.key === 'ArrowUp' && !nextElement && !isCurrentInNav) {
           const filterSections = document.querySelectorAll<HTMLElement>('[data-tv-filter-section="true"]');
           if (filterSections.length > 0) {
-            // Find filter buttons in the nearest filter section directly above
             const filterButtons = Array.from(document.querySelectorAll<HTMLElement>('[data-tv-filter-section="true"] .tv-focus-target'))
-              .filter(el => {
-                const style = window.getComputedStyle(el);
-                return style.display !== 'none' && style.visibility !== 'hidden';
-              });
+              .filter(el => el.offsetParent !== null && !el.hasAttribute('disabled'));
             if (filterButtons.length > 0) {
-              // Find the filter button that is horizontally closest to current card or active
               let bestFilter = filterButtons[0];
               let bestXDist = Infinity;
               for (const fb of filterButtons) {
@@ -442,9 +506,9 @@ export function useTVNavigation(isEnabled = true) {
           // If the focused element is within the Hero Billboard or Filter Section in Movies/Series, scroll immediately to top
           if (nextElement.closest('[data-hero-banner="true"]') !== null || nextElement.closest('[data-tv-filter-section="true"]') !== null) {
             window.scrollTo({ top: 0, left: 0, behavior: getScrollBehavior() });
-            nextElement.scrollIntoView({ behavior: getScrollBehavior(), block: 'nearest', inline: 'center' });
+            nextElement.scrollIntoView({ behavior: e.repeat ? 'auto' : getScrollBehavior(), block: 'nearest', inline: 'center' });
           } else {
-            nextElement.scrollIntoView({ behavior: getScrollBehavior(), block: 'center', inline: 'nearest' });
+            nextElement.scrollIntoView({ behavior: e.repeat ? 'auto' : getScrollBehavior(), block: 'center', inline: 'nearest' });
             setTimeout(() => {
               const r = nextElement?.getBoundingClientRect();
               if (r && r.bottom > window.innerHeight - 80) {
@@ -454,7 +518,6 @@ export function useTVNavigation(isEnabled = true) {
           }
         } else {
           // Boundary reached (e.g. at the bottom of the page or end of a row)
-          // Always prevent default to prevent the webview from dropping focus to body or scrolling untracked
           e.preventDefault();
           currentFocused.focus();
         }

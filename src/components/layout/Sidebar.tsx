@@ -1,5 +1,5 @@
 import React from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
+import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { Home, Film, Tv, Search, Bookmark, Settings, Tv2, Smartphone, Tablet, Monitor } from 'lucide-react';
 import { Logo } from '../common/Logo';
 import { useDevice } from '../../hooks/useDevice';
@@ -7,6 +7,7 @@ import { useDevice } from '../../hooks/useDevice';
 export const Sidebar: React.FC = () => {
   const { deviceMode, activeLayout } = useDevice();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const links = [
     { label: 'Home', path: '/', icon: Home },
@@ -45,14 +46,12 @@ export const Sidebar: React.FC = () => {
                 key={link.path}
                 to={link.path}
                 data-tv-nav="true"
-                onClick={(e) => {
-                  e.preventDefault();
-                  navigate(link.path);
-                }}
+                data-nav-path={link.path}
+                data-active-route={link.path === '/' ? location.pathname === '/' : location.pathname.startsWith(link.path)}
                 className={({ isActive }) =>
                   `group relative flex items-center justify-center lg:justify-start gap-3.5 px-3 py-3 rounded-xl font-semibold text-sm transition-all tv-focus-target ${
                     isActive
-                      ? 'text-white'
+                      ? 'active text-white'
                       : 'text-gray-400 hover:text-white'
                   }`
                 }
