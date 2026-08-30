@@ -1142,12 +1142,6 @@ export const Settings: React.FC = () => {
             </button>
           </div>
 
-          {/* Current Installed Version Badge (Full Display) */}
-          <div className="flex flex-wrap items-center justify-between gap-2 p-3 bg-hbo-dark/80 rounded-xl border border-hbo-border/60 text-xs font-mono">
-            <span className="text-gray-400 font-sans font-bold">Installed Version:</span>
-            <span className="text-gray-200 font-bold break-all">{APP_VERSION_FULL}</span>
-          </div>
-
           {/* Update Status Banner if already checked */}
           {updateInfo && (
             <div className={`p-3.5 rounded-xl border flex items-center justify-between gap-3 text-xs ${
