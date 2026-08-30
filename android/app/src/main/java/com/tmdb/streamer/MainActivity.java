@@ -139,6 +139,29 @@ public class MainActivity extends BridgeActivity {
             // Set modern Chrome mobile user agent to prevent 403 bot-blocking by embed providers
             settings.setUserAgentString("Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Mobile Safari/537.36");
 
+            // Attach Custom BridgeWebViewClient with AdBlock Shield
+            BridgeWebViewClient customClient = new BridgeWebViewClient(this.bridge) {
+                @Override
+                public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
+                    if (request == null || request.getUrl() == null) {
+                        return super.shouldInterceptRequest(view, request);
+                    }
+
+                    String url = request.getUrl().toString();
+                    String lowerUrl = url.toLowerCase();
+
+                    // AdBlock Shield: Block known ad/tracker scripts & domains
+                    if (isAdOrTrackerUrl(lowerUrl)) {
+                        return new WebResourceResponse("text/plain", "UTF-8", new ByteArrayInputStream("".getBytes(StandardCharsets.UTF_8)));
+                    }
+
+                    return super.shouldInterceptRequest(view, request);
+                }
+            };
+
+            this.bridge.setWebViewClient(customClient);
+            webView.setWebViewClient(customClient);
+
             // Register JS Bridge
             webView.addJavascriptInterface(new Object() {
                 @JavascriptInterface
@@ -694,11 +717,24 @@ public class MainActivity extends BridgeActivity {
                             "  var header = document.querySelector('[data-watch-header=\"true\"]');" +
                             "  var isHeaderFocused = !!window.__tmdbHeaderFocused || (header && header.contains(document.activeElement));" +
                             "  if (!isHeaderFocused) return false;" +
+                            "  var backBtn = document.getElementById('watch-back-btn');" +
+                            "  var nextBtn = document.getElementById('watch-next-ep-btn');" +
                             "  var trigger = document.getElementById('watch-provider-trigger');" +
-                            "  if (trigger && document.activeElement !== trigger) {" +
-                            "    trigger.focus();" +
+                            "  var active = document.activeElement;" +
+                            "  if (active === backBtn) {" +
+                            "    if (nextBtn) {" +
+                            "      nextBtn.focus();" +
+                            "    } else if (trigger) {" +
+                            "      trigger.focus();" +
+                            "    }" +
                             "    window.dispatchEvent(new CustomEvent('tmdb_reset_header_timer'));" +
                             "    return true;" +
+                            "  } else if (active === nextBtn) {" +
+                            "    if (trigger) {" +
+                            "      trigger.focus();" +
+                            "      window.dispatchEvent(new CustomEvent('tmdb_reset_header_timer'));" +
+                            "      return true;" +
+                            "    }" +
                             "  }" +
                             "  return false;" +
                             "})();",
@@ -716,10 +752,23 @@ public class MainActivity extends BridgeActivity {
                             "  var isHeaderFocused = !!window.__tmdbHeaderFocused || (header && header.contains(document.activeElement));" +
                             "  if (!isHeaderFocused) return false;" +
                             "  var backBtn = document.getElementById('watch-back-btn');" +
-                            "  if (backBtn && document.activeElement !== backBtn) {" +
-                            "    backBtn.focus();" +
+                            "  var nextBtn = document.getElementById('watch-next-ep-btn');" +
+                            "  var trigger = document.getElementById('watch-provider-trigger');" +
+                            "  var active = document.activeElement;" +
+                            "  if (active === trigger) {" +
+                            "    if (nextBtn) {" +
+                            "      nextBtn.focus();" +
+                            "    } else if (backBtn) {" +
+                            "      backBtn.focus();" +
+                            "    }" +
                             "    window.dispatchEvent(new CustomEvent('tmdb_reset_header_timer'));" +
                             "    return true;" +
+                            "  } else if (active === nextBtn) {" +
+                            "    if (backBtn) {" +
+                            "      backBtn.focus();" +
+                            "      window.dispatchEvent(new CustomEvent('tmdb_reset_header_timer'));" +
+                            "      return true;" +
+                            "    }" +
                             "  }" +
                             "  return false;" +
                             "})();",

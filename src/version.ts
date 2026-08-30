@@ -2,23 +2,23 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20260830-1027';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-app-icon-refres.20260830-1027';
+export const APP_BUILD_NUMBER = '20260830-1646';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-stream-progress.20260830-1646';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
-export const APP_BRANCH = 'feat-app-icon-refres';
-export const APP_CHANGELOG = `* feat(easter-egg): add scrollable structured changelog to build number easter egg screen
-* refactor(settings): remove duplicate installed version from software update card
-* fix(update): prevent false update triggers on newer local dev builds causing version downgrade rejection
-* feat(update): order changelogs from latest first and display full untruncated versions
-* feat(suggestions): base personalized suggestions strictly on user watch history
-* perf(billboard): optimize slide transitions with w1280 backdrops, 350ms duration, and GPU layer isolation
-* feat(nav): implement anchored left focus ring with sliding rail track and bilateral peek cards
-* feat(ui): implement HBO Max full-width rail structure on left sidebar boundary
-* feat(ui): extend viewport across full width and refine billboard autoplay pause controls
-* fix(ui): add scroll-pl-6 and pl-6 clearance to prevent left selection ring truncation
-* fix(ui): eliminate selection ring truncation in horizontal content rails
-* fix(billboard): fix manual right navigation sliding track alignment to 100% viewport
-* fix(ui): eliminate horizontal scroll drift and snap billboard track cleanly to 100% viewport
-* fix(ui): scale down billboard title, add scroll snapping to avoid stuck cards, and remove white selection border
-* feat(ui): full-width sliding billboard rail, 1.5px white padding focus ring, clean 3-dot card icon, HBO Max spacing, and personalized suggestions rail`;
+export const APP_BRANCH = 'feat-stream-progress';
+export const APP_CHANGELOG = `* fix(tv): update native Android MainActivity dispatchKeyEvent for watch header next button D-pad navigation
+* fix(watch): enable seamless D-pad remote navigation across header back, next episode, and server picker
+* fix(build): resolve syntax error in VideoPlayer and verify live installation on TV
+* feat(settings): disable TorBox & Private Extractor by default and update trigger % to 80-100% (5% step)
+* refactor(settings): unify Up Next popup into Auto-Play Next Episode setting
+* fix(navigation): resolve spatial focus lock on Home page hero banner and content rails
+* feat(settings): use 10% step buttons for Up Next popup trigger percentage
+* feat(settings): convert Up Next popup trigger percentage into a 10% step slider
+* feat(settings): add configurable trigger percent and countdown timeout for Up Next episode popup
+* fix(settings): restore FormattedChangelog import in settings views
+* fix(player): fix black screen on 90% and make Up Next popup configurable in settings
+* fix(player): fix black screen on 90% and make Up Next popup configurable in settings
+* fix(tv): wire series resume timestamp to watch navigation in details and episode grid
+* fix(player): wire resume timestamp across details, continue watching and player streamUrl
+* fix(player): add useMemo import in VideoPlayer.tsx`;

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { Play, Heart, Bookmark, Star, ArrowLeft, Plus, Check } from 'lucide-react';
+import { Play, Heart, Bookmark, Star, ArrowLeft, Plus, Check, RotateCcw } from 'lucide-react';
 import type { TMDBMovieDetails, TMDBTVDetails, TMDBMediaItem } from '../../types/tmdb';
 import { tmdbApi, tmdbImages, extractContentRating } from '../../services/tmdb';
 import { dbService } from '../../services/db';
@@ -21,6 +21,7 @@ export const Details: React.FC = () => {
   const [isLiked, setIsLiked] = useState(false);
   const [isWatchlist, setIsWatchlist] = useState(false);
   const [lastWatched, setLastWatched] = useState<{ season: number; episode: number } | null>(null);
+  const [watchProgress, setWatchProgress] = useState<{ timestamp: number; duration: number; progressPercent: number } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -44,7 +45,7 @@ export const Details: React.FC = () => {
         const [liked, watchlisted, historyItem] = await Promise.allSettled([
           dbService.isLiked(tmdbId, mediaType),
           dbService.isWatchlisted(tmdbId, mediaType),
-          mediaType === 'tv' ? dbService.getHistoryItem(tmdbId, 'tv') : Promise.resolve(undefined)
+          dbService.getHistoryItem(tmdbId, mediaType)
         ]);
 
         if (liked.status === 'fulfilled') setIsLiked(liked.value);
@@ -53,6 +54,13 @@ export const Details: React.FC = () => {
           const item = historyItem.value;
           if (item.season && item.episode) {
             setLastWatched({ season: item.season, episode: item.episode });
+          }
+          if (item.timestamp > 0) {
+            setWatchProgress({
+              timestamp: item.timestamp,
+              duration: item.duration,
+              progressPercent: item.progressPercent
+            });
           }
         }
       } catch (err) {
@@ -77,13 +85,22 @@ export const Details: React.FC = () => {
     fetchDetails();
   }, [tmdbId, mediaType]);
 
-  // Keep last watched season & episode synchronized when returning to Details
+  // Keep last watched season & episode and progress synchronized when returning to Details
   useEffect(() => {
     const updateLastWatched = async () => {
-      if (mediaType === 'tv' && tmdbId) {
-        const historyItem = await dbService.getHistoryItem(tmdbId, 'tv');
-        if (historyItem?.season && historyItem?.episode) {
-          setLastWatched({ season: historyItem.season, episode: historyItem.episode });
+      if (tmdbId) {
+        const historyItem = await dbService.getHistoryItem(tmdbId, mediaType);
+        if (historyItem) {
+          if (historyItem.season && historyItem.episode) {
+            setLastWatched({ season: historyItem.season, episode: historyItem.episode });
+          }
+          if (historyItem.timestamp > 0) {
+            setWatchProgress({
+              timestamp: historyItem.timestamp,
+              duration: historyItem.duration,
+              progressPercent: historyItem.progressPercent
+            });
+          }
         }
       }
     };
@@ -283,22 +300,55 @@ export const Details: React.FC = () => {
 
             {/* Primary Action Buttons */}
             <div className="flex items-center justify-center sm:justify-start gap-3 sm:gap-4 pt-2 flex-wrap p-1">
-              <Link
-                to={
-                  mediaType === 'tv'
-                    ? `/watch/tv/${tmdbId}?s=${lastWatched?.season || 1}&e=${lastWatched?.episode || 1}`
-                    : `/watch/movie/${tmdbId}`
-                }
-                data-details-primary="true"
-                className="flex items-center gap-2.5 px-8 py-3.5 rounded-xl bg-gradient-to-r from-hbo-purple to-hbo-cyan text-white font-bold text-sm sm:text-base shadow-hbo-glow hover:scale-105 transition-all tv-focus-target"
-              >
-                <Play className="w-5 h-5 fill-current" />
-                <span>
-                  {mediaType === 'tv' && lastWatched
-                    ? `Resume S${lastWatched.season} E${lastWatched.episode}`
-                    : 'Watch Now'}
-                </span>
-              </Link>
+              {(() => {
+                const isResumable = watchProgress && (watchProgress.timestamp > 15 || watchProgress.progressPercent > 1) && watchProgress.progressPercent < 90;
+                const minsLeft = watchProgress && watchProgress.duration > watchProgress.timestamp
+                  ? Math.max(1, Math.round((watchProgress.duration - watchProgress.timestamp) / 60))
+                  : 0;
+
+                const targetResumeTime = isResumable ? (watchProgress?.timestamp || 0) : 0;
+
+                const watchUrl = mediaType === 'tv'
+                  ? `/watch/tv/${tmdbId}?s=${lastWatched?.season || 1}&e=${lastWatched?.episode || 1}${targetResumeTime > 0 ? `&t=${targetResumeTime}` : ''}`
+                  : `/watch/movie/${tmdbId}${targetResumeTime > 0 ? `?t=${targetResumeTime}` : ''}`;
+
+                const restartUrl = mediaType === 'tv'
+                  ? `/watch/tv/${tmdbId}?s=${lastWatched?.season || 1}&e=${lastWatched?.episode || 1}&t=0`
+                  : `/watch/movie/${tmdbId}?t=0`;
+
+                return (
+                  <>
+                    <Link
+                      to={watchUrl}
+                      data-details-primary="true"
+                      className="flex items-center gap-2.5 px-8 py-3.5 rounded-xl bg-gradient-to-r from-hbo-purple to-hbo-cyan text-white font-bold text-sm sm:text-base shadow-hbo-glow hover:scale-105 transition-all tv-focus-target"
+                    >
+                      <Play className="w-5 h-5 fill-current" />
+                      <span>
+                        {isResumable
+                          ? (mediaType === 'tv' && lastWatched
+                              ? `Resume S${lastWatched.season} E${lastWatched.episode}${minsLeft > 0 ? ` (${minsLeft}m left)` : ''}`
+                              : `Resume${minsLeft > 0 ? ` (${minsLeft}m left)` : ''}`)
+                          : (mediaType === 'tv' && lastWatched
+                              ? `Play S${lastWatched.season} E${lastWatched.episode}`
+                              : 'Watch Now')}
+                      </span>
+                    </Link>
+
+                    {isResumable && (
+                      <button
+                        type="button"
+                        onClick={() => navigate(restartUrl)}
+                        title="Restart from beginning"
+                        aria-label="Restart from beginning"
+                        className="p-3.5 rounded-full bg-white/10 hover:bg-white/20 text-white border border-white/20 backdrop-blur-md transition-all hover:scale-105 tv-focus-target"
+                      >
+                        <RotateCcw className="w-5 h-5 text-gray-200" />
+                      </button>
+                    )}
+                  </>
+                );
+              })()}
 
               <button
                 onClick={handleToggleWatchlist}
@@ -351,8 +401,10 @@ export const Details: React.FC = () => {
               currentEpisode={lastWatched?.episode || 1}
               hasWatchedHistory={Boolean(lastWatched)}
               onSelectEpisode={(s, e) => {
+                const isCurrentEp = Boolean(lastWatched && lastWatched.season === s && lastWatched.episode === e);
+                const epTime = (isCurrentEp && watchProgress && watchProgress.timestamp > 15) ? watchProgress.timestamp : 0;
                 setLastWatched({ season: s, episode: e });
-                navigate(`/watch/tv/${tmdbId}?s=${s}&e=${e}`);
+                navigate(`/watch/tv/${tmdbId}?s=${s}&e=${e}${epTime > 0 ? `&t=${epTime}` : ''}`);
               }}
             />
           </div>

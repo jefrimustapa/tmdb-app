@@ -35,11 +35,11 @@ export function useTVNavigation(isEnabled = true) {
           }
           return;
         } else if (pathname === '/') {
-          // On Home page: focus the Billboard "Watch Now" button
-          target = mainContent.querySelector<HTMLElement>('[data-hero-watch-now="true"]') ||
-                   Array.from(mainContent.querySelectorAll<HTMLElement>('.tv-focus-target, a, button')).find(
-                     el => el.textContent?.trim().toLowerCase().includes('watch now')
-                   ) || mainContent.querySelector<HTMLElement>('.tv-focus-target');
+          // On Home page: focus the Billboard "Watch Now" button on active slide
+          target = mainContent.querySelector<HTMLElement>('[data-hero-btn="play"].tv-focus-target') ||
+                   mainContent.querySelector<HTMLElement>('[data-hero-btn="play"][tabindex="0"]') ||
+                   mainContent.querySelector<HTMLElement>('[data-hero-watch-now="true"]') ||
+                   mainContent.querySelector<HTMLElement>('.tv-focus-target');
         } else if (pathname === '/movies' || pathname === '/tv') {
           // On Movies or Series catalog page: focus "All Platforms" filter button
           target = Array.from(mainContent.querySelectorAll<HTMLElement>('button.tv-focus-target')).find(
@@ -122,79 +122,8 @@ export function useTVNavigation(isEnabled = true) {
           return;
         }
 
-        const isHeaderFocused = !!(window as any).__tmdbHeaderFocused || (header && header.contains(document.activeElement));
-
-        // If not in header, allow default behavior (iframe / player control)
-        if (!isHeaderFocused) {
-          return;
-        }
-
-        // Check if provider dropdown is currently open
-        const openDropdown = header?.querySelector('[data-provider-dropdown-open="true"]');
-        if (openDropdown) {
-          const dropdownOptions = Array.from(openDropdown.querySelectorAll<HTMLElement>('.tv-focus-target, button'))
-            .filter(el => {
-              const style = window.getComputedStyle(el);
-              const rect = el.getBoundingClientRect();
-              return style.display !== 'none' && style.visibility !== 'hidden' && !el.hasAttribute('disabled') && (rect.width > 0 || rect.height > 0);
-            });
-
-          if (dropdownOptions.length > 0) {
-            const currentIdx = dropdownOptions.indexOf(document.activeElement as HTMLElement);
-            if (e.key === 'ArrowDown' || e.keyCode === 20) {
-              e.preventDefault();
-              const nextIdx = (currentIdx + 1) % dropdownOptions.length;
-              dropdownOptions[nextIdx].focus();
-              dropdownOptions[nextIdx].scrollIntoView({ block: 'nearest' });
-              return;
-            } else if (e.key === 'ArrowUp' || e.keyCode === 19) {
-              e.preventDefault();
-              const prevIdx = (currentIdx - 1 + dropdownOptions.length) % dropdownOptions.length;
-              dropdownOptions[prevIdx].focus();
-              dropdownOptions[prevIdx].scrollIntoView({ block: 'nearest' });
-              return;
-            }
-          }
-        }
-
-        // If dropdown is NOT open and user presses ArrowDown, return focus down to player iframe
-        if (!openDropdown && (e.key === 'ArrowDown' || e.keyCode === 20)) {
-          e.preventDefault();
-          (window as any).__tmdbHeaderFocused = false;
-          if (document.activeElement && typeof (document.activeElement as HTMLElement).blur === 'function') {
-            (document.activeElement as HTMLElement).blur();
-          }
-          const iframe = document.querySelector<HTMLIFrameElement>('iframe');
-          if (iframe) {
-            try {
-              iframe.focus();
-            } catch {}
-          }
-          return;
-        }
-
-        // When dropdown is closed, navigate horizontally between header elements (Back Button <-> Provider Picker Trigger)
-        const headerFocusables = header ? Array.from(header.querySelectorAll<HTMLElement>('[data-watch-header-item="true"], .tv-focus-target, button'))
-          .filter(el => {
-            const style = window.getComputedStyle(el);
-            const rect = el.getBoundingClientRect();
-            return style.display !== 'none' && style.visibility !== 'hidden' && !el.hasAttribute('disabled') && (rect.width > 0 || rect.height > 0);
-          }) : [];
-
-        if (headerFocusables.length > 1) {
-          const currentIdx = headerFocusables.indexOf(document.activeElement as HTMLElement);
-          if (e.key === 'ArrowRight' || e.keyCode === 22) {
-            e.preventDefault();
-            const nextIdx = (currentIdx + 1) % headerFocusables.length;
-            headerFocusables[nextIdx].focus();
-            return;
-          } else if (e.key === 'ArrowLeft' || e.keyCode === 21) {
-            e.preventDefault();
-            const prevIdx = (currentIdx - 1 + headerFocusables.length) % headerFocusables.length;
-            headerFocusables[prevIdx].focus();
-            return;
-          }
-        }
+        // On Watch page, Watch.tv.tsx handles all other header and player navigation directly
+        return;
       }
 
       // Fast-path D-Pad key-repeat throttling during rapid hold
@@ -231,8 +160,13 @@ export function useTVNavigation(isEnabled = true) {
         if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
           e.preventDefault();
           const mainContent = document.querySelector('main');
-          const firstTarget = mainContent?.querySelector<HTMLElement>('.tv-focus-target') || focusableElements[0];
-          firstTarget?.focus();
+          const heroPlay = mainContent?.querySelector<HTMLElement>('[data-hero-btn="play"].tv-focus-target') ||
+                           mainContent?.querySelector<HTMLElement>('[data-hero-btn="play"][tabindex="0"]');
+          const firstTarget = heroPlay || mainContent?.querySelector<HTMLElement>('.tv-focus-target') || focusableElements[0];
+          if (firstTarget) {
+            firstTarget.focus();
+            firstTarget.scrollIntoView({ behavior: getScrollBehavior(), block: 'nearest', inline: 'center' });
+          }
           return;
         }
         return;
@@ -344,16 +278,27 @@ export function useTVNavigation(isEnabled = true) {
             e.preventDefault();
             if (btnType === 'play') {
               const detailsBtn = heroBanner?.querySelector<HTMLElement>(
+                `[data-hero-btn="details"].tv-focus-target`
+              ) || heroBanner?.querySelector<HTMLElement>(
                 `[data-hero-btn="details"][data-hero-index="${currentSlideIdx}"]`
               );
-              detailsBtn?.focus({ preventScroll: true });
+              if (detailsBtn) {
+                detailsBtn.focus({ preventScroll: true });
+              } else {
+                const railCards = Array.from(document.querySelectorAll<HTMLElement>('[data-content-rail="true"] .tv-focus-target, main [role="button"].tv-focus-target'))
+                  .filter(el => el.offsetParent !== null && !el.hasAttribute('disabled'));
+                if (railCards.length > 0) {
+                  railCards[0].focus();
+                  railCards[0].scrollIntoView({ behavior: getScrollBehavior(), block: 'center' });
+                }
+              }
             } else {
               // From details: move down to first card of next section (Continue watching / Trending now)
-              const firstRail = document.querySelector('[data-content-rail="true"]');
-              const firstCard = firstRail?.querySelector<HTMLElement>('.tv-focus-target');
-              if (firstCard) {
-                firstCard.focus({ preventScroll: true });
-                firstCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              const railCards = Array.from(document.querySelectorAll<HTMLElement>('[data-content-rail="true"] .tv-focus-target, main [role="button"].tv-focus-target'))
+                .filter(el => el.offsetParent !== null && !el.hasAttribute('disabled'));
+              if (railCards.length > 0) {
+                railCards[0].focus();
+                railCards[0].scrollIntoView({ behavior: getScrollBehavior(), block: 'center' });
               }
             }
             return;
