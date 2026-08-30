@@ -227,19 +227,6 @@ export const Watch: React.FC = () => {
     };
   }, [resetHeaderTimer]);
 
-  if (isLoading || !details) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-hbo-dark">
-        <div className="w-12 h-12 border-4 border-hbo-purple border-t-hbo-cyan rounded-full animate-spin shadow-hbo-glow mb-4" />
-        <h2 className="text-sm font-bold font-display text-white tracking-widest">LOADING STREAM...</h2>
-      </div>
-    );
-  }
-
-  const title = details.title || details.name;
-  const releaseYear = (details.release_date || details.first_air_date || '').split('-')[0];
-  const episodeLabel = mediaType === 'tv' ? `S${seasonParam}E${episodeParam}` : null;
-
   const currentEpisode = mediaType === 'tv' && seasonDetails
     ? seasonDetails.episodes?.find((e) => e.episode_number === episodeParam)
     : null;
@@ -278,6 +265,19 @@ export const Watch: React.FC = () => {
     if (!nextEpisodeInfo) return;
     navigate(`/watch/tv/${tmdbId}?s=${nextEpisodeInfo.season}&e=${nextEpisodeInfo.episode}`, { replace: true });
   }, [nextEpisodeInfo, navigate, tmdbId]);
+
+  if (isLoading || !details) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-hbo-dark">
+        <div className="w-12 h-12 border-4 border-hbo-purple border-t-hbo-cyan rounded-full animate-spin shadow-hbo-glow mb-4" />
+        <h2 className="text-sm font-bold font-display text-white tracking-widest">LOADING STREAM...</h2>
+      </div>
+    );
+  }
+
+  const title = details.title || details.name;
+  const releaseYear = (details.release_date || details.first_air_date || '').split('-')[0];
+  const episodeLabel = mediaType === 'tv' ? `S${seasonParam}E${episodeParam}` : null;
 
   return (
     <div
