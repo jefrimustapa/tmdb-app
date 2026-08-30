@@ -173,14 +173,16 @@ export const ProviderPickerTV: React.FC<ProviderPickerTVProps> = ({
       {isOpen && (
         <div
           data-provider-dropdown-open="true"
-          className="absolute right-0 mt-2 w-84 sm:w-96 min-w-[340px] sm:min-w-[380px] max-h-[65vh] overflow-y-auto rounded-2xl bg-hbo-card/98 border border-white/20 shadow-2xl backdrop-blur-2xl p-2.5 z-50 focus:outline-none scrollbar-thin scrollbar-thumb-white/20 animate-fade-in"
+          className="absolute right-0 top-[calc(100%+8px)] w-80 sm:w-88 rounded-xl bg-hbo-card/98 border border-hbo-border shadow-2xl backdrop-blur-2xl z-50 flex flex-col overflow-hidden focus:outline-none animate-fade-in"
         >
-          <div className="px-3 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider flex items-center justify-between sticky top-0 bg-hbo-card/95 backdrop-blur-md z-10 border-b border-white/10 mb-1">
+          {/* Fixed Non-Scrolling Header - Never overlaps items */}
+          <div className="px-3.5 py-2.5 text-[10px] font-bold text-gray-400 uppercase tracking-wider flex items-center justify-between border-b border-hbo-border/60 bg-hbo-dark/80 flex-shrink-0">
             <span>Select Stream Server</span>
             <ShieldCheck className="w-3.5 h-3.5 text-green-400" />
           </div>
 
-          <div className="space-y-2 pt-1 px-1 pb-1">
+          {/* Scrollable Server Items Container */}
+          <div className="p-2 space-y-1.5 overflow-y-auto max-h-[min(320px,calc(100vh-140px))] focus-scroll-container">
             {STREAM_PROVIDERS.map((provider, idx) => {
               const isSelected = provider.id === currentProviderId;
               const isHighlighted = idx === highlightedIndex;
@@ -227,28 +229,28 @@ export const ProviderPickerTV: React.FC<ProviderPickerTVProps> = ({
                       handleSelect(provider);
                     }
                   }}
-                  className={`w-full flex items-center justify-between gap-3.5 px-4 py-3 sm:px-4.5 sm:py-3.5 rounded-xl text-left transition-all tv-focus-target focus:outline-none ${
+                  className={`w-full flex items-center justify-between gap-3 px-3.5 py-2.5 sm:py-3 rounded-xl text-left transition-all tv-focus-target focus:outline-none ${
                     isHighlighted
-                      ? 'bg-gradient-to-r from-hbo-purple/60 to-hbo-cyan/30 border-2 border-hbo-cyan text-white shadow-hbo-glow ring-2 ring-hbo-cyan scale-[1.02]'
+                      ? 'bg-hbo-purple/40 border border-hbo-cyan/60 text-white font-bold'
                       : (isSelected
-                        ? 'bg-hbo-purple/25 border border-hbo-cyan/50 text-white'
-                        : 'text-gray-300 hover:text-white hover:bg-white/5 border border-transparent')
+                        ? 'bg-hbo-purple/20 border border-hbo-cyan/40 text-white font-semibold'
+                        : 'text-gray-300 hover:text-white hover:bg-hbo-hover border border-transparent')
                   }`}
                 >
                   <div className="min-w-0 flex-1 pr-1">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <p className={`text-xs sm:text-sm font-bold ${isHighlighted || isSelected ? 'text-hbo-cyan' : 'text-white'}`}>
+                    <div className="flex items-center gap-2">
+                      <p className={`text-xs sm:text-sm font-bold truncate ${isHighlighted || isSelected ? 'text-hbo-cyan' : 'text-white'}`}>
                         {provider.name}
                       </p>
-                      <span className="text-[10px] px-2 py-0.5 rounded-md bg-white/10 text-gray-300 font-bold whitespace-nowrap flex-shrink-0">
+                      <span className="text-[10px] px-2 py-0.5 rounded bg-white/10 text-gray-300 font-bold whitespace-nowrap flex-shrink-0">
                         {provider.badge}
                       </span>
                     </div>
-                    <p className="text-[11px] text-gray-400 mt-1 leading-snug whitespace-normal break-words">
+                    <p className="text-[11px] text-gray-400 mt-0.5 leading-snug truncate">
                       {provider.tagline}
                     </p>
                   </div>
-                  {isSelected && <Check className="w-4 h-4 text-hbo-cyan flex-shrink-0 ml-2" />}
+                  {isSelected && <Check className="w-3.5 h-3.5 text-hbo-cyan flex-shrink-0 ml-2" />}
                 </button>
               );
             })}
