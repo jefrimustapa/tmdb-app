@@ -2,12 +2,13 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20260830-1228';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-stream-progress.20260830-1228';
+export const APP_BUILD_NUMBER = '20260830-1246';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-stream-progress.20260830-1246';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
 export const APP_BRANCH = 'feat-stream-progress';
-export const APP_CHANGELOG = `* feat: stream progress tracking, episode thumbnail continue watching, and up next auto-advance
+export const APP_CHANGELOG = `* fix(watch): move nextEpisodeInfo hooks before conditional loading return to resolve React error #310
+* feat: stream progress tracking, episode thumbnail continue watching, and up next auto-advance
 * Merge pull request #41 from jefrimustapa/feat/app-icon-refresh
 * feat(branding): scale mobile launcher emblem to 90% and use centered icon-only TV banner
 * feat(launcher): remove outer circle from launcher icon and ensure Android TV launcher banner is refreshed across all densities
@@ -20,5 +21,4 @@ export const APP_CHANGELOG = `* feat: stream progress tracking, episode thumbnai
 * Merge pull request #39 from jefrimustapa/feat/ui-improvements
 * feat(suggestions): base personalized suggestions strictly on user watch history
 * perf(billboard): optimize slide transitions with w1280 backdrops, 350ms duration, and GPU layer isolation
-* feat(nav): implement anchored left focus ring with sliding rail track and bilateral peek cards
-* feat(ui): implement HBO Max full-width rail structure on left sidebar boundary`;
+* feat(nav): implement anchored left focus ring with sliding rail track and bilateral peek cards`;
