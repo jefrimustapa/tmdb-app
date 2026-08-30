@@ -292,12 +292,12 @@ export const Watch: React.FC = () => {
         {/* Overlay Top Header Nav: Back Button (icon only), Title stacked with [S1E1] underneath, Provider Switcher & HUD */}
         <div
           data-watch-header="true"
-          className={`absolute top-0 left-0 right-0 z-40 flex items-center justify-between gap-3 px-3 sm:px-6 pt-[max(0.75rem,env(safe-area-inset-top,1.75rem))] pb-5 bg-gradient-to-b from-black/95 via-black/60 to-transparent transition-all duration-300 pointer-events-auto ${
+          className={`absolute top-0 left-0 right-0 z-40 flex items-start justify-between gap-3 px-3 sm:px-6 pt-[max(0.75rem,env(safe-area-inset-top,1.75rem))] pb-5 bg-gradient-to-b from-black/95 via-black/60 to-transparent transition-all duration-300 pointer-events-auto ${
             headerVisible ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4 pointer-events-none'
           }`}
         >
           {/* Left: Back Button Icon Only + Title with [S1E1] underneath */}
-          <div className="flex items-center gap-3 min-w-0 flex-1 mr-2">
+          <div className="flex items-start gap-3 min-w-0 flex-1 mr-2 pt-0.5">
             <button
               onClick={handleExitWatch}
               id="watch-back-btn"
@@ -330,7 +330,7 @@ export const Watch: React.FC = () => {
             </button>
 
             <div className="flex flex-col min-w-0 flex-1">
-              <h1 className="text-sm sm:text-base md:text-lg font-black font-display text-white tracking-tight drop-shadow-md truncate max-w-[220px] sm:max-w-md">
+              <h1 className="text-sm sm:text-base md:text-lg font-black font-display text-white tracking-tight drop-shadow-md truncate max-w-[200px] sm:max-w-md">
                 {title}
               </h1>
               {episodeLabel && (
@@ -341,24 +341,8 @@ export const Watch: React.FC = () => {
             </div>
           </div>
 
-          {/* Right: Quick Provider Switcher Dropdown + Next Episode Button */}
-          <div className="flex items-center gap-2 flex-shrink-0">
-            {nextEpisodeInfo && (
-              <button
-                type="button"
-                onClick={handleNextEpisode}
-                id="watch-next-ep-btn"
-                data-watch-header-item="true"
-                title={`Play Next: S${nextEpisodeInfo.season} E${nextEpisodeInfo.episode}`}
-                aria-label={`Play Next: S${nextEpisodeInfo.season} E${nextEpisodeInfo.episode}`}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-hbo-purple/60 hover:bg-hbo-purple text-hbo-cyan border border-hbo-cyan/30 text-xs font-bold transition hover:scale-105 tv-focus-target"
-              >
-                <SkipForward className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Next: S{nextEpisodeInfo.season} E{nextEpisodeInfo.episode}</span>
-                <span className="sm:hidden">Next</span>
-              </button>
-            )}
-
+          {/* Right: Quick Provider Switcher Dropdown with Next Episode Button Below */}
+          <div className="flex flex-col items-end gap-2 flex-shrink-0">
             {enabledResolvers.includes('embed') ? (
               <ProviderPickerMobile
                 currentProviderId={providerId}
@@ -381,6 +365,21 @@ export const Watch: React.FC = () => {
                   </span>
                 )}
               </div>
+            )}
+
+            {nextEpisodeInfo && (
+              <button
+                type="button"
+                onClick={handleNextEpisode}
+                id="watch-next-ep-btn"
+                data-watch-header-item="true"
+                title={`Play Next: S${nextEpisodeInfo.season} E${nextEpisodeInfo.episode}`}
+                aria-label={`Play Next: S${nextEpisodeInfo.season} E${nextEpisodeInfo.episode}`}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-hbo-purple/70 hover:bg-hbo-purple text-hbo-cyan border border-hbo-cyan/30 text-xs font-bold backdrop-blur-md shadow-md transition active:scale-95 hover:scale-105"
+              >
+                <SkipForward className="w-3.5 h-3.5" />
+                <span className="inline">Next: S{nextEpisodeInfo.season} E{nextEpisodeInfo.episode}</span>
+              </button>
             )}
           </div>
         </div>
