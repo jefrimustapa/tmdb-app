@@ -748,49 +748,15 @@ export const Settings: React.FC = () => {
 
         {/* Playback & Episode Navigation */}
         <div className="bg-hbo-card border border-hbo-border rounded-2xl p-5 sm:p-6 space-y-5">
-          {/* Up Next Episode Popup */}
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex-1 min-w-0 pr-2">
-              <h3 className="text-base sm:text-lg font-bold font-display text-white flex items-center gap-2 mb-1">
-                <SkipForward className="w-5 h-5 text-hbo-cyan flex-shrink-0" />
-                <span>"Up Next" Episode Popup</span>
-              </h3>
-              <p className="text-xs text-gray-400">
-                Show an interactive countdown popup card near the end of a series episode for quick transition to the next episode.
-              </p>
-            </div>
-
-            <button
-              onClick={() => handleUpdate({ upNextPopup: settings.upNextPopup === false ? true : false })}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all tv-focus-target flex items-center gap-1.5 flex-shrink-0 border ${
-                settings.upNextPopup !== false
-                  ? 'bg-emerald-500/20 border-emerald-400 text-emerald-400'
-                  : 'bg-white/5 border-white/10 text-gray-400'
-              }`}
-            >
-              {settings.upNextPopup !== false ? (
-                <>
-                  <Check className="w-3.5 h-3.5 stroke-[2.5]" />
-                  <span>Enabled</span>
-                </>
-              ) : (
-                <>
-                  <X className="w-3.5 h-3.5 stroke-[2.5]" />
-                  <span>Disabled</span>
-                </>
-              )}
-            </button>
-          </div>
-
           {/* Autoplay Next Episode */}
-          <div className="border-t border-hbo-border/60 pt-4 flex items-center justify-between gap-4">
+          <div className="flex items-center justify-between gap-4">
             <div className="flex-1 min-w-0 pr-2">
               <h3 className="text-base sm:text-lg font-bold font-display text-white flex items-center gap-2 mb-1">
                 <Sparkles className="w-5 h-5 text-hbo-purple-light flex-shrink-0" />
                 <span>Auto-Play Next Episode</span>
               </h3>
               <p className="text-xs text-gray-400">
-                Automatically advance to the next episode when the countdown ends without requiring manual tap input.
+                Display the "Up Next" preview popup and automatically advance to the next series episode when the countdown ends.
               </p>
             </div>
 
