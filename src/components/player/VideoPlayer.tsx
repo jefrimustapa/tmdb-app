@@ -69,7 +69,6 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   // Up Next state
   const [showUpNext, setShowUpNext] = useState(false);
   const [countdown, setCountdown] = useState(10);
-  const [upNextPopupEnabled, setUpNextPopupEnabled] = useState(true);
   const [autoplayNextEnabled, setAutoplayNextEnabled] = useState(true);
   const [upNextTriggerPercent, setUpNextTriggerPercent] = useState(90);
   const [upNextTimeout, setUpNextTimeout] = useState(10);
@@ -77,7 +76,6 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const dismissedUpNextRef = useRef(false);
   const nextEpisodeTriggeredRef = useRef(false);
   const countdownIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const upNextPopupEnabledRef = useRef(true);
   const autoplayNextEnabledRef = useRef(true);
   const upNextTriggerPercentRef = useRef(90);
   const upNextTimeoutRef = useRef(10);
@@ -167,11 +165,6 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         }
         if (s.topProviders && s.topProviders.length >= 3) {
           setTopProviders(s.topProviders);
-        }
-        if (typeof s.upNextPopup === 'boolean') {
-          setUpNextPopupEnabled(s.upNextPopup);
-          upNextPopupEnabledRef.current = s.upNextPopup;
-        }
         if (typeof s.autoplayNext === 'boolean') {
           setAutoplayNextEnabled(s.autoplayNext);
           autoplayNextEnabledRef.current = s.autoplayNext;
@@ -310,10 +303,10 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       : 0;
     const now = Date.now();
 
-    // Check for Up Next trigger on TV Series (>= configured % or within last 75 seconds)
+    // Check for Up Next trigger on TV Series (>= configured % or within last 75 seconds) when Auto-Play is enabled
     const targetPercent = upNextTriggerPercentRef.current || 90;
     if (
-      upNextPopupEnabledRef.current &&
+      autoplayNextEnabledRef.current &&
       mediaType === 'tv' &&
       nextEpisodeInfoRef.current &&
       !showUpNextRef.current &&

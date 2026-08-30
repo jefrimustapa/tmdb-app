@@ -2,12 +2,13 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20260830-1534';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-stream-progress.20260830-1534';
+export const APP_BUILD_NUMBER = '20260830-1602';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-stream-progress.20260830-1602';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
 export const APP_BRANCH = 'feat-stream-progress';
-export const APP_CHANGELOG = `* feat(settings): use 10% step buttons for Up Next popup trigger percentage
+export const APP_CHANGELOG = `* fix(navigation): resolve spatial focus lock on Home page hero banner and content rails
+* feat(settings): use 10% step buttons for Up Next popup trigger percentage
 * feat(settings): convert Up Next popup trigger percentage into a 10% step slider
 * feat(settings): add configurable trigger percent and countdown timeout for Up Next episode popup
 * fix(settings): restore FormattedChangelog import in settings views
@@ -20,5 +21,4 @@ export const APP_CHANGELOG = `* feat(settings): use 10% step buttons for Up Next
 * feat(player): restore universal elapsed watch session ticker and clean up native subframe injection
 * fix(native): ensure bridge.setWebViewClient registers custom subframe tracker on Android
 * feat(player): implement native Android WebView subframe HTML injection for 100% embed provider coverage
-* feat(player): add universal elapsed watch time fallback ticker for all 29 embed providers
-* fix(player): enhance VidLink PLAYER_EVENT and MEDIA_DATA postMessage stream progress tracking`;
+* feat(player): add universal elapsed watch time fallback ticker for all 29 embed providers`;
