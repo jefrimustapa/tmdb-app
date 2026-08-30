@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Sparkles, Download, CheckCircle2, AlertCircle, X, ExternalLink, Moon, ArrowRight } from 'lucide-react';
+import { Sparkles, Download, AlertCircle, X, Moon, ArrowRight } from 'lucide-react';
 import { updateService, type UpdateInfo } from '../../services/updateService';
 import { APP_VERSION_FULL } from '../../version';
 
@@ -12,8 +12,12 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({ updateInfo, onClose })
   const [downloading, setDownloading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [statusText, setStatusText] = useState('');
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
   const changelogRef = useRef<HTMLDivElement>(null);
   const installButtonRef = useRef<HTMLButtonElement>(null);
+  const laterButtonRef = useRef<HTMLButtonElement>(null);
 
   const handleChangelogKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
     if (!changelogRef.current) return;
@@ -21,19 +25,37 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({ updateInfo, onClose })
     const step = 60;
 
     if (e.key === 'ArrowDown') {
-      const isAtBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 5;
+      const isAtBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 8;
       if (!isAtBottom) {
         e.preventDefault();
         e.stopPropagation();
         el.scrollBy({ top: step, behavior: 'smooth' });
+      } else {
+        // Transfer focus down to action buttons
+        e.preventDefault();
+        if (installButtonRef.current && !installButtonRef.current.hasAttribute('disabled')) {
+          installButtonRef.current.focus();
+        } else if (laterButtonRef.current) {
+          laterButtonRef.current.focus();
+        }
       }
     } else if (e.key === 'ArrowUp') {
-      const isAtTop = el.scrollTop <= 5;
+      const isAtTop = el.scrollTop <= 8;
       if (!isAtTop) {
         e.preventDefault();
         e.stopPropagation();
         el.scrollBy({ top: -step, behavior: 'smooth' });
+      } else {
+        // Transfer focus up to close button
+        e.preventDefault();
+        if (closeButtonRef.current) {
+          closeButtonRef.current.focus();
+        }
       }
+    } else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+      // Lock horizontal navigation inside changelog
+      e.preventDefault();
+      e.stopPropagation();
     }
   };
 
@@ -54,6 +76,19 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({ updateInfo, onClose })
       if (status) {
         setStatusText(status);
       }
+      setErrorMessage(null);
+    };
+
+    const handleComplete = () => {
+      setProgress(100);
+      setStatusText('Launching installer...');
+    };
+
+    const handleError = (e: any) => {
+      const err = e.detail?.error || 'Download failed. Please try again.';
+      setErrorMessage(err);
+      setDownloading(false);
+      setStatusText('');
     };
 
     // Listen to Escape / remote Back keyboard event
@@ -66,10 +101,15 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({ updateInfo, onClose })
 
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('tmdb_update_download_progress', handleProgress);
+    window.addEventListener('tmdb_update_download_complete', handleComplete);
+    window.addEventListener('tmdb_update_download_error', handleError);
+
     return () => {
       clearTimeout(timer);
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('tmdb_update_download_progress', handleProgress);
+      window.removeEventListener('tmdb_update_download_complete', handleComplete);
+      window.removeEventListener('tmdb_update_download_error', handleError);
     };
   }, [onClose]);
 
@@ -79,17 +119,24 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({ updateInfo, onClose })
       return;
     }
 
+    setErrorMessage(null);
     setDownloading(true);
     setProgress(5);
-    setStatusText('Initiating download...');
+    setStatusText('Connecting to update server...');
     updateService.installUpdate(updateInfo.apkUrl, updateInfo.apkName);
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 sm:p-6 animate-fade-in select-none">
+    <div
+      data-modal-container="true"
+      role="dialog"
+      aria-modal="true"
+      className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 sm:p-6 animate-fade-in select-none"
+    >
       <div className="bg-hbo-card border border-hbo-border rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl shadow-hbo-purple/40 relative flex flex-col max-h-[90vh]">
         {/* Close Button */}
         <button
+          ref={closeButtonRef}
           data-modal-close="true"
           onClick={onClose}
           className="absolute top-5 right-5 p-2.5 rounded-full bg-white/10 hover:bg-white/20 text-gray-400 hover:text-white transition-all tv-focus-target focus:outline-none focus:ring-2 focus:ring-hbo-cyan"
@@ -140,6 +187,7 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({ updateInfo, onClose })
         {/* Release Notes / Changelog */}
         <div
           ref={changelogRef}
+          data-modal-scroll="true"
           tabIndex={0}
           onKeyDown={handleChangelogKeyDown}
           className="flex-1 overflow-y-auto pr-1 mb-5 space-y-2 border-t border-b border-hbo-border/60 py-3 scrollbar-thin scrollbar-thumb-hbo-purple tv-focus-target focus:outline-none focus:ring-2 focus:ring-hbo-cyan/60 rounded-xl px-2 transition-all"
@@ -152,6 +200,14 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({ updateInfo, onClose })
             {updateInfo.releaseNotes || 'Bug fixes, performance improvements, and media streaming updates.'}
           </div>
         </div>
+
+        {/* Error Banner */}
+        {errorMessage && (
+          <div className="mb-4 p-3 rounded-xl bg-red-500/20 border border-red-500/40 text-red-300 text-xs flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 flex-shrink-0 text-red-400" />
+            <span className="truncate">{errorMessage}</span>
+          </div>
+        )}
 
         {/* Download Progress Bar (when active) */}
         {downloading && (
@@ -173,6 +229,7 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({ updateInfo, onClose })
         <div className="flex items-center gap-3">
           <button
             ref={installButtonRef}
+            data-modal-install="true"
             onClick={handleInstall}
             disabled={downloading}
             className={`flex-1 py-3 px-5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all tv-focus-target ${
@@ -186,6 +243,8 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({ updateInfo, onClose })
           </button>
 
           <button
+            ref={laterButtonRef}
+            data-modal-later="true"
             data-modal-close="true"
             onClick={onClose}
             disabled={downloading}
