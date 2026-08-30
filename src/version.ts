@@ -2,23 +2,23 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20260830-1027';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-app-icon-refres.20260830-1027';
+export const APP_BUILD_NUMBER = '20260830-1218';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-stream-progress.20260830-1218';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
-export const APP_BRANCH = 'feat-app-icon-refres';
-export const APP_CHANGELOG = `* feat(easter-egg): add scrollable structured changelog to build number easter egg screen
+export const APP_BRANCH = 'feat-stream-progress';
+export const APP_CHANGELOG = `* Merge pull request #41 from jefrimustapa/feat/app-icon-refresh
+* feat(branding): scale mobile launcher emblem to 90% and use centered icon-only TV banner
+* feat(launcher): remove outer circle from launcher icon and ensure Android TV launcher banner is refreshed across all densities
+* feat(branding): refresh app icon to modern circular TMDB badge across web, mobile, tv, splash, and launcher
+* Merge pull request #40 from jefrimustapa/feat/improve-update-info
+* feat(easter-egg): add scrollable structured changelog to build number easter egg screen
 * refactor(settings): remove duplicate installed version from software update card
 * fix(update): prevent false update triggers on newer local dev builds causing version downgrade rejection
 * feat(update): order changelogs from latest first and display full untruncated versions
+* Merge pull request #39 from jefrimustapa/feat/ui-improvements
 * feat(suggestions): base personalized suggestions strictly on user watch history
 * perf(billboard): optimize slide transitions with w1280 backdrops, 350ms duration, and GPU layer isolation
 * feat(nav): implement anchored left focus ring with sliding rail track and bilateral peek cards
 * feat(ui): implement HBO Max full-width rail structure on left sidebar boundary
-* feat(ui): extend viewport across full width and refine billboard autoplay pause controls
-* fix(ui): add scroll-pl-6 and pl-6 clearance to prevent left selection ring truncation
-* fix(ui): eliminate selection ring truncation in horizontal content rails
-* fix(billboard): fix manual right navigation sliding track alignment to 100% viewport
-* fix(ui): eliminate horizontal scroll drift and snap billboard track cleanly to 100% viewport
-* fix(ui): scale down billboard title, add scroll snapping to avoid stuck cards, and remove white selection border
-* feat(ui): full-width sliding billboard rail, 1.5px white padding focus ring, clean 3-dot card icon, HBO Max spacing, and personalized suggestions rail`;
+* feat(ui): extend viewport across full width and refine billboard autoplay pause controls`;

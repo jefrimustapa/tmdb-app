@@ -13,6 +13,7 @@ interface MediaCardProps {
   season?: number;
   episode?: number;
   episodeTitle?: string;
+  stillPath?: string | null;
   progress?: number;
   onDelete?: () => void;
 }
@@ -24,6 +25,7 @@ const MediaCardComponent: React.FC<MediaCardProps> = ({
   season,
   episode,
   episodeTitle,
+  stillPath,
   progress,
   onDelete
 }) => {
@@ -48,7 +50,9 @@ const MediaCardComponent: React.FC<MediaCardProps> = ({
   }, []);
 
   const imageUrl = variant === 'landscape'
-    ? tmdbImages.backdrop(item.backdrop_path || item.poster_path, isPerfMode ? 'w300' : 'w1280')
+    ? (stillPath
+        ? tmdbImages.still(stillPath, isPerfMode ? 'w300' : 'original')
+        : tmdbImages.backdrop(item.backdrop_path || item.poster_path, isPerfMode ? 'w300' : 'w1280'))
     : tmdbImages.poster(item.poster_path, isPerfMode ? 'w185' : 'w500');
 
   const [menuOpen, setMenuOpen] = useState(false);
@@ -329,12 +333,12 @@ const MediaCardComponent: React.FC<MediaCardProps> = ({
           )}
         </div>
 
-        {/* Progress Bar for Standard Posters (Omitted for Landscape continue watching) */}
-        {!isLandscape && progress !== undefined && progress > 0 && (
-          <div className="absolute bottom-0 left-0 right-0 h-1.5 bg-black/60 z-10">
+        {/* Progress Bar (Visible on both Poster and Landscape Continue Watching cards) */}
+        {progress !== undefined && progress > 0 && (
+          <div className="absolute bottom-0 left-0 right-0 h-1.5 bg-black/70 z-10 overflow-hidden">
             <div
               className="h-full bg-gradient-to-r from-hbo-purple-light to-hbo-cyan"
-              style={{ width: `${Math.min(100, progress)}%` }}
+              style={{ width: `${Math.min(100, Math.max(3, progress))}%` }}
             />
           </div>
         )}

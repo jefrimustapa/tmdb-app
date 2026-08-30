@@ -161,6 +161,7 @@ export const Home: React.FC = () => {
                 season={hist.season}
                 episode={hist.episode}
                 episodeTitle={hist.episodeTitle}
+                stillPath={hist.stillPath}
                 progress={hist.progressPercent}
               />
             ))}
