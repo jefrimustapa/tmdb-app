@@ -15,7 +15,11 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ items }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const bannerRef = useRef<HTMLDivElement>(null);
   const [isVisible, setIsVisible] = useState(true);
+  const isAutoPlayPaused = useRef(false);
   const pauseTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const displayItems = items && items.length > 0 ? items.slice(0, 8) : [];
+  const totalItems = displayItems.length;
 
   // Helper to pause for 5 seconds upon remote activity in billboard
   const trigger5sRemotePause = () => {
