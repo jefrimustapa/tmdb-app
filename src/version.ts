@@ -2,12 +2,13 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20260830-1612';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-stream-progress.20260830-1612';
+export const APP_BUILD_NUMBER = '20260830-1621';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-stream-progress.20260830-1621';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
 export const APP_BRANCH = 'feat-stream-progress';
-export const APP_CHANGELOG = `* refactor(settings): unify Up Next popup into Auto-Play Next Episode setting
+export const APP_CHANGELOG = `* feat(settings): disable TorBox & Private Extractor by default and update trigger % to 80-100% (5% step)
+* refactor(settings): unify Up Next popup into Auto-Play Next Episode setting
 * fix(navigation): resolve spatial focus lock on Home page hero banner and content rails
 * feat(settings): use 10% step buttons for Up Next popup trigger percentage
 * feat(settings): convert Up Next popup trigger percentage into a 10% step slider
@@ -20,5 +21,4 @@ export const APP_CHANGELOG = `* refactor(settings): unify Up Next popup into Aut
 * fix(player): add useMemo import in VideoPlayer.tsx
 * fix(player): pass resume start offset to streamUrl and dispatch iframe seek commands
 * feat(player): restore universal elapsed watch session ticker and clean up native subframe injection
-* fix(native): ensure bridge.setWebViewClient registers custom subframe tracker on Android
-* feat(player): implement native Android WebView subframe HTML injection for 100% embed provider coverage`;
+* fix(native): ensure bridge.setWebViewClient registers custom subframe tracker on Android`;
