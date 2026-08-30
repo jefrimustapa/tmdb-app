@@ -170,7 +170,7 @@ export const Search: React.FC = () => {
   });
 
   return (
-    <div className="min-h-screen pt-24 pb-16 px-4 sm:px-8 max-w-7xl mx-auto">
+    <div className="min-h-screen pt-24 pb-16 px-4 sm:px-8 w-full max-w-full">
       {/* Search Header Input */}
       <div className="relative max-w-3xl mx-auto mb-8">
         <div className="relative">

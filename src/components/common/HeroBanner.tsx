@@ -15,10 +15,45 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ items }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const bannerRef = useRef<HTMLDivElement>(null);
   const [isVisible, setIsVisible] = useState(true);
-  const isAutoPlayPaused = useRef(false);
+  const pauseTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  const displayItems = items && items.length > 0 ? items.slice(0, 8) : [];
-  const totalItems = displayItems.length;
+  // Helper to pause for 5 seconds upon remote activity in billboard
+  const trigger5sRemotePause = () => {
+    isAutoPlayPaused.current = true;
+    if (pauseTimerRef.current) clearTimeout(pauseTimerRef.current);
+    pauseTimerRef.current = setTimeout(() => {
+      // Resume auto-slide only if focus is still in hero or at top level (not focused in other sections)
+      const currActive = document.activeElement;
+      const stillInHero = bannerRef.current ? bannerRef.current.contains(currActive) : false;
+      const inOtherSection = currActive && currActive !== document.body && currActive !== document.documentElement && !stillInHero;
+      if (!inOtherSection) {
+        isAutoPlayPaused.current = false;
+      }
+    }, 5000);
+  };
+
+  // Global focus tracking: Pause autoslide whenever focus moves to another section (sidebar, continue watching, trending rows, etc.)
+  useEffect(() => {
+    const handleFocusIn = () => {
+      const active = document.activeElement;
+      const isFocusInHero = bannerRef.current ? bannerRef.current.contains(active) : false;
+      
+      if (!isFocusInHero && active && active !== document.body && active !== document.documentElement) {
+        // Focus is at another section: pause autoslide indefinitely
+        isAutoPlayPaused.current = true;
+        if (pauseTimerRef.current) clearTimeout(pauseTimerRef.current);
+      } else if (isFocusInHero) {
+        // Focus arrived or moved within hero: pause for 5 seconds
+        trigger5sRemotePause();
+      }
+    };
+
+    window.addEventListener('focusin', handleFocusIn);
+    return () => {
+      window.removeEventListener('focusin', handleFocusIn);
+      if (pauseTimerRef.current) clearTimeout(pauseTimerRef.current);
+    };
+  }, []);
 
   // Pause carousel when scrolled out of view to save CPU/GPU cycles
   useEffect(() => {
@@ -36,7 +71,7 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ items }) => {
     return () => observer.disconnect();
   }, []);
 
-  // Auto-play rotation (pauses when user is interacting or remote-focused)
+  // Auto-play rotation (pauses when user is interacting, remote-active, or focused in other section)
   useEffect(() => {
     if (totalItems <= 1 || !isVisible) return;
 
@@ -56,7 +91,7 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ items }) => {
       if (custom.detail && typeof custom.detail.index === 'number') {
         const targetIdx = custom.detail.index;
         if (targetIdx >= 0 && targetIdx < totalItems) {
-          isAutoPlayPaused.current = true;
+          trigger5sRemotePause();
           setCurrentIndex(targetIdx);
 
           // Focus the target button on the new slide after state update
@@ -98,6 +133,7 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ items }) => {
       data-hero-banner="true"
       data-total-slides={totalItems}
       className="relative w-full h-[65vh] sm:h-[75vh] min-h-[460px] max-h-[750px] overflow-hidden bg-hbo-dark select-none"
+      onKeyDownCapture={trigger5sRemotePause}
       onMouseEnter={() => { isAutoPlayPaused.current = true; }}
       onMouseLeave={() => { isAutoPlayPaused.current = false; }}
       onFocusCapture={() => { isAutoPlayPaused.current = true; }}
