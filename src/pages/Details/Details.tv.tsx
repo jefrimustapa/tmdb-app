@@ -301,7 +301,7 @@ export const Details: React.FC = () => {
             {/* Primary Action Buttons */}
             <div className="flex items-center justify-center sm:justify-start gap-3 sm:gap-4 pt-2 flex-wrap p-1">
               {(() => {
-                const isResumable = watchProgress && watchProgress.progressPercent > 3 && watchProgress.progressPercent < 90;
+                const isResumable = watchProgress && (watchProgress.timestamp > 15 || watchProgress.progressPercent > 1) && watchProgress.progressPercent < 90;
                 const minsLeft = watchProgress && watchProgress.duration > watchProgress.timestamp
                   ? Math.max(1, Math.round((watchProgress.duration - watchProgress.timestamp) / 60))
                   : 0;

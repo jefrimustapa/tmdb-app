@@ -2,12 +2,13 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20260830-1246';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-stream-progress.20260830-1246';
+export const APP_BUILD_NUMBER = '20260830-1256';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-stream-progress.20260830-1256';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
 export const APP_BRANCH = 'feat-stream-progress';
-export const APP_CHANGELOG = `* fix(watch): move nextEpisodeInfo hooks before conditional loading return to resolve React error #310
+export const APP_CHANGELOG = `* fix(player): enhance VidLink PLAYER_EVENT and MEDIA_DATA postMessage stream progress tracking
+* fix(watch): move nextEpisodeInfo hooks before conditional loading return to resolve React error #310
 * feat: stream progress tracking, episode thumbnail continue watching, and up next auto-advance
 * Merge pull request #41 from jefrimustapa/feat/app-icon-refresh
 * feat(branding): scale mobile launcher emblem to 90% and use centered icon-only TV banner
@@ -20,5 +21,4 @@ export const APP_CHANGELOG = `* fix(watch): move nextEpisodeInfo hooks before co
 * feat(update): order changelogs from latest first and display full untruncated versions
 * Merge pull request #39 from jefrimustapa/feat/ui-improvements
 * feat(suggestions): base personalized suggestions strictly on user watch history
-* perf(billboard): optimize slide transitions with w1280 backdrops, 350ms duration, and GPU layer isolation
-* feat(nav): implement anchored left focus ring with sliding rail track and bilateral peek cards`;
+* perf(billboard): optimize slide transitions with w1280 backdrops, 350ms duration, and GPU layer isolation`;
