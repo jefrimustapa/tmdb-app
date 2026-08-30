@@ -2,8 +2,8 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20260829-1658';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-ui-performance-.20260829-1658';
+export const APP_BUILD_NUMBER = '20260830-0034';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.fix-settings-dropdow.20260830-0034';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
-export const APP_BRANCH = 'feat-ui-performance-';
+export const APP_BRANCH = 'fix-settings-dropdow';
