@@ -35,11 +35,11 @@ export function useTVNavigation(isEnabled = true) {
           }
           return;
         } else if (pathname === '/') {
-          // On Home page: focus the Billboard "Watch Now" button
-          target = mainContent.querySelector<HTMLElement>('[data-hero-watch-now="true"]') ||
-                   Array.from(mainContent.querySelectorAll<HTMLElement>('.tv-focus-target, a, button')).find(
-                     el => el.textContent?.trim().toLowerCase().includes('watch now')
-                   ) || mainContent.querySelector<HTMLElement>('.tv-focus-target');
+          // On Home page: focus the Billboard "Watch Now" button on active slide
+          target = mainContent.querySelector<HTMLElement>('[data-hero-btn="play"].tv-focus-target') ||
+                   mainContent.querySelector<HTMLElement>('[data-hero-btn="play"][tabindex="0"]') ||
+                   mainContent.querySelector<HTMLElement>('[data-hero-watch-now="true"]') ||
+                   mainContent.querySelector<HTMLElement>('.tv-focus-target');
         } else if (pathname === '/movies' || pathname === '/tv') {
           // On Movies or Series catalog page: focus "All Platforms" filter button
           target = Array.from(mainContent.querySelectorAll<HTMLElement>('button.tv-focus-target')).find(
@@ -231,8 +231,13 @@ export function useTVNavigation(isEnabled = true) {
         if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
           e.preventDefault();
           const mainContent = document.querySelector('main');
-          const firstTarget = mainContent?.querySelector<HTMLElement>('.tv-focus-target') || focusableElements[0];
-          firstTarget?.focus();
+          const heroPlay = mainContent?.querySelector<HTMLElement>('[data-hero-btn="play"].tv-focus-target') ||
+                           mainContent?.querySelector<HTMLElement>('[data-hero-btn="play"][tabindex="0"]');
+          const firstTarget = heroPlay || mainContent?.querySelector<HTMLElement>('.tv-focus-target') || focusableElements[0];
+          if (firstTarget) {
+            firstTarget.focus();
+            firstTarget.scrollIntoView({ behavior: getScrollBehavior(), block: 'nearest', inline: 'center' });
+          }
           return;
         }
         return;
@@ -344,16 +349,27 @@ export function useTVNavigation(isEnabled = true) {
             e.preventDefault();
             if (btnType === 'play') {
               const detailsBtn = heroBanner?.querySelector<HTMLElement>(
+                `[data-hero-btn="details"].tv-focus-target`
+              ) || heroBanner?.querySelector<HTMLElement>(
                 `[data-hero-btn="details"][data-hero-index="${currentSlideIdx}"]`
               );
-              detailsBtn?.focus({ preventScroll: true });
+              if (detailsBtn) {
+                detailsBtn.focus({ preventScroll: true });
+              } else {
+                const railCards = Array.from(document.querySelectorAll<HTMLElement>('[data-content-rail="true"] .tv-focus-target, main [role="button"].tv-focus-target'))
+                  .filter(el => el.offsetParent !== null && !el.hasAttribute('disabled'));
+                if (railCards.length > 0) {
+                  railCards[0].focus();
+                  railCards[0].scrollIntoView({ behavior: getScrollBehavior(), block: 'center' });
+                }
+              }
             } else {
               // From details: move down to first card of next section (Continue watching / Trending now)
-              const firstRail = document.querySelector('[data-content-rail="true"]');
-              const firstCard = firstRail?.querySelector<HTMLElement>('.tv-focus-target');
-              if (firstCard) {
-                firstCard.focus({ preventScroll: true });
-                firstCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              const railCards = Array.from(document.querySelectorAll<HTMLElement>('[data-content-rail="true"] .tv-focus-target, main [role="button"].tv-focus-target'))
+                .filter(el => el.offsetParent !== null && !el.hasAttribute('disabled'));
+              if (railCards.length > 0) {
+                railCards[0].focus();
+                railCards[0].scrollIntoView({ behavior: getScrollBehavior(), block: 'center' });
               }
             }
             return;

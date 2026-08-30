@@ -224,7 +224,9 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ items }) => {
                         navigate(`/watch/${mediaType}/${featured.id}`);
                       }
                     }}
-                    className="flex items-center gap-2 px-5 sm:px-6 py-2.5 rounded-xl bg-gradient-to-r from-hbo-purple to-hbo-cyan text-white font-bold text-xs sm:text-sm shadow-hbo-glow hover:scale-105 transition-all tv-focus-target"
+                    className={`flex items-center gap-2 px-5 sm:px-6 py-2.5 rounded-xl bg-gradient-to-r from-hbo-purple to-hbo-cyan text-white font-bold text-xs sm:text-sm shadow-hbo-glow hover:scale-105 transition-all ${
+                      idx === currentIndex ? 'tv-focus-target' : 'pointer-events-none'
+                    }`}
                   >
                     <Play className="w-4 h-4 fill-current" />
                     <span>Watch Now</span>
@@ -245,7 +247,9 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ items }) => {
                         navigate(`/details/${mediaType}/${featured.id}`);
                       }
                     }}
-                    className="flex items-center gap-2 px-4 sm:px-5 py-2 rounded-xl bg-white/20 hover:bg-white/30 text-white font-semibold text-xs sm:text-sm border border-white/25 transition-all hover:scale-105 tv-focus-target"
+                    className={`flex items-center gap-2 px-4 sm:px-5 py-2 rounded-xl bg-white/20 hover:bg-white/30 text-white font-semibold text-xs sm:text-sm border border-white/25 transition-all hover:scale-105 ${
+                      idx === currentIndex ? 'tv-focus-target' : 'pointer-events-none'
+                    }`}
                   >
                     <Info className="w-4 h-4" />
                     <span>Details</span>
