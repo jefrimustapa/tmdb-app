@@ -270,11 +270,18 @@ export const Settings: React.FC = () => {
                   onClick={() => handleUpdate({ deviceMode: mode.id as any })}
                   className={`p-4 rounded-xl border text-left transition-all tv-focus-target flex flex-col justify-between min-h-[96px] ${
                     isSelected
-                      ? 'bg-gradient-to-r from-hbo-purple/40 to-hbo-cyan/20 border-hbo-cyan shadow-hbo-glow'
+                      ? 'bg-hbo-purple/40 border-hbo-purple-light text-white shadow-lg'
                       : 'bg-hbo-dark/60 border-hbo-border hover:bg-hbo-hover hover:border-white/20'
                   }`}
                 >
-                  <Icon className={`w-5 h-5 mb-2 flex-shrink-0 ${isSelected ? 'text-hbo-cyan' : 'text-gray-400'}`} />
+                  <div className="flex items-center justify-between w-full mb-2">
+                    <Icon className={`w-5 h-5 flex-shrink-0 ${isSelected ? 'text-hbo-cyan' : 'text-gray-400'}`} />
+                    {isSelected && (
+                      <span className="w-4 h-4 rounded-full bg-hbo-cyan text-black flex items-center justify-center flex-shrink-0 shadow-sm">
+                        <Check className="w-2.5 h-2.5 stroke-[3]" />
+                      </span>
+                    )}
+                  </div>
                   <div>
                     <p className="text-xs sm:text-sm font-bold text-white leading-tight">{mode.label}</p>
                     <p className={`text-[11px] mt-1 leading-snug ${isSelected ? 'text-hbo-cyan font-semibold' : 'text-gray-400'}`}>
@@ -316,13 +323,20 @@ export const Settings: React.FC = () => {
                   onClick={() => handleUpdate({ streamHeaderTimeout: opt.seconds })}
                   className={`p-3.5 sm:p-4 rounded-xl border text-left transition-all tv-focus-target min-h-[76px] flex flex-col justify-between ${
                     isSelected
-                      ? 'bg-hbo-cyan/20 border-hbo-cyan text-white shadow-hbo-glow'
+                      ? 'bg-hbo-purple/40 border-hbo-purple-light text-white shadow-lg'
                       : 'bg-hbo-dark/60 border-hbo-border text-gray-400 hover:text-gray-200 hover:border-white/20'
                   }`}
                 >
-                  <p className={`text-xs sm:text-sm font-bold ${isSelected ? 'text-hbo-cyan' : 'text-white'}`}>
-                    {opt.label}
-                  </p>
+                  <div className="flex items-center justify-between w-full">
+                    <p className={`text-xs sm:text-sm font-bold ${isSelected ? 'text-hbo-cyan' : 'text-white'}`}>
+                      {opt.label}
+                    </p>
+                    {isSelected && (
+                      <span className="w-4 h-4 rounded-full bg-hbo-cyan text-black flex items-center justify-center flex-shrink-0 shadow-sm">
+                        <Check className="w-2.5 h-2.5 stroke-[3]" />
+                      </span>
+                    )}
+                  </div>
                   <p className="text-[11px] text-gray-400 mt-1 leading-snug">{opt.desc}</p>
                 </button>
               );
@@ -349,13 +363,23 @@ export const Settings: React.FC = () => {
             </div>
             <button
               onClick={() => handleUpdate({ performanceMode: !(settings.performanceMode ?? true) })}
-              className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all tv-focus-target flex items-center gap-2 flex-shrink-0 ${
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all tv-focus-target flex items-center gap-1.5 flex-shrink-0 border ${
                 (settings.performanceMode ?? true)
-                  ? 'bg-hbo-cyan text-black shadow-hbo-glow'
-                  : 'bg-hbo-dark border border-hbo-border text-gray-400 hover:border-white/20'
+                  ? 'bg-emerald-500/20 border-emerald-400 text-emerald-400'
+                  : 'bg-white/5 border-white/10 text-gray-400'
               }`}
             >
-              {(settings.performanceMode ?? true) ? 'Enabled' : 'Disabled'}
+              {(settings.performanceMode ?? true) ? (
+                <>
+                  <Check className="w-3.5 h-3.5 stroke-[2.5]" />
+                  <span>Enabled</span>
+                </>
+              ) : (
+                <>
+                  <X className="w-3.5 h-3.5 stroke-[2.5]" />
+                  <span>Disabled</span>
+                </>
+              )}
             </button>
           </div>
         </div>
@@ -374,13 +398,23 @@ export const Settings: React.FC = () => {
             </div>
             <button
               onClick={() => handleUpdate({ virtualCursorEnabled: !(settings.virtualCursorEnabled ?? true) })}
-              className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all tv-focus-target flex items-center gap-2 flex-shrink-0 ${
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all tv-focus-target flex items-center gap-1.5 flex-shrink-0 border ${
                 (settings.virtualCursorEnabled ?? true)
-                  ? 'bg-hbo-cyan text-black shadow-hbo-glow'
-                  : 'bg-hbo-dark border border-hbo-border text-gray-400 hover:border-white/20'
+                  ? 'bg-emerald-500/20 border-emerald-400 text-emerald-400'
+                  : 'bg-white/5 border-white/10 text-gray-400'
               }`}
             >
-              {(settings.virtualCursorEnabled ?? true) ? 'Enabled' : 'Disabled'}
+              {(settings.virtualCursorEnabled ?? true) ? (
+                <>
+                  <Check className="w-3.5 h-3.5 stroke-[2.5]" />
+                  <span>Enabled</span>
+                </>
+              ) : (
+                <>
+                  <X className="w-3.5 h-3.5 stroke-[2.5]" />
+                  <span>Disabled</span>
+                </>
+              )}
             </button>
           </div>
 
@@ -428,7 +462,7 @@ export const Settings: React.FC = () => {
                         setOpenDropdownSlot(null);
                         setOpenCursorDropdown(openCursorDropdown === 'style' ? null : 'style');
                       }}
-                      className="w-full flex items-center justify-between bg-hbo-dark/80 border border-hbo-border text-white text-xs font-bold rounded-xl px-4 py-3.5 min-h-[64px] hover:bg-hbo-hover hover:border-hbo-cyan focus:outline-none focus:border-hbo-cyan focus:ring-2 focus:ring-hbo-cyan transition-all tv-focus-target"
+                      className="w-full flex items-center justify-between bg-hbo-dark/80 border border-hbo-border text-white text-xs font-bold rounded-xl px-4 py-3.5 min-h-[64px] hover:bg-hbo-hover transition-all tv-focus-target"
                     >
                       <div className="flex items-center gap-3.5 min-w-0 pr-2">
                         <div className="w-7 h-7 flex items-center justify-center flex-shrink-0">
@@ -495,7 +529,7 @@ export const Settings: React.FC = () => {
                         setOpenDropdownSlot(null);
                         setOpenCursorDropdown(openCursorDropdown === 'trigger' ? null : 'trigger');
                       }}
-                      className="w-full flex items-center justify-between bg-hbo-dark/80 border border-hbo-border text-white text-xs font-bold rounded-xl px-4 py-3.5 min-h-[64px] hover:bg-hbo-hover hover:border-hbo-cyan focus:outline-none focus:border-hbo-cyan focus:ring-2 focus:ring-hbo-cyan transition-all tv-focus-target"
+                      className="w-full flex items-center justify-between bg-hbo-dark/80 border border-hbo-border text-white text-xs font-bold rounded-xl px-4 py-3.5 min-h-[64px] hover:bg-hbo-hover transition-all tv-focus-target"
                     >
                       <div className="text-left min-w-0 pr-2">
                         <span className="font-bold text-white text-xs sm:text-sm block">
@@ -553,7 +587,7 @@ export const Settings: React.FC = () => {
                         setOpenDropdownSlot(null);
                         setOpenCursorDropdown(openCursorDropdown === 'timeout' ? null : 'timeout');
                       }}
-                      className="w-full flex items-center justify-between bg-hbo-dark/80 border border-hbo-border text-white text-xs font-bold rounded-xl px-4 py-3.5 min-h-[64px] hover:bg-hbo-hover hover:border-hbo-cyan focus:outline-none focus:border-hbo-cyan focus:ring-2 focus:ring-hbo-cyan transition-all tv-focus-target"
+                      className="w-full flex items-center justify-between bg-hbo-dark/80 border border-hbo-border text-white text-xs font-bold rounded-xl px-4 py-3.5 min-h-[64px] hover:bg-hbo-hover transition-all tv-focus-target"
                     >
                       <div className="text-left min-w-0 pr-2">
                         <span className="font-bold text-white text-xs sm:text-sm block">
@@ -611,7 +645,7 @@ export const Settings: React.FC = () => {
                         setOpenDropdownSlot(null);
                         setOpenCursorDropdown(openCursorDropdown === 'speed' ? null : 'speed');
                       }}
-                      className="w-full flex items-center justify-between bg-hbo-dark/80 border border-hbo-border text-white text-xs font-bold rounded-xl px-4 py-3.5 min-h-[64px] hover:bg-hbo-hover hover:border-hbo-cyan focus:outline-none focus:border-hbo-cyan focus:ring-2 focus:ring-hbo-cyan transition-all tv-focus-target"
+                      className="w-full flex items-center justify-between bg-hbo-dark/80 border border-hbo-border text-white text-xs font-bold rounded-xl px-4 py-3.5 min-h-[64px] hover:bg-hbo-hover transition-all tv-focus-target"
                     >
                       <div className="text-left min-w-0 pr-2">
                         <span className="font-bold text-white text-xs sm:text-sm block">
@@ -728,7 +762,7 @@ export const Settings: React.FC = () => {
                       type="button"
                       id={`priority-server-btn-${index}`}
                       onClick={() => setOpenDropdownSlot(openDropdownSlot === index ? null : index)}
-                      className="w-full flex items-center justify-between bg-hbo-card/90 border border-hbo-border text-white text-xs font-bold rounded-xl px-3.5 py-3 min-h-[52px] hover:bg-hbo-hover hover:border-hbo-cyan focus:outline-none focus:border-hbo-cyan focus:ring-2 focus:ring-hbo-cyan transition-all tv-focus-target"
+                      className="w-full flex items-center justify-between bg-hbo-card/90 border border-hbo-border text-white text-xs font-bold rounded-xl px-3.5 py-3 min-h-[52px] hover:bg-hbo-hover transition-all tv-focus-target"
                     >
                       <span className="truncate pr-2 text-xs sm:text-sm">{selectedProviderObj.name}</span>
                       <ChevronDown className={`w-4 h-4 text-gray-400 flex-shrink-0 transition-transform ${openDropdownSlot === index ? 'rotate-180 text-hbo-cyan' : ''}`} />
@@ -802,15 +836,23 @@ export const Settings: React.FC = () => {
 
             <button
               onClick={() => handleUpdate({ filterAdult: settings.filterAdult === false ? true : false })}
-              className={`flex-shrink-0 w-12 h-6 rounded-full transition-colors relative tv-focus-target ${
-                settings.filterAdult !== false ? 'bg-amber-500' : 'bg-gray-700'
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all tv-focus-target flex items-center gap-1.5 flex-shrink-0 border ${
+                settings.filterAdult !== false
+                  ? 'bg-emerald-500/20 border-emerald-400 text-emerald-400'
+                  : 'bg-white/5 border-white/10 text-gray-400'
               }`}
             >
-              <div
-                className={`w-5 h-5 rounded-full bg-white transition-transform transform ${
-                  settings.filterAdult !== false ? 'translate-x-6' : 'translate-x-0.5'
-                }`}
-              />
+              {settings.filterAdult !== false ? (
+                <>
+                  <Check className="w-3.5 h-3.5 stroke-[2.5]" />
+                  <span>Enabled</span>
+                </>
+              ) : (
+                <>
+                  <X className="w-3.5 h-3.5 stroke-[2.5]" />
+                  <span>Disabled</span>
+                </>
+              )}
             </button>
           </div>
 
@@ -828,15 +870,23 @@ export const Settings: React.FC = () => {
 
             <button
               onClick={() => handleUpdate({ filterUnreleased: settings.filterUnreleased === false ? true : false })}
-              className={`flex-shrink-0 w-12 h-6 rounded-full transition-colors relative tv-focus-target ${
-                settings.filterUnreleased !== false ? 'bg-hbo-cyan' : 'bg-gray-700'
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all tv-focus-target flex items-center gap-1.5 flex-shrink-0 border ${
+                settings.filterUnreleased !== false
+                  ? 'bg-emerald-500/20 border-emerald-400 text-emerald-400'
+                  : 'bg-white/5 border-white/10 text-gray-400'
               }`}
             >
-              <div
-                className={`w-5 h-5 rounded-full bg-white transition-transform transform ${
-                  settings.filterUnreleased !== false ? 'translate-x-6' : 'translate-x-0.5'
-                }`}
-              />
+              {settings.filterUnreleased !== false ? (
+                <>
+                  <Check className="w-3.5 h-3.5 stroke-[2.5]" />
+                  <span>Enabled</span>
+                </>
+              ) : (
+                <>
+                  <X className="w-3.5 h-3.5 stroke-[2.5]" />
+                  <span>Disabled</span>
+                </>
+              )}
             </button>
           </div>
 
@@ -862,13 +912,20 @@ export const Settings: React.FC = () => {
                     onClick={() => handleUpdate({ maturityLevel: lvl.id as any })}
                     className={`p-3 rounded-xl border text-left transition-all tv-focus-target ${
                       isSelected
-                        ? 'bg-hbo-cyan/20 border-hbo-cyan text-white shadow-hbo-glow'
+                        ? 'bg-hbo-purple/40 border-hbo-purple-light text-white shadow-lg'
                         : 'bg-hbo-dark/60 border-hbo-border text-gray-400 hover:text-gray-200'
                     }`}
                   >
-                    <p className={`text-xs font-bold ${isSelected ? 'text-hbo-cyan' : 'text-white'}`}>
-                      {lvl.label}
-                    </p>
+                    <div className="flex items-center justify-between w-full">
+                      <p className={`text-xs font-bold ${isSelected ? 'text-hbo-cyan' : 'text-white'}`}>
+                        {lvl.label}
+                      </p>
+                      {isSelected && (
+                        <span className="w-4 h-4 rounded-full bg-hbo-cyan text-black flex items-center justify-center flex-shrink-0 shadow-sm">
+                          <Check className="w-2.5 h-2.5 stroke-[3]" />
+                        </span>
+                      )}
+                    </div>
                     <p className="text-[11px] text-gray-400 mt-0.5">{lvl.desc}</p>
                   </button>
                 );
@@ -1042,15 +1099,23 @@ export const Settings: React.FC = () => {
           <button
             onClick={() => handleUpdate({ adBlockShield: !settings.adBlockShield })}
             data-settings-bottom="true"
-            className={`flex-shrink-0 w-12 h-6 rounded-full transition-colors relative tv-focus-target ${
-              settings.adBlockShield ? 'bg-hbo-purple-light' : 'bg-gray-700'
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all tv-focus-target flex items-center gap-1.5 flex-shrink-0 border ${
+              settings.adBlockShield
+                ? 'bg-emerald-500/20 border-emerald-400 text-emerald-400'
+                : 'bg-white/5 border-white/10 text-gray-400'
             }`}
           >
-            <div
-              className={`w-5 h-5 rounded-full bg-white transition-transform transform ${
-                settings.adBlockShield ? 'translate-x-6' : 'translate-x-0.5'
-              }`}
-            />
+            {settings.adBlockShield ? (
+              <>
+                <Check className="w-3.5 h-3.5 stroke-[2.5]" />
+                <span>Enabled</span>
+              </>
+            ) : (
+              <>
+                <X className="w-3.5 h-3.5 stroke-[2.5]" />
+                <span>Disabled</span>
+              </>
+            )}
           </button>
         </div>
 
@@ -1126,15 +1191,23 @@ export const Settings: React.FC = () => {
 
             <button
               onClick={() => handleUpdate({ includeNightlyUpdates: !settings.includeNightlyUpdates })}
-              className={`flex-shrink-0 w-12 h-6 rounded-full transition-colors relative tv-focus-target ${
-                settings.includeNightlyUpdates ? 'bg-hbo-cyan' : 'bg-gray-700'
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all tv-focus-target flex items-center gap-1.5 flex-shrink-0 border ${
+                settings.includeNightlyUpdates
+                  ? 'bg-emerald-500/20 border-emerald-400 text-emerald-400'
+                  : 'bg-white/5 border-white/10 text-gray-400'
               }`}
             >
-              <div
-                className={`w-5 h-5 rounded-full bg-white transition-transform transform ${
-                  settings.includeNightlyUpdates ? 'translate-x-6' : 'translate-x-0.5'
-                }`}
-              />
+              {settings.includeNightlyUpdates ? (
+                <>
+                  <Check className="w-3.5 h-3.5 stroke-[2.5]" />
+                  <span>Enabled</span>
+                </>
+              ) : (
+                <>
+                  <X className="w-3.5 h-3.5 stroke-[2.5]" />
+                  <span>Disabled</span>
+                </>
+              )}
             </button>
           </div>
         </div>
