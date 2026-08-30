@@ -1177,6 +1177,40 @@ export const Settings: React.FC = () => {
             </div>
           )}
 
+          {/* Auto-Check on Startup Toggle */}
+          <div className="border-t border-hbo-border/60 pt-4 flex items-center justify-between gap-4">
+            <div className="flex-1 min-w-0 pr-2">
+              <h4 className="text-xs font-bold text-gray-200 flex items-center gap-2 mb-0.5">
+                <RefreshCw className="w-3.5 h-3.5 text-hbo-cyan" />
+                <span>Auto-Check on Startup</span>
+              </h4>
+              <p className="text-[11px] text-gray-400">
+                Automatically scan for newer releases in the background when the application starts.
+              </p>
+            </div>
+
+            <button
+              onClick={() => handleUpdate({ autoUpdateCheck: !(settings.autoUpdateCheck ?? true) })}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all tv-focus-target flex items-center gap-1.5 flex-shrink-0 border ${
+                (settings.autoUpdateCheck ?? true)
+                  ? 'bg-emerald-500/20 border-emerald-400 text-emerald-400'
+                  : 'bg-white/5 border-white/10 text-gray-400'
+              }`}
+            >
+              {(settings.autoUpdateCheck ?? true) ? (
+                <>
+                  <Check className="w-3.5 h-3.5 stroke-[2.5]" />
+                  <span>Enabled</span>
+                </>
+              ) : (
+                <>
+                  <X className="w-3.5 h-3.5 stroke-[2.5]" />
+                  <span>Disabled</span>
+                </>
+              )}
+            </button>
+          </div>
+
           {/* Nightly Channel Toggle */}
           <div className="border-t border-hbo-border/60 pt-4 flex items-center justify-between gap-4">
             <div className="flex-1 min-w-0 pr-2">
