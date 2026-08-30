@@ -80,6 +80,7 @@ export interface UserSettings {
   directStreamMode?: boolean; // Legacy fallback flag
   streamHeaderTimeout: number; // in seconds, e.g. 3, 5, 8, or 0 for always visible
   includeNightlyUpdates: boolean; // Option to check for and install Nightly pre-releases
+  autoUpdateCheck?: boolean; // Automatically check for updates on application startup
   virtualCursorEnabled?: boolean; // TV Mode on-demand virtual cursor
   virtualCursorClicks?: 2 | 3; // Number of repeated OK clicks to activate (2 or 3)
   virtualCursorTimeout?: number; // Inactivity auto-hide in seconds (5, 10, 15, 30, 0 for never)
