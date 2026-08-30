@@ -303,7 +303,7 @@ export const Search: React.FC = () => {
         </div>
       ) : results.length > 0 ? (
         <div className="space-y-6">
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 sm:gap-6 lg:gap-7 py-4 px-1">
+          <div className="grid grid-cols-5 gap-3.5 sm:gap-4 py-4 px-1">
             {filteredResults.map((item) => (
               <div key={item.id} className="flex justify-center">
                 <MediaCard item={item} />

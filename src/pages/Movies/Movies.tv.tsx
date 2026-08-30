@@ -253,7 +253,7 @@ export const Movies: React.FC = () => {
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3.5 sm:gap-5 lg:gap-6 py-2 px-1">
+          <div className="grid grid-cols-5 gap-3.5 sm:gap-4 py-2 px-1">
             {movies.map((movie) => (
               <div key={movie.id} className="flex justify-center">
                 <MediaCard item={movie} type="movie" />

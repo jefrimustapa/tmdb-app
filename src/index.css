@@ -40,7 +40,7 @@
   }
 }
 
-/* TV & D-Pad spatial focus indicators - High Contrast & Standardized 2px Thickness */
+/* TV & D-Pad spatial focus indicators - 1px Selection Ring with 1px Padding Gap */
 .tv-focus-target:not([data-tv-nav="true"]) {
   will-change: transform;
   transition: transform 0.1s ease-out, border-color 0.1s ease-out, box-shadow 0.1s ease-out;
@@ -49,13 +49,13 @@
 .tv-focus-target:not([data-tv-nav="true"]):focus,
 .tv-focus-target:not([data-tv-nav="true"]):focus-visible {
   outline: none !important;
-  border-color: #00f0ff !important;
-  box-shadow: 0 0 0 2px #00f0ff, 0 0 10px rgba(0, 240, 255, 0.5) !important;
-  transform: scale(1.04) translateZ(0);
+  border-color: transparent !important;
+  box-shadow: 0 0 0 1px #050508, 0 0 0 2px #00f0ff, 0 0 8px rgba(0, 240, 255, 0.45) !important;
+  transform: scale(1.03) translateZ(0);
   z-index: 30;
 }
 
-/* In dropdown menus and tight lists, avoid expanding scale that clips left/right overflow & use identical 2px selector ring */
+/* In dropdown menus and tight lists, avoid expanding scale that clips left/right overflow & use identical 1px padded selector ring */
 [data-provider-dropdown-open] .tv-focus-target:focus,
 [data-provider-dropdown-open] .tv-focus-target:focus-visible,
 [data-priority-dropdown-container] .tv-focus-target:focus,
@@ -64,11 +64,13 @@
 [data-cursor-dropdown-container] .tv-focus-target:focus-visible {
   transform: none !important;
   outline: none !important;
-  border-color: #00f0ff !important;
-  box-shadow: 0 0 0 2px #00f0ff, 0 0 8px rgba(0, 240, 255, 0.4) !important;
+  border-color: transparent !important;
+  box-shadow: 0 0 0 1px #050508, 0 0 0 2px #00f0ff, 0 0 6px rgba(0, 240, 255, 0.35) !important;
 }
 
 /* Sidebar TV Navigation - Minimalist Icon Glow Focus (No rectangular box outline) */
+aside .tv-focus-target:focus,
+aside .tv-focus-target:focus-visible,
 [data-tv-nav="true"].tv-focus-target:focus,
 [data-tv-nav="true"].tv-focus-target:focus-visible {
   outline: none !important;
@@ -78,7 +80,9 @@
   background-color: transparent !important;
 }
 
-/* Standard Mode (Performance Mode Disabled): Scale icon up on focus */
+/* Standard Mode (Performance Mode Disabled): Scale icon up on focus with Cyan Glow */
+aside .tv-focus-target:focus .tv-nav-icon,
+aside .tv-focus-target:focus-visible .tv-nav-icon,
 [data-tv-nav="true"].tv-focus-target:focus .tv-nav-icon,
 [data-tv-nav="true"].tv-focus-target:focus-visible .tv-nav-icon {
   color: #00f0ff !important;
@@ -86,6 +90,8 @@
   transform: scale(1.22) translateZ(0);
 }
 
+aside .tv-focus-target:focus .tv-nav-label,
+aside .tv-focus-target:focus-visible .tv-nav-label,
 [data-tv-nav="true"].tv-focus-target:focus .tv-nav-label,
 [data-tv-nav="true"].tv-focus-target:focus-visible .tv-nav-label {
   color: #00f0ff !important;
@@ -93,6 +99,8 @@
 }
 
 /* Performance Mode (Lite Graphics Enabled): 1:1 Scale without zoom transform */
+[data-perf-mode="true"] aside .tv-focus-target:focus,
+[data-perf-mode="true"] aside .tv-focus-target:focus-visible,
 [data-perf-mode="true"] [data-tv-nav="true"].tv-focus-target:focus,
 [data-perf-mode="true"] [data-tv-nav="true"].tv-focus-target:focus-visible {
   outline: none !important;
@@ -102,6 +110,8 @@
   background-color: transparent !important;
 }
 
+[data-perf-mode="true"] aside .tv-focus-target:focus .tv-nav-icon,
+[data-perf-mode="true"] aside .tv-focus-target:focus-visible .tv-nav-icon,
 [data-perf-mode="true"] [data-tv-nav="true"].tv-focus-target:focus .tv-nav-icon,
 [data-perf-mode="true"] [data-tv-nav="true"].tv-focus-target:focus-visible .tv-nav-icon {
   color: #00f0ff !important;
@@ -109,6 +119,8 @@
   transform: none !important;
 }
 
+[data-perf-mode="true"] aside .tv-focus-target:focus .tv-nav-label,
+[data-perf-mode="true"] aside .tv-focus-target:focus-visible .tv-nav-label,
 [data-perf-mode="true"] [data-tv-nav="true"].tv-focus-target:focus .tv-nav-label,
 [data-perf-mode="true"] [data-tv-nav="true"].tv-focus-target:focus-visible .tv-nav-label {
   color: #00f0ff !important;
@@ -165,7 +177,7 @@
   background-color: #0e0e1a !important;
 }
 
-/* 3. Crisp focus indicators without zoom/resizing - Uniform 2px Ring Only on Focused Element */
+/* 3. Crisp focus indicators without zoom/resizing - Uniform 1px Selection Ring with 1px Padding Gap */
 [data-perf-mode="true"] .tv-focus-target {
   transform: none !important;
   transition: none !important;
@@ -177,8 +189,8 @@
 [data-perf-mode="true"] [data-priority-dropdown-container] .tv-focus-target:focus,
 [data-perf-mode="true"] [data-cursor-dropdown-container] .tv-focus-target:focus {
   outline: none !important;
-  border-color: #00f0ff !important;
-  box-shadow: 0 0 0 2px #00f0ff !important;
+  border-color: transparent !important;
+  box-shadow: 0 0 0 1px #050508, 0 0 0 2px #00f0ff !important;
   transform: none !important;
   transition: none !important;
 }
@@ -213,9 +225,14 @@
 }
 
 /* 7. Dedicated hardware compositing layer for horizontal content rails */
-[data-perf-mode="true"] [data-content-rail="true"] .overflow-x-auto {
+[data-content-rail="true"] .overflow-x-auto {
   transform: translateZ(0);
-  will-change: transform;
+  will-change: scroll-position;
+  scroll-behavior: smooth;
+}
+
+[data-perf-mode="true"] [data-content-rail="true"] .overflow-x-auto {
+  scroll-behavior: auto;
 }
 
 /* Smooth gradient overlays */

@@ -6,7 +6,6 @@ import { dbService } from '../../services/db';
 import { HeroBanner } from '../../components/common/HeroBanner';
 import { MediaRow } from '../../components/common/MediaRow';
 import { MediaCard } from '../../components/common/MediaCard';
-import { PlatformHubs } from '../../components/common/PlatformHubs';
 import { Play, Sparkles, Flame, Trophy, Film, Tv, Compass } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
@@ -152,17 +151,14 @@ export const Home: React.FC = () => {
       {/* Hero Billboard Carousel */}
       <HeroBanner items={trending} />
 
-      {/* Streaming Platform Hubs (Apple TV, HBO, Disney+, Netflix, Prime Video, Viu, Netflix Kids) */}
-      <PlatformHubs />
-
-      {/* Continue Watching Section */}
+      {/* Continue Watching Section (HBO Max 16:9 Landscape Widescreen Cards) */}
       {history.length > 0 && (
-        <section className="my-8 px-4 sm:px-8 max-w-7xl mx-auto">
+        <section className="my-8 px-4 sm:px-8 max-w-7xl mx-auto" data-content-rail="true">
           <h2 className="text-lg sm:text-2xl font-bold font-display text-white tracking-tight flex items-center gap-2 mb-3">
             <span className="w-1.5 h-5 bg-hbo-cyan rounded-full inline-block"></span>
             Continue Watching
           </h2>
-          <div className="flex items-center gap-4 sm:gap-6 lg:gap-7 overflow-x-auto no-scrollbar py-3 px-2">
+          <div className="flex items-center gap-3 overflow-x-auto no-scrollbar py-3 pl-2 pr-6 scroll-smooth transform-gpu">
             {history.map((hist) => (
               <MediaCard
                 key={hist.id || `${hist.tmdbId}-${hist.mediaType}`}
@@ -178,6 +174,10 @@ export const Home: React.FC = () => {
                   original_language: 'en'
                 }}
                 type={hist.mediaType}
+                variant="landscape"
+                season={hist.season}
+                episode={hist.episode}
+                episodeTitle={hist.episodeTitle}
                 progress={hist.progressPercent}
               />
             ))}
