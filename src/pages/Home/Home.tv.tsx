@@ -143,12 +143,14 @@ export const Home: React.FC = () => {
 
       {/* Continue Watching Section (HBO Max 16:9 Landscape Widescreen Cards) */}
       {history.length > 0 && (
-        <section className="mb-7 sm:mb-9 px-4 sm:px-8 w-full max-w-full" data-content-rail="true">
-          <h2 className="text-lg sm:text-2xl font-bold font-display text-white tracking-tight flex items-center gap-2 mb-2.5">
-            <span className="w-1.5 h-5 bg-hbo-cyan rounded-full inline-block"></span>
-            Continue Watching
-          </h2>
-          <div className="flex items-center gap-3.5 overflow-x-auto no-scrollbar py-4 pl-6 pr-8 -my-2 scroll-smooth transform-gpu snap-x snap-mandatory scroll-pl-6">
+        <section className="mb-7 sm:mb-9 w-full" data-content-rail="true">
+          <div className="px-4 sm:px-8 mb-2.5">
+            <h2 className="text-lg sm:text-2xl font-bold font-display text-white tracking-tight flex items-center gap-2">
+              <span className="w-1.5 h-5 bg-hbo-cyan rounded-full inline-block"></span>
+              Continue Watching
+            </h2>
+          </div>
+          <div className="flex items-center gap-3.5 overflow-x-auto no-scrollbar py-4 pl-4 sm:pl-8 pr-6 sm:pr-8 -my-2 scroll-smooth transform-gpu snap-x snap-mandatory scroll-pl-4 sm:scroll-pl-8">
             {history.map((hist) => (
               <MediaCard
                 key={hist.id || `${hist.tmdbId}-${hist.mediaType}`}
