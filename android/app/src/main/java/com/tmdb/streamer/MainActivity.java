@@ -293,13 +293,37 @@ public class MainActivity extends BridgeActivity {
                             connection.setReadTimeout(30000);
                             connection.connect();
 
-                            if (connection.getResponseCode() != HttpURLConnection.HTTP_OK) {
-                                Log.e("TMDB_APP", "[Update] Server returned HTTP " + connection.getResponseCode() + " " + connection.getResponseMessage());
-                                return;
+                            // Follow HTTP redirects (301, 302, 303, 307, 308) from GitHub to AWS S3 storage
+                            int responseCode = connection.getResponseCode();
+                            int redirectCount = 0;
+                            while ((responseCode == HttpURLConnection.HTTP_MOVED_TEMP || 
+                                    responseCode == HttpURLConnection.HTTP_MOVED_PERM || 
+                                    responseCode == HttpURLConnection.HTTP_SEE_OTHER || 
+                                    responseCode == 307 || responseCode == 308) && redirectCount < 6) {
+                                String newUrl = connection.getHeaderField("Location");
+                                Log.i("TMDB_APP", "[Update] Following redirect (" + responseCode + ") to: " + newUrl);
+                                connection.disconnect();
+                                url = new URL(newUrl);
+                                connection = (HttpURLConnection) url.openConnection();
+                                connection.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android) TMDBStreamer");
+                                connection.setConnectTimeout(15000);
+                                connection.setReadTimeout(30000);
+                                connection.connect();
+                                responseCode = connection.getResponseCode();
+                                redirectCount++;
+                            }
+
+                            if (responseCode != HttpURLConnection.HTTP_OK) {
+                                throw new Exception("Server returned HTTP " + responseCode + " " + connection.getResponseMessage());
                             }
 
                             int fileLength = connection.getContentLength();
-                            File downloadDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
+                            
+                            // Use app-scoped external files directory (no WRITE_EXTERNAL_STORAGE permission required)
+                            File downloadDir = getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS);
+                            if (downloadDir == null) {
+                                downloadDir = new File(getCacheDir(), "updates");
+                            }
                             if (!downloadDir.exists()) {
                                 downloadDir.mkdirs();
                             }
@@ -321,16 +345,22 @@ public class MainActivity extends BridgeActivity {
                                 output.write(data, 0, count);
 
                                 long now = System.currentTimeMillis();
-                                if (now - lastProgressUpdate > 300) {
+                                if (now - lastProgressUpdate > 250) {
                                     lastProgressUpdate = now;
-                                    final int progress = fileLength > 0 ? (int) (total * 100 / fileLength) : -1;
+                                    final int progress = fileLength > 0 ? (int) (total * 100 / fileLength) : 50;
                                     final long currentTotal = total;
+                                    final int totalLen = fileLength;
                                     runOnUiThread(() -> {
                                         WebView wv = bridge.getWebView();
                                         if (wv != null) {
+                                            String statusStr = String.format(
+                                                "%.1f MB / %.1f MB", 
+                                                (currentTotal / (1024.0 * 1024.0)), 
+                                                (totalLen > 0 ? (totalLen / (1024.0 * 1024.0)) : (currentTotal / (1024.0 * 1024.0)))
+                                            );
                                             String js = String.format(
-                                                "window.dispatchEvent(new CustomEvent('tmdb_apk_download_progress', { detail: { progress: %d, total: %d, downloaded: %d } }));",
-                                                progress, fileLength, currentTotal
+                                                "window.dispatchEvent(new CustomEvent('tmdb_update_download_progress', { detail: { percent: %d, downloaded: %d, total: %d, status: '%s' } }));",
+                                                progress, currentTotal, totalLen, statusStr
                                             );
                                             wv.evaluateJavascript(js, null);
                                         }
@@ -346,7 +376,7 @@ public class MainActivity extends BridgeActivity {
                             runOnUiThread(() -> {
                                 WebView wv = bridge.getWebView();
                                 if (wv != null) {
-                                    wv.evaluateJavascript("window.dispatchEvent(new CustomEvent('tmdb_apk_download_complete', { detail: { path: '" + outputFile.getAbsolutePath() + "' } }));", null);
+                                    wv.evaluateJavascript("window.dispatchEvent(new CustomEvent('tmdb_update_download_complete', { detail: { path: '" + outputFile.getAbsolutePath().replace("\\", "\\\\") + "' } }));", null);
                                 }
                                 promptInstallApk(outputFile);
                             });
@@ -356,7 +386,8 @@ public class MainActivity extends BridgeActivity {
                             runOnUiThread(() -> {
                                 WebView wv = bridge.getWebView();
                                 if (wv != null) {
-                                    wv.evaluateJavascript("window.dispatchEvent(new CustomEvent('tmdb_apk_download_error', { detail: { error: '" + e.getMessage() + "' } }));", null);
+                                    String safeErr = (e.getMessage() != null ? e.getMessage() : "Download error").replace("'", "\\'");
+                                    wv.evaluateJavascript("window.dispatchEvent(new CustomEvent('tmdb_update_download_error', { detail: { error: '" + safeErr + "' } }));", null);
                                 }
                             });
                         }
