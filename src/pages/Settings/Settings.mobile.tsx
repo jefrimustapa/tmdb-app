@@ -4,10 +4,11 @@ import type { UserSettings } from '../../types/db';
 import { STREAM_PROVIDERS } from '../../services/streamProviders';
 import { useDevice } from '../../hooks/useDevice';
 import { Logo } from '../../components/common/Logo';
-import { APP_VERSION, APP_BUILD_NUMBER, APP_VERSION_FULL, APP_BUILD_CHANNEL } from '../../version';
+import { APP_VERSION, APP_BUILD_NUMBER, APP_VERSION_FULL, APP_BUILD_CHANNEL, APP_CHANGELOG } from '../../version';
 import { updateService, type UpdateInfo } from '../../services/updateService';
 import { UpdateModal } from '../../components/common/UpdateModal';
-import { Settings as SettingsIcon, Tv2, Smartphone, Tablet, Monitor, ShieldCheck, Server, Database, Check, ShieldAlert, EyeOff, Lock, Zap, X, ArrowUpCircle, RefreshCw, Moon, Sparkles, AlertCircle, CalendarX, ChevronDown, Radio } from 'lucide-react';
+import { FormattedChangelog } from '../../components/common/FormattedChangelog';
+import { Settings as SettingsIcon, Tv2, Smartphone, Tablet, Monitor, ShieldCheck, Server, Database, Check, ShieldAlert, EyeOff, Lock, Zap, X, ArrowUpCircle, RefreshCw, Moon, Sparkles, AlertCircle, CalendarX, ChevronDown, Radio, FileText } from 'lucide-react';
 
 export const Settings: React.FC = () => {
   const [settings, setSettings] = useState<UserSettings | null>(null);
@@ -781,14 +782,16 @@ export const Settings: React.FC = () => {
                 ) : (
                   <Check className="w-4 h-4 text-emerald-400 flex-shrink-0" />
                 )}
-                <span className="truncate">
-                  {updateInfo.hasUpdate ? `Update Available: v${updateInfo.latestVersion}` : 'You are on the latest build'}
+                <span className="break-all font-mono">
+                  {updateInfo.hasUpdate 
+                    ? `Update Available: v${updateInfo.latestVersion}${updateInfo.apkSizeFormatted ? ` (${updateInfo.apkSizeFormatted})` : ''}` 
+                    : 'You are on the latest build'}
                 </span>
               </div>
               {updateInfo.hasUpdate && (
                 <button
                   onClick={() => setShowUpdateModal(true)}
-                  className="px-3 py-1 bg-hbo-cyan text-black font-bold rounded-lg hover:bg-hbo-cyan/90 text-xs tv-focus-target"
+                  className="px-3 py-1.5 bg-hbo-cyan text-black font-bold rounded-lg hover:bg-hbo-cyan/90 text-xs tv-focus-target flex-shrink-0"
                 >
                   View Update
                 </button>
@@ -902,37 +905,68 @@ export const Settings: React.FC = () => {
         </div>
       </div>
 
-      {/* Full Page Logo Screen (Easter Egg on 3 taps) */}
+      {/* Full Page Logo & Version Changelog Screen (Easter Egg on 3 taps) */}
       {showEasterEgg && (
         <div
-          onClick={() => setShowEasterEgg(false)}
-          className="fixed inset-0 z-50 bg-hbo-dark/95 backdrop-blur-2xl flex flex-col items-center justify-center p-6 animate-fade-in cursor-pointer select-none"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowEasterEgg(false);
+            }
+          }}
+          className="fixed inset-0 z-50 bg-hbo-dark/95 backdrop-blur-2xl flex flex-col items-center justify-center p-4 sm:p-6 animate-fade-in select-none"
         >
-          <button
-            onClick={() => setShowEasterEgg(false)}
-            className="absolute top-8 right-8 p-3 rounded-full bg-white/10 hover:bg-white/20 border border-white/10 text-gray-300 hover:text-white transition-all tv-focus-target focus:outline-none focus:ring-2 focus:ring-hbo-cyan"
-            aria-label="Close"
-          >
-            <X className="w-6 h-6" />
-          </button>
+          <div className="relative w-full max-w-lg bg-hbo-card/95 border border-hbo-border/80 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh] animate-scale-in">
+            {/* Header */}
+            <div className="p-4 border-b border-hbo-border/60 flex items-center justify-between gap-4 bg-hbo-dark/60">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="p-2 rounded-xl bg-hbo-card border border-hbo-border/80 shadow-md flex items-center justify-center flex-shrink-0">
+                  <Logo size="sm" showText={false} />
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm sm:text-base font-bold font-display text-white truncate">TMDB Streamer</h3>
+                    <span className="px-2 py-0.5 rounded-full bg-hbo-purple/30 border border-hbo-purple-light text-hbo-cyan font-mono text-[10px] font-bold uppercase">
+                      {APP_BUILD_CHANNEL}
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-400 font-mono truncate">v{APP_VERSION} (Build #{APP_BUILD_NUMBER})</p>
+                </div>
+              </div>
 
-          <div className="flex flex-col items-center justify-center text-center space-y-6 animate-scale-in max-w-sm w-full">
-            <div className="p-6 sm:p-8 rounded-3xl bg-hbo-card/90 border border-hbo-border/80 shadow-[0_0_60px_rgba(144,85,255,0.3)] flex items-center justify-center">
-              <Logo size="lg" showText={true} />
+              <button
+                onClick={() => setShowEasterEgg(false)}
+                className="p-2 rounded-full bg-white/10 hover:bg-white/20 border border-white/10 text-gray-300 hover:text-white transition-all focus:outline-none focus:ring-2 focus:ring-hbo-cyan flex-shrink-0"
+                aria-label="Close"
+              >
+                <X className="w-5 h-5" />
+              </button>
             </div>
 
-            <div className="space-y-2">
-              <span className="px-3.5 py-1 rounded-full bg-hbo-purple/30 border border-hbo-purple-light text-hbo-cyan font-mono text-xs font-bold shadow-sm inline-block">
-                v{APP_VERSION} (Build #{APP_BUILD_NUMBER})
-              </span>
-              <p className="text-xs text-gray-400">
-                Community Streaming & Discovery Suite
+            {/* Changelog Title Bar */}
+            <div className="px-4 py-2 bg-black/30 border-b border-white/5 flex items-center justify-between">
+              <div className="flex items-center gap-2 text-xs font-bold text-gray-300 uppercase tracking-wider">
+                <FileText className="w-3.5 h-3.5 text-hbo-cyan" />
+                <span>Installed Version Changelog</span>
+              </div>
+            </div>
+
+            {/* Scrollable Changelog Content */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-2 font-sans scrollbar-thin scrollbar-thumb-hbo-purple transition-all bg-black/20">
+              <FormattedChangelog notes={APP_CHANGELOG} />
+            </div>
+
+            {/* Footer */}
+            <div className="p-3.5 border-t border-hbo-border/60 bg-hbo-dark/60 flex items-center justify-between gap-3">
+              <p className="text-[10px] sm:text-[11px] text-gray-400 font-mono truncate max-w-[220px]">
+                {APP_VERSION_FULL}
               </p>
+              <button
+                onClick={() => setShowEasterEgg(false)}
+                className="px-4 py-1.5 rounded-xl bg-gradient-to-r from-hbo-purple to-hbo-cyan text-white font-bold text-xs hover:opacity-90 active:scale-95 transition-all"
+              >
+                Close
+              </button>
             </div>
-
-            <p className="text-[11px] text-gray-500 pt-4">
-              Tap anywhere or press back to return
-            </p>
           </div>
         </div>
       )}
