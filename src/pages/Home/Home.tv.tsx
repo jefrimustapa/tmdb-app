@@ -143,7 +143,7 @@ export const Home: React.FC = () => {
 
       {/* Continue Watching Section (HBO Max 16:9 Landscape Widescreen Cards) */}
       {history.length > 0 && (
-        <section className="mb-7 sm:mb-9 px-4 sm:px-8 max-w-7xl mx-auto" data-content-rail="true">
+        <section className="mb-7 sm:mb-9 px-4 sm:px-8 w-full max-w-full" data-content-rail="true">
           <h2 className="text-lg sm:text-2xl font-bold font-display text-white tracking-tight flex items-center gap-2 mb-2.5">
             <span className="w-1.5 h-5 bg-hbo-cyan rounded-full inline-block"></span>
             Continue Watching
