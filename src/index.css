@@ -15,6 +15,9 @@
     -webkit-font-smoothing: antialiased;
     -webkit-tap-highlight-color: transparent;
     user-select: none;
+    overflow-x: hidden;
+    max-width: 100vw;
+    width: 100%;
   }
 
   /* Custom smooth scrolling */
@@ -40,7 +43,7 @@
   }
 }
 
-/* TV & D-Pad spatial focus indicators - 1px Selection Ring with 1px Padding Gap */
+/* TV & D-Pad spatial focus indicators - 1.5px Selection Ring with 1.5px Padding Gap */
 .tv-focus-target:not([data-tv-nav="true"]) {
   will-change: transform;
   transition: transform 0.1s ease-out, border-color 0.1s ease-out, box-shadow 0.1s ease-out;
@@ -50,12 +53,12 @@
 .tv-focus-target:not([data-tv-nav="true"]):focus-visible {
   outline: none !important;
   border-color: transparent !important;
-  box-shadow: 0 0 0 1px #050508, 0 0 0 2px #00f0ff, 0 0 8px rgba(0, 240, 255, 0.45) !important;
+  box-shadow: 0 0 0 1.5px #050508, 0 0 0 2.5px #00f0ff, 0 0 8px rgba(0, 240, 255, 0.45) !important;
   transform: scale(1.03) translateZ(0);
   z-index: 30;
 }
 
-/* In dropdown menus and tight lists, avoid expanding scale that clips left/right overflow & use identical 1px padded selector ring */
+/* In dropdown menus and tight lists, avoid expanding scale that clips left/right overflow & use identical 1.5px padded selector ring */
 [data-provider-dropdown-open] .tv-focus-target:focus,
 [data-provider-dropdown-open] .tv-focus-target:focus-visible,
 [data-priority-dropdown-container] .tv-focus-target:focus,
@@ -65,7 +68,7 @@
   transform: none !important;
   outline: none !important;
   border-color: transparent !important;
-  box-shadow: 0 0 0 1px #050508, 0 0 0 2px #00f0ff, 0 0 6px rgba(0, 240, 255, 0.35) !important;
+  box-shadow: 0 0 0 1.5px #050508, 0 0 0 2.5px #00f0ff, 0 0 6px rgba(0, 240, 255, 0.35) !important;
 }
 
 /* Sidebar TV Navigation - Minimalist Icon Glow Focus (No rectangular box outline) */
@@ -177,7 +180,7 @@ aside .tv-focus-target:focus-visible .tv-nav-label,
   background-color: #0e0e1a !important;
 }
 
-/* 3. Crisp focus indicators without zoom/resizing - Uniform 1px Selection Ring with 1px Padding Gap */
+/* 3. Crisp focus indicators without zoom/resizing - Uniform 1.5px Selection Ring with 1.5px Padding Gap */
 [data-perf-mode="true"] .tv-focus-target {
   transform: none !important;
   transition: none !important;
@@ -190,7 +193,7 @@ aside .tv-focus-target:focus-visible .tv-nav-label,
 [data-perf-mode="true"] [data-cursor-dropdown-container] .tv-focus-target:focus {
   outline: none !important;
   border-color: transparent !important;
-  box-shadow: 0 0 0 1px #050508, 0 0 0 2px #00f0ff !important;
+  box-shadow: 0 0 0 1.5px #050508, 0 0 0 2.5px #00f0ff !important;
   transform: none !important;
   transition: none !important;
 }

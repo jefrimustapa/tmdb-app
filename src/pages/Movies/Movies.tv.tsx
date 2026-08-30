@@ -142,7 +142,7 @@ export const Movies: React.FC = () => {
   const activePlatform = PLATFORMS.find((p) => p.id === selectedProvider);
 
   return (
-    <div className={`min-h-screen ${isTV ? 'pt-6 sm:pt-8 pb-16 px-6 lg:px-8' : 'pt-20 sm:pt-24 pb-20 px-4 sm:px-6'} max-w-7xl mx-auto`}>
+    <div className={`min-h-screen ${isTV ? 'pt-6 sm:pt-8 pb-16 px-6 lg:px-8' : 'pt-20 sm:pt-24 pb-20 px-4 sm:px-6'} w-full max-w-full`}>
       {/* Header & Filter Bar */}
       <div data-tv-filter-section="true" className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-5">
         <div>
