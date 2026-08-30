@@ -8,7 +8,7 @@ import { APP_VERSION, APP_BUILD_NUMBER, APP_VERSION_FULL, APP_BUILD_CHANNEL, APP
 import { updateService, type UpdateInfo } from '../../services/updateService';
 import { UpdateModal } from '../../components/common/UpdateModal';
 import { FormattedChangelog } from '../../components/common/FormattedChangelog';
-import { Settings as SettingsIcon, Tv2, Smartphone, Tablet, Monitor, ShieldCheck, Server, Database, Check, ShieldAlert, EyeOff, Lock, Zap, X, ArrowUpCircle, RefreshCw, Moon, Sparkles, AlertCircle, CalendarX, ChevronDown, Radio, FileText } from 'lucide-react';
+import { Settings as SettingsIcon, Tv2, Smartphone, Tablet, Monitor, ShieldCheck, Server, Database, Check, ShieldAlert, EyeOff, Lock, Zap, X, ArrowUpCircle, RefreshCw, Moon, Sparkles, AlertCircle, CalendarX, ChevronDown, Radio, FileText, SkipForward, Clock, Percent } from 'lucide-react';
 
 export const Settings: React.FC = () => {
   const [settings, setSettings] = useState<UserSettings | null>(null);
@@ -608,7 +608,7 @@ export const Settings: React.FC = () => {
             ].map((resOption) => {
               const currentEnabled = settings.enabledResolvers && settings.enabledResolvers.length > 0
                 ? settings.enabledResolvers
-                : ['torbox', 'private_extractor', 'embed'];
+                : ['embed'];
               const isEnabled = currentEnabled.includes(resOption.id);
 
               return (
@@ -744,6 +744,134 @@ export const Settings: React.FC = () => {
               </>
             )}
           </button>
+        </div>
+
+        {/* Playback & Episode Navigation */}
+        <div className="bg-hbo-card border border-hbo-border rounded-2xl p-5 sm:p-6 space-y-5">
+          {/* Autoplay Next Episode */}
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex-1 min-w-0 pr-2">
+              <h3 className="text-base sm:text-lg font-bold font-display text-white flex items-center gap-2 mb-1">
+                <Sparkles className="w-5 h-5 text-hbo-purple-light flex-shrink-0" />
+                <span>Auto-Play Next Episode</span>
+              </h3>
+              <p className="text-xs text-gray-400">
+                Display the "Up Next" preview popup and automatically advance to the next series episode when the countdown ends.
+              </p>
+            </div>
+
+            <button
+              onClick={() => handleUpdate({ autoplayNext: settings.autoplayNext === false ? true : false })}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all tv-focus-target flex items-center gap-1.5 flex-shrink-0 border ${
+                settings.autoplayNext !== false
+                  ? 'bg-emerald-500/20 border-emerald-400 text-emerald-400'
+                  : 'bg-white/5 border-white/10 text-gray-400'
+              }`}
+            >
+              {settings.autoplayNext !== false ? (
+                <>
+                  <Check className="w-3.5 h-3.5 stroke-[2.5]" />
+                  <span>Enabled</span>
+                </>
+              ) : (
+                <>
+                  <X className="w-3.5 h-3.5 stroke-[2.5]" />
+                  <span>Disabled</span>
+                </>
+              )}
+            </button>
+          </div>
+
+          {/* Popup Trigger Percentage (80% - 100% with 5% Step Buttons) */}
+          <div className="border-t border-hbo-border/60 pt-4">
+            <div className="flex items-center justify-between mb-2">
+              <h4 className="text-xs font-bold text-gray-300 uppercase tracking-wider flex items-center gap-2">
+                <Percent className="w-4 h-4 text-hbo-cyan flex-shrink-0" />
+                <span>Popup Trigger Timing (% of Episode)</span>
+              </h4>
+              <span className="text-xs px-2.5 py-0.5 rounded-full bg-hbo-dark/90 border border-hbo-border text-hbo-cyan font-bold">
+                {settings.upNextTriggerPercent || 90}% Progress
+              </span>
+            </div>
+            <p className="text-xs text-gray-400 mb-3">
+              Select the playback completion percentage threshold when the "Up Next" popup should appear.
+            </p>
+
+            <div className="grid grid-cols-5 gap-2">
+              {[
+                { percent: 80, label: '80%', desc: 'Early' },
+                { percent: 85, label: '85%', desc: 'Mid' },
+                { percent: 90, label: '90%', desc: 'Default' },
+                { percent: 95, label: '95%', desc: 'End' },
+                { percent: 100, label: '100%', desc: 'Finish' },
+              ].map((opt) => {
+                const isSelected = (settings.upNextTriggerPercent || 90) === opt.percent;
+                return (
+                  <button
+                    key={opt.percent}
+                    type="button"
+                    onClick={() => handleUpdate({ upNextTriggerPercent: opt.percent })}
+                    className={`py-3 px-1.5 rounded-xl border text-center transition-all tv-focus-target flex flex-col items-center justify-center gap-1 ${
+                      isSelected
+                        ? 'bg-hbo-purple/40 border-hbo-cyan text-white font-bold shadow-lg ring-1 ring-hbo-cyan/50'
+                        : 'bg-hbo-dark/60 border-hbo-border hover:bg-hbo-hover hover:border-white/20 text-gray-300'
+                    }`}
+                  >
+                    <span className="text-sm sm:text-base font-bold text-white leading-none">{opt.label}</span>
+                    <span className={`text-[9px] ${isSelected ? 'text-hbo-cyan font-semibold' : 'text-gray-500'}`}>
+                      {opt.desc}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Countdown Timeout Before Advancing */}
+          <div className="border-t border-hbo-border/60 pt-4">
+            <div className="flex items-center justify-between mb-2">
+              <h4 className="text-xs font-bold text-gray-300 uppercase tracking-wider flex items-center gap-2">
+                <Clock className="w-4 h-4 text-hbo-cyan flex-shrink-0" />
+                <span>Countdown Timeout Before Next Episode</span>
+              </h4>
+              <span className="text-xs px-2.5 py-0.5 rounded-full bg-hbo-dark/90 border border-hbo-border text-hbo-cyan font-bold">
+                {settings.upNextTimeout || 10} Seconds
+              </span>
+            </div>
+            <p className="text-xs text-gray-400 mb-3">
+              How many seconds the countdown timer displays before starting playback of the next episode.
+            </p>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+              {[
+                { seconds: 5, label: '5s', desc: 'Fast transition' },
+                { seconds: 10, label: '10s', desc: 'Standard (Default)' },
+                { seconds: 15, label: '15s', desc: 'Relaxed duration' },
+                { seconds: 20, label: '20s', desc: 'Extended time' },
+              ].map((opt) => {
+                const isSelected = (settings.upNextTimeout || 10) === opt.seconds;
+                return (
+                  <button
+                    key={opt.seconds}
+                    onClick={() => handleUpdate({ upNextTimeout: opt.seconds })}
+                    className={`p-3 rounded-xl border text-left transition-all tv-focus-target flex flex-col justify-between ${
+                      isSelected
+                        ? 'bg-hbo-purple/40 border-hbo-purple-light text-white shadow-md'
+                        : 'bg-hbo-dark/60 border-hbo-border hover:bg-hbo-hover hover:border-white/20 text-gray-300'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-sm font-bold text-white">{opt.label}</span>
+                      {isSelected && <Check className="w-3.5 h-3.5 text-hbo-cyan flex-shrink-0" />}
+                    </div>
+                    <span className={`text-[10px] leading-snug ${isSelected ? 'text-hbo-cyan' : 'text-gray-400'}`}>
+                      {opt.desc}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
         </div>
 
         {/* Software Updates & Release Channel */}

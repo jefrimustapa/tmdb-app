@@ -50,12 +50,15 @@ export const DEFAULT_SETTINGS: UserSettings = {
   topProviders: ['vidlink', 'moviesapi', 'cinesrc'],
   deviceMode: 'auto',
   autoplayNext: true,
+  upNextPopup: true,
+  upNextTriggerPercent: 90,
+  upNextTimeout: 10,
   adBlockShield: true,
   filterAdult: true,
   filterUnreleased: true,
   maturityLevel: 'all',
   streamResolver: 'embed',
-  enabledResolvers: ['torbox', 'private_extractor', 'embed'],
+  enabledResolvers: ['embed'],
   directStreamMode: false,
   directStreamApiUrl: 'https://tmdb-api-yfbu.onrender.com',
   torboxApiKey: 'fd12d8fe-2429-43eb-bcb3-1a3d2dfeb5f9',
@@ -220,7 +223,7 @@ export const dbService = {
       await db.settings.put(settings);
     }
     if (!settings.enabledResolvers || settings.enabledResolvers.length === 0) {
-      settings.enabledResolvers = ['torbox', 'private_extractor', 'embed'];
+      settings.enabledResolvers = ['embed'];
       await db.settings.put(settings);
     }
     if (settings.performanceMode === undefined) {

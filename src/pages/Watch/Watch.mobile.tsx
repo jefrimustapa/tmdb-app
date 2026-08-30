@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import { tmdbApi } from '../../services/tmdb';
-import type { TMDBMovieDetails, TMDBTVDetails } from '../../types/tmdb';
+import type { TMDBMovieDetails, TMDBTVDetails, TMDBSeasonDetails } from '../../types/tmdb';
 import { VideoPlayer } from '../../components/player/VideoPlayer';
 import { ProviderPickerMobile } from '../../components/player/ProviderPickerMobile';
 import { dbService } from '../../services/db';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, SkipForward } from 'lucide-react';
 
 export const Watch: React.FC = () => {
   const { type, id } = useParams<{ type: 'movie' | 'tv'; id: string }>();
@@ -14,15 +14,17 @@ export const Watch: React.FC = () => {
 
   const seasonParam = parseInt(searchParams.get('s') || '1', 10);
   const episodeParam = parseInt(searchParams.get('e') || '1', 10);
+  const timestampParam = searchParams.has('t') ? parseInt(searchParams.get('t') || '0', 10) : undefined;
 
   const [details, setDetails] = useState<TMDBMovieDetails | TMDBTVDetails | null>(null);
+  const [seasonDetails, setSeasonDetails] = useState<TMDBSeasonDetails | null>(null);
   const [providerId, setProviderId] = useState('vidlink');
   const [isLoading, setIsLoading] = useState(true);
 
   const tmdbId = parseInt(id || '0', 10);
   const mediaType = (type === 'tv' ? 'tv' : 'movie') as 'movie' | 'tv';
 
-  const [enabledResolvers, setEnabledResolvers] = useState<('embed' | 'private_extractor' | 'torbox')[]>(['torbox', 'private_extractor', 'embed']);
+  const [enabledResolvers, setEnabledResolvers] = useState<('embed' | 'private_extractor' | 'torbox')[]>(['embed']);
 
   // Load default user settings for preferred provider
   useEffect(() => {
@@ -56,6 +58,16 @@ export const Watch: React.FC = () => {
 
     fetchDetails();
   }, [tmdbId, mediaType]);
+
+  // Fetch season details for TV series (cached in memory for 0ms back navigation)
+  useEffect(() => {
+    if (!tmdbId || mediaType !== 'tv') return;
+    let active = true;
+    tmdbApi.getSeasonDetails(tmdbId, seasonParam).then((res) => {
+      if (active) setSeasonDetails(res);
+    }).catch(() => {});
+    return () => { active = false; };
+  }, [tmdbId, mediaType, seasonParam]);
 
   const [isProbing, setIsProbing] = useState(false);
   const [serverIndex, setServerIndex] = useState(1);
@@ -216,6 +228,45 @@ export const Watch: React.FC = () => {
     };
   }, [resetHeaderTimer]);
 
+  const currentEpisode = mediaType === 'tv' && seasonDetails
+    ? seasonDetails.episodes?.find((e) => e.episode_number === episodeParam)
+    : null;
+
+  const nextEpisodeInfo = React.useMemo(() => {
+    if (mediaType !== 'tv' || !details) return null;
+    const tvDetails = details as TMDBTVDetails;
+
+    // 1. Next episode in the same season
+    if (seasonDetails && seasonDetails.episodes) {
+      const nextInSeason = seasonDetails.episodes.find((e) => e.episode_number === episodeParam + 1);
+      if (nextInSeason) {
+        return {
+          season: seasonParam,
+          episode: episodeParam + 1,
+          title: nextInSeason.name,
+          stillPath: nextInSeason.still_path
+        };
+      }
+    }
+
+    // 2. Season rollover (e.g. S1 E10 -> S2 E1)
+    if (tvDetails.number_of_seasons && seasonParam < tvDetails.number_of_seasons) {
+      return {
+        season: seasonParam + 1,
+        episode: 1,
+        title: 'Season Premiere',
+        stillPath: null
+      };
+    }
+
+    return null;
+  }, [mediaType, details, seasonDetails, seasonParam, episodeParam]);
+
+  const handleNextEpisode = React.useCallback(() => {
+    if (!nextEpisodeInfo) return;
+    navigate(`/watch/tv/${tmdbId}?s=${nextEpisodeInfo.season}&e=${nextEpisodeInfo.episode}`, { replace: true });
+  }, [nextEpisodeInfo, navigate, tmdbId]);
+
   if (isLoading || !details) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-hbo-dark">
@@ -290,8 +341,24 @@ export const Watch: React.FC = () => {
             </div>
           </div>
 
-          {/* Right: Quick Provider Switcher Dropdown (ONLY if Embed Resolver is enabled) */}
-          <div className="flex-shrink-0">
+          {/* Right: Quick Provider Switcher Dropdown + Next Episode Button */}
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {nextEpisodeInfo && (
+              <button
+                type="button"
+                onClick={handleNextEpisode}
+                id="watch-next-ep-btn"
+                data-watch-header-item="true"
+                title={`Play Next: S${nextEpisodeInfo.season} E${nextEpisodeInfo.episode}`}
+                aria-label={`Play Next: S${nextEpisodeInfo.season} E${nextEpisodeInfo.episode}`}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-hbo-purple/60 hover:bg-hbo-purple text-hbo-cyan border border-hbo-cyan/30 text-xs font-bold transition hover:scale-105 tv-focus-target"
+              >
+                <SkipForward className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Next: S{nextEpisodeInfo.season} E{nextEpisodeInfo.episode}</span>
+                <span className="sm:hidden">Next</span>
+              </button>
+            )}
+
             {enabledResolvers.includes('embed') ? (
               <ProviderPickerMobile
                 currentProviderId={providerId}
@@ -326,15 +393,21 @@ export const Watch: React.FC = () => {
             title={title || ''}
             posterPath={details.poster_path}
             backdropPath={details.backdrop_path}
+            stillPath={currentEpisode?.still_path || null}
             voteAverage={details.vote_average}
             season={seasonParam}
             episode={episodeParam}
+            episodeTitle={currentEpisode?.name}
+            episodeRuntimeMinutes={mediaType === 'movie' ? ('runtime' in details ? details.runtime : undefined) : currentEpisode?.runtime}
             providerId={providerId}
+            initialTimestamp={timestampParam}
             onProviderChange={(p) => setProviderId(p.id)}
             onProbingStatusChange={(probing, idx) => {
               setIsProbing(probing);
               setServerIndex(idx);
             }}
+            nextEpisodeInfo={nextEpisodeInfo}
+            onNextEpisode={handleNextEpisode}
           />
         </div>
       </div>

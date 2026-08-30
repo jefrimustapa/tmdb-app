@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { ShieldCheck, RefreshCw, AlertCircle, Maximize2, Minimize2, Zap, Tv, ArrowLeft, Play, ExternalLink, SkipForward, Radio } from 'lucide-react';
 import Hls from 'hls.js';
 import type { StreamProvider } from '../../types/stream';
@@ -8,7 +8,7 @@ import { fetchDirectStream, DEFAULT_DIRECT_STREAM_API } from '../../services/dir
 import { fetchTorboxStream } from '../../services/torboxService';
 import type { StreamResolverType } from '../../types/db';
 import { Logo } from '../common/Logo';
-import { tmdbImages } from '../../services/tmdb';
+import { tmdbImages, TMDB_FALLBACK_BACKDROP } from '../../services/tmdb';
 
 interface VideoPlayerProps {
   mediaType: 'movie' | 'tv';
@@ -16,6 +16,7 @@ interface VideoPlayerProps {
   title: string;
   posterPath: string | null;
   backdropPath: string | null;
+  stillPath?: string | null;
   voteAverage?: number;
   season?: number;
   episode?: number;
@@ -23,6 +24,10 @@ interface VideoPlayerProps {
   providerId: string;
   onProviderChange: (p: StreamProvider) => void;
   onProbingStatusChange?: (isProbing: boolean, currentServerIndex: number) => void;
+  nextEpisodeInfo?: { season: number; episode: number; title?: string; stillPath?: string | null } | null;
+  onNextEpisode?: () => void;
+  initialTimestamp?: number;
+  episodeRuntimeMinutes?: number;
 }
 
 export const VideoPlayer: React.FC<VideoPlayerProps> = ({
@@ -31,13 +36,18 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   title,
   posterPath,
   backdropPath,
+  stillPath,
   voteAverage,
   season = 1,
   episode = 1,
   episodeTitle,
   providerId,
   onProviderChange,
-  onProbingStatusChange
+  onProbingStatusChange,
+  nextEpisodeInfo,
+  onNextEpisode,
+  initialTimestamp = 0,
+  episodeRuntimeMinutes
 }) => {
   const [iframeKey, setIframeKey] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
@@ -54,7 +64,38 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showControls, setShowControls] = useState(true);
   const [topProviders, setTopProviders] = useState<string[]>(['vidlink', 'moviesapi', 'cinesrc']);
-  const [enabledResolvers, setEnabledResolvers] = useState<StreamResolverType[]>(['torbox', 'private_extractor', 'embed']);
+  const [enabledResolvers, setEnabledResolvers] = useState<StreamResolverType[]>(['embed']);
+
+  // Up Next state
+  const [showUpNext, setShowUpNext] = useState(false);
+  const [countdown, setCountdown] = useState(10);
+  const [autoplayNextEnabled, setAutoplayNextEnabled] = useState(true);
+  const [upNextTriggerPercent, setUpNextTriggerPercent] = useState(90);
+  const [upNextTimeout, setUpNextTimeout] = useState(10);
+
+  const dismissedUpNextRef = useRef(false);
+  const nextEpisodeTriggeredRef = useRef(false);
+  const countdownIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const autoplayNextEnabledRef = useRef(true);
+  const upNextTriggerPercentRef = useRef(90);
+  const upNextTimeoutRef = useRef(10);
+  const showUpNextRef = useRef(false);
+  const nextEpisodeInfoRef = useRef(nextEpisodeInfo);
+  const onNextEpisodeRef = useRef(onNextEpisode);
+
+  useEffect(() => {
+    nextEpisodeInfoRef.current = nextEpisodeInfo;
+    onNextEpisodeRef.current = onNextEpisode;
+  }, [nextEpisodeInfo, onNextEpisode]);
+
+  useEffect(() => {
+    showUpNextRef.current = showUpNext;
+  }, [showUpNext]);
+
+  // Playback position memory refs (0% React re-render overhead)
+  const currentTimeRef = useRef<number>(initialTimestamp || 0);
+  const durationRef = useRef<number>(0);
+  const hasSeekedInitialRef = useRef(false);
 
   // Auto-Cycle Provider until first working stream state
   const [autoCycle, setAutoCycle] = useState(true);
@@ -115,7 +156,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         } catch {}
         const activeResolver = s.streamResolver || (s.directStreamMode ? 'private_extractor' : 'embed');
         setStreamResolver(activeResolver);
-        setEnabledResolvers(s.enabledResolvers && s.enabledResolvers.length > 0 ? s.enabledResolvers : ['torbox', 'private_extractor', 'embed']);
+        setEnabledResolvers(s.enabledResolvers && s.enabledResolvers.length > 0 ? s.enabledResolvers : ['embed']);
         if (s.directStreamApiUrl) {
           setDirectStreamApiUrl(s.directStreamApiUrl);
         }
@@ -124,6 +165,18 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         }
         if (s.topProviders && s.topProviders.length >= 3) {
           setTopProviders(s.topProviders);
+        }
+        if (typeof s.autoplayNext === 'boolean') {
+          setAutoplayNextEnabled(s.autoplayNext);
+          autoplayNextEnabledRef.current = s.autoplayNext;
+        }
+        if (typeof s.upNextTriggerPercent === 'number') {
+          setUpNextTriggerPercent(s.upNextTriggerPercent);
+          upNextTriggerPercentRef.current = s.upNextTriggerPercent;
+        }
+        if (typeof s.upNextTimeout === 'number') {
+          setUpNextTimeout(s.upNextTimeout);
+          upNextTimeoutRef.current = s.upNextTimeout;
         }
       }
     });
@@ -200,7 +253,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         setExtractionFailed(true);
         setIsExtracting(false);
       }
-    }
+    };
 
     executeStreamResolution();
 
@@ -209,17 +262,115 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     };
   }, [enabledResolvers, tmdbId, title, mediaType, season, episode, directStreamApiUrl, torboxApiKey]);
 
+  const [resumeTimestamp, setResumeTimestamp] = useState<number>(initialTimestamp || 0);
+
   const provider = getProviderById(providerId);
-  const streamUrl =
+  const baseStreamUrl =
     mediaType === 'movie'
       ? provider.getMovieUrl(tmdbId)
       : provider.getTVUrl(tmdbId, season, episode);
 
+  const streamUrl = useMemo(() => {
+    if (!baseStreamUrl) return '';
+    if (resumeTimestamp <= 0) return baseStreamUrl;
+
+    const sep = baseStreamUrl.includes('?') ? '&' : '?';
+    if (provider.id === 'vidlink') {
+      return `${baseStreamUrl}${sep}start=${resumeTimestamp}`;
+    }
+    return `${baseStreamUrl}${sep}start=${resumeTimestamp}&t=${resumeTimestamp}&time=${resumeTimestamp}#t=${resumeTimestamp}`;
+  }, [baseStreamUrl, resumeTimestamp, provider.id]);
+
   const lastSaveTimeRef = useRef<number>(0);
 
-  // Clean up media decoders and iframe resources on unmount
+  // Unified progress recorder (Throttled to 10s to guarantee 0% CPU & I/O overhead on TV)
+  const recordProgress = useCallback((currentSec: number, totalDurationSec: number, force = false) => {
+    if ((!totalDurationSec || totalDurationSec <= 0) && episodeRuntimeMinutes) {
+      totalDurationSec = episodeRuntimeMinutes * 60;
+    }
+    if ((!totalDurationSec || totalDurationSec <= 0) && durationRef.current > 0) {
+      totalDurationSec = durationRef.current;
+    }
+    if (currentSec < 0) return;
+
+    currentTimeRef.current = currentSec;
+    if (totalDurationSec > 0) {
+      durationRef.current = totalDurationSec;
+    }
+
+    const effectiveDuration = totalDurationSec > 0 ? totalDurationSec : durationRef.current;
+    const progressPercent = effectiveDuration > 0
+      ? Math.min(100, Math.round((currentSec / effectiveDuration) * 100))
+      : 0;
+    const now = Date.now();
+
+    // Check for Up Next trigger on TV Series (>= configured % or within last 75 seconds) when Auto-Play is enabled
+    const targetPercent = upNextTriggerPercentRef.current || 90;
+    if (
+      autoplayNextEnabledRef.current &&
+      mediaType === 'tv' &&
+      nextEpisodeInfoRef.current &&
+      !showUpNextRef.current &&
+      !dismissedUpNextRef.current &&
+      (progressPercent >= targetPercent || (totalDurationSec > 120 && totalDurationSec - currentSec <= 75))
+    ) {
+      showUpNextRef.current = true;
+      setShowUpNext(true);
+      setCountdown(upNextTimeoutRef.current || 10);
+      setTimeout(() => {
+        const upNextBtn = document.getElementById('up-next-play-btn');
+        if (upNextBtn && (window as any).__tmdbHeaderFocused !== true) {
+          upNextBtn.focus();
+        }
+      }, 50);
+    }
+
+    // Throttled save to IndexedDB
+    if (force || now - lastSaveTimeRef.current >= 10000 || progressPercent >= 95) {
+      lastSaveTimeRef.current = now;
+      dbService.saveWatchProgress({
+        tmdbId,
+        mediaType,
+        title,
+        posterPath,
+        backdropPath,
+        stillPath,
+        voteAverage,
+        season: mediaType === 'tv' ? season : undefined,
+        episode: mediaType === 'tv' ? episode : undefined,
+        episodeTitle: mediaType === 'tv' ? episodeTitle : undefined,
+        timestamp: Math.round(currentSec),
+        duration: Math.round(totalDurationSec),
+        progressPercent
+      }).catch(() => {});
+    }
+  }, [tmdbId, mediaType, title, posterPath, backdropPath, stillPath, voteAverage, season, episode, episodeTitle, episodeRuntimeMinutes]);
+
+  // Clean up media decoders and save progress on TRUE component unmount only
   useEffect(() => {
     return () => {
+      if (countdownIntervalRef.current) {
+        clearInterval(countdownIntervalRef.current);
+        countdownIntervalRef.current = null;
+      }
+      // Force save on unmount if user was watching
+      if (currentTimeRef.current > 0 && durationRef.current > 0) {
+        dbService.saveWatchProgress({
+          tmdbId,
+          mediaType,
+          title,
+          posterPath,
+          backdropPath,
+          stillPath,
+          voteAverage,
+          season: mediaType === 'tv' ? season : undefined,
+          episode: mediaType === 'tv' ? episode : undefined,
+          episodeTitle: mediaType === 'tv' ? episodeTitle : undefined,
+          timestamp: Math.round(currentTimeRef.current),
+          duration: Math.round(durationRef.current),
+          progressPercent: durationRef.current > 0 ? Math.min(100, Math.round((currentTimeRef.current / durationRef.current) * 100)) : 0
+        }).catch(() => {});
+      }
       if (hlsRef.current) {
         try { hlsRef.current.destroy(); } catch {}
         hlsRef.current = null;
@@ -231,12 +382,44 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           videoRef.current.load();
         } catch {}
       }
-      const iframe = document.querySelector<HTMLIFrameElement>('iframe');
-      if (iframe) {
-        try { iframe.src = 'about:blank'; } catch {}
-      }
     };
   }, []);
+
+  // Up Next Countdown interval
+  useEffect(() => {
+    if (!showUpNext) {
+      if (countdownIntervalRef.current) {
+        clearInterval(countdownIntervalRef.current);
+        countdownIntervalRef.current = null;
+      }
+      return;
+    }
+
+    countdownIntervalRef.current = setInterval(() => {
+      setCountdown((prev) => {
+        if (prev <= 1) {
+          if (countdownIntervalRef.current) {
+            clearInterval(countdownIntervalRef.current);
+            countdownIntervalRef.current = null;
+          }
+          setShowUpNext(false);
+          showUpNextRef.current = false;
+          if (autoplayNextEnabledRef.current) {
+            onNextEpisodeRef.current?.();
+          }
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => {
+      if (countdownIntervalRef.current) {
+        clearInterval(countdownIntervalRef.current);
+        countdownIntervalRef.current = null;
+      }
+    };
+  }, [showUpNext]);
 
   // Listen for Native Android iframe / subframe playback state changes
   useEffect(() => {
@@ -252,27 +435,8 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             autoCycleTimeoutRef.current = null;
           }
         }
-        // If currentTime and duration are available from the media stream, record progress (throttled to 10s to prevent flash storage wear)
         if (duration > 0 && currentTime > 0) {
-          const now = Date.now();
-          const progressPercent = Math.min(100, Math.round((currentTime / duration) * 100));
-          if (now - lastSaveTimeRef.current >= 10000 || progressPercent >= 95) {
-            lastSaveTimeRef.current = now;
-            dbService.saveWatchProgress({
-              tmdbId,
-              mediaType,
-              title,
-              posterPath,
-              backdropPath,
-              voteAverage,
-              season: mediaType === 'tv' ? season : undefined,
-              episode: mediaType === 'tv' ? episode : undefined,
-              episodeTitle: mediaType === 'tv' ? episodeTitle : undefined,
-              timestamp: Math.round(currentTime),
-              duration: Math.round(duration),
-              progressPercent
-            });
-          }
+          recordProgress(currentTime, duration);
         }
       }
     };
@@ -281,7 +445,82 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     return () => {
       window.removeEventListener('tmdb_playback_state_changed', handlePlaybackStateChanged);
     };
-  }, [tmdbId, mediaType, title, posterPath, backdropPath, voteAverage, season, episode, episodeTitle]);
+  }, [recordProgress]);
+
+  const lastPostMessageTimeRef = useRef<number>(0);
+
+  // Listen for Cross-Origin Embed postMessage events (VidLink, PlayerJS, Plyr)
+  useEffect(() => {
+    const handlePostMessage = (e: MessageEvent) => {
+      try {
+        const data = typeof e.data === 'string' ? JSON.parse(e.data) : e.data;
+        if (!data) return;
+
+        // 1. VidLink PLAYER_EVENT (event: 'timeupdate' | 'pause' | 'ended' | 'time')
+        if (data.type === 'PLAYER_EVENT' && data.data) {
+          lastPostMessageTimeRef.current = Date.now();
+          const evt = data.data.event;
+          const current = data.data.currentTime ?? data.data.seconds ?? 0;
+          const dur = data.data.duration ?? data.data.totalDuration ?? 0;
+          if (current > 0) {
+            recordProgress(current, dur, evt === 'ended');
+          }
+          return;
+        }
+
+        // 2. VidLink MEDIA_DATA dictionary
+        if (data.type === 'MEDIA_DATA' && data.data) {
+          lastPostMessageTimeRef.current = Date.now();
+          const item = data.data[tmdbId];
+          if (item) {
+            if (mediaType === 'tv' && item.show_progress && season && episode) {
+              const epKey = `s${season}e${episode}`;
+              const epProgress = item.show_progress[epKey]?.progress;
+              if (epProgress && epProgress.watched > 0) {
+                recordProgress(epProgress.watched, epProgress.duration || 0);
+              }
+            } else if (item.progress && item.progress.watched > 0) {
+              recordProgress(item.progress.watched, item.progress.duration || 0);
+            }
+          }
+          return;
+        }
+
+        // 3. PlayerJS, Plyr, vidsrc, or standard event postMessages
+        if (data.event === 'timeupdate' || data.event === 'progress' || data.event === 'time') {
+          lastPostMessageTimeRef.current = Date.now();
+          const current = data.currentTime ?? data.data?.currentTime ?? data.seconds ?? 0;
+          const dur = data.duration ?? data.data?.duration ?? data.totalDuration ?? 0;
+          if (current > 0) {
+            recordProgress(current, dur);
+          }
+        }
+      } catch {}
+    };
+
+    window.addEventListener('message', handlePostMessage);
+    return () => window.removeEventListener('message', handlePostMessage);
+  }, [recordProgress, tmdbId, mediaType, season, episode]);
+
+  // Universal Fallback Elapsed Watch Session Ticker (For Sandboxed Embed Providers)
+  useEffect(() => {
+    if (playerMode !== 'embed' || hasError || allFailed) return;
+
+    const tickerInterval = setInterval(() => {
+      // If the window/document is hidden or paused in background, do not tick
+      if (typeof document !== 'undefined' && document.hidden) return;
+
+      // If we recently received real postMessage time within the last 20 seconds, defer to postMessage
+      if (Date.now() - lastPostMessageTimeRef.current < 20000) return;
+
+      // Otherwise, advance elapsed watch session time smoothly (10s increments)
+      const nextTime = (currentTimeRef.current || 0) + 10;
+      const fallbackDur = durationRef.current || (episodeRuntimeMinutes ? episodeRuntimeMinutes * 60 : 0);
+      recordProgress(nextTime, fallbackDur);
+    }, 10000);
+
+    return () => clearInterval(tickerInterval);
+  }, [playerMode, hasError, allFailed, recordProgress, episodeRuntimeMinutes]);
 
   // HLS Player attachment for direct streams
   useEffect(() => {
@@ -353,32 +592,57 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     onProbingStatusChange?.(isProbing, currentIndex >= 0 ? currentIndex + 1 : 1);
   }, [isProbing, providerId, onProbingStatusChange]);
 
-  // Save progress when user starts streaming & reset probe for new media
+  // Initialize progress and preserve previous progress
   useEffect(() => {
     setTriedProviders([]);
     setAllFailed(false);
     setIsProbing(true);
     setIsLoading(true);
     setHasError(false);
+    setShowUpNext(false);
+    dismissedUpNextRef.current = false;
+    nextEpisodeTriggeredRef.current = false;
+    hasSeekedInitialRef.current = false;
 
-    const saveProgress = async () => {
+    const initProgress = async () => {
+      const existing = await dbService.getHistoryItem(tmdbId, mediaType);
+      const isSameEpisode = mediaType === 'tv' ? (existing?.season === season && existing?.episode === episode) : true;
+      
+      const targetTimestamp = (initialTimestamp !== undefined && initialTimestamp >= 0)
+        ? initialTimestamp 
+        : (isSameEpisode && existing ? existing.timestamp : 0);
+      
+      currentTimeRef.current = targetTimestamp;
+      if (targetTimestamp > 0) {
+        setResumeTimestamp(targetTimestamp);
+      }
+
+      // Provisional duration from metadata
+      const provisionalDuration = (episodeRuntimeMinutes ? episodeRuntimeMinutes * 60 : 0) || (existing?.duration || 0);
+      durationRef.current = provisionalDuration;
+
+      const progressPercent = provisionalDuration > 0 && targetTimestamp > 0 
+        ? Math.min(100, Math.round((targetTimestamp / provisionalDuration) * 100))
+        : (isSameEpisode && existing ? existing.progressPercent : 0);
+
       await dbService.saveWatchProgress({
         tmdbId,
         mediaType,
         title,
         posterPath,
         backdropPath,
+        stillPath,
         voteAverage,
         season: mediaType === 'tv' ? season : undefined,
         episode: mediaType === 'tv' ? episode : undefined,
         episodeTitle: mediaType === 'tv' ? episodeTitle : undefined,
-        timestamp: 0,
-        duration: 0,
-        progressPercent: 0
+        timestamp: targetTimestamp,
+        duration: provisionalDuration,
+        progressPercent
       });
     };
-    saveProgress();
-  }, [tmdbId, mediaType, season, episode, voteAverage]);
+    initProgress();
+  }, [tmdbId, mediaType, season, episode, voteAverage, posterPath, backdropPath, stillPath, episodeTitle, episodeRuntimeMinutes, initialTimestamp]);
 
   const orderedProviders = React.useMemo(() => getOrderedProviders(topProviders), [topProviders]);
 
@@ -471,6 +735,14 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             iframe.contentWindow.postMessage(JSON.stringify({ type: 'unmute' }), '*');
             iframe.contentWindow.postMessage(JSON.stringify({ method: 'setMuted', value: false }), '*');
             iframe.contentWindow.postMessage(JSON.stringify({ method: 'setVolume', value: 1 }), '*');
+
+            if (resumeTimestamp > 0) {
+              iframe.contentWindow.postMessage({ type: 'SEEK', data: { time: resumeTimestamp } }, '*');
+              iframe.contentWindow.postMessage({ event: 'seek', time: resumeTimestamp }, '*');
+              iframe.contentWindow.postMessage({ type: 'seek', time: resumeTimestamp }, '*');
+              iframe.contentWindow.postMessage(JSON.stringify({ type: 'seek', time: resumeTimestamp }), '*');
+              iframe.contentWindow.postMessage(JSON.stringify({ event: 'command', func: 'seekTo', args: [resumeTimestamp, true] }), '*');
+            }
           } catch {
             // ignore cross-origin postMessage restrictions
           }
@@ -648,6 +920,41 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           muted={false}
           className="w-full h-full object-contain bg-black transform-gpu will-change-transform"
           onLoadedData={() => setIsLoading(false)}
+          onLoadedMetadata={(e) => {
+            const el = e.currentTarget;
+            if (el.duration > 0) {
+              durationRef.current = el.duration;
+            }
+            if (currentTimeRef.current > 10 && !hasSeekedInitialRef.current) {
+              hasSeekedInitialRef.current = true;
+              try {
+                el.currentTime = currentTimeRef.current;
+              } catch {}
+            }
+          }}
+          onTimeUpdate={(e) => {
+            const el = e.currentTarget;
+            recordProgress(el.currentTime, el.duration);
+          }}
+          onPause={(e) => {
+            const el = e.currentTarget;
+            recordProgress(el.currentTime, el.duration, true);
+          }}
+          onEnded={() => {
+            if (durationRef.current > 0) {
+              recordProgress(durationRef.current, durationRef.current, true);
+            }
+            if (mediaType === 'tv' && nextEpisodeInfo) {
+              setShowUpNext(true);
+              setCountdown(10);
+              setTimeout(() => {
+                const upNextBtn = document.getElementById('up-next-play-btn');
+                if (upNextBtn && (window as any).__tmdbHeaderFocused !== true) {
+                  upNextBtn.focus();
+                }
+              }, 50);
+            }
+          }}
           onError={() => {
             if (enabledResolvers.includes('embed')) {
               console.log('[DirectStream] Playback error on direct stream. Fallback to embed.');
@@ -743,6 +1050,86 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             >
               Try Next Server
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Up Next Episode Overlay (Appears at >= 90% or episode end) */}
+      {showUpNext && nextEpisodeInfo && (
+        <div className="absolute bottom-6 right-6 z-40 max-w-sm sm:max-w-md w-full bg-hbo-card/95 border border-hbo-cyan/40 rounded-2xl shadow-2xl p-4 backdrop-blur-xl animate-in fade-in slide-in-from-bottom-5 duration-300 transform-gpu">
+          <div className="flex items-center justify-between gap-2 mb-2.5">
+            <span className="text-[11px] font-black uppercase tracking-wider text-hbo-cyan flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-hbo-cyan animate-pulse" />
+              Up Next in {countdown}s
+            </span>
+            <button
+              onClick={() => {
+                setShowUpNext(false);
+                dismissedUpNextRef.current = true;
+              }}
+              className="p-1 text-gray-400 hover:text-white rounded-lg transition"
+              title="Dismiss"
+              aria-label="Dismiss"
+            >
+              <Minimize2 className="w-4 h-4" />
+            </button>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <div className="w-24 aspect-video rounded-lg overflow-hidden bg-gray-900 flex-shrink-0 border border-white/10 relative">
+              <img
+                src={nextEpisodeInfo.stillPath ? tmdbImages.still(nextEpisodeInfo.stillPath, 'w300') : (backdropPath ? tmdbImages.backdrop(backdropPath, 'w300') : TMDB_FALLBACK_BACKDROP)}
+                alt={nextEpisodeInfo.title || 'Next Episode'}
+                className="w-full h-full object-cover"
+                loading="lazy"
+                decoding="async"
+              />
+              <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
+                <Play className="w-5 h-5 fill-white text-white opacity-90" />
+              </div>
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs text-hbo-purple-light font-bold">
+                Season {nextEpisodeInfo.season} • Episode {nextEpisodeInfo.episode}
+              </p>
+              <h4 className="text-sm font-bold text-white truncate mt-0.5">
+                {nextEpisodeInfo.title || `Episode ${nextEpisodeInfo.episode}`}
+              </h4>
+            </div>
+          </div>
+
+          {/* Action Buttons & Countdown Bar */}
+          <div className="mt-3.5 space-y-2">
+            <div className="w-full h-1 bg-white/10 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-gradient-to-r from-hbo-purple-light to-hbo-cyan transition-all duration-1000 ease-linear"
+                style={{ width: `${(countdown / 10) * 100}%` }}
+              />
+            </div>
+            <div className="flex items-center justify-end gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowUpNext(false);
+                  dismissedUpNextRef.current = true;
+                }}
+                className="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-semibold transition tv-focus-target"
+              >
+                Dismiss
+              </button>
+              <button
+                id="up-next-play-btn"
+                type="button"
+                onClick={() => {
+                  setShowUpNext(false);
+                  onNextEpisode?.();
+                }}
+                className="px-4 py-1.5 rounded-xl bg-gradient-to-r from-hbo-purple to-hbo-cyan text-white text-xs font-bold shadow-hbo-glow hover:scale-105 transition flex items-center gap-1.5 tv-focus-target"
+              >
+                <Play className="w-3.5 h-3.5 fill-current" />
+                Play Now
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -5,6 +5,7 @@ export interface WatchHistoryItem {
   title: string;
   posterPath: string | null;
   backdropPath: string | null;
+  stillPath?: string | null;
   voteAverage?: number;
   season?: number;
   episode?: number;
@@ -69,6 +70,9 @@ export interface UserSettings {
   topProviders?: [string, string, string] | string[];
   deviceMode: 'auto' | 'tv' | 'mobile' | 'tablet' | 'desktop';
   autoplayNext: boolean;
+  upNextPopup?: boolean;
+  upNextTriggerPercent?: number; // e.g. 75, 80, 85, 90, 95
+  upNextTimeout?: number; // e.g. 5, 10, 15, 20
   adBlockShield: boolean;
   filterAdult: boolean;
   filterUnreleased?: boolean;
