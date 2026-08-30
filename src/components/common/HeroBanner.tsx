@@ -16,7 +16,6 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ items }) => {
   const bannerRef = useRef<HTMLDivElement>(null);
   const [isVisible, setIsVisible] = useState(true);
   const isAutoPlayPaused = useRef(false);
-  const touchStartX = useRef<number | null>(null);
 
   const displayItems = items && items.length > 0 ? items.slice(0, 8) : [];
   const totalItems = displayItems.length;
@@ -56,20 +55,18 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ items }) => {
       const custom = e as CustomEvent<{ index: number; btnType?: 'play' | 'details' }>;
       if (custom.detail && typeof custom.detail.index === 'number') {
         const targetIdx = custom.detail.index;
-          // Reset scrollLeft to guarantee 0 drift before state update
-          if (bannerRef.current) bannerRef.current.scrollLeft = 0;
+        if (targetIdx >= 0 && targetIdx < totalItems) {
           isAutoPlayPaused.current = true;
           setCurrentIndex(targetIdx);
 
-          // Focus the target button on the new slide after state update without browser scrolling
+          // Focus the target button on the new slide after state update
           setTimeout(() => {
-            if (bannerRef.current) bannerRef.current.scrollLeft = 0;
             const btnType = custom.detail.btnType || 'play';
             const newBtn = bannerRef.current?.querySelector<HTMLElement>(
               `[data-hero-btn="${btnType}"][data-hero-index="${targetIdx}"]`
             );
             newBtn?.focus({ preventScroll: true });
-          }, 50);
+          }, 60);
         }
       }
     };
@@ -93,27 +90,6 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ items }) => {
     return () => window.removeEventListener('tmdb_settings_changed', handleSettings);
   }, []);
 
-  // Swipe / Drag gesture handlers to ensure full 100% slide increments without sticking
-  const handleTouchStart = (e: React.TouchEvent | React.MouseEvent) => {
-    touchStartX.current = 'touches' in e ? e.touches[0].clientX : e.clientX;
-    isAutoPlayPaused.current = true;
-  };
-
-  const handleTouchEnd = (e: React.TouchEvent | React.MouseEvent) => {
-    if (touchStartX.current === null) return;
-    const endX = 'changedTouches' in e ? e.changedTouches[0].clientX : e.clientX;
-    const diffX = touchStartX.current - endX;
-    touchStartX.current = null;
-
-    if (Math.abs(diffX) > 40) {
-      if (diffX > 0 && currentIndex + 1 < totalItems) {
-        setCurrentIndex((prev) => prev + 1);
-      } else if (diffX < 0 && currentIndex > 0) {
-        setCurrentIndex((prev) => prev - 1);
-      }
-    }
-  };
-
   if (totalItems === 0) return null;
 
   return (
@@ -126,15 +102,14 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ items }) => {
       onMouseLeave={() => { isAutoPlayPaused.current = false; }}
       onFocusCapture={() => { isAutoPlayPaused.current = true; }}
       onBlurCapture={() => { isAutoPlayPaused.current = false; }}
-      onTouchStart={handleTouchStart}
-      onTouchEnd={handleTouchEnd}
-      onMouseDown={handleTouchStart}
-      onMouseUp={handleTouchEnd}
     >
       {/* Continuous Full-Width Sliding Track */}
       <div
-        className="flex transition-transform duration-700 ease-out h-full w-full transform-gpu"
-        style={{ transform: `translateX(-${currentIndex * 100}%)` }}
+        className="flex h-full transition-transform duration-700 ease-out transform-gpu"
+        style={{
+          width: `${totalItems * 100}%`,
+          transform: `translate3d(-${(currentIndex * 100) / totalItems}%, 0, 0)`
+        }}
       >
         {displayItems.map((featured, idx) => {
           const title = featured.title || featured.name || 'Featured Title';
@@ -146,7 +121,8 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ items }) => {
           return (
             <div
               key={featured.id}
-              className="w-full min-w-full h-full relative flex-shrink-0"
+              style={{ width: `${100 / totalItems}%` }}
+              className="h-full relative flex-shrink-0 overflow-hidden"
             >
               {/* Background Backdrop Image */}
               <div className="absolute inset-0 select-none pointer-events-none">
@@ -164,8 +140,8 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ items }) => {
                 <div className="absolute inset-0 hero-side-gradient hidden sm:block" />
               </div>
 
-              {/* Hero Content Overlay */}
-              <div className="relative z-10 h-full w-full max-w-7xl mx-auto px-4 sm:px-8 flex flex-col justify-end pb-12 sm:pb-16 max-w-2xl lg:max-w-3xl">
+              {/* Hero Content Overlay (Left Aligned) */}
+              <div className="relative z-10 h-full w-full px-6 sm:px-12 flex flex-col justify-end pb-12 sm:pb-16 max-w-3xl">
                 {/* Brand Tag & Meta */}
                 <div className="flex items-center gap-2.5 mb-2 flex-wrap">
                   <span className="px-2.5 py-0.5 rounded-full bg-hbo-purple/60 border border-hbo-purple-light text-white text-xs font-bold uppercase tracking-wider backdrop-blur-md">
@@ -181,7 +157,7 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ items }) => {
                 </h1>
 
                 {/* Overview */}
-                <p className="text-xs sm:text-sm text-gray-300 line-clamp-3 mb-4 max-w-2xl leading-relaxed drop-shadow-md">
+                <p className="text-xs sm:text-sm text-gray-300 line-clamp-3 mb-4 max-w-xl leading-relaxed drop-shadow-md">
                   {featured.overview}
                 </p>
 
@@ -236,7 +212,7 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ items }) => {
       </div>
 
       {/* Slide Indicators */}
-      <div className="absolute bottom-4 left-4 sm:left-8 z-20 flex items-center gap-2">
+      <div className="absolute bottom-4 left-4 sm:left-12 z-20 flex items-center gap-2">
         {displayItems.map((_, idx) => (
           <button
             key={idx}
