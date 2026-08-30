@@ -21,7 +21,7 @@ export const TMDB_FALLBACK_BACKDROP = '/placeholder-backdrop.svg';
 export const tmdbImages = {
   poster: (path: string | null, size: 'w92' | 'w154' | 'w185' | 'w342' | 'w500' | 'w780' | 'original' = 'w500') =>
     path ? `${IMAGE_BASE_URL}/${size}${path}` : TMDB_FALLBACK_POSTER,
-  backdrop: (path: string | null, size: 'w780' | 'w1280' | 'original' = 'w1280') =>
+  backdrop: (path: string | null, size: 'w300' | 'w780' | 'w1280' | 'original' = 'w1280') =>
     path ? `${IMAGE_BASE_URL}/${size}${path}` : TMDB_FALLBACK_BACKDROP,
   profile: (path: string | null, size: 'w185' | 'h632' | 'original' = 'w185') =>
     path ? `${IMAGE_BASE_URL}/${size}${path}` : TMDB_FALLBACK_POSTER,

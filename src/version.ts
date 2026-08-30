@@ -2,8 +2,8 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20260830-0154';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-tv-sidebar-icon.20260830-0154';
+export const APP_BUILD_NUMBER = '20260830-0401';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-performance-twe.20260830-0401';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
-export const APP_BRANCH = 'feat-tv-sidebar-icon';
+export const APP_BRANCH = 'feat-performance-twe';
