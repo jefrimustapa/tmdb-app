@@ -261,9 +261,9 @@ const MediaCardComponent: React.FC<MediaCardProps> = ({
             type="button"
             onClick={handleMenuToggle}
             aria-label="More options"
-            className="w-8 h-8 rounded-full bg-black/70 hover:bg-black text-white border border-white/20 backdrop-blur-md flex items-center justify-center transition-transform hover:scale-110 shadow-md focus:outline-none"
+            className="p-1 text-white/90 hover:text-white transition-all hover:scale-110 focus:outline-none drop-shadow-[0_2px_4px_rgba(0,0,0,0.85)]"
           >
-            <MoreVertical className="w-4 h-4 text-white" />
+            <MoreVertical className="w-4 h-4 text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.85)]" />
           </button>
 
           {/* Consolidated Menu Popup */}

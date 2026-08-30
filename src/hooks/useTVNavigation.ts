@@ -312,6 +312,63 @@ export function useTVNavigation(isEnabled = true) {
         // Candidate filtering rules:
         let candidateElements = focusableElements.filter(el => el !== currentFocused);
 
+        // Dedicated Hero Billboard Navigation (Full-Width Sliding Rail)
+        const heroBtn = currentFocused.closest('[data-hero-btn]');
+        if (heroBtn) {
+          const btnType = heroBtn.getAttribute('data-hero-btn'); // 'play' | 'details'
+          const currentSlideIdx = parseInt(heroBtn.getAttribute('data-hero-index') || '0', 10);
+          const heroBanner = document.querySelector('[data-hero-banner="true"]');
+          const totalSlides = parseInt(heroBanner?.getAttribute('data-total-slides') || '1', 10);
+
+          if (e.key === 'ArrowRight') {
+            e.preventDefault();
+            if (currentSlideIdx + 1 < totalSlides) {
+              window.dispatchEvent(new CustomEvent('tmdb_hero_slide_change', {
+                detail: { index: currentSlideIdx + 1, btnType }
+              }));
+            }
+            return;
+          } else if (e.key === 'ArrowLeft') {
+            e.preventDefault();
+            if (currentSlideIdx > 0) {
+              window.dispatchEvent(new CustomEvent('tmdb_hero_slide_change', {
+                detail: { index: currentSlideIdx - 1, btnType }
+              }));
+            } else {
+              // At leftmost slide (Card 0): move focus to navbar / sidebar
+              const navActive = document.querySelector<HTMLElement>('aside .tv-focus-target, [data-tv-nav="true"]');
+              navActive?.focus();
+            }
+            return;
+          } else if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            if (btnType === 'play') {
+              const detailsBtn = heroBanner?.querySelector<HTMLElement>(
+                `[data-hero-btn="details"][data-hero-index="${currentSlideIdx}"]`
+              );
+              detailsBtn?.focus();
+            } else {
+              // From details: move down to first card of next section (Continue watching / Trending now)
+              const firstRail = document.querySelector('[data-content-rail="true"]');
+              const firstCard = firstRail?.querySelector<HTMLElement>('.tv-focus-target');
+              if (firstCard) {
+                firstCard.focus();
+                firstCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              }
+            }
+            return;
+          } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            if (btnType === 'details') {
+              const playBtn = heroBanner?.querySelector<HTMLElement>(
+                `[data-hero-btn="play"][data-hero-index="${currentSlideIdx}"]`
+              );
+              playBtn?.focus();
+            }
+            return;
+          }
+        }
+
         if (isCurrentInNav && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
           // Linear navigation inside Sidebar
           const allNav = Array.from(document.querySelectorAll<HTMLElement>('aside .tv-focus-target, [data-tv-nav="true"]'))
@@ -528,24 +585,35 @@ export function useTVNavigation(isEnabled = true) {
           }
         }
 
-        // Special fallback when moving ArrowUp from top row of catalog / grid cards to filter buttons
+        // Special fallback when moving ArrowUp from top row of catalog / grid cards to filter buttons or Hero Billboard
         if (e.key === 'ArrowUp' && !nextElement && !isCurrentInNav) {
-          const filterSections = document.querySelectorAll<HTMLElement>('[data-tv-filter-section="true"]');
-          if (filterSections.length > 0) {
-            const filterButtons = Array.from(document.querySelectorAll<HTMLElement>('[data-tv-filter-section="true"] .tv-focus-target'))
-              .filter(el => el.offsetParent !== null && !el.hasAttribute('disabled'));
-            if (filterButtons.length > 0) {
-              let bestFilter = filterButtons[0];
-              let bestXDist = Infinity;
-              for (const fb of filterButtons) {
-                const r = fb.getBoundingClientRect();
-                const xDist = Math.abs((r.left + r.width / 2) - (currentRect.left + currentRect.width / 2));
-                if (xDist < bestXDist) {
-                  bestXDist = xDist;
-                  bestFilter = fb;
+          const heroBanner = document.querySelector('[data-hero-banner="true"]');
+          if (heroBanner) {
+            const activeDetailsBtn = heroBanner.querySelector<HTMLElement>('[data-hero-btn="details"][tabindex="0"]') ||
+                                    heroBanner.querySelector<HTMLElement>('[data-hero-btn="details"]');
+            if (activeDetailsBtn) {
+              nextElement = activeDetailsBtn;
+            }
+          }
+
+          if (!nextElement) {
+            const filterSections = document.querySelectorAll<HTMLElement>('[data-tv-filter-section="true"]');
+            if (filterSections.length > 0) {
+              const filterButtons = Array.from(document.querySelectorAll<HTMLElement>('[data-tv-filter-section="true"] .tv-focus-target'))
+                .filter(el => el.offsetParent !== null && !el.hasAttribute('disabled'));
+              if (filterButtons.length > 0) {
+                let bestFilter = filterButtons[0];
+                let bestXDist = Infinity;
+                for (const fb of filterButtons) {
+                  const r = fb.getBoundingClientRect();
+                  const xDist = Math.abs((r.left + r.width / 2) - (currentRect.left + currentRect.width / 2));
+                  if (xDist < bestXDist) {
+                    bestXDist = xDist;
+                    bestFilter = fb;
+                  }
                 }
+                nextElement = bestFilter;
               }
-              nextElement = bestFilter;
             }
           }
         }
