@@ -159,6 +159,7 @@ export const Library: React.FC = () => {
                     episodeTitle={item.episodeTitle}
                     stillPath={item.stillPath}
                     progress={item.progressPercent}
+                    timestamp={item.timestamp}
                     onDelete={() => {
                       dbService.removeFromHistory(item.tmdbId, item.mediaType);
                       setHistory((prev) => prev.filter((h) => !(h.tmdbId === item.tmdbId && h.mediaType === item.mediaType)));
