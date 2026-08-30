@@ -55,6 +55,7 @@ export const Settings: React.FC = () => {
                          document.querySelector<HTMLElement>('[data-priority-dropdown-container="true"] .tv-focus-target');
         if (activeEl) {
           activeEl.focus();
+          activeEl.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
         }
       }, 50);
     } else if (openCursorDropdown !== null) {
@@ -63,6 +64,7 @@ export const Settings: React.FC = () => {
                          document.querySelector<HTMLElement>('[data-cursor-dropdown-container="true"] .tv-focus-target');
         if (activeEl) {
           activeEl.focus();
+          activeEl.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
         }
       }, 50);
     }
@@ -442,7 +444,7 @@ export const Settings: React.FC = () => {
 
                     {/* Styles Dropdown Menu */}
                     {openCursorDropdown === 'style' && (
-                      <div className="absolute left-0 right-0 sm:min-w-[460px] md:min-w-[500px] top-full mt-2 z-50 bg-hbo-card/98 border border-hbo-border rounded-2xl shadow-2xl p-3.5 sm:p-4 max-h-80 overflow-y-auto space-y-2.5 focus-scroll-container backdrop-blur-2xl animate-fade-in">
+                      <div className="absolute left-0 right-0 w-full top-[calc(100%+4px)] z-50 bg-hbo-card/98 border border-hbo-border rounded-xl shadow-2xl p-2 max-h-[min(260px,calc(100vh-140px))] overflow-y-auto space-y-1.5 focus-scroll-container backdrop-blur-2xl animate-fade-in">
                         {CURSOR_STYLES_LIST.map((styleOpt) => {
                           const isSelected = currentStyleId === styleOpt.id;
                           return (
@@ -456,22 +458,22 @@ export const Settings: React.FC = () => {
                                   document.getElementById('cursor-style-btn')?.focus();
                                 }, 50);
                               }}
-                              className={`w-full flex items-center justify-between gap-5 px-5 sm:px-6 py-3.5 sm:py-4 rounded-2xl text-left text-xs transition-all tv-focus-target ${
+                              className={`w-full flex items-center justify-between gap-3 px-3.5 py-2.5 sm:py-3 rounded-xl text-left text-xs transition-all tv-focus-target ${
                                 isSelected
-                                  ? 'bg-hbo-purple/40 border border-hbo-cyan text-white font-bold shadow-hbo-glow'
+                                  ? 'bg-hbo-purple/40 border border-hbo-cyan/60 text-white font-bold'
                                   : 'text-gray-300 hover:bg-hbo-hover hover:text-white border border-transparent'
                               }`}
                             >
-                              <div className="flex items-center gap-4 min-w-0 flex-1 pr-3 pl-1">
-                                <div className="w-8 h-8 flex items-center justify-center flex-shrink-0">
+                              <div className="flex items-center gap-3 min-w-0 flex-1 pr-1">
+                                <div className="w-7 h-7 flex items-center justify-center flex-shrink-0">
                                   {styleOpt.renderSvg(false)}
                                 </div>
                                 <div className="min-w-0 flex-1">
-                                  <span className="font-bold text-white block text-xs sm:text-sm leading-snug whitespace-normal break-words">{styleOpt.name}</span>
-                                  <span className="text-[11px] text-gray-400 block leading-normal mt-1 whitespace-normal break-words">{styleOpt.desc}</span>
+                                  <span className="font-bold text-white block text-xs sm:text-sm leading-snug truncate">{styleOpt.name}</span>
+                                  <span className="text-[11px] text-gray-400 block leading-normal mt-0.5 truncate">{styleOpt.desc}</span>
                                 </div>
                               </div>
-                              <span className="text-[10px] px-3 py-1 rounded-md font-bold border border-white/20 bg-white/10 text-gray-300 flex-shrink-0 ml-3 whitespace-nowrap">
+                              <span className="text-[10px] px-2.5 py-0.5 rounded font-bold border border-white/20 bg-white/10 text-gray-300 flex-shrink-0 ml-2 whitespace-nowrap">
                                 {styleOpt.badge}
                               </span>
                             </button>
@@ -507,7 +509,7 @@ export const Settings: React.FC = () => {
                     </button>
 
                     {openCursorDropdown === 'trigger' && (
-                      <div className="absolute left-0 right-0 sm:min-w-[400px] md:min-w-[440px] top-full mt-2 z-50 bg-hbo-card/98 border border-hbo-border rounded-2xl shadow-2xl p-3.5 sm:p-4 max-h-72 overflow-y-auto space-y-2.5 focus-scroll-container backdrop-blur-2xl animate-fade-in">
+                      <div className="absolute left-0 right-0 w-full top-[calc(100%+4px)] z-50 bg-hbo-card/98 border border-hbo-border rounded-xl shadow-2xl p-2 max-h-[min(260px,calc(100vh-140px))] overflow-y-auto space-y-1.5 focus-scroll-container backdrop-blur-2xl animate-fade-in">
                         {clickOpts.map((opt) => {
                           const isSelected = currentClk === opt.clicks;
                           return (
@@ -521,17 +523,17 @@ export const Settings: React.FC = () => {
                                   document.getElementById('cursor-trigger-btn')?.focus();
                                 }, 50);
                               }}
-                              className={`w-full flex items-center justify-between gap-5 px-5 sm:px-6 py-3.5 sm:py-4 rounded-2xl text-left text-xs transition-all tv-focus-target ${
+                              className={`w-full flex items-center justify-between gap-3 px-3.5 py-2.5 sm:py-3 rounded-xl text-left text-xs transition-all tv-focus-target ${
                                 isSelected
-                                  ? 'bg-hbo-purple/40 border border-hbo-cyan text-white font-bold shadow-hbo-glow'
+                                  ? 'bg-hbo-purple/40 border border-hbo-cyan/60 text-white font-bold'
                                   : 'text-gray-300 hover:bg-hbo-hover hover:text-white border border-transparent'
                               }`}
                             >
-                              <div className="min-w-0 flex-1 pr-3 pl-1">
-                                <span className="font-bold text-white block text-xs sm:text-sm leading-snug whitespace-normal break-words">{opt.label}</span>
-                                <span className="text-[11px] text-gray-400 block leading-normal mt-1 whitespace-normal break-words">{opt.desc}</span>
+                              <div className="min-w-0 flex-1 pr-1">
+                                <span className="font-bold text-white block text-xs sm:text-sm leading-snug truncate">{opt.label}</span>
+                                <span className="text-[11px] text-gray-400 block leading-normal mt-0.5 truncate">{opt.desc}</span>
                               </div>
-                              {isSelected && <Check className="w-4 h-4 text-hbo-cyan flex-shrink-0 ml-3" />}
+                              {isSelected && <Check className="w-4 h-4 text-hbo-cyan flex-shrink-0 ml-2" />}
                             </button>
                           );
                         })}
@@ -565,7 +567,7 @@ export const Settings: React.FC = () => {
                     </button>
 
                     {openCursorDropdown === 'timeout' && (
-                      <div className="absolute left-0 right-0 sm:min-w-[400px] md:min-w-[440px] top-full mt-2 z-50 bg-hbo-card/98 border border-hbo-border rounded-2xl shadow-2xl p-3.5 sm:p-4 max-h-72 overflow-y-auto space-y-2.5 focus-scroll-container backdrop-blur-2xl animate-fade-in">
+                      <div className="absolute left-0 right-0 w-full top-[calc(100%+4px)] z-50 bg-hbo-card/98 border border-hbo-border rounded-xl shadow-2xl p-2 max-h-[min(260px,calc(100vh-140px))] overflow-y-auto space-y-1.5 focus-scroll-container backdrop-blur-2xl animate-fade-in">
                         {timeoutOpts.map((opt) => {
                           const isSelected = currentTimeoutSec === opt.seconds;
                           return (
@@ -579,17 +581,17 @@ export const Settings: React.FC = () => {
                                   document.getElementById('cursor-timeout-btn')?.focus();
                                 }, 50);
                               }}
-                              className={`w-full flex items-center justify-between gap-5 px-5 sm:px-6 py-3.5 sm:py-4 rounded-2xl text-left text-xs transition-all tv-focus-target ${
+                              className={`w-full flex items-center justify-between gap-3 px-3.5 py-2.5 sm:py-3 rounded-xl text-left text-xs transition-all tv-focus-target ${
                                 isSelected
-                                  ? 'bg-hbo-purple/40 border border-hbo-cyan text-white font-bold shadow-hbo-glow'
+                                  ? 'bg-hbo-purple/40 border border-hbo-cyan/60 text-white font-bold'
                                   : 'text-gray-300 hover:bg-hbo-hover hover:text-white border border-transparent'
                               }`}
                             >
-                              <div className="min-w-0 flex-1 pr-3 pl-1">
-                                <span className="font-bold text-white block text-xs sm:text-sm leading-snug whitespace-normal break-words">{opt.label}</span>
-                                <span className="text-[11px] text-gray-400 block leading-normal mt-1 whitespace-normal break-words">{opt.desc}</span>
+                              <div className="min-w-0 flex-1 pr-1">
+                                <span className="font-bold text-white block text-xs sm:text-sm leading-snug truncate">{opt.label}</span>
+                                <span className="text-[11px] text-gray-400 block leading-normal mt-0.5 truncate">{opt.desc}</span>
                               </div>
-                              {isSelected && <Check className="w-4 h-4 text-hbo-cyan flex-shrink-0 ml-3" />}
+                              {isSelected && <Check className="w-4 h-4 text-hbo-cyan flex-shrink-0 ml-2" />}
                             </button>
                           );
                         })}
@@ -623,7 +625,7 @@ export const Settings: React.FC = () => {
                     </button>
 
                     {openCursorDropdown === 'speed' && (
-                      <div className="absolute left-0 right-0 sm:min-w-[400px] md:min-w-[440px] top-full mt-2 z-50 bg-hbo-card/98 border border-hbo-border rounded-2xl shadow-2xl p-3.5 sm:p-4 max-h-72 overflow-y-auto space-y-2.5 focus-scroll-container backdrop-blur-2xl animate-fade-in">
+                      <div className="absolute left-0 right-0 w-full top-[calc(100%+4px)] z-50 bg-hbo-card/98 border border-hbo-border rounded-xl shadow-2xl p-2 max-h-[min(260px,calc(100vh-140px))] overflow-y-auto space-y-1.5 focus-scroll-container backdrop-blur-2xl animate-fade-in">
                         {speedOpts.map((opt) => {
                           const isSelected = currentSpd === opt.speed;
                           return (
@@ -637,17 +639,17 @@ export const Settings: React.FC = () => {
                                   document.getElementById('cursor-speed-btn')?.focus();
                                 }, 50);
                               }}
-                              className={`w-full flex items-center justify-between gap-5 px-5 sm:px-6 py-3.5 sm:py-4 rounded-2xl text-left text-xs transition-all tv-focus-target ${
+                              className={`w-full flex items-center justify-between gap-3 px-3.5 py-2.5 sm:py-3 rounded-xl text-left text-xs transition-all tv-focus-target ${
                                 isSelected
-                                  ? 'bg-hbo-purple/40 border border-hbo-cyan text-white font-bold shadow-hbo-glow'
+                                  ? 'bg-hbo-purple/40 border border-hbo-cyan/60 text-white font-bold'
                                   : 'text-gray-300 hover:bg-hbo-hover hover:text-white border border-transparent'
                               }`}
                             >
-                              <div className="min-w-0 flex-1 pr-3 pl-1">
-                                <span className="font-bold text-white block text-xs sm:text-sm leading-snug whitespace-normal break-words">{opt.label}</span>
-                                <span className="text-[11px] text-gray-400 block leading-normal mt-1 whitespace-normal break-words">{opt.desc}</span>
+                              <div className="min-w-0 flex-1 pr-1">
+                                <span className="font-bold text-white block text-xs sm:text-sm leading-snug truncate">{opt.label}</span>
+                                <span className="text-[11px] text-gray-400 block leading-normal mt-0.5 truncate">{opt.desc}</span>
                               </div>
-                              {isSelected && <Check className="w-4 h-4 text-hbo-cyan flex-shrink-0 ml-3" />}
+                              {isSelected && <Check className="w-4 h-4 text-hbo-cyan flex-shrink-0 ml-2" />}
                             </button>
                           );
                         })}
@@ -735,7 +737,7 @@ export const Settings: React.FC = () => {
                     {/* Inline Dropdown Menu */}
                     {openDropdownSlot === index && (
                       <div
-                        className={`absolute ${index === 2 ? 'right-0' : 'left-0'} w-[340px] sm:w-[400px] md:w-[440px] top-full mt-2 z-50 bg-hbo-card/98 border border-hbo-border rounded-2xl shadow-2xl p-3.5 sm:p-4 max-h-72 overflow-y-auto space-y-2.5 focus-scroll-container backdrop-blur-2xl animate-fade-in`}
+                        className="absolute left-0 right-0 w-full top-[calc(100%+4px)] z-50 bg-hbo-card/98 border border-hbo-border rounded-xl shadow-2xl p-2 max-h-[min(260px,calc(100vh-140px))] overflow-y-auto space-y-1.5 focus-scroll-container backdrop-blur-2xl animate-fade-in"
                       >
                         {STREAM_PROVIDERS.map((provider) => {
                           const isSelected = selectedId === provider.id;
@@ -755,19 +757,19 @@ export const Settings: React.FC = () => {
                                   document.getElementById(`priority-server-btn-${index}`)?.focus();
                                 }, 50);
                               }}
-                              className={`w-full flex items-center justify-between gap-4 px-5 sm:px-6 py-3.5 sm:py-4 rounded-2xl text-left text-xs transition-all tv-focus-target ${
+                              className={`w-full flex items-center justify-between gap-3 px-3.5 py-2.5 sm:py-3 rounded-xl text-left text-xs transition-all tv-focus-target ${
                                 isSelected
-                                  ? 'bg-hbo-purple/40 border border-hbo-cyan text-white font-bold shadow-hbo-glow'
+                                  ? 'bg-hbo-purple/40 border border-hbo-cyan/60 text-white font-bold'
                                   : 'text-gray-300 hover:bg-hbo-hover hover:text-white border border-transparent'
                               }`}
                             >
-                              <div className="min-w-0 flex-1 pr-3 pl-1">
-                                <span className="font-bold text-white block text-xs sm:text-sm leading-snug whitespace-normal break-words">{provider.name}</span>
-                                <span className="text-[11px] text-gray-400 block leading-normal mt-0.5 whitespace-normal break-words">{provider.tagline}</span>
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center justify-between gap-1.5">
+                                  <span className="font-bold text-white block text-xs sm:text-sm leading-snug truncate">{provider.name}</span>
+                                  {isSelected && <Check className="w-3.5 h-3.5 text-hbo-cyan flex-shrink-0" />}
+                                </div>
+                                <span className="text-[11px] text-gray-400 block leading-normal mt-0.5 truncate">{provider.tagline}</span>
                               </div>
-                              <span className="text-[10px] px-3 py-1 rounded-md bg-white/10 text-gray-300 font-bold flex-shrink-0 ml-3 whitespace-nowrap">
-                                {provider.badge}
-                              </span>
                             </button>
                           );
                         })}
