@@ -163,6 +163,7 @@ export const Home: React.FC = () => {
                 episodeTitle={hist.episodeTitle}
                 stillPath={hist.stillPath}
                 progress={hist.progressPercent}
+                timestamp={hist.timestamp}
               />
             ))}
           </div>

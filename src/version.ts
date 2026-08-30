@@ -2,12 +2,13 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20260830-1354';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-stream-progress.20260830-1354';
+export const APP_BUILD_NUMBER = '20260830-1356';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-stream-progress.20260830-1356';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
 export const APP_BRANCH = 'feat-stream-progress';
-export const APP_CHANGELOG = `* fix(player): pass resume start offset to streamUrl and dispatch iframe seek commands
+export const APP_CHANGELOG = `* fix(player): add useMemo import in VideoPlayer.tsx
+* fix(player): pass resume start offset to streamUrl and dispatch iframe seek commands
 * feat(player): restore universal elapsed watch session ticker and clean up native subframe injection
 * fix(native): ensure bridge.setWebViewClient registers custom subframe tracker on Android
 * feat(player): implement native Android WebView subframe HTML injection for 100% embed provider coverage
@@ -20,5 +21,4 @@ export const APP_CHANGELOG = `* fix(player): pass resume start offset to streamU
 * feat(launcher): remove outer circle from launcher icon and ensure Android TV launcher banner is refreshed across all densities
 * feat(branding): refresh app icon to modern circular TMDB badge across web, mobile, tv, splash, and launcher
 * Merge pull request #40 from jefrimustapa/feat/improve-update-info
-* feat(easter-egg): add scrollable structured changelog to build number easter egg screen
-* refactor(settings): remove duplicate installed version from software update card`;
+* feat(easter-egg): add scrollable structured changelog to build number easter egg screen`;

@@ -306,9 +306,11 @@ export const Details: React.FC = () => {
                   ? Math.max(1, Math.round((watchProgress.duration - watchProgress.timestamp) / 60))
                   : 0;
 
+                const targetResumeTime = isResumable ? (mediaType === 'tv' ? (lastWatched?.timestamp || 0) : (watchProgress?.timestamp || 0)) : 0;
+
                 const watchUrl = mediaType === 'tv'
-                  ? `/watch/tv/${tmdbId}?s=${lastWatched?.season || 1}&e=${lastWatched?.episode || 1}`
-                  : `/watch/movie/${tmdbId}`;
+                  ? `/watch/tv/${tmdbId}?s=${lastWatched?.season || 1}&e=${lastWatched?.episode || 1}${targetResumeTime > 0 ? `&t=${targetResumeTime}` : ''}`
+                  : `/watch/movie/${tmdbId}${targetResumeTime > 0 ? `?t=${targetResumeTime}` : ''}`;
 
                 const restartUrl = mediaType === 'tv'
                   ? `/watch/tv/${tmdbId}?s=${lastWatched?.season || 1}&e=${lastWatched?.episode || 1}&t=0`

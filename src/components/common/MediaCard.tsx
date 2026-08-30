@@ -15,6 +15,7 @@ interface MediaCardProps {
   episodeTitle?: string;
   stillPath?: string | null;
   progress?: number;
+  timestamp?: number;
   onDelete?: () => void;
 }
 
@@ -27,6 +28,7 @@ const MediaCardComponent: React.FC<MediaCardProps> = ({
   episodeTitle,
   stillPath,
   progress,
+  timestamp,
   onDelete
 }) => {
   const navigate = useNavigate();
@@ -115,9 +117,9 @@ const MediaCardComponent: React.FC<MediaCardProps> = ({
     if (variant === 'landscape') {
       // One-click instant resume
       if (mediaType === 'tv' && season && episode) {
-        navigate(`/watch/tv/${item.id}?s=${season}&e=${episode}`);
+        navigate(`/watch/tv/${item.id}?s=${season}&e=${episode}${timestamp && timestamp > 0 ? `&t=${timestamp}` : ''}`);
       } else {
-        navigate(`/watch/${mediaType}/${item.id}`);
+        navigate(`/watch/${mediaType}/${item.id}${timestamp && timestamp > 0 ? `?t=${timestamp}` : ''}`);
       }
       return;
     }
@@ -136,9 +138,9 @@ const MediaCardComponent: React.FC<MediaCardProps> = ({
     e.stopPropagation();
     setMenuOpen(false);
     if (mediaType === 'tv' && season && episode) {
-      navigate(`/watch/tv/${item.id}?s=${season}&e=${episode}`);
+      navigate(`/watch/tv/${item.id}?s=${season}&e=${episode}${timestamp && timestamp > 0 ? `&t=${timestamp}` : ''}`);
     } else {
-      navigate(`/watch/${mediaType}/${item.id}`);
+      navigate(`/watch/${mediaType}/${item.id}${timestamp && timestamp > 0 ? `?t=${timestamp}` : ''}`);
     }
   };
 
