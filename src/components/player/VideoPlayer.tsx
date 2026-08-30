@@ -71,12 +71,16 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const [countdown, setCountdown] = useState(10);
   const [upNextPopupEnabled, setUpNextPopupEnabled] = useState(true);
   const [autoplayNextEnabled, setAutoplayNextEnabled] = useState(true);
+  const [upNextTriggerPercent, setUpNextTriggerPercent] = useState(90);
+  const [upNextTimeout, setUpNextTimeout] = useState(10);
 
   const dismissedUpNextRef = useRef(false);
   const nextEpisodeTriggeredRef = useRef(false);
   const countdownIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const upNextPopupEnabledRef = useRef(true);
   const autoplayNextEnabledRef = useRef(true);
+  const upNextTriggerPercentRef = useRef(90);
+  const upNextTimeoutRef = useRef(10);
   const showUpNextRef = useRef(false);
   const nextEpisodeInfoRef = useRef(nextEpisodeInfo);
   const onNextEpisodeRef = useRef(onNextEpisode);
@@ -171,6 +175,14 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         if (typeof s.autoplayNext === 'boolean') {
           setAutoplayNextEnabled(s.autoplayNext);
           autoplayNextEnabledRef.current = s.autoplayNext;
+        }
+        if (typeof s.upNextTriggerPercent === 'number') {
+          setUpNextTriggerPercent(s.upNextTriggerPercent);
+          upNextTriggerPercentRef.current = s.upNextTriggerPercent;
+        }
+        if (typeof s.upNextTimeout === 'number') {
+          setUpNextTimeout(s.upNextTimeout);
+          upNextTimeoutRef.current = s.upNextTimeout;
         }
       }
     });
@@ -298,18 +310,19 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       : 0;
     const now = Date.now();
 
-    // Check for Up Next trigger on TV Series (>= 90% or within last 75 seconds)
+    // Check for Up Next trigger on TV Series (>= configured % or within last 75 seconds)
+    const targetPercent = upNextTriggerPercentRef.current || 90;
     if (
       upNextPopupEnabledRef.current &&
       mediaType === 'tv' &&
       nextEpisodeInfoRef.current &&
       !showUpNextRef.current &&
       !dismissedUpNextRef.current &&
-      (progressPercent >= 90 || (totalDurationSec > 120 && totalDurationSec - currentSec <= 75))
+      (progressPercent >= targetPercent || (totalDurationSec > 120 && totalDurationSec - currentSec <= 75))
     ) {
       showUpNextRef.current = true;
       setShowUpNext(true);
-      setCountdown(10);
+      setCountdown(upNextTimeoutRef.current || 10);
       setTimeout(() => {
         const upNextBtn = document.getElementById('up-next-play-btn');
         if (upNextBtn && (window as any).__tmdbHeaderFocused !== true) {
