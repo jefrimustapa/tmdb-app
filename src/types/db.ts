@@ -70,6 +70,7 @@ export interface UserSettings {
   topProviders?: [string, string, string] | string[];
   deviceMode: 'auto' | 'tv' | 'mobile' | 'tablet' | 'desktop';
   autoplayNext: boolean;
+  upNextPopup?: boolean;
   adBlockShield: boolean;
   filterAdult: boolean;
   filterUnreleased?: boolean;

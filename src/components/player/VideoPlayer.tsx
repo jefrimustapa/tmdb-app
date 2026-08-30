@@ -69,9 +69,26 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   // Up Next state
   const [showUpNext, setShowUpNext] = useState(false);
   const [countdown, setCountdown] = useState(10);
+  const [upNextPopupEnabled, setUpNextPopupEnabled] = useState(true);
+  const [autoplayNextEnabled, setAutoplayNextEnabled] = useState(true);
+
   const dismissedUpNextRef = useRef(false);
   const nextEpisodeTriggeredRef = useRef(false);
   const countdownIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const upNextPopupEnabledRef = useRef(true);
+  const autoplayNextEnabledRef = useRef(true);
+  const showUpNextRef = useRef(false);
+  const nextEpisodeInfoRef = useRef(nextEpisodeInfo);
+  const onNextEpisodeRef = useRef(onNextEpisode);
+
+  useEffect(() => {
+    nextEpisodeInfoRef.current = nextEpisodeInfo;
+    onNextEpisodeRef.current = onNextEpisode;
+  }, [nextEpisodeInfo, onNextEpisode]);
+
+  useEffect(() => {
+    showUpNextRef.current = showUpNext;
+  }, [showUpNext]);
 
   // Playback position memory refs (0% React re-render overhead)
   const currentTimeRef = useRef<number>(initialTimestamp || 0);
@@ -146,6 +163,14 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         }
         if (s.topProviders && s.topProviders.length >= 3) {
           setTopProviders(s.topProviders);
+        }
+        if (typeof s.upNextPopup === 'boolean') {
+          setUpNextPopupEnabled(s.upNextPopup);
+          upNextPopupEnabledRef.current = s.upNextPopup;
+        }
+        if (typeof s.autoplayNext === 'boolean') {
+          setAutoplayNextEnabled(s.autoplayNext);
+          autoplayNextEnabledRef.current = s.autoplayNext;
         }
       }
     });
@@ -275,12 +300,14 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
     // Check for Up Next trigger on TV Series (>= 90% or within last 75 seconds)
     if (
+      upNextPopupEnabledRef.current &&
       mediaType === 'tv' &&
-      nextEpisodeInfo &&
-      !showUpNext &&
+      nextEpisodeInfoRef.current &&
+      !showUpNextRef.current &&
       !dismissedUpNextRef.current &&
       (progressPercent >= 90 || (totalDurationSec > 120 && totalDurationSec - currentSec <= 75))
     ) {
+      showUpNextRef.current = true;
       setShowUpNext(true);
       setCountdown(10);
       setTimeout(() => {
@@ -308,11 +335,11 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         timestamp: Math.round(currentSec),
         duration: Math.round(totalDurationSec),
         progressPercent
-      });
+      }).catch(() => {});
     }
-  }, [tmdbId, mediaType, title, posterPath, backdropPath, stillPath, voteAverage, season, episode, episodeTitle, episodeRuntimeMinutes, nextEpisodeInfo, showUpNext]);
+  }, [tmdbId, mediaType, title, posterPath, backdropPath, stillPath, voteAverage, season, episode, episodeTitle, episodeRuntimeMinutes]);
 
-  // Clean up media decoders and iframe resources on unmount
+  // Clean up media decoders and save progress on TRUE component unmount only
   useEffect(() => {
     return () => {
       if (countdownIntervalRef.current) {
@@ -321,7 +348,21 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       }
       // Force save on unmount if user was watching
       if (currentTimeRef.current > 0 && durationRef.current > 0) {
-        recordProgress(currentTimeRef.current, durationRef.current, true);
+        dbService.saveWatchProgress({
+          tmdbId,
+          mediaType,
+          title,
+          posterPath,
+          backdropPath,
+          stillPath,
+          voteAverage,
+          season: mediaType === 'tv' ? season : undefined,
+          episode: mediaType === 'tv' ? episode : undefined,
+          episodeTitle: mediaType === 'tv' ? episodeTitle : undefined,
+          timestamp: Math.round(currentTimeRef.current),
+          duration: Math.round(durationRef.current),
+          progressPercent: durationRef.current > 0 ? Math.min(100, Math.round((currentTimeRef.current / durationRef.current) * 100)) : 0
+        }).catch(() => {});
       }
       if (hlsRef.current) {
         try { hlsRef.current.destroy(); } catch {}
@@ -334,12 +375,8 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           videoRef.current.load();
         } catch {}
       }
-      const iframe = document.querySelector<HTMLIFrameElement>('iframe');
-      if (iframe) {
-        try { iframe.src = 'about:blank'; } catch {}
-      }
     };
-  }, [recordProgress]);
+  }, []);
 
   // Up Next Countdown interval
   useEffect(() => {
@@ -359,7 +396,10 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             countdownIntervalRef.current = null;
           }
           setShowUpNext(false);
-          onNextEpisode?.();
+          showUpNextRef.current = false;
+          if (autoplayNextEnabledRef.current) {
+            onNextEpisodeRef.current?.();
+          }
           return 0;
         }
         return prev - 1;
@@ -372,7 +412,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         countdownIntervalRef.current = null;
       }
     };
-  }, [showUpNext, onNextEpisode]);
+  }, [showUpNext]);
 
   // Listen for Native Android iframe / subframe playback state changes
   useEffect(() => {
