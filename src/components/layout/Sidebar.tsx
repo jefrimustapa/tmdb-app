@@ -32,10 +32,10 @@ export const Sidebar: React.FC = () => {
 
   return (
     <aside className="fixed left-0 top-0 bottom-0 w-20 lg:w-64 bg-hbo-dark/95 border-r border-hbo-border/60 z-40 flex flex-col justify-between p-3 lg:p-4 backdrop-blur-xl select-none">
-      {/* 1. Top Pinned Logo */}
-      <div className="px-1 lg:px-2 flex-shrink-0">
+      {/* 1. Top Pinned Logo (Horizontally Centered) */}
+      <div className="w-full flex items-center justify-center flex-shrink-0">
         <Logo size="md" showText={true} className="hidden lg:flex" />
-        <Logo size="md" showText={false} className="lg:hidden flex justify-center" />
+        <Logo size="md" showText={false} className="lg:hidden flex items-center justify-center" />
       </div>
 
       {/* 2. Vertically Centered Navigation Icon Group */}
