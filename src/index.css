@@ -258,3 +258,31 @@ aside .tv-focus-target:focus-visible .tv-nav-label,
     transparent 100%
   );
 }
+
+/* Cinematic HBO Billboard Motion */
+@keyframes heroFadeInUp {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 10px, 0);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+.animate-hero-badge {
+  animation: heroFadeInUp 400ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-hero-title {
+  animation: heroFadeInUp 450ms cubic-bezier(0.16, 1, 0.3, 1) 60ms both;
+}
+
+.animate-hero-overview {
+  animation: heroFadeInUp 500ms cubic-bezier(0.16, 1, 0.3, 1) 120ms both;
+}
+
+.animate-hero-buttons {
+  animation: heroFadeInUp 550ms cubic-bezier(0.16, 1, 0.3, 1) 180ms both;
+}
