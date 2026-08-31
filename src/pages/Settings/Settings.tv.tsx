@@ -320,12 +320,10 @@ export const Settings: React.FC = () => {
                     : 'bg-hbo-card/70 border-hbo-border hover:bg-hbo-hover hover:border-white/20 text-gray-300'
                 }`}
               >
-                <div className="flex items-center gap-3 min-w-0 flex-1">
-                  <div className={`w-8.5 h-8.5 rounded-xl flex items-center justify-center flex-shrink-0 ${
-                    isSelected ? 'bg-hbo-cyan text-black' : 'bg-white/10 text-gray-400'
-                  }`}>
-                    <Icon className="w-4.5 h-4.5 stroke-[2.5]" />
-                  </div>
+                <div className="flex items-center gap-3.5 min-w-0 flex-1">
+                  <Icon className={`w-5 h-5 flex-shrink-0 stroke-[2.2] transition-colors ${
+                    isSelected ? 'text-hbo-cyan' : 'text-gray-400'
+                  }`} />
                   <div className="min-w-0 flex-1">
                     <p className={`text-xs sm:text-sm font-bold leading-tight truncate ${isSelected ? 'text-white' : 'text-gray-200'}`}>
                       {cat.label}
