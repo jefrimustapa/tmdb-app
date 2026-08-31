@@ -388,6 +388,33 @@ export function useTVNavigation(isEnabled = true) {
               }
             }
 
+            // On Settings page: Right from inside Right Content Panel moves focus within same row
+            if (window.location.pathname === '/settings' && currentFocused.closest('[data-settings-panel="true"]')) {
+              const panelElements = Array.from(document.querySelectorAll<HTMLElement>('[data-settings-panel="true"] .tv-focus-target'))
+                .filter(el => el !== currentFocused && el.offsetParent !== null && !el.hasAttribute('disabled'));
+              
+              let internalRightTarget: HTMLElement | null = null;
+              let internalMinDist = Infinity;
+              for (const pEl of panelElements) {
+                const pRect = pEl.getBoundingClientRect();
+                const isSameRow = (pRect.top < currentRect.bottom - 8 && pRect.bottom > currentRect.top + 8);
+                if (isSameRow && pRect.left >= currentRect.right - 5) {
+                  const dx = Math.max(0, pRect.left - currentRect.right);
+                  if (dx < internalMinDist) {
+                    internalMinDist = dx;
+                    internalRightTarget = pEl;
+                  }
+                }
+              }
+
+              if (internalRightTarget) {
+                e.preventDefault();
+                internalRightTarget.focus();
+                internalRightTarget.scrollIntoView({ behavior: e.repeat ? 'auto' : getScrollBehavior(), block: 'nearest', inline: 'nearest' });
+                return;
+              }
+            }
+
             // In content viewport: if currently in a horizontal row/container, check for sibling items
             const currentRow = currentFocused.parentElement;
             const isInsideRail = currentFocused.closest('[data-content-rail="true"]') !== null || 
