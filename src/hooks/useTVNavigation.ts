@@ -489,7 +489,7 @@ export function useTVNavigation(isEnabled = true) {
 
             // On Settings page: Left from inside Right Content Panel moves focus back to active Category Item
             if (window.location.pathname === '/settings' && currentFocused.closest('[data-settings-panel="true"]')) {
-              // Check if there is a left candidate strictly within the right content panel
+              // Check if there is a left candidate strictly within the SAME visual row in the right content panel
               const panelElements = Array.from(document.querySelectorAll<HTMLElement>('[data-settings-panel="true"] .tv-focus-target'))
                 .filter(el => el !== currentFocused && el.offsetParent !== null && !el.hasAttribute('disabled'));
               
@@ -497,12 +497,11 @@ export function useTVNavigation(isEnabled = true) {
               let internalMinDist = Infinity;
               for (const pEl of panelElements) {
                 const pRect = pEl.getBoundingClientRect();
-                if (pRect.right <= currentRect.left + 5) {
+                const isSameRow = (pRect.top < currentRect.bottom - 8 && pRect.bottom > currentRect.top + 8);
+                if (isSameRow && pRect.right <= currentRect.left + 5) {
                   const dx = Math.max(0, currentRect.left - pRect.right);
-                  const dy = Math.abs(pRect.top - currentRect.top);
-                  const dist = dx + dy * 2.0;
-                  if (dist < internalMinDist) {
-                    internalMinDist = dist;
+                  if (dx < internalMinDist) {
+                    internalMinDist = dx;
                     internalLeftTarget = pEl;
                   }
                 }
@@ -515,7 +514,7 @@ export function useTVNavigation(isEnabled = true) {
                 return;
               }
 
-              // At the left edge of right panel: return to active Category tab
+              // At the leftmost element of this row: return directly to active Category tab on the left rail
               const activeCat = document.querySelector<HTMLElement>('[data-tv-category-active="true"]') ||
                                 document.querySelector<HTMLElement>('[data-tv-category-item="true"]');
               if (activeCat) {
