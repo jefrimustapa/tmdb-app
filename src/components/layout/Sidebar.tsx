@@ -31,54 +31,55 @@ export const Sidebar: React.FC = () => {
   };
 
   return (
-    <aside className="fixed left-0 top-0 bottom-0 w-20 lg:w-64 bg-hbo-dark/95 border-r border-hbo-border/60 z-40 flex flex-col justify-between p-3 lg:p-4 backdrop-blur-xl">
-      <div>
-        <div className="mb-6 lg:mb-8 px-1 lg:px-2">
-          <Logo size="md" showText={true} className="hidden lg:flex" />
-          <Logo size="md" showText={false} className="lg:hidden flex justify-center" />
-        </div>
-
-        <nav className="space-y-1.5 relative">
-          {links.map((link) => {
-            const Icon = link.icon;
-            return (
-              <NavLink
-                key={link.path}
-                to={link.path}
-                data-tv-nav="true"
-                data-nav-path={link.path}
-                data-active-route={link.path === '/' ? location.pathname === '/' : location.pathname.startsWith(link.path)}
-                className={({ isActive }) =>
-                  `group relative flex items-center justify-center lg:justify-start gap-3.5 px-3 py-3 rounded-xl font-semibold text-sm transition-all tv-focus-target ${
-                    isActive
-                      ? 'active text-white'
-                      : 'text-gray-400 hover:text-white'
-                  }`
-                }
-              >
-                {({ isActive }) => (
-                  <>
-                    {/* Active Page Indicator Bar (HBO Purple) */}
-                    {isActive && (
-                      <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-4 rounded-r-full bg-hbo-purple-light shadow-[0_0_8px_rgba(144,85,255,0.9)] pointer-events-none" />
-                    )}
-                    <Icon className={`w-5 h-5 flex-shrink-0 transition-all duration-150 tv-nav-icon ${
-                      isActive ? 'text-white' : 'text-gray-400 group-hover:text-white'
-                    }`} />
-                    <span className={`hidden lg:inline transition-colors duration-150 tv-nav-label ${
-                      isActive ? 'text-white font-bold' : 'text-gray-400 group-hover:text-white'
-                    }`}>
-                      {link.label}
-                    </span>
-                  </>
-                )}
-              </NavLink>
-            );
-          })}
-        </nav>
+    <aside className="fixed left-0 top-0 bottom-0 w-20 lg:w-64 bg-hbo-dark/95 border-r border-hbo-border/60 z-40 flex flex-col justify-between p-3 lg:p-4 backdrop-blur-xl select-none">
+      {/* 1. Top Pinned Logo */}
+      <div className="px-1 lg:px-2 flex-shrink-0">
+        <Logo size="md" showText={true} className="hidden lg:flex" />
+        <Logo size="md" showText={false} className="lg:hidden flex justify-center" />
       </div>
 
-      <div className="pt-3 border-t border-hbo-border/40 space-y-2">
+      {/* 2. Vertically Centered Navigation Icon Group */}
+      <nav className="space-y-2 my-auto flex flex-col justify-center relative">
+        {links.map((link) => {
+          const Icon = link.icon;
+          return (
+            <NavLink
+              key={link.path}
+              to={link.path}
+              data-tv-nav="true"
+              data-nav-path={link.path}
+              data-active-route={link.path === '/' ? location.pathname === '/' : location.pathname.startsWith(link.path)}
+              className={({ isActive }) =>
+                `group relative flex items-center justify-center lg:justify-start gap-3.5 px-3 py-3 rounded-xl font-semibold text-sm transition-all tv-focus-target ${
+                  isActive
+                    ? 'active text-white'
+                    : 'text-gray-400 hover:text-white'
+                }`
+              }
+            >
+              {({ isActive }) => (
+                <>
+                  {/* Active Page Indicator Bar (HBO Purple) */}
+                  {isActive && (
+                    <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-4 rounded-r-full bg-hbo-purple-light shadow-[0_0_8px_rgba(144,85,255,0.9)] pointer-events-none" />
+                  )}
+                  <Icon className={`w-5 h-5 flex-shrink-0 transition-all duration-150 tv-nav-icon ${
+                    isActive ? 'text-white' : 'text-gray-400 group-hover:text-white'
+                  }`} />
+                  <span className={`hidden lg:inline transition-colors duration-150 tv-nav-label ${
+                    isActive ? 'text-white font-bold' : 'text-gray-400 group-hover:text-white'
+                  }`}>
+                    {link.label}
+                  </span>
+                </>
+              )}
+            </NavLink>
+          );
+        })}
+      </nav>
+
+      {/* 3. Bottom Device Mode Indicator */}
+      <div className="pt-3 border-t border-hbo-border/40 space-y-2 flex-shrink-0">
         {/* Device Mode Indicator (View Only, Non-clickable, Non-focusable) */}
         <div
           className="w-full flex items-center justify-center lg:justify-start gap-2.5 p-2 rounded-xl bg-white/5 border border-white/10 text-xs font-semibold text-gray-300 pointer-events-none select-none"
