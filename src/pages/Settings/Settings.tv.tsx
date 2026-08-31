@@ -274,8 +274,8 @@ export const Settings: React.FC = () => {
 
   return (
     <div className="h-screen w-full overflow-hidden flex flex-col pt-5 px-6 pb-3 select-none">
-      {/* 1. Static Top Title Header - Pure Black Matching Background */}
-      <div className="flex items-center justify-between mb-3.5 pb-2.5 border-b border-white/10 flex-shrink-0 z-20 bg-black/95 backdrop-blur-xl">
+      {/* 1. Static Top Title Header - Same exact background color as the body (#050508) */}
+      <div className="flex items-center justify-between mb-3.5 pb-2.5 border-b border-hbo-border/60 flex-shrink-0 z-20 bg-[#050508]">
         <div className="flex items-center gap-3.5">
           <div className="w-9 h-9 rounded-xl bg-hbo-purple/20 border border-hbo-purple/40 flex items-center justify-center flex-shrink-0 shadow-inner">
             <SettingsIcon className="w-4.5 h-4.5 text-hbo-purple-light" />
@@ -295,10 +295,10 @@ export const Settings: React.FC = () => {
       </div>
 
       {/* 2. Main Content Split View: Left Static Category Rail + Right Vertical Sliding Rail */}
-      <div className="flex-1 min-h-0 flex flex-row gap-6 items-start overflow-hidden">
-        {/* Left Static Category Rail - Ample Width and Clean Padding */}
-        <div className="w-80 flex-shrink-0 space-y-2 pr-1">
-          <span className="text-[11px] font-black uppercase tracking-wider text-gray-400 px-3 block mb-1">
+      <div className="flex-1 min-h-0 flex flex-row gap-6 items-start overflow-visible">
+        {/* Left Static Category Rail - Ample Width and Clean 8px Ring Padding Buffer */}
+        <div className="w-80 flex-shrink-0 space-y-2.5 px-2 py-1">
+          <span className="text-[11px] font-black uppercase tracking-wider text-gray-400 px-2 block mb-1">
             Categories
           </span>
 
