@@ -2,12 +2,13 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20260831-1424';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-restructure-set.20260831-1424';
+export const APP_BUILD_NUMBER = '20260831-1427';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-restructure-set.20260831-1427';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
 export const APP_BRANCH = 'feat-restructure-set';
-export const APP_CHANGELOG = `* fix: TV layout margins, background & mobile navbar offset + sticky freeze
+export const APP_CHANGELOG = `* fix: TV category rail left padding buffer and header body background match
+* fix: TV layout margins, background & mobile navbar offset + sticky freeze
 * feat: TV Settings 1-row-per-section vertical sliding rail navigation
 * fix(tv-nav): enforce same-row boundary on Left key so single buttons return to active Category
 * fix(tv-nav): treat child panel sections as independent horizontal rows for left-to-category navigation
@@ -20,5 +21,4 @@ export const APP_CHANGELOG = `* fix: TV layout margins, background & mobile navb
 * fix(build): resolve syntax error in VideoPlayer and verify live installation on TV
 * feat(settings): disable TorBox & Private Extractor by default and update trigger % to 80-100% (5% step)
 * refactor(settings): unify Up Next popup into Auto-Play Next Episode setting
-* fix(navigation): resolve spatial focus lock on Home page hero banner and content rails
-* feat(settings): use 10% step buttons for Up Next popup trigger percentage`;
+* fix(navigation): resolve spatial focus lock on Home page hero banner and content rails`;
