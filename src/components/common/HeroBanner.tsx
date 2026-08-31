@@ -148,17 +148,68 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ items }) => {
   const releaseYear = releaseDate ? new Date(releaseDate).getFullYear() : '';
   const mediaType: 'movie' | 'tv' = currentFeatured.media_type === 'tv' ? 'tv' : 'movie';
 
+  // Touch swipe handling for mobile
+  const touchStartX = useRef<number | null>(null);
+  const touchStartY = useRef<number | null>(null);
+  const touchStartTime = useRef<number>(0);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length === 1) {
+      touchStartX.current = e.touches[0].clientX;
+      touchStartY.current = e.touches[0].clientY;
+      touchStartTime.current = Date.now();
+      isAutoPlayPaused.current = true;
+    }
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (touchStartX.current === null || touchStartY.current === null) {
+      isAutoPlayPaused.current = false;
+      return;
+    }
+
+    const deltaX = e.changedTouches[0].clientX - touchStartX.current;
+    const deltaY = e.changedTouches[0].clientY - touchStartY.current;
+    const deltaTime = Date.now() - touchStartTime.current;
+
+    touchStartX.current = null;
+    touchStartY.current = null;
+    isAutoPlayPaused.current = false;
+
+    // Must be predominantly horizontal swipe:
+    // Min 40px deltaX, horizontal > 1.3x vertical, duration < 800ms
+    if (Math.abs(deltaX) > 40 && Math.abs(deltaX) > Math.abs(deltaY) * 1.3 && deltaTime < 800) {
+      trigger5sRemotePause();
+      if (deltaX < 0) {
+        // Swiped Left -> Next Slide
+        setCurrentIndex((prev) => (prev + 1) % totalItems);
+      } else {
+        // Swiped Right -> Previous Slide
+        setCurrentIndex((prev) => (prev - 1 + totalItems) % totalItems);
+      }
+    }
+  };
+
+  const handleTouchCancel = () => {
+    touchStartX.current = null;
+    touchStartY.current = null;
+    isAutoPlayPaused.current = false;
+  };
+
   return (
     <div
       ref={bannerRef}
       data-hero-banner="true"
       data-total-slides={totalItems}
-      className="relative w-full h-[65vh] sm:h-[75vh] min-h-[460px] max-h-[750px] overflow-hidden bg-[#050508] select-none"
+      className="relative w-full h-[65vh] sm:h-[75vh] min-h-[460px] max-h-[750px] overflow-hidden bg-[#050508] select-none touch-pan-y"
       onKeyDownCapture={trigger5sRemotePause}
       onMouseEnter={() => { isAutoPlayPaused.current = true; }}
       onMouseLeave={() => { isAutoPlayPaused.current = false; }}
       onFocusCapture={() => { isAutoPlayPaused.current = true; }}
       onBlurCapture={() => { isAutoPlayPaused.current = false; }}
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+      onTouchCancel={handleTouchCancel}
     >
       {/* 1. Cinematic Cross-Dissolving Backdrops Layer */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none select-none">
