@@ -214,7 +214,7 @@ export const Settings: React.FC = () => {
       </div>
 
       {/* Sticky Category Pill Filter Bar (Freezes cleanly below the top Navbar upon scroll) */}
-      <div className="sticky top-[calc(env(safe-area-inset-top,24px)+3.75rem)] sm:top-[4.75rem] z-30 -mx-3.5 sm:-mx-6 px-3.5 sm:px-6 py-2.5 bg-black/95 backdrop-blur-xl border-b border-white/10 mb-6 overflow-x-auto no-scrollbar shadow-xl">
+      <div className="sticky top-[calc(env(safe-area-inset-top,24px)+3.75rem)] sm:top-[4.75rem] z-30 -mx-3.5 sm:-mx-6 px-3.5 sm:px-6 py-2.5 bg-[#050508] border-b border-hbo-border/60 mb-6 overflow-x-auto no-scrollbar shadow-xl">
         <div className="flex items-center gap-2 min-w-max">
           {[
             { id: 'all' as MobileCategory, label: 'All', icon: SlidersHorizontal },
