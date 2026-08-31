@@ -2,12 +2,13 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20260831-1458';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-restructure-set.20260831-1458';
+export const APP_BUILD_NUMBER = '20260831-1508';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-restructure-set.20260831-1508';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
 export const APP_BRANCH = 'feat-restructure-set';
-export const APP_CHANGELOG = `* style: center TV sidebar navigation icon group vertically
+export const APP_CHANGELOG = `* style: center app icon horizontally in TV navbar
+* style: center TV sidebar navigation icon group vertically
 * style: remove background container behind TV category icons
 * fix: TV category rail left padding buffer and header body background match
 * fix: TV layout margins, background & mobile navbar offset + sticky freeze
@@ -20,5 +21,4 @@ export const APP_CHANGELOG = `* style: center TV sidebar navigation icon group v
 * style(details): change restart button to icon-only circular action button
 * fix(tv): update native Android MainActivity dispatchKeyEvent for watch header next button D-pad navigation
 * fix(watch): enable seamless D-pad remote navigation across header back, next episode, and server picker
-* fix(build): resolve syntax error in VideoPlayer and verify live installation on TV
-* feat(settings): disable TorBox & Private Extractor by default and update trigger % to 80-100% (5% step)`;
+* fix(build): resolve syntax error in VideoPlayer and verify live installation on TV`;

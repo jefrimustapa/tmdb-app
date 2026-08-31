@@ -48,7 +48,21 @@ export const Settings: React.FC = () => {
   const [showUpdateModal, setShowUpdateModal] = useState(false);
   const [updateError, setUpdateError] = useState<string | null>(null);
   const [activeCategory, setActiveCategory] = useState<MobileCategory>('all');
+  const [isFilterFrozen, setIsFilterFrozen] = useState(false);
+  const filterSentinelRef = useRef<HTMLDivElement>(null);
 
+  useEffect(() => {
+    const handleScroll = () => {
+      if (!filterSentinelRef.current) return;
+      const rect = filterSentinelRef.current.getBoundingClientRect();
+      // On mobile, the top navbar bottom threshold is around 68px
+      setIsFilterFrozen(rect.top <= 68);
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    handleScroll();
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
   const handleCheckForUpdates = async () => {
     setCheckingUpdate(true);
     setUpdateError(null);
@@ -213,33 +227,44 @@ export const Settings: React.FC = () => {
         )}
       </div>
 
-      {/* Sticky Category Pill Filter Bar (Freezes cleanly below the top Navbar upon scroll) */}
-      <div className="sticky top-[calc(env(safe-area-inset-top,24px)+3.75rem)] sm:top-[4.75rem] z-30 -mx-3.5 sm:-mx-6 px-3.5 sm:px-6 py-2.5 bg-[#050508] border-b border-hbo-border/60 mb-6 overflow-x-auto no-scrollbar shadow-xl">
-        <div className="flex items-center gap-2 min-w-max">
-          {[
-            { id: 'all' as MobileCategory, label: 'All', icon: SlidersHorizontal },
-            { id: 'playback' as MobileCategory, label: 'Playback', icon: Zap },
-            { id: 'display' as MobileCategory, label: 'Display', icon: Monitor },
-            { id: 'content' as MobileCategory, label: 'Content', icon: ShieldCheck },
-            { id: 'system' as MobileCategory, label: 'System', icon: Info },
-          ].map((cat) => {
-            const Icon = cat.icon;
-            const isActive = activeCategory === cat.id;
-            return (
-              <button
-                key={cat.id}
-                onClick={() => setActiveCategory(cat.id)}
-                className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold transition-all ${
-                  isActive
-                    ? 'bg-gradient-to-r from-hbo-purple to-hbo-cyan text-white shadow-hbo-glow'
-                    : 'bg-white/5 hover:bg-white/10 text-gray-400 hover:text-gray-200 border border-white/5'
-                }`}
-              >
-                <Icon className="w-3.5 h-3.5 flex-shrink-0" />
-                <span>{cat.label}</span>
-              </button>
-            );
-          })}
+      {/* Sentinel & Freeze Row Filter Bar */}
+      <div ref={filterSentinelRef} className="relative">
+        {/* Placeholder when filter is frozen to avoid layout jump */}
+        {isFilterFrozen && <div className="h-[48px] mb-6" />}
+
+        <div
+          className={`transition-all duration-150 z-30 ${
+            isFilterFrozen
+              ? 'fixed top-[calc(max(0.75rem,env(safe-area-inset-top,20px))+3rem)] left-0 right-0 px-3.5 sm:px-6 py-2.5 bg-[#050508]/98 backdrop-blur-2xl border-b border-hbo-border/80 shadow-2xl overflow-x-auto no-scrollbar'
+              : 'relative -mx-3.5 sm:-mx-6 px-3.5 sm:px-6 py-2.5 bg-[#050508] border-b border-hbo-border/60 mb-6 overflow-x-auto no-scrollbar shadow-lg'
+          }`}
+        >
+          <div className="flex items-center gap-2 min-w-max max-w-4xl mx-auto">
+            {[
+              { id: 'all' as MobileCategory, label: 'All', icon: SlidersHorizontal },
+              { id: 'playback' as MobileCategory, label: 'Playback', icon: Zap },
+              { id: 'display' as MobileCategory, label: 'Display', icon: Monitor },
+              { id: 'content' as MobileCategory, label: 'Content', icon: ShieldCheck },
+              { id: 'system' as MobileCategory, label: 'System', icon: Info },
+            ].map((cat) => {
+              const Icon = cat.icon;
+              const isActive = activeCategory === cat.id;
+              return (
+                <button
+                  key={cat.id}
+                  onClick={() => setActiveCategory(cat.id)}
+                  className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold transition-all ${
+                    isActive
+                      ? 'bg-gradient-to-r from-hbo-purple to-hbo-cyan text-white shadow-hbo-glow'
+                      : 'bg-white/5 hover:bg-white/10 text-gray-400 hover:text-gray-200 border border-white/5'
+                  }`}
+                >
+                  <Icon className="w-3.5 h-3.5 flex-shrink-0" />
+                  <span>{cat.label}</span>
+                </button>
+              );
+            })}
+          </div>
         </div>
       </div>
 
