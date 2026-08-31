@@ -2,23 +2,23 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20260830-2322';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.fix-mobile-next-ep-l.20260830-2322';
+export const APP_BUILD_NUMBER = '20260831-1508';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-restructure-set.20260831-1508';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
-export const APP_BRANCH = 'fix-mobile-next-ep-l';
-export const APP_CHANGELOG = `* style(details): change restart button to icon-only circular action button
+export const APP_BRANCH = 'feat-restructure-set';
+export const APP_CHANGELOG = `* style: center app icon horizontally in TV navbar
+* style: center TV sidebar navigation icon group vertically
+* style: remove background container behind TV category icons
+* fix: TV category rail left padding buffer and header body background match
+* fix: TV layout margins, background & mobile navbar offset + sticky freeze
+* feat: TV Settings 1-row-per-section vertical sliding rail navigation
+* fix(tv-nav): enforce same-row boundary on Left key so single buttons return to active Category
+* fix(tv-nav): treat child panel sections as independent horizontal rows for left-to-category navigation
+* fix(tv-nav): smooth 2-way spatial focus between sidebar, categories rail, and content cards
+* feat(settings): restructure TV and mobile settings into HBO Max category layout
+* fix(mobile): move Next Episode button below provider dropdown in watch header
+* style(details): change restart button to icon-only circular action button
 * fix(tv): update native Android MainActivity dispatchKeyEvent for watch header next button D-pad navigation
 * fix(watch): enable seamless D-pad remote navigation across header back, next episode, and server picker
-* fix(build): resolve syntax error in VideoPlayer and verify live installation on TV
-* feat(settings): disable TorBox & Private Extractor by default and update trigger % to 80-100% (5% step)
-* refactor(settings): unify Up Next popup into Auto-Play Next Episode setting
-* fix(navigation): resolve spatial focus lock on Home page hero banner and content rails
-* feat(settings): use 10% step buttons for Up Next popup trigger percentage
-* feat(settings): convert Up Next popup trigger percentage into a 10% step slider
-* feat(settings): add configurable trigger percent and countdown timeout for Up Next episode popup
-* fix(settings): restore FormattedChangelog import in settings views
-* fix(player): fix black screen on 90% and make Up Next popup configurable in settings
-* fix(player): fix black screen on 90% and make Up Next popup configurable in settings
-* fix(tv): wire series resume timestamp to watch navigation in details and episode grid
-* fix(player): wire resume timestamp across details, continue watching and player streamUrl`;
+* fix(build): resolve syntax error in VideoPlayer and verify live installation on TV`;
