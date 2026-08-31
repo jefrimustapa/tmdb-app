@@ -273,31 +273,31 @@ export const Settings: React.FC = () => {
   ];
 
   return (
-    <div className="h-screen overflow-hidden flex flex-col pt-16 sm:pt-20 px-6 sm:px-10 max-w-7xl mx-auto select-none">
-      {/* 1. Static Top Title Header */}
-      <div className="flex items-center justify-between mb-4 pb-3 border-b border-hbo-border flex-shrink-0 z-20 bg-hbo-dark/95 backdrop-blur-md">
+    <div className="h-screen w-full overflow-hidden flex flex-col pt-5 px-6 pb-3 select-none">
+      {/* 1. Static Top Title Header - Pure Black Matching Background */}
+      <div className="flex items-center justify-between mb-3.5 pb-2.5 border-b border-white/10 flex-shrink-0 z-20 bg-black/95 backdrop-blur-xl">
         <div className="flex items-center gap-3.5">
-          <div className="w-10 h-10 rounded-2xl bg-hbo-purple/20 border border-hbo-purple/40 flex items-center justify-center flex-shrink-0 shadow-inner">
-            <SettingsIcon className="w-5 h-5 text-hbo-purple-light" />
+          <div className="w-9 h-9 rounded-xl bg-hbo-purple/20 border border-hbo-purple/40 flex items-center justify-center flex-shrink-0 shadow-inner">
+            <SettingsIcon className="w-4.5 h-4.5 text-hbo-purple-light" />
           </div>
           <div>
-            <h1 className="text-2xl sm:text-3xl font-black font-display text-white tracking-tight leading-none">System Settings</h1>
-            <p className="text-xs text-gray-400 mt-1">Manage streaming resolvers, display, cursor controls, and software updates</p>
+            <h1 className="text-xl sm:text-2xl font-black font-display text-white tracking-tight leading-none">System Settings</h1>
+            <p className="text-[11px] text-gray-400 mt-0.5">Manage streaming resolvers, display, cursor controls, and software updates</p>
           </div>
         </div>
 
         {savedMessage && (
-          <div className="flex items-center gap-2 px-3.5 py-1.5 bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 rounded-full text-xs font-semibold animate-fade-in flex-shrink-0">
-            <Check className="w-4 h-4" />
+          <div className="flex items-center gap-1.5 px-3 py-1 bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 rounded-full text-xs font-semibold animate-fade-in flex-shrink-0">
+            <Check className="w-3.5 h-3.5" />
             <span>Saved</span>
           </div>
         )}
       </div>
 
       {/* 2. Main Content Split View: Left Static Category Rail + Right Vertical Sliding Rail */}
-      <div className="flex-1 min-h-0 flex flex-col md:flex-row gap-8 items-start pb-6 overflow-hidden">
-        {/* Left Static Category Rail */}
-        <div className="w-full md:w-72 flex-shrink-0 space-y-2.5">
+      <div className="flex-1 min-h-0 flex flex-row gap-6 items-start overflow-hidden">
+        {/* Left Static Category Rail - Ample Width and Clean Padding */}
+        <div className="w-80 flex-shrink-0 space-y-2 pr-1">
           <span className="text-[11px] font-black uppercase tracking-wider text-gray-400 px-3 block mb-1">
             Categories
           </span>
@@ -314,23 +314,23 @@ export const Settings: React.FC = () => {
                 data-tv-category-active={isSelected ? 'true' : 'false'}
                 onClick={() => setActiveCategory(cat.id)}
                 onFocus={() => setActiveCategory(cat.id)}
-                className={`w-full p-4 rounded-2xl border text-left transition-all tv-focus-target flex items-center justify-between gap-3 min-h-[70px] ${
+                className={`w-full p-3.5 rounded-2xl border text-left transition-all tv-focus-target flex items-center justify-between gap-3 min-h-[66px] ${
                   isSelected
-                    ? 'bg-gradient-to-r from-hbo-purple/60 via-hbo-purple/30 to-hbo-cyan/20 border-hbo-cyan shadow-hbo-glow text-white ring-1 ring-hbo-cyan/50'
+                    ? 'bg-gradient-to-r from-hbo-purple/60 via-hbo-purple/30 to-hbo-cyan/20 border-hbo-cyan shadow-hbo-glow text-white ring-2 ring-hbo-cyan/60'
                     : 'bg-hbo-card/70 border-hbo-border hover:bg-hbo-hover hover:border-white/20 text-gray-300'
                 }`}
               >
-                <div className="flex items-center gap-3.5 min-w-0">
-                  <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                <div className="flex items-center gap-3 min-w-0 flex-1">
+                  <div className={`w-8.5 h-8.5 rounded-xl flex items-center justify-center flex-shrink-0 ${
                     isSelected ? 'bg-hbo-cyan text-black' : 'bg-white/10 text-gray-400'
                   }`}>
-                    <Icon className="w-5 h-5 stroke-[2.5]" />
+                    <Icon className="w-4.5 h-4.5 stroke-[2.5]" />
                   </div>
-                  <div className="min-w-0">
-                    <p className={`text-sm font-bold leading-tight ${isSelected ? 'text-white' : 'text-gray-200'}`}>
+                  <div className="min-w-0 flex-1">
+                    <p className={`text-xs sm:text-sm font-bold leading-tight truncate ${isSelected ? 'text-white' : 'text-gray-200'}`}>
                       {cat.label}
                     </p>
-                    <p className={`text-[11px] mt-0.5 truncate ${isSelected ? 'text-hbo-cyan font-medium' : 'text-gray-400'}`}>
+                    <p className={`text-[10px] mt-0.5 truncate ${isSelected ? 'text-hbo-cyan font-medium' : 'text-gray-400'}`}>
                       {cat.desc}
                     </p>
                   </div>
@@ -348,31 +348,31 @@ export const Settings: React.FC = () => {
         <div
           ref={contentPanelRef}
           data-settings-panel="true"
-          className="flex-1 min-w-0 h-full overflow-y-auto overflow-x-hidden pr-3 pb-24 space-y-4 focus-scroll-container scroll-smooth"
+          className="flex-1 min-w-0 h-full overflow-y-auto overflow-x-hidden pr-3 pb-32 space-y-3.5 focus-scroll-container scroll-smooth"
         >
           {/* ========================================================================= */}
           {/* 1. PLAYBACK & STREAMING PANEL                                            */}
           {/* ========================================================================= */}
           {activeCategory === 'playback' && (
-            <div className="space-y-4 animate-fade-in">
+            <div className="space-y-3.5 animate-fade-in">
               {/* Row 1: Auto-Play Next Episode Toggle */}
               <div
                 data-settings-row="true"
-                className="bg-hbo-card border border-hbo-border rounded-2xl p-5 shadow-lg flex items-center justify-between gap-4"
+                className="bg-hbo-card border border-hbo-border rounded-2xl p-4 shadow-lg flex items-center justify-between gap-4"
               >
                 <div className="flex-1 min-w-0 pr-2">
-                  <h3 className="text-base font-bold font-display text-white flex items-center gap-2.5 mb-0.5">
-                    <Sparkles className="w-5 h-5 text-hbo-purple-light flex-shrink-0" />
+                  <h3 className="text-sm sm:text-base font-bold font-display text-white flex items-center gap-2 mb-0.5">
+                    <Sparkles className="w-4.5 h-4.5 text-hbo-purple-light flex-shrink-0" />
                     <span>Auto-Play Next Episode</span>
                   </h3>
-                  <p className="text-xs text-gray-400">
-                    Display the "Up Next" preview popup and automatically advance to the next series episode when the countdown ends.
+                  <p className="text-[11px] text-gray-400">
+                    Display the "Up Next" preview popup and advance automatically to next episode.
                   </p>
                 </div>
 
                 <button
                   onClick={() => handleUpdate({ autoplayNext: settings.autoplayNext === false ? true : false })}
-                  className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all tv-focus-target flex items-center gap-1.5 flex-shrink-0 border ${
+                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all tv-focus-target flex items-center gap-1.5 flex-shrink-0 border ${
                     settings.autoplayNext !== false
                       ? 'bg-emerald-500/20 border-emerald-400 text-emerald-400 shadow-md'
                       : 'bg-white/5 border-white/10 text-gray-400'
@@ -397,19 +397,19 @@ export const Settings: React.FC = () => {
                   {/* Row 2: Popup Trigger Timing (% of Episode) */}
                   <div
                     data-settings-row="true"
-                    className="bg-hbo-card border border-hbo-border rounded-2xl p-5 shadow-lg space-y-3"
+                    className="bg-hbo-card border border-hbo-border rounded-2xl p-4 shadow-lg space-y-2.5"
                   >
-                    <div className="flex items-center justify-between mb-1">
+                    <div className="flex items-center justify-between mb-0.5">
                       <div>
-                        <h4 className="text-xs font-bold text-gray-200 uppercase tracking-wider flex items-center gap-2">
-                          <Percent className="w-4 h-4 text-hbo-cyan flex-shrink-0" />
+                        <h4 className="text-xs font-bold text-gray-200 uppercase tracking-wider flex items-center gap-1.5">
+                          <Percent className="w-3.5 h-3.5 text-hbo-cyan flex-shrink-0" />
                           <span>Popup Trigger Timing (% of Episode)</span>
                         </h4>
-                        <p className="text-xs text-gray-400 mt-0.5">
-                          Playback completion percentage threshold when the "Up Next" popup should appear.
+                        <p className="text-[11px] text-gray-400 mt-0.5">
+                          Playback completion percentage when the "Up Next" popup appears.
                         </p>
                       </div>
-                      <span className="text-xs px-2.5 py-0.5 rounded-full bg-hbo-dark/90 border border-hbo-border text-hbo-cyan font-bold flex-shrink-0">
+                      <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-black/80 border border-hbo-border text-hbo-cyan font-bold flex-shrink-0">
                         {settings.upNextTriggerPercent || 90}% Progress
                       </span>
                     </div>
@@ -428,13 +428,13 @@ export const Settings: React.FC = () => {
                             key={opt.percent}
                             type="button"
                             onClick={() => handleUpdate({ upNextTriggerPercent: opt.percent })}
-                            className={`py-3 px-1.5 rounded-xl border text-center transition-all tv-focus-target flex flex-col items-center justify-center gap-1 ${
+                            className={`py-2.5 px-1.5 rounded-xl border text-center transition-all tv-focus-target flex flex-col items-center justify-center gap-0.5 ${
                               isSelected
                                 ? 'bg-hbo-purple/40 border-hbo-cyan text-white font-bold shadow-lg ring-1 ring-hbo-cyan/50'
                                 : 'bg-hbo-dark/60 border-hbo-border hover:bg-hbo-hover hover:border-white/20 text-gray-300'
                             }`}
                           >
-                            <span className="text-sm sm:text-base font-bold text-white leading-none">{opt.label}</span>
+                            <span className="text-sm font-bold text-white leading-none">{opt.label}</span>
                             <span className={`text-[9px] ${isSelected ? 'text-hbo-cyan font-semibold' : 'text-gray-500'}`}>
                               {opt.desc}
                             </span>
@@ -447,19 +447,19 @@ export const Settings: React.FC = () => {
                   {/* Row 3: Countdown Timeout Before Next Episode */}
                   <div
                     data-settings-row="true"
-                    className="bg-hbo-card border border-hbo-border rounded-2xl p-5 shadow-lg space-y-3"
+                    className="bg-hbo-card border border-hbo-border rounded-2xl p-4 shadow-lg space-y-2.5"
                   >
-                    <div className="flex items-center justify-between mb-1">
+                    <div className="flex items-center justify-between mb-0.5">
                       <div>
-                        <h4 className="text-xs font-bold text-gray-200 uppercase tracking-wider flex items-center gap-2">
-                          <Clock className="w-4 h-4 text-hbo-cyan flex-shrink-0" />
+                        <h4 className="text-xs font-bold text-gray-200 uppercase tracking-wider flex items-center gap-1.5">
+                          <Clock className="w-3.5 h-3.5 text-hbo-cyan flex-shrink-0" />
                           <span>Countdown Timeout Before Next Episode</span>
                         </h4>
-                        <p className="text-xs text-gray-400 mt-0.5">
-                          How many seconds the countdown timer displays before starting playback of the next episode.
+                        <p className="text-[11px] text-gray-400 mt-0.5">
+                          Seconds countdown timer displays before starting the next episode.
                         </p>
                       </div>
-                      <span className="text-xs px-2.5 py-0.5 rounded-full bg-hbo-dark/90 border border-hbo-border text-hbo-cyan font-bold flex-shrink-0">
+                      <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-black/80 border border-hbo-border text-hbo-cyan font-bold flex-shrink-0">
                         {settings.upNextTimeout || 10} Seconds
                       </span>
                     </div>
@@ -476,17 +476,17 @@ export const Settings: React.FC = () => {
                           <button
                             key={opt.seconds}
                             onClick={() => handleUpdate({ upNextTimeout: opt.seconds })}
-                            className={`p-3 rounded-xl border text-left transition-all tv-focus-target flex flex-col justify-between ${
+                            className={`p-2.5 rounded-xl border text-left transition-all tv-focus-target flex flex-col justify-between ${
                               isSelected
                                 ? 'bg-hbo-purple/40 border-hbo-purple-light text-white shadow-md ring-1 ring-hbo-purple-light/50'
                                 : 'bg-hbo-dark/60 border-hbo-border hover:bg-hbo-hover hover:border-white/20 text-gray-300'
                             }`}
                           >
-                            <div className="flex items-center justify-between mb-1">
-                              <span className="text-sm font-bold text-white">{opt.label}</span>
-                              {isSelected && <Check className="w-3.5 h-3.5 text-hbo-cyan flex-shrink-0" />}
+                            <div className="flex items-center justify-between mb-0.5">
+                              <span className="text-xs sm:text-sm font-bold text-white">{opt.label}</span>
+                              {isSelected && <Check className="w-3 h-3 text-hbo-cyan flex-shrink-0" />}
                             </div>
-                            <span className={`text-[10px] leading-snug ${isSelected ? 'text-hbo-cyan font-medium' : 'text-gray-400'}`}>
+                            <span className={`text-[9px] leading-snug ${isSelected ? 'text-hbo-cyan font-medium' : 'text-gray-400'}`}>
                               {opt.desc}
                             </span>
                           </button>
@@ -507,7 +507,7 @@ export const Settings: React.FC = () => {
                 return (
                   <div
                     data-settings-row="true"
-                    className="bg-hbo-card border border-hbo-border rounded-2xl p-5 shadow-lg"
+                    className="bg-hbo-card border border-hbo-border rounded-2xl p-4 shadow-lg"
                   >
                     <button
                       onClick={() => {
@@ -523,27 +523,27 @@ export const Settings: React.FC = () => {
                           streamResolver: updated[0] || 'embed'
                         });
                       }}
-                      className={`w-full p-4 rounded-xl border text-left transition-all tv-focus-target flex flex-col justify-between ${
+                      className={`w-full p-3.5 rounded-xl border text-left transition-all tv-focus-target flex flex-col justify-between ${
                         isTorboxEnabled
-                          ? 'bg-hbo-purple/30 border-hbo-cyan text-white shadow-hbo-glow'
+                          ? 'bg-hbo-purple/30 border-hbo-cyan text-white shadow-hbo-glow ring-1 ring-hbo-cyan/40'
                           : 'bg-black/30 border-hbo-border hover:border-gray-600 text-gray-500 opacity-60'
                       }`}
                     >
                       <div>
-                        <div className="flex items-center justify-between mb-1.5 gap-2">
+                        <div className="flex items-center justify-between mb-1 gap-2">
                           <div className="flex items-center gap-2 min-w-0">
                             <div className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 ${isTorboxEnabled ? 'bg-hbo-cyan border-hbo-cyan' : 'border-gray-600 bg-black/40'}`}>
-                              {isTorboxEnabled && <Check className="w-3.5 h-3.5 text-black stroke-[3]" />}
+                              {isTorboxEnabled && <Check className="w-3 h-3 text-black stroke-[3]" />}
                             </div>
-                            <span className="font-bold text-sm text-white truncate">TorBox Debrid Stream Engine</span>
+                            <span className="font-bold text-xs sm:text-sm text-white truncate">TorBox Debrid Stream Engine</span>
                           </div>
-                          <span className={`text-[10px] px-2 py-0.5 rounded font-mono font-bold flex-shrink-0 ${isTorboxEnabled ? 'bg-hbo-cyan/20 text-hbo-cyan border border-hbo-cyan/40' : 'bg-gray-800 text-gray-500'}`}>
+                          <span className={`text-[9px] px-2 py-0.5 rounded font-mono font-bold flex-shrink-0 ${isTorboxEnabled ? 'bg-hbo-cyan/20 text-hbo-cyan border border-hbo-cyan/40' : 'bg-gray-800 text-gray-500'}`}>
                             4K Ultra HD
                           </span>
                         </div>
-                        <p className="text-xs text-gray-300 leading-relaxed mt-1">Ultra-fast direct HTTPS 4K HDR & 1080p BluRay cloud streams via TorBox CDN.</p>
+                        <p className="text-[11px] text-gray-300 leading-relaxed">Direct HTTPS 4K HDR & 1080p BluRay cloud streams via TorBox CDN.</p>
                       </div>
-                      <div className="mt-2.5 flex items-center justify-between text-[11px] font-bold">
+                      <div className="mt-2 flex items-center justify-between text-[10px] font-bold">
                         <span className={isTorboxEnabled ? 'text-hbo-cyan' : 'text-gray-500'}>#1 Priority Engine</span>
                         <span className={isTorboxEnabled ? 'text-emerald-400' : 'text-gray-500'}>{isTorboxEnabled ? '● Enabled' : '○ Disabled'}</span>
                       </div>
@@ -556,10 +556,10 @@ export const Settings: React.FC = () => {
               {(settings.enabledResolvers || []).includes('torbox') && (
                 <div
                   data-settings-row="true"
-                  className="bg-hbo-card border border-emerald-500/40 rounded-2xl p-5 shadow-lg space-y-2"
+                  className="bg-hbo-card border border-emerald-500/40 rounded-2xl p-4 shadow-lg space-y-1.5"
                 >
                   <p className="font-bold text-xs text-emerald-400 flex items-center gap-1.5">
-                    <Radio className="w-4 h-4 text-emerald-400" />
+                    <Radio className="w-3.5 h-3.5 text-emerald-400" />
                     <span>TorBox Debrid API Key</span>
                   </p>
                   <input
@@ -567,7 +567,7 @@ export const Settings: React.FC = () => {
                     placeholder="Paste your TorBox API Key here..."
                     value={settings.torboxApiKey || ''}
                     onChange={(e) => handleUpdate({ torboxApiKey: e.target.value })}
-                    className="w-full bg-black/60 border border-gray-700 focus:border-emerald-400 text-white px-3.5 py-2.5 rounded-xl text-xs font-mono outline-none tv-focus-target"
+                    className="w-full bg-black/60 border border-gray-700 focus:border-emerald-400 text-white px-3 py-2 rounded-xl text-xs font-mono outline-none tv-focus-target"
                   />
                 </div>
               )}
@@ -582,7 +582,7 @@ export const Settings: React.FC = () => {
                 return (
                   <div
                     data-settings-row="true"
-                    className="bg-hbo-card border border-hbo-border rounded-2xl p-5 shadow-lg"
+                    className="bg-hbo-card border border-hbo-border rounded-2xl p-4 shadow-lg"
                   >
                     <button
                       onClick={() => {
@@ -598,27 +598,27 @@ export const Settings: React.FC = () => {
                           streamResolver: updated[0] || 'embed'
                         });
                       }}
-                      className={`w-full p-4 rounded-xl border text-left transition-all tv-focus-target flex flex-col justify-between ${
+                      className={`w-full p-3.5 rounded-xl border text-left transition-all tv-focus-target flex flex-col justify-between ${
                         isExtractorEnabled
-                          ? 'bg-hbo-purple/30 border-hbo-cyan text-white shadow-hbo-glow'
+                          ? 'bg-hbo-purple/30 border-hbo-cyan text-white shadow-hbo-glow ring-1 ring-hbo-cyan/40'
                           : 'bg-black/30 border-hbo-border hover:border-gray-600 text-gray-500 opacity-60'
                       }`}
                     >
                       <div>
-                        <div className="flex items-center justify-between mb-1.5 gap-2">
+                        <div className="flex items-center justify-between mb-1 gap-2">
                           <div className="flex items-center gap-2 min-w-0">
                             <div className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 ${isExtractorEnabled ? 'bg-hbo-cyan border-hbo-cyan' : 'border-gray-600 bg-black/40'}`}>
-                              {isExtractorEnabled && <Check className="w-3.5 h-3.5 text-black stroke-[3]" />}
+                              {isExtractorEnabled && <Check className="w-3 h-3 text-black stroke-[3]" />}
                             </div>
-                            <span className="font-bold text-sm text-white truncate">Private Extractor Stream Engine</span>
+                            <span className="font-bold text-xs sm:text-sm text-white truncate">Private Extractor Stream Engine</span>
                           </div>
-                          <span className={`text-[10px] px-2 py-0.5 rounded font-mono font-bold flex-shrink-0 ${isExtractorEnabled ? 'bg-hbo-cyan/20 text-hbo-cyan border border-hbo-cyan/40' : 'bg-gray-800 text-gray-500'}`}>
+                          <span className={`text-[9px] px-2 py-0.5 rounded font-mono font-bold flex-shrink-0 ${isExtractorEnabled ? 'bg-hbo-cyan/20 text-hbo-cyan border border-hbo-cyan/40' : 'bg-gray-800 text-gray-500'}`}>
                             Consumet API
                           </span>
                         </div>
-                        <p className="text-xs text-gray-300 leading-relaxed mt-1">Direct HLS .m3u8 streams resolved via your private backend (Render API).</p>
+                        <p className="text-[11px] text-gray-300 leading-relaxed">Direct HLS .m3u8 streams resolved via your private backend (Render API).</p>
                       </div>
-                      <div className="mt-2.5 flex items-center justify-between text-[11px] font-bold">
+                      <div className="mt-2 flex items-center justify-between text-[10px] font-bold">
                         <span className={isExtractorEnabled ? 'text-hbo-cyan' : 'text-gray-500'}>#2 Priority Engine</span>
                         <span className={isExtractorEnabled ? 'text-emerald-400' : 'text-gray-500'}>{isExtractorEnabled ? '● Enabled' : '○ Disabled'}</span>
                       </div>
@@ -637,7 +637,7 @@ export const Settings: React.FC = () => {
                 return (
                   <div
                     data-settings-row="true"
-                    className="bg-hbo-card border border-hbo-border rounded-2xl p-5 shadow-lg"
+                    className="bg-hbo-card border border-hbo-border rounded-2xl p-4 shadow-lg"
                   >
                     <button
                       onClick={() => {
@@ -653,27 +653,27 @@ export const Settings: React.FC = () => {
                           streamResolver: updated[0] || 'embed'
                         });
                       }}
-                      className={`w-full p-4 rounded-xl border text-left transition-all tv-focus-target flex flex-col justify-between ${
+                      className={`w-full p-3.5 rounded-xl border text-left transition-all tv-focus-target flex flex-col justify-between ${
                         isEmbedEnabled
-                          ? 'bg-hbo-purple/30 border-hbo-cyan text-white shadow-hbo-glow'
+                          ? 'bg-hbo-purple/30 border-hbo-cyan text-white shadow-hbo-glow ring-1 ring-hbo-cyan/40'
                           : 'bg-black/30 border-hbo-border hover:border-gray-600 text-gray-500 opacity-60'
                       }`}
                     >
                       <div>
-                        <div className="flex items-center justify-between mb-1.5 gap-2">
+                        <div className="flex items-center justify-between mb-1 gap-2">
                           <div className="flex items-center gap-2 min-w-0">
                             <div className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 ${isEmbedEnabled ? 'bg-hbo-cyan border-hbo-cyan' : 'border-gray-600 bg-black/40'}`}>
-                              {isEmbedEnabled && <Check className="w-3.5 h-3.5 text-black stroke-[3]" />}
+                              {isEmbedEnabled && <Check className="w-3 h-3 text-black stroke-[3]" />}
                             </div>
-                            <span className="font-bold text-sm text-white truncate">Embed Resolver Stream Engine</span>
+                            <span className="font-bold text-xs sm:text-sm text-white truncate">Embed Resolver Stream Engine</span>
                           </div>
-                          <span className={`text-[10px] px-2 py-0.5 rounded font-mono font-bold flex-shrink-0 ${isEmbedEnabled ? 'bg-hbo-cyan/20 text-hbo-cyan border border-hbo-cyan/40' : 'bg-gray-800 text-gray-500'}`}>
+                          <span className={`text-[9px] px-2 py-0.5 rounded font-mono font-bold flex-shrink-0 ${isEmbedEnabled ? 'bg-hbo-cyan/20 text-hbo-cyan border border-hbo-cyan/40' : 'bg-gray-800 text-gray-500'}`}>
                             Multi-Mirror
                           </span>
                         </div>
-                        <p className="text-xs text-gray-300 leading-relaxed mt-1">Standard multi-server iframe embeds (VidLink, MoviesAPI) with ad & popup sandboxing.</p>
+                        <p className="text-[11px] text-gray-300 leading-relaxed">Standard multi-server iframe embeds (VidLink, MoviesAPI) with ad & popup sandboxing.</p>
                       </div>
-                      <div className="mt-2.5 flex items-center justify-between text-[11px] font-bold">
+                      <div className="mt-2 flex items-center justify-between text-[10px] font-bold">
                         <span className={isEmbedEnabled ? 'text-hbo-cyan' : 'text-gray-500'}>#3 Priority Engine</span>
                         <span className={isEmbedEnabled ? 'text-emerald-400' : 'text-gray-500'}>{isEmbedEnabled ? '● Enabled' : '○ Disabled'}</span>
                       </div>
@@ -685,24 +685,24 @@ export const Settings: React.FC = () => {
               {/* Row 8: Embed Resolver Priority Server Slots */}
               <div
                 data-settings-row="true"
-                className="bg-hbo-card border border-hbo-border rounded-2xl p-5 shadow-lg space-y-3"
+                className="bg-hbo-card border border-hbo-border rounded-2xl p-4 shadow-lg space-y-2.5"
               >
-                <div className="flex items-center justify-between mb-1">
+                <div className="flex items-center justify-between mb-0.5">
                   <div>
-                    <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                      <Server className="w-4 h-4 text-hbo-cyan flex-shrink-0" />
+                    <h3 className="text-xs sm:text-sm font-bold text-white flex items-center gap-1.5">
+                      <Server className="w-3.5 h-3.5 text-hbo-cyan flex-shrink-0" />
                       <span>Embed Resolver Priority Servers</span>
                     </h3>
-                    <p className="text-xs text-gray-400 mt-0.5">
-                      Choose the 3 primary fallback embed servers when playing through the Embed Resolver.
+                    <p className="text-[11px] text-gray-400 mt-0.5">
+                      Choose the 3 primary fallback embed servers for Embed Resolver playback.
                     </p>
                   </div>
-                  <span className="text-xs px-2.5 py-0.5 rounded-full bg-hbo-purple/30 border border-hbo-purple/50 text-hbo-cyan font-bold flex-shrink-0">
+                  <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-hbo-purple/30 border border-hbo-purple/50 text-hbo-cyan font-bold flex-shrink-0">
                     {STREAM_PROVIDERS.length} Servers Available
                   </span>
                 </div>
 
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-3 gap-2.5">
                   {[
                     { index: 0, priorityLabel: '#1 Priority (Primary)', badgeClass: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40', defaultId: 'vidlink' },
                     { index: 1, priorityLabel: '#2 Priority (Failover 1)', badgeClass: 'bg-hbo-purple/30 text-hbo-purple-light border-hbo-purple/40', defaultId: 'moviesapi' },
@@ -717,10 +717,10 @@ export const Settings: React.FC = () => {
                     return (
                       <div
                         key={index}
-                        className="bg-hbo-dark/70 border border-hbo-border/90 rounded-xl p-3 flex flex-col justify-between gap-2"
+                        className="bg-hbo-dark/70 border border-hbo-border/90 rounded-xl p-2.5 flex flex-col justify-between gap-1.5"
                       >
-                        <div className="flex items-center justify-between gap-2">
-                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md border ${badgeClass}`}>
+                        <div className="flex items-center justify-between gap-1">
+                          <span className={`text-[9px] font-bold px-2 py-0.5 rounded-md border ${badgeClass}`}>
                             {priorityLabel}
                           </span>
                         </div>
@@ -730,10 +730,10 @@ export const Settings: React.FC = () => {
                             type="button"
                             id={`priority-server-btn-${index}`}
                             onClick={() => setOpenDropdownSlot(openDropdownSlot === index ? null : index)}
-                            className="w-full flex items-center justify-between bg-hbo-card/90 border border-hbo-border text-white text-xs font-bold rounded-xl px-3 py-2.5 hover:bg-hbo-hover hover:border-hbo-cyan focus:outline-none focus:border-hbo-cyan focus:ring-2 focus:ring-hbo-cyan transition-all tv-focus-target"
+                            className="w-full flex items-center justify-between bg-hbo-card/90 border border-hbo-border text-white text-xs font-bold rounded-xl px-2.5 py-2 hover:bg-hbo-hover hover:border-hbo-cyan focus:outline-none focus:border-hbo-cyan focus:ring-2 focus:ring-hbo-cyan transition-all tv-focus-target"
                           >
-                            <span className="truncate pr-2 text-xs">{selectedProviderObj.name}</span>
-                            <ChevronDown className={`w-3.5 h-3.5 text-gray-400 flex-shrink-0 transition-transform ${openDropdownSlot === index ? 'rotate-180 text-hbo-cyan' : ''}`} />
+                            <span className="truncate pr-1 text-xs">{selectedProviderObj.name}</span>
+                            <ChevronDown className={`w-3 h-3 text-gray-400 flex-shrink-0 transition-transform ${openDropdownSlot === index ? 'rotate-180 text-hbo-cyan' : ''}`} />
                           </button>
 
                           {openDropdownSlot === index && (
@@ -758,7 +758,7 @@ export const Settings: React.FC = () => {
                                         document.getElementById(`priority-server-btn-${index}`)?.focus();
                                       }, 50);
                                     }}
-                                    className={`w-full flex items-center justify-between gap-3 px-3.5 py-2.5 rounded-xl text-left text-xs transition-all tv-focus-target ${
+                                    className={`w-full flex items-center justify-between gap-3 px-3 py-2 rounded-xl text-left text-xs transition-all tv-focus-target ${
                                       isSelected
                                         ? 'bg-hbo-purple/40 border border-hbo-cyan/60 text-white font-bold'
                                         : 'text-gray-300 hover:bg-hbo-hover hover:text-white border border-transparent'
@@ -767,9 +767,9 @@ export const Settings: React.FC = () => {
                                     <div className="min-w-0 flex-1">
                                       <div className="flex items-center justify-between gap-1.5">
                                         <span className="font-bold text-white block text-xs truncate">{provider.name}</span>
-                                        {isSelected && <Check className="w-3.5 h-3.5 text-hbo-cyan flex-shrink-0" />}
+                                        {isSelected && <Check className="w-3 h-3 text-hbo-cyan flex-shrink-0" />}
                                       </div>
-                                      <span className="text-[10px] text-gray-400 block leading-normal mt-0.5 truncate">{provider.tagline}</span>
+                                      <span className="text-[9px] text-gray-400 block leading-normal mt-0.5 truncate">{provider.tagline}</span>
                                     </div>
                                   </button>
                                 );
@@ -786,21 +786,21 @@ export const Settings: React.FC = () => {
               {/* Row 9: Ad & Popup Sandboxing Shield */}
               <div
                 data-settings-row="true"
-                className="bg-hbo-card border border-hbo-border rounded-2xl p-5 shadow-lg flex items-center justify-between gap-4"
+                className="bg-hbo-card border border-hbo-border rounded-2xl p-4 shadow-lg flex items-center justify-between gap-4"
               >
                 <div className="flex-1 min-w-0 pr-2">
-                  <h3 className="text-base font-bold font-display text-white flex items-center gap-2.5 mb-0.5">
-                    <ShieldCheck className="w-5 h-5 text-green-400 flex-shrink-0" />
+                  <h3 className="text-sm sm:text-base font-bold font-display text-white flex items-center gap-2 mb-0.5">
+                    <ShieldCheck className="w-4.5 h-4.5 text-green-400 flex-shrink-0" />
                     <span>Ad & Popup Sandboxing</span>
                   </h3>
-                  <p className="text-xs text-gray-400">
+                  <p className="text-[11px] text-gray-400">
                     Restricts iframe popups, new window triggers, and click hijacking.
                   </p>
                 </div>
 
                 <button
                   onClick={() => handleUpdate({ adBlockShield: !settings.adBlockShield })}
-                  className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all tv-focus-target flex items-center gap-1.5 flex-shrink-0 border ${
+                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all tv-focus-target flex items-center gap-1.5 flex-shrink-0 border ${
                     settings.adBlockShield
                       ? 'bg-emerald-500/20 border-emerald-400 text-emerald-400 shadow-md'
                       : 'bg-white/5 border-white/10 text-gray-400'
@@ -826,28 +826,28 @@ export const Settings: React.FC = () => {
           {/* 2. DISPLAY & UI PANEL                                                    */}
           {/* ========================================================================= */}
           {activeCategory === 'display' && (
-            <div className="space-y-4 animate-fade-in">
+            <div className="space-y-3.5 animate-fade-in">
               {/* Row 1: Device Experience Mode */}
               <div
                 data-settings-row="true"
-                className="bg-hbo-card border border-hbo-border rounded-2xl p-5 shadow-lg space-y-3"
+                className="bg-hbo-card border border-hbo-border rounded-2xl p-4 shadow-lg space-y-2.5"
               >
-                <div className="flex items-center justify-between mb-1">
+                <div className="flex items-center justify-between mb-0.5">
                   <div>
-                    <h3 className="text-base font-bold font-display text-white flex items-center gap-2.5">
-                      <Tv2 className="w-5 h-5 text-hbo-cyan flex-shrink-0" />
+                    <h3 className="text-sm sm:text-base font-bold font-display text-white flex items-center gap-2">
+                      <Tv2 className="w-4.5 h-4.5 text-hbo-cyan flex-shrink-0" />
                       <span>Device Experience Mode</span>
                     </h3>
-                    <p className="text-xs text-gray-400 mt-0.5">
+                    <p className="text-[11px] text-gray-400 mt-0.5">
                       Select your preferred display format or keep Auto-Detect for responsive switching.
                     </p>
                   </div>
-                  <span className="text-xs px-3 py-1 rounded-full bg-hbo-dark/90 border border-hbo-border text-hbo-cyan font-semibold flex-shrink-0">
+                  <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-black/80 border border-hbo-border text-hbo-cyan font-semibold flex-shrink-0">
                     Active: {activeLayout.toUpperCase()} ({settings.deviceMode === 'auto' ? 'Auto' : 'Override'})
                   </span>
                 </div>
 
-                <div className="grid grid-cols-5 gap-3">
+                <div className="grid grid-cols-5 gap-2.5">
                   {[
                     { id: 'auto', label: 'Auto Detect', icon: Monitor, desc: `Live: ${detectedPlatform.toUpperCase()}` },
                     { id: 'tv', label: 'Android TV', icon: Tv2, desc: 'D-Pad spatial focus' },
@@ -861,23 +861,23 @@ export const Settings: React.FC = () => {
                       <button
                         key={mode.id}
                         onClick={() => handleUpdate({ deviceMode: mode.id as any })}
-                        className={`p-3.5 rounded-xl border text-left transition-all tv-focus-target flex flex-col justify-between min-h-[90px] ${
+                        className={`p-3 rounded-xl border text-left transition-all tv-focus-target flex flex-col justify-between min-h-[84px] ${
                           isSelected
                             ? 'bg-gradient-to-r from-hbo-purple/40 to-hbo-cyan/20 border-hbo-cyan shadow-hbo-glow ring-1 ring-hbo-cyan/50'
                             : 'bg-hbo-dark/60 border-hbo-border hover:bg-hbo-hover hover:border-white/20'
                         }`}
                       >
-                        <div className="flex items-center justify-between w-full mb-1.5">
-                          <Icon className={`w-5 h-5 flex-shrink-0 ${isSelected ? 'text-hbo-cyan' : 'text-gray-400'}`} />
+                        <div className="flex items-center justify-between w-full mb-1">
+                          <Icon className={`w-4.5 h-4.5 flex-shrink-0 ${isSelected ? 'text-hbo-cyan' : 'text-gray-400'}`} />
                           {isSelected && (
-                            <span className="w-4 h-4 rounded-full bg-hbo-cyan text-black flex items-center justify-center flex-shrink-0 shadow-sm">
+                            <span className="w-3.5 h-3.5 rounded-full bg-hbo-cyan text-black flex items-center justify-center flex-shrink-0 shadow-sm">
                               <Check className="w-2.5 h-2.5 stroke-[3]" />
                             </span>
                           )}
                         </div>
                         <div>
                           <p className="text-xs font-bold text-white leading-tight">{mode.label}</p>
-                          <p className={`text-[10px] mt-0.5 leading-snug ${isSelected ? 'text-hbo-cyan font-semibold' : 'text-gray-400'}`}>
+                          <p className={`text-[9px] mt-0.5 leading-snug ${isSelected ? 'text-hbo-cyan font-semibold' : 'text-gray-400'}`}>
                             {mode.desc}
                           </p>
                         </div>
@@ -890,24 +890,24 @@ export const Settings: React.FC = () => {
               {/* Row 2: Stream Header Auto-Hide Timeout */}
               <div
                 data-settings-row="true"
-                className="bg-hbo-card border border-hbo-border rounded-2xl p-5 shadow-lg space-y-3"
+                className="bg-hbo-card border border-hbo-border rounded-2xl p-4 shadow-lg space-y-2.5"
               >
-                <div className="flex items-center justify-between mb-1">
+                <div className="flex items-center justify-between mb-0.5">
                   <div>
-                    <h3 className="text-base font-bold font-display text-white flex items-center gap-2.5">
-                      <EyeOff className="w-5 h-5 text-hbo-cyan flex-shrink-0" />
+                    <h3 className="text-sm sm:text-base font-bold font-display text-white flex items-center gap-2">
+                      <EyeOff className="w-4.5 h-4.5 text-hbo-cyan flex-shrink-0" />
                       <span>Stream Header Auto-Hide Timeout</span>
                     </h3>
-                    <p className="text-xs text-gray-400 mt-0.5">
-                      Automatically fade out the top overlay header while streaming. Press remote Back or D-Pad to reveal anytime.
+                    <p className="text-[11px] text-gray-400 mt-0.5">
+                      Automatically fade out top header while playing. Press remote Back to reveal.
                     </p>
                   </div>
-                  <span className="text-xs px-3 py-1 rounded-full bg-hbo-dark/90 border border-hbo-border text-hbo-cyan font-semibold flex-shrink-0">
+                  <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-black/80 border border-hbo-border text-hbo-cyan font-semibold flex-shrink-0">
                     {(settings.streamHeaderTimeout || 5) === 0 ? 'Always Visible' : `${settings.streamHeaderTimeout || 5} Seconds`}
                   </span>
                 </div>
 
-                <div className="grid grid-cols-4 gap-3">
+                <div className="grid grid-cols-4 gap-2.5">
                   {[
                     { seconds: 3, label: '3 Seconds', desc: 'Quick fade out' },
                     { seconds: 5, label: '5 Seconds (Default)', desc: 'Standard cinema mode' },
@@ -919,7 +919,7 @@ export const Settings: React.FC = () => {
                       <button
                         key={opt.seconds}
                         onClick={() => handleUpdate({ streamHeaderTimeout: opt.seconds })}
-                        className={`p-3.5 rounded-xl border text-left transition-all tv-focus-target min-h-[72px] flex flex-col justify-between ${
+                        className={`p-3 rounded-xl border text-left transition-all tv-focus-target min-h-[68px] flex flex-col justify-between ${
                           isSelected
                             ? 'bg-hbo-cyan/20 border-hbo-cyan text-white shadow-hbo-glow ring-1 ring-hbo-cyan/50'
                             : 'bg-hbo-dark/60 border-hbo-border text-gray-400 hover:text-gray-200 hover:border-white/20'
@@ -928,7 +928,7 @@ export const Settings: React.FC = () => {
                         <p className={`text-xs font-bold ${isSelected ? 'text-hbo-cyan' : 'text-white'}`}>
                           {opt.label}
                         </p>
-                        <p className="text-[10px] text-gray-400 mt-0.5 leading-snug">{opt.desc}</p>
+                        <p className="text-[9px] text-gray-400 mt-0.5 leading-snug">{opt.desc}</p>
                       </button>
                     );
                   })}
@@ -938,26 +938,26 @@ export const Settings: React.FC = () => {
               {/* Row 3: UI Performance Mode */}
               <div
                 data-settings-row="true"
-                className="bg-hbo-card border border-hbo-border rounded-2xl p-5 shadow-lg flex items-center justify-between gap-4"
+                className="bg-hbo-card border border-hbo-border rounded-2xl p-4 shadow-lg flex items-center justify-between gap-4"
               >
                 <div className="flex-1 min-w-0 pr-2">
                   <div className="flex items-center gap-2 mb-0.5 flex-wrap">
-                    <h3 className="text-base font-bold font-display text-white flex items-center gap-2.5">
-                      <Zap className="w-5 h-5 text-hbo-cyan flex-shrink-0" />
+                    <h3 className="text-sm sm:text-base font-bold font-display text-white flex items-center gap-2">
+                      <Zap className="w-4.5 h-4.5 text-hbo-cyan flex-shrink-0" />
                       <span>UI Performance Mode (Lite Graphics)</span>
                     </h3>
-                    <span className="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-white/10 text-gray-300 border border-white/20">
+                    <span className="px-2 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wider bg-white/10 text-gray-300 border border-white/20">
                       Recommended: ON
                     </span>
                   </div>
-                  <p className="text-xs text-gray-400">
-                    Optimizes framerate on budget TV hardware by disabling GPU backdrop blurs and complex shadows.
+                  <p className="text-[11px] text-gray-400">
+                    Optimizes framerate on budget TV hardware by disabling GPU backdrop blurs.
                   </p>
                 </div>
 
                 <button
                   onClick={() => handleUpdate({ performanceMode: !(settings.performanceMode ?? true) })}
-                  className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all tv-focus-target flex items-center gap-1.5 flex-shrink-0 border ${
+                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all tv-focus-target flex items-center gap-1.5 flex-shrink-0 border ${
                     (settings.performanceMode ?? true)
                       ? 'bg-emerald-500/20 border-emerald-400 text-emerald-400 shadow-md'
                       : 'bg-white/5 border-white/10 text-gray-400'
@@ -983,30 +983,30 @@ export const Settings: React.FC = () => {
           {/* 3. REMOTE & VIRTUAL CURSOR PANEL                                         */}
           {/* ========================================================================= */}
           {activeCategory === 'controls' && (
-            <div className="space-y-4 animate-fade-in">
+            <div className="space-y-3.5 animate-fade-in">
               {/* Row 1: On-Demand Virtual Cursor Toggle */}
               <div
                 data-settings-row="true"
-                className="bg-hbo-card border border-hbo-border rounded-2xl p-5 shadow-lg flex items-center justify-between gap-4"
+                className="bg-hbo-card border border-hbo-border rounded-2xl p-4 shadow-lg flex items-center justify-between gap-4"
               >
                 <div className="flex-1 min-w-0 pr-2">
                   <div className="flex items-center gap-2 mb-0.5">
-                    <h3 className="text-base font-bold font-display text-white flex items-center gap-2.5">
-                      <MousePointer className="w-5 h-5 text-hbo-cyan flex-shrink-0" />
+                    <h3 className="text-sm sm:text-base font-bold font-display text-white flex items-center gap-2">
+                      <MousePointer className="w-4.5 h-4.5 text-hbo-cyan flex-shrink-0" />
                       <span>On-Demand Virtual Cursor (TV Player)</span>
                     </h3>
-                    <span className="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-hbo-cyan/20 text-hbo-cyan border border-hbo-cyan/40">
+                    <span className="px-2 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wider bg-hbo-cyan/20 text-hbo-cyan border border-hbo-cyan/40">
                       TV Only
                     </span>
                   </div>
-                  <p className="text-xs text-gray-400">
-                    Control unclickable web player dialogs (like server audio or quality pickers) using your remote D-pad as an on-screen mouse pointer.
+                  <p className="text-[11px] text-gray-400">
+                    Control unclickable web player dialogs using remote D-pad as a mouse pointer.
                   </p>
                 </div>
 
                 <button
                   onClick={() => handleUpdate({ virtualCursorEnabled: !(settings.virtualCursorEnabled ?? true) })}
-                  className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all tv-focus-target flex items-center gap-1.5 flex-shrink-0 border ${
+                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all tv-focus-target flex items-center gap-1.5 flex-shrink-0 border ${
                     (settings.virtualCursorEnabled ?? true)
                       ? 'bg-emerald-500/20 border-emerald-400 text-emerald-400 shadow-md'
                       : 'bg-white/5 border-white/10 text-gray-400'
@@ -1031,17 +1031,17 @@ export const Settings: React.FC = () => {
                   {/* Row 2: Activation Trigger Mode */}
                   <div
                     data-settings-row="true"
-                    className="bg-hbo-card border border-hbo-border rounded-2xl p-5 shadow-lg space-y-3"
+                    className="bg-hbo-card border border-hbo-border rounded-2xl p-4 shadow-lg space-y-2.5"
                   >
                     <div>
-                      <h4 className="text-xs font-bold text-gray-200 uppercase tracking-wider flex items-center gap-2">
-                        <Radio className="w-4 h-4 text-hbo-cyan flex-shrink-0" />
+                      <h4 className="text-xs font-bold text-gray-200 uppercase tracking-wider flex items-center gap-1.5">
+                        <Radio className="w-3.5 h-3.5 text-hbo-cyan flex-shrink-0" />
                         <span>Activation Trigger</span>
                       </h4>
-                      <p className="text-xs text-gray-400 mt-0.5">How the virtual cursor is activated while watching a video.</p>
+                      <p className="text-[11px] text-gray-400 mt-0.5">How the virtual cursor is activated while watching a video.</p>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-3 max-w-md">
+                    <div className="grid grid-cols-2 gap-2.5 max-w-md">
                       {[
                         { clicks: 2 as const, label: 'Double OK Press', desc: 'Press OK twice quickly' },
                         { clicks: 3 as const, label: 'Triple OK Press', desc: 'Press OK 3 times' },
@@ -1051,14 +1051,14 @@ export const Settings: React.FC = () => {
                           <button
                             key={mode.clicks}
                             onClick={() => handleUpdate({ virtualCursorClicks: mode.clicks })}
-                            className={`p-3 rounded-xl border text-center text-xs font-bold transition-all tv-focus-target ${
+                            className={`p-2.5 rounded-xl border text-center text-xs font-bold transition-all tv-focus-target ${
                               isSel
                                 ? 'bg-hbo-purple/40 border-hbo-cyan text-white shadow-md ring-1 ring-hbo-cyan/50'
                                 : 'bg-hbo-dark/60 border-hbo-border text-gray-400 hover:text-white'
                             }`}
                           >
-                            <p className="text-sm font-bold text-white leading-tight">{mode.label}</p>
-                            <p className={`text-[10px] mt-0.5 ${isSel ? 'text-hbo-cyan' : 'text-gray-400'}`}>{mode.desc}</p>
+                            <p className="text-xs sm:text-sm font-bold text-white leading-tight">{mode.label}</p>
+                            <p className={`text-[9px] mt-0.5 ${isSel ? 'text-hbo-cyan' : 'text-gray-400'}`}>{mode.desc}</p>
                           </button>
                         );
                       })}
@@ -1068,24 +1068,24 @@ export const Settings: React.FC = () => {
                   {/* Row 3: Cursor Reticle Style */}
                   <div
                     data-settings-row="true"
-                    className="bg-hbo-card border border-hbo-border rounded-2xl p-5 shadow-lg space-y-3"
+                    className="bg-hbo-card border border-hbo-border rounded-2xl p-4 shadow-lg space-y-2.5"
                   >
                     <div>
-                      <h4 className="text-xs font-bold text-gray-200 uppercase tracking-wider flex items-center gap-2">
-                        <Sparkles className="w-4 h-4 text-hbo-cyan flex-shrink-0" />
+                      <h4 className="text-xs font-bold text-gray-200 uppercase tracking-wider flex items-center gap-1.5">
+                        <Sparkles className="w-3.5 h-3.5 text-hbo-cyan flex-shrink-0" />
                         <span>Cursor Reticle Style</span>
                       </h4>
-                      <p className="text-xs text-gray-400 mt-0.5">Visual look and accent colors of the TV mouse pointer.</p>
+                      <p className="text-[11px] text-gray-400 mt-0.5">Visual look and accent colors of the TV mouse pointer.</p>
                     </div>
 
-                    <div className="grid grid-cols-4 gap-3">
+                    <div className="grid grid-cols-4 gap-2.5">
                       {CURSOR_STYLES_LIST.slice(0, 4).map((style) => {
                         const isSel = (settings.virtualCursorStyle || 'hbo_max') === style.id;
                         return (
                           <button
                             key={style.id}
                             onClick={() => handleUpdate({ virtualCursorStyle: style.id as any })}
-                            className={`p-3.5 rounded-xl border text-left text-xs font-bold transition-all tv-focus-target min-h-[64px] flex flex-col justify-between ${
+                            className={`p-3 rounded-xl border text-left text-xs font-bold transition-all tv-focus-target min-h-[60px] flex flex-col justify-between ${
                               isSel
                                 ? 'bg-hbo-purple/40 border-hbo-cyan text-white shadow-md ring-1 ring-hbo-cyan/50'
                                 : 'bg-hbo-dark/60 border-hbo-border text-gray-400 hover:text-white'
@@ -1093,9 +1093,9 @@ export const Settings: React.FC = () => {
                           >
                             <div className="flex items-center justify-between w-full">
                               <span className="text-xs font-bold text-white truncate">{style.name}</span>
-                              {isSel && <Check className="w-3.5 h-3.5 text-hbo-cyan flex-shrink-0" />}
+                              {isSel && <Check className="w-3 h-3 text-hbo-cyan flex-shrink-0" />}
                             </div>
-                            <span className={`text-[10px] ${isSel ? 'text-hbo-cyan' : 'text-gray-400'}`}>{style.desc}</span>
+                            <span className={`text-[9px] ${isSel ? 'text-hbo-cyan' : 'text-gray-400'}`}>{style.desc}</span>
                           </button>
                         );
                       })}
@@ -1110,23 +1110,23 @@ export const Settings: React.FC = () => {
           {/* 4. CONTENT CONTROLS PANEL                                                */}
           {/* ========================================================================= */}
           {activeCategory === 'content' && (
-            <div className="space-y-4 animate-fade-in">
+            <div className="space-y-3.5 animate-fade-in">
               {/* Row 1: Catalog Maturity Level */}
               <div
                 data-settings-row="true"
-                className="bg-hbo-card border border-hbo-border rounded-2xl p-5 shadow-lg space-y-3"
+                className="bg-hbo-card border border-hbo-border rounded-2xl p-4 shadow-lg space-y-2.5"
               >
                 <div>
-                  <h3 className="text-base font-bold font-display text-white flex items-center gap-2.5">
-                    <Lock className="w-5 h-5 text-hbo-cyan flex-shrink-0" />
+                  <h3 className="text-sm sm:text-base font-bold font-display text-white flex items-center gap-2">
+                    <Lock className="w-4.5 h-4.5 text-hbo-cyan flex-shrink-0" />
                     <span>Catalog Maturity Level / Parental Filter</span>
                   </h3>
-                  <p className="text-xs text-gray-400 mt-0.5">
+                  <p className="text-[11px] text-gray-400 mt-0.5">
                     Limit discovery catalog recommendations to age-appropriate certification tiers.
                   </p>
                 </div>
 
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-3 gap-2.5">
                   {[
                     { id: 'all', label: 'All Ratings', desc: 'Unrestricted (R, TV-MA, PG-13, PG, G)' },
                     { id: 'pg13', label: 'Teens & Below', desc: 'Up to PG-13 / TV-14 (Excludes R & TV-MA)' },
@@ -1137,19 +1137,19 @@ export const Settings: React.FC = () => {
                       <button
                         key={lvl.id}
                         onClick={() => handleUpdate({ maturityLevel: lvl.id as any })}
-                        className={`p-3.5 rounded-xl border text-left transition-all tv-focus-target min-h-[72px] flex flex-col justify-between ${
+                        className={`p-3 rounded-xl border text-left transition-all tv-focus-target min-h-[68px] flex flex-col justify-between ${
                           isSelected
                             ? 'bg-hbo-cyan/20 border-hbo-cyan text-white shadow-hbo-glow ring-1 ring-hbo-cyan/50'
                             : 'bg-hbo-dark/60 border-hbo-border text-gray-400 hover:text-gray-200'
                         }`}
                       >
-                        <div className="flex items-center justify-between mb-1">
+                        <div className="flex items-center justify-between mb-0.5">
                           <p className={`text-xs font-bold ${isSelected ? 'text-hbo-cyan' : 'text-white'}`}>
                             {lvl.label}
                           </p>
-                          {isSelected && <Check className="w-3.5 h-3.5 text-hbo-cyan stroke-[3]" />}
+                          {isSelected && <Check className="w-3 h-3 text-hbo-cyan stroke-[3]" />}
                         </div>
-                        <p className="text-[10px] text-gray-400">{lvl.desc}</p>
+                        <p className="text-[9px] text-gray-400">{lvl.desc}</p>
                       </button>
                     );
                   })}
@@ -1159,21 +1159,21 @@ export const Settings: React.FC = () => {
               {/* Row 2: Filter Adult & Explicit Content */}
               <div
                 data-settings-row="true"
-                className="bg-hbo-card border border-hbo-border rounded-2xl p-5 shadow-lg flex items-center justify-between gap-4"
+                className="bg-hbo-card border border-hbo-border rounded-2xl p-4 shadow-lg flex items-center justify-between gap-4"
               >
                 <div className="flex-1 min-w-0 pr-2">
-                  <h4 className="text-base font-bold text-white flex items-center gap-2 mb-0.5">
-                    <EyeOff className="w-5 h-5 text-amber-400 flex-shrink-0" />
+                  <h4 className="text-sm sm:text-base font-bold text-white flex items-center gap-2 mb-0.5">
+                    <EyeOff className="w-4.5 h-4.5 text-amber-400 flex-shrink-0" />
                     <span>Filter Adult & Explicit Content</span>
                   </h4>
-                  <p className="text-xs text-gray-400">
+                  <p className="text-[11px] text-gray-400">
                     SafeSearch mode: Excludes 18+ adult rated media from search queries and catalogs.
                   </p>
                 </div>
 
                 <button
                   onClick={() => handleUpdate({ filterAdult: settings.filterAdult === false ? true : false })}
-                  className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all tv-focus-target flex items-center gap-1.5 flex-shrink-0 border ${
+                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all tv-focus-target flex items-center gap-1.5 flex-shrink-0 border ${
                     settings.filterAdult !== false
                       ? 'bg-emerald-500/20 border-emerald-400 text-emerald-400 shadow-md'
                       : 'bg-white/5 border-white/10 text-gray-400'
@@ -1196,21 +1196,21 @@ export const Settings: React.FC = () => {
               {/* Row 3: Filter Out Unreleased Titles */}
               <div
                 data-settings-row="true"
-                className="bg-hbo-card border border-hbo-border rounded-2xl p-5 shadow-lg flex items-center justify-between gap-4"
+                className="bg-hbo-card border border-hbo-border rounded-2xl p-4 shadow-lg flex items-center justify-between gap-4"
               >
                 <div className="flex-1 min-w-0 pr-2">
-                  <h4 className="text-base font-bold text-white flex items-center gap-2 mb-0.5">
-                    <CalendarX className="w-5 h-5 text-hbo-cyan flex-shrink-0" />
+                  <h4 className="text-sm sm:text-base font-bold text-white flex items-center gap-2 mb-0.5">
+                    <CalendarX className="w-4.5 h-4.5 text-hbo-cyan flex-shrink-0" />
                     <span>Filter Out Unreleased Titles</span>
                   </h4>
-                  <p className="text-xs text-gray-400">
-                    Hide future and unreleased movies and TV series that have not yet premiered in theaters or streaming.
+                  <p className="text-[11px] text-gray-400">
+                    Hide future and unreleased movies and TV series that have not yet premiered.
                   </p>
                 </div>
 
                 <button
                   onClick={() => handleUpdate({ filterUnreleased: settings.filterUnreleased === false ? true : false })}
-                  className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all tv-focus-target flex items-center gap-1.5 flex-shrink-0 border ${
+                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all tv-focus-target flex items-center gap-1.5 flex-shrink-0 border ${
                     settings.filterUnreleased !== false
                       ? 'bg-emerald-500/20 border-emerald-400 text-emerald-400 shadow-md'
                       : 'bg-white/5 border-white/10 text-gray-400'
@@ -1236,20 +1236,20 @@ export const Settings: React.FC = () => {
           {/* 5. SYSTEM & UPDATES PANEL                                                */}
           {/* ========================================================================= */}
           {activeCategory === 'system' && (
-            <div className="space-y-4 animate-fade-in">
+            <div className="space-y-3.5 animate-fade-in">
               {/* Row 1: Software Update */}
               <div
                 data-settings-row="true"
-                className="bg-hbo-card border border-hbo-border rounded-2xl p-5 shadow-lg space-y-3"
+                className="bg-hbo-card border border-hbo-border rounded-2xl p-4 shadow-lg space-y-2.5"
               >
                 <div className="flex items-center justify-between gap-4">
                   <div className="flex-1 min-w-0 pr-2">
-                    <h3 className="text-base font-bold font-display text-white flex items-center gap-2 mb-0.5">
-                      <ArrowUpCircle className="w-5 h-5 text-hbo-cyan flex-shrink-0" />
+                    <h3 className="text-sm sm:text-base font-bold font-display text-white flex items-center gap-2 mb-0.5">
+                      <ArrowUpCircle className="w-4.5 h-4.5 text-hbo-cyan flex-shrink-0" />
                       <span>Software Update</span>
                     </h3>
-                    <p className="text-xs text-gray-400">
-                      Check for new versions, bug fixes, and feature updates directly from GitHub Releases.
+                    <p className="text-[11px] text-gray-400">
+                      Check for new versions, bug fixes, and feature updates directly from GitHub.
                     </p>
                   </div>
 
@@ -1257,7 +1257,7 @@ export const Settings: React.FC = () => {
                     <button
                       onClick={handleCheckForUpdates}
                       disabled={checkingUpdate}
-                      className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-hbo-purple to-hbo-cyan hover:opacity-90 active:scale-95 text-white font-bold text-xs flex items-center gap-2 shadow-lg shadow-hbo-purple/30 tv-focus-target transition-all"
+                      className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-hbo-purple to-hbo-cyan hover:opacity-90 active:scale-95 text-white font-bold text-xs flex items-center gap-1.5 shadow-lg shadow-hbo-purple/30 tv-focus-target transition-all"
                     >
                       <RefreshCw className={`w-3.5 h-3.5 ${checkingUpdate ? 'animate-spin' : ''}`} />
                       <span>{checkingUpdate ? 'Checking...' : 'Check for Updates'}</span>
@@ -1266,7 +1266,7 @@ export const Settings: React.FC = () => {
                     {updateInfo?.hasUpdate && (
                       <button
                         onClick={() => setShowUpdateModal(true)}
-                        className="px-3.5 py-2.5 bg-hbo-cyan text-black font-bold rounded-xl hover:bg-hbo-cyan/90 text-xs tv-focus-target shadow-md"
+                        className="px-3 py-2 bg-hbo-cyan text-black font-bold rounded-xl hover:bg-hbo-cyan/90 text-xs tv-focus-target shadow-md"
                       >
                         View Update
                       </button>
@@ -1275,7 +1275,7 @@ export const Settings: React.FC = () => {
                 </div>
 
                 {updateInfo && (
-                  <div className={`p-3 rounded-xl border flex items-center justify-between gap-3 text-xs ${
+                  <div className={`p-2.5 rounded-xl border flex items-center justify-between gap-3 text-xs ${
                     updateInfo.hasUpdate 
                       ? 'bg-hbo-purple/20 border-hbo-purple-light text-white' 
                       : 'bg-white/5 border-white/10 text-gray-300'
@@ -1284,9 +1284,9 @@ export const Settings: React.FC = () => {
                       {updateInfo.hasUpdate ? (
                         <Sparkles className="w-4 h-4 text-hbo-cyan flex-shrink-0" />
                       ) : (
-                        <Check className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                        <Check className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
                       )}
-                      <span className="truncate font-mono">
+                      <span className="truncate font-mono text-[11px]">
                         {updateInfo.hasUpdate 
                           ? `v${updateInfo.latestVersion} Available (${updateInfo.apkSizeFormatted || 'APK'})` 
                           : 'You are on the latest build'}
@@ -1296,9 +1296,9 @@ export const Settings: React.FC = () => {
                 )}
 
                 {updateError && (
-                  <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2">
-                    <AlertCircle className="w-4 h-4 flex-shrink-0" />
-                    <span>{updateError}</span>
+                  <div className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2">
+                    <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
+                    <span className="text-[11px]">{updateError}</span>
                   </div>
                 )}
               </div>
@@ -1306,21 +1306,21 @@ export const Settings: React.FC = () => {
               {/* Row 2: Auto-Check on Startup */}
               <div
                 data-settings-row="true"
-                className="bg-hbo-card border border-hbo-border rounded-2xl p-5 shadow-lg flex items-center justify-between gap-4"
+                className="bg-hbo-card border border-hbo-border rounded-2xl p-4 shadow-lg flex items-center justify-between gap-4"
               >
                 <div className="flex-1 min-w-0 pr-2">
-                  <h4 className="text-base font-bold text-gray-200 flex items-center gap-2 mb-0.5">
+                  <h4 className="text-sm sm:text-base font-bold text-gray-200 flex items-center gap-2 mb-0.5">
                     <RefreshCw className="w-4 h-4 text-hbo-cyan" />
                     <span>Auto-Check on Startup</span>
                   </h4>
-                  <p className="text-xs text-gray-400">
+                  <p className="text-[11px] text-gray-400">
                     Automatically scan for newer releases in the background when the application starts.
                   </p>
                 </div>
 
                 <button
                   onClick={() => handleUpdate({ autoUpdateCheck: !(settings.autoUpdateCheck ?? true) })}
-                  className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all tv-focus-target flex items-center gap-1.5 flex-shrink-0 border ${
+                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all tv-focus-target flex items-center gap-1.5 flex-shrink-0 border ${
                     (settings.autoUpdateCheck ?? true)
                       ? 'bg-emerald-500/20 border-emerald-400 text-emerald-400 shadow-md'
                       : 'bg-white/5 border-white/10 text-gray-400'
@@ -1343,21 +1343,21 @@ export const Settings: React.FC = () => {
               {/* Row 3: Nightly Channel */}
               <div
                 data-settings-row="true"
-                className="bg-hbo-card border border-hbo-border rounded-2xl p-5 shadow-lg flex items-center justify-between gap-4"
+                className="bg-hbo-card border border-hbo-border rounded-2xl p-4 shadow-lg flex items-center justify-between gap-4"
               >
                 <div className="flex-1 min-w-0 pr-2">
-                  <h4 className="text-base font-bold text-gray-200 flex items-center gap-2 mb-0.5">
+                  <h4 className="text-sm sm:text-base font-bold text-gray-200 flex items-center gap-2 mb-0.5">
                     <Moon className="w-3.5 h-3.5 text-amber-400" />
                     <span>Include Nightly Builds</span>
                   </h4>
-                  <p className="text-xs text-gray-400">
+                  <p className="text-[11px] text-gray-400">
                     Receive bleeding-edge automated daily builds before official stable releases.
                   </p>
                 </div>
 
                 <button
                   onClick={() => handleUpdate({ includeNightlyUpdates: !settings.includeNightlyUpdates })}
-                  className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all tv-focus-target flex items-center gap-1.5 flex-shrink-0 border ${
+                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all tv-focus-target flex items-center gap-1.5 flex-shrink-0 border ${
                     settings.includeNightlyUpdates
                       ? 'bg-emerald-500/20 border-emerald-400 text-emerald-400 shadow-md'
                       : 'bg-white/5 border-white/10 text-gray-400'
@@ -1380,30 +1380,30 @@ export const Settings: React.FC = () => {
               {/* Row 4: Version Info & Easter Egg Card */}
               <div
                 data-settings-row="true"
-                className="w-full bg-hbo-card/40 border border-hbo-border/60 rounded-2xl p-5 text-xs text-gray-400 space-y-2.5 text-left"
+                className="w-full bg-hbo-card/40 border border-hbo-border/60 rounded-2xl p-4 text-xs text-gray-400 space-y-2 text-left"
               >
                 <div className="flex items-center justify-between flex-wrap gap-3">
                   <div>
-                    <p className="font-bold text-gray-200 text-sm flex items-center gap-2">
+                    <p className="font-bold text-gray-200 text-xs sm:text-sm flex items-center gap-2">
                       <span>TMDB Streamer v{APP_VERSION}</span>
                       {APP_BUILD_CHANNEL !== 'stable' && (
-                        <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded-full bg-hbo-cyan/20 text-hbo-cyan border border-hbo-cyan/40">
+                        <span className="text-[9px] uppercase font-mono px-2 py-0.5 rounded-full bg-hbo-cyan/20 text-hbo-cyan border border-hbo-cyan/40">
                           {APP_BUILD_CHANNEL}
                         </span>
                       )}
                     </p>
-                    <p className="text-[11px] text-gray-400 mt-0.5">{APP_VERSION_FULL}</p>
+                    <p className="text-[10px] text-gray-400 mt-0.5">{APP_VERSION_FULL}</p>
                   </div>
                   
                   <button
                     type="button"
                     onClick={handleBuildNumberClick}
-                    className="px-3.5 py-1.5 rounded-full bg-hbo-purple/30 border border-hbo-purple-light text-hbo-cyan font-mono text-xs font-bold tv-focus-target focus:outline-none focus:border-hbo-cyan focus:ring-2 focus:ring-hbo-cyan/60 focus:bg-hbo-purple/60 focus:shadow-hbo-glow transition-all cursor-pointer inline-flex items-center gap-1.5 active:scale-95"
+                    className="px-3 py-1 rounded-full bg-hbo-purple/30 border border-hbo-purple-light text-hbo-cyan font-mono text-xs font-bold tv-focus-target focus:outline-none focus:border-hbo-cyan focus:ring-2 focus:ring-hbo-cyan/60 focus:bg-hbo-purple/60 focus:shadow-hbo-glow transition-all cursor-pointer inline-flex items-center gap-1 active:scale-95"
                   >
                     <span>Build #{APP_BUILD_NUMBER}</span>
                   </button>
                 </div>
-                <p className="text-gray-400 text-xs leading-relaxed">
+                <p className="text-gray-400 text-[11px] leading-relaxed">
                   This application uses the TMDB API and free third-party streaming video embeds.
                 </p>
               </div>
@@ -1420,11 +1420,11 @@ export const Settings: React.FC = () => {
               setShowEasterEgg(false);
             }
           }}
-          className="fixed inset-0 z-50 bg-hbo-dark/95 backdrop-blur-2xl flex flex-col items-center justify-center p-4 sm:p-6 animate-fade-in select-none"
+          className="fixed inset-0 z-50 bg-black/95 backdrop-blur-2xl flex flex-col items-center justify-center p-4 sm:p-6 animate-fade-in select-none"
         >
           <div className="relative w-full max-w-2xl bg-hbo-card/95 border border-hbo-border/80 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh] animate-scale-in">
             {/* Header */}
-            <div className="p-4 border-b border-hbo-border/60 flex items-center justify-between gap-4 bg-hbo-dark/60">
+            <div className="p-4 border-b border-hbo-border/60 flex items-center justify-between gap-4 bg-black/60">
               <div className="flex items-center gap-3 min-w-0">
                 <div className="p-2 rounded-xl bg-hbo-card border border-hbo-border/80 shadow-md flex items-center justify-center flex-shrink-0">
                   <Logo size="sm" showText={false} />
@@ -1450,7 +1450,7 @@ export const Settings: React.FC = () => {
             </div>
 
             {/* Changelog Title Bar */}
-            <div className="px-4 py-2 bg-black/30 border-b border-white/5 flex items-center justify-between">
+            <div className="px-4 py-2 bg-black/40 border-b border-white/5 flex items-center justify-between">
               <div className="flex items-center gap-2 text-xs font-bold text-gray-300 uppercase tracking-wider">
                 <FileText className="w-3.5 h-3.5 text-hbo-cyan" />
                 <span>Installed Version Changelog</span>
@@ -1468,7 +1468,7 @@ export const Settings: React.FC = () => {
             </div>
 
             {/* Footer */}
-            <div className="p-3.5 border-t border-hbo-border/60 bg-hbo-dark/60 flex items-center justify-between gap-3">
+            <div className="p-3.5 border-t border-hbo-border/60 bg-black/60 flex items-center justify-between gap-3">
               <p className="text-[10px] sm:text-[11px] text-gray-400 font-mono truncate max-w-[220px]">
                 {APP_VERSION_FULL}
               </p>
