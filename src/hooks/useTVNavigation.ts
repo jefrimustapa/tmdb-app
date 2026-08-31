@@ -345,6 +345,18 @@ export function useTVNavigation(isEnabled = true) {
               return;
             }
 
+            // On Settings page: Right from sidebar moves focus directly to active Category Item
+            if (window.location.pathname === '/settings') {
+              const activeCat = document.querySelector<HTMLElement>('[data-tv-category-active="true"]') ||
+                                document.querySelector<HTMLElement>('[data-tv-category-item="true"]');
+              if (activeCat) {
+                e.preventDefault();
+                activeCat.focus();
+                activeCat.scrollIntoView({ behavior: e.repeat ? 'auto' : getScrollBehavior(), block: 'nearest', inline: 'center' });
+                return;
+              }
+            }
+
             // Fallback: Directly focus the most appropriate page element (closest Y or first in main)
             const mainContent = document.querySelector('main');
             const mainPageElements = pageElements.filter(el => mainContent?.contains(el));
@@ -365,6 +377,17 @@ export function useTVNavigation(isEnabled = true) {
               return;
             }
           } else {
+            // On Settings page: Right from Category Rail moves directly to first item in right content panel
+            if (window.location.pathname === '/settings' && currentFocused.getAttribute('data-tv-category-item') === 'true') {
+              const firstChild = document.querySelector<HTMLElement>('[data-settings-panel="true"] .tv-focus-target');
+              if (firstChild) {
+                e.preventDefault();
+                firstChild.focus();
+                firstChild.scrollIntoView({ behavior: e.repeat ? 'auto' : getScrollBehavior(), block: 'nearest', inline: 'nearest' });
+                return;
+              }
+            }
+
             // In content viewport: if currently in a horizontal row/container, check for sibling items
             const currentRow = currentFocused.parentElement;
             const isInsideRail = currentFocused.closest('[data-content-rail="true"]') !== null || 
@@ -424,6 +447,58 @@ export function useTVNavigation(isEnabled = true) {
           if (isCurrentInNav) {
             candidateElements = navElements;
           } else {
+            // On Settings page: Left from Category Rail moves focus back to Sidebar nav
+            if (window.location.pathname === '/settings' && currentFocused.getAttribute('data-tv-category-item') === 'true') {
+              const settingsNav = document.querySelector<HTMLElement>('aside a[data-nav-path="/settings"]') ||
+                                  document.querySelector<HTMLElement>('aside a[href="/settings"]') ||
+                                  document.querySelector<HTMLElement>('aside .tv-focus-target');
+              if (settingsNav) {
+                e.preventDefault();
+                settingsNav.focus();
+                settingsNav.scrollIntoView({ behavior: e.repeat ? 'auto' : getScrollBehavior(), block: 'nearest', inline: 'center' });
+                return;
+              }
+            }
+
+            // On Settings page: Left from inside Right Content Panel moves focus back to active Category Item
+            if (window.location.pathname === '/settings' && currentFocused.closest('[data-settings-panel="true"]')) {
+              // Check if there is a left candidate strictly within the right content panel
+              const panelElements = Array.from(document.querySelectorAll<HTMLElement>('[data-settings-panel="true"] .tv-focus-target'))
+                .filter(el => el !== currentFocused && el.offsetParent !== null && !el.hasAttribute('disabled'));
+              
+              let internalLeftTarget: HTMLElement | null = null;
+              let internalMinDist = Infinity;
+              for (const pEl of panelElements) {
+                const pRect = pEl.getBoundingClientRect();
+                if (pRect.right <= currentRect.left + 5) {
+                  const dx = Math.max(0, currentRect.left - pRect.right);
+                  const dy = Math.abs(pRect.top - currentRect.top);
+                  const dist = dx + dy * 2.0;
+                  if (dist < internalMinDist) {
+                    internalMinDist = dist;
+                    internalLeftTarget = pEl;
+                  }
+                }
+              }
+
+              if (internalLeftTarget) {
+                e.preventDefault();
+                internalLeftTarget.focus();
+                internalLeftTarget.scrollIntoView({ behavior: e.repeat ? 'auto' : getScrollBehavior(), block: 'nearest', inline: 'nearest' });
+                return;
+              }
+
+              // At the left edge of right panel: return to active Category tab
+              const activeCat = document.querySelector<HTMLElement>('[data-tv-category-active="true"]') ||
+                                document.querySelector<HTMLElement>('[data-tv-category-item="true"]');
+              if (activeCat) {
+                e.preventDefault();
+                activeCat.focus();
+                activeCat.scrollIntoView({ behavior: e.repeat ? 'auto' : getScrollBehavior(), block: 'nearest', inline: 'center' });
+                return;
+              }
+            }
+
             // In content viewport: check previous sibling in horizontal row first
             const currentRow = currentFocused.parentElement;
             const isInsideRail = currentFocused.closest('[data-content-rail="true"]') !== null || 

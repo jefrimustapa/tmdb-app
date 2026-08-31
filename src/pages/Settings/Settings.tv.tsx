@@ -326,14 +326,10 @@ export const Settings: React.FC = () => {
               <button
                 key={cat.id}
                 id={`tv-settings-cat-${cat.id}`}
+                data-tv-category-item="true"
+                data-tv-category-active={isSelected ? 'true' : 'false'}
                 onClick={() => setActiveCategory(cat.id)}
-                onKeyDown={(e) => {
-                  if (e.key === 'ArrowRight') {
-                    e.preventDefault();
-                    const firstTarget = document.querySelector<HTMLElement>('[data-settings-panel="true"] .tv-focus-target');
-                    firstTarget?.focus();
-                  }
-                }}
+                onFocus={() => setActiveCategory(cat.id)}
                 className={`w-full p-4 rounded-2xl border text-left transition-all tv-focus-target flex items-center justify-between gap-3 min-h-[72px] ${
                   isSelected
                     ? 'bg-gradient-to-r from-hbo-purple/60 via-hbo-purple/30 to-hbo-cyan/20 border-hbo-cyan shadow-hbo-glow text-white ring-1 ring-hbo-cyan/50'
