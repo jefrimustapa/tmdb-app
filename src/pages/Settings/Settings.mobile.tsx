@@ -192,7 +192,7 @@ export const Settings: React.FC = () => {
   const showSystem = activeCategory === 'all' || activeCategory === 'system';
 
   return (
-    <div className="min-h-screen pt-16 sm:pt-20 pb-36 px-3.5 sm:px-6 lg:px-8 max-w-4xl mx-auto select-none">
+    <div className="min-h-screen pt-[calc(max(1rem,env(safe-area-inset-top,24px))+3.75rem)] sm:pt-24 pb-36 px-3.5 sm:px-6 lg:px-8 max-w-4xl mx-auto select-none">
       {/* Header */}
       <div className="flex items-center justify-between mb-4 pb-3 border-b border-hbo-border/60">
         <div className="flex items-center gap-3">
@@ -213,8 +213,8 @@ export const Settings: React.FC = () => {
         )}
       </div>
 
-      {/* Sticky Category Pill Filter Bar */}
-      <div className="sticky top-14 sm:top-16 z-30 -mx-3.5 sm:-mx-6 px-3.5 sm:px-6 py-2.5 bg-black/90 backdrop-blur-xl border-b border-white/5 mb-6 overflow-x-auto no-scrollbar">
+      {/* Sticky Category Pill Filter Bar (Freezes cleanly below the top Navbar upon scroll) */}
+      <div className="sticky top-[calc(env(safe-area-inset-top,24px)+3.75rem)] sm:top-[4.75rem] z-30 -mx-3.5 sm:-mx-6 px-3.5 sm:px-6 py-2.5 bg-black/95 backdrop-blur-xl border-b border-white/10 mb-6 overflow-x-auto no-scrollbar shadow-xl">
         <div className="flex items-center gap-2 min-w-max">
           {[
             { id: 'all' as MobileCategory, label: 'All', icon: SlidersHorizontal },

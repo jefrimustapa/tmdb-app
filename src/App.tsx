@@ -78,7 +78,7 @@ const AppContent: React.FC = () => {
   const isWatchPage = location.pathname.startsWith('/watch');
 
   return (
-    <div className="min-h-screen bg-hbo-dark text-white flex flex-col relative overflow-x-hidden w-full max-w-[100vw]">
+    <div className="min-h-screen bg-hbo-dark text-white flex flex-col relative overflow-x-clip w-full max-w-[100vw]">
       {/* Top Navbar (Hidden on TV mode where Sidebar is used, and on watch page) */}
       {!isTV && !isWatchPage && <Navbar />}
 
@@ -86,7 +86,7 @@ const AppContent: React.FC = () => {
       {isTV && !isWatchPage && <Sidebar />}
 
       {/* Main Content Viewport */}
-      <main className={`flex-1 overflow-x-hidden w-full max-w-full ${isWatchPage ? 'p-0 pb-0 m-0' : `pb-24 md:pb-0 ${isTV ? 'pl-20 lg:pl-64' : ''}`}`}>
+      <main className={`flex-1 overflow-x-clip w-full max-w-full ${isWatchPage ? 'p-0 pb-0 m-0' : `pb-24 md:pb-0 ${isTV ? 'pl-20 lg:pl-64' : ''}`}`}>
         <Routes>
           <Route path="/" element={<PlatformRoute tv={HomeTV} mobile={HomeMobile} />} />
           <Route path="/movies" element={<PlatformRoute tv={MoviesTV} mobile={MoviesMobile} />} />
