@@ -333,6 +333,86 @@ export function useTVNavigation(isEnabled = true) {
         }
 
         if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+          // On Settings page: Category rail linear up/down
+          if (window.location.pathname === '/settings' && currentFocused.getAttribute('data-tv-category-item') === 'true') {
+            const allCategories = Array.from(document.querySelectorAll<HTMLElement>('[data-tv-category-item="true"]'))
+              .filter(el => el.offsetParent !== null && !el.hasAttribute('disabled'));
+            const currIdx = allCategories.indexOf(currentFocused);
+            if (currIdx !== -1) {
+              e.preventDefault();
+              if (e.key === 'ArrowDown' && currIdx < allCategories.length - 1) {
+                const nextCat = allCategories[currIdx + 1];
+                nextCat.focus();
+                nextCat.click();
+              } else if (e.key === 'ArrowUp' && currIdx > 0) {
+                const prevCat = allCategories[currIdx - 1];
+                prevCat.focus();
+                prevCat.click();
+              }
+              return;
+            }
+          }
+
+          // On Settings page: Inside Child Panel, strictly navigate between data-settings-row="true" rows
+          if (window.location.pathname === '/settings' && currentFocused.closest('[data-settings-panel="true"]')) {
+            const currentRow = currentFocused.closest('[data-settings-row="true"]');
+            const allRows = Array.from(document.querySelectorAll<HTMLElement>('[data-settings-panel="true"] [data-settings-row="true"]'))
+              .filter(r => r.offsetParent !== null);
+            const currentRowIdx = currentRow ? allRows.indexOf(currentRow as HTMLElement) : -1;
+
+            if (e.key === 'ArrowDown') {
+              if (currentRowIdx >= 0 && currentRowIdx < allRows.length - 1) {
+                const nextRow = allRows[currentRowIdx + 1];
+                const nextRowItems = Array.from(nextRow.querySelectorAll<HTMLElement>('.tv-focus-target'))
+                  .filter(el => el.offsetParent !== null && !el.hasAttribute('disabled'));
+                if (nextRowItems.length > 0) {
+                  let bestTarget = nextRowItems[0];
+                  let minXDiff = Infinity;
+                  for (const item of nextRowItems) {
+                    const r = item.getBoundingClientRect();
+                    const xDiff = Math.abs((r.left + r.width / 2) - (currentRect.left + currentRect.width / 2));
+                    if (xDiff < minXDiff) {
+                      minXDiff = xDiff;
+                      bestTarget = item;
+                    }
+                  }
+                  e.preventDefault();
+                  bestTarget.focus();
+                  bestTarget.scrollIntoView({ behavior: e.repeat ? 'auto' : getScrollBehavior(), block: 'center', inline: 'nearest' });
+                  return;
+                }
+              }
+              // Last row reached: lock
+              e.preventDefault();
+              return;
+            } else if (e.key === 'ArrowUp') {
+              if (currentRowIdx > 0) {
+                const prevRow = allRows[currentRowIdx - 1];
+                const prevRowItems = Array.from(prevRow.querySelectorAll<HTMLElement>('.tv-focus-target'))
+                  .filter(el => el.offsetParent !== null && !el.hasAttribute('disabled'));
+                if (prevRowItems.length > 0) {
+                  let bestTarget = prevRowItems[0];
+                  let minXDiff = Infinity;
+                  for (const item of prevRowItems) {
+                    const r = item.getBoundingClientRect();
+                    const xDiff = Math.abs((r.left + r.width / 2) - (currentRect.left + currentRect.width / 2));
+                    if (xDiff < minXDiff) {
+                      minXDiff = xDiff;
+                      bestTarget = item;
+                    }
+                  }
+                  e.preventDefault();
+                  bestTarget.focus();
+                  bestTarget.scrollIntoView({ behavior: e.repeat ? 'auto' : getScrollBehavior(), block: 'center', inline: 'nearest' });
+                  return;
+                }
+              }
+              // Top row reached: lock
+              e.preventDefault();
+              return;
+            }
+          }
+
           // In main content canvas, UP/DOWN stays strictly inside main content canvas
           candidateElements = pageElements;
         } else if (e.key === 'ArrowRight') {
@@ -390,29 +470,21 @@ export function useTVNavigation(isEnabled = true) {
 
             // On Settings page: Right from inside Right Content Panel moves focus within same row
             if (window.location.pathname === '/settings' && currentFocused.closest('[data-settings-panel="true"]')) {
-              const panelElements = Array.from(document.querySelectorAll<HTMLElement>('[data-settings-panel="true"] .tv-focus-target'))
-                .filter(el => el !== currentFocused && el.offsetParent !== null && !el.hasAttribute('disabled'));
-              
-              let internalRightTarget: HTMLElement | null = null;
-              let internalMinDist = Infinity;
-              for (const pEl of panelElements) {
-                const pRect = pEl.getBoundingClientRect();
-                const isSameRow = (pRect.top < currentRect.bottom - 8 && pRect.bottom > currentRect.top + 8);
-                if (isSameRow && pRect.left >= currentRect.right - 5) {
-                  const dx = Math.max(0, pRect.left - currentRect.right);
-                  if (dx < internalMinDist) {
-                    internalMinDist = dx;
-                    internalRightTarget = pEl;
-                  }
-                }
-              }
-
-              if (internalRightTarget) {
+              const currentRow = currentFocused.closest('[data-settings-row="true"]');
+              const rowItems = currentRow 
+                ? Array.from(currentRow.querySelectorAll<HTMLElement>('.tv-focus-target')).filter(el => el.offsetParent !== null && !el.hasAttribute('disabled'))
+                : [];
+              const currIdx = rowItems.indexOf(currentFocused);
+              if (currIdx >= 0 && currIdx < rowItems.length - 1) {
+                const nextItem = rowItems[currIdx + 1];
                 e.preventDefault();
-                internalRightTarget.focus();
-                internalRightTarget.scrollIntoView({ behavior: e.repeat ? 'auto' : getScrollBehavior(), block: 'nearest', inline: 'nearest' });
+                nextItem.focus();
+                nextItem.scrollIntoView({ behavior: e.repeat ? 'auto' : getScrollBehavior(), block: 'nearest', inline: 'nearest' });
                 return;
               }
+              // Last item in row: hard boundary lock
+              e.preventDefault();
+              return;
             }
 
             // In content viewport: if currently in a horizontal row/container, check for sibling items
@@ -489,28 +561,16 @@ export function useTVNavigation(isEnabled = true) {
 
             // On Settings page: Left from inside Right Content Panel moves focus back to active Category Item
             if (window.location.pathname === '/settings' && currentFocused.closest('[data-settings-panel="true"]')) {
-              // Check if there is a left candidate strictly within the SAME visual row in the right content panel
-              const panelElements = Array.from(document.querySelectorAll<HTMLElement>('[data-settings-panel="true"] .tv-focus-target'))
-                .filter(el => el !== currentFocused && el.offsetParent !== null && !el.hasAttribute('disabled'));
-              
-              let internalLeftTarget: HTMLElement | null = null;
-              let internalMinDist = Infinity;
-              for (const pEl of panelElements) {
-                const pRect = pEl.getBoundingClientRect();
-                const isSameRow = (pRect.top < currentRect.bottom - 8 && pRect.bottom > currentRect.top + 8);
-                if (isSameRow && pRect.right <= currentRect.left + 5) {
-                  const dx = Math.max(0, currentRect.left - pRect.right);
-                  if (dx < internalMinDist) {
-                    internalMinDist = dx;
-                    internalLeftTarget = pEl;
-                  }
-                }
-              }
-
-              if (internalLeftTarget) {
+              const currentRow = currentFocused.closest('[data-settings-row="true"]');
+              const rowItems = currentRow 
+                ? Array.from(currentRow.querySelectorAll<HTMLElement>('.tv-focus-target')).filter(el => el.offsetParent !== null && !el.hasAttribute('disabled'))
+                : [];
+              const currIdx = rowItems.indexOf(currentFocused);
+              if (currIdx > 0) {
+                const prevItem = rowItems[currIdx - 1];
                 e.preventDefault();
-                internalLeftTarget.focus();
-                internalLeftTarget.scrollIntoView({ behavior: e.repeat ? 'auto' : getScrollBehavior(), block: 'nearest', inline: 'nearest' });
+                prevItem.focus();
+                prevItem.scrollIntoView({ behavior: e.repeat ? 'auto' : getScrollBehavior(), block: 'nearest', inline: 'nearest' });
                 return;
               }
 
