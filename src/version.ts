@@ -2,12 +2,15 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20260831-1508';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-restructure-set.20260831-1508';
+export const APP_BUILD_NUMBER = '20260831-1552';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-improve-billboa.20260831-1552';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
-export const APP_BRANCH = 'feat-restructure-set';
-export const APP_CHANGELOG = `* style: center app icon horizontally in TV navbar
+export const APP_BRANCH = 'feat-improve-billboa';
+export const APP_CHANGELOG = `* fix: resolve useEffect closing bracket in HeroBanner
+* feat: HBO Max style cross-dissolve backdrop transitions and staggered typography motion in HeroBanner
+* feat: mobile settings Excel freeze-row tabs on navbar collision
+* style: center app icon horizontally in TV navbar
 * style: center TV sidebar navigation icon group vertically
 * style: remove background container behind TV category icons
 * fix: TV category rail left padding buffer and header body background match
@@ -18,7 +21,4 @@ export const APP_CHANGELOG = `* style: center app icon horizontally in TV navbar
 * fix(tv-nav): smooth 2-way spatial focus between sidebar, categories rail, and content cards
 * feat(settings): restructure TV and mobile settings into HBO Max category layout
 * fix(mobile): move Next Episode button below provider dropdown in watch header
-* style(details): change restart button to icon-only circular action button
-* fix(tv): update native Android MainActivity dispatchKeyEvent for watch header next button D-pad navigation
-* fix(watch): enable seamless D-pad remote navigation across header back, next episode, and server picker
-* fix(build): resolve syntax error in VideoPlayer and verify live installation on TV`;
+* style(details): change restart button to icon-only circular action button`;
