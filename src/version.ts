@@ -2,12 +2,13 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20260831-1314';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-restructure-set.20260831-1314';
+export const APP_BUILD_NUMBER = '20260831-1322';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-restructure-set.20260831-1322';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
 export const APP_BRANCH = 'feat-restructure-set';
-export const APP_CHANGELOG = `* feat(settings): restructure TV and mobile settings into HBO Max category layout
+export const APP_CHANGELOG = `* fix(tv-nav): smooth 2-way spatial focus between sidebar, categories rail, and content cards
+* feat(settings): restructure TV and mobile settings into HBO Max category layout
 * fix(mobile): move Next Episode button below provider dropdown in watch header
 * style(details): change restart button to icon-only circular action button
 * fix(tv): update native Android MainActivity dispatchKeyEvent for watch header next button D-pad navigation
@@ -20,5 +21,4 @@ export const APP_CHANGELOG = `* feat(settings): restructure TV and mobile settin
 * feat(settings): convert Up Next popup trigger percentage into a 10% step slider
 * feat(settings): add configurable trigger percent and countdown timeout for Up Next episode popup
 * fix(settings): restore FormattedChangelog import in settings views
-* fix(player): fix black screen on 90% and make Up Next popup configurable in settings
 * fix(player): fix black screen on 90% and make Up Next popup configurable in settings`;
