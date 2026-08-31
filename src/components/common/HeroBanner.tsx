@@ -127,6 +127,8 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ items }) => {
     };
     window.addEventListener('tmdb_settings_changed', handleSettings);
     return () => window.removeEventListener('tmdb_settings_changed', handleSettings);
+  }, []);
+
   // Preload upcoming backdrops into browser cache to eliminate gray flash
   useEffect(() => {
     if (totalItems <= 1) return;
