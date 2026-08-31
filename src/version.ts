@@ -2,12 +2,13 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20260830-1646';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-stream-progress.20260830-1646';
+export const APP_BUILD_NUMBER = '20260830-2322';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.fix-mobile-next-ep-l.20260830-2322';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
-export const APP_BRANCH = 'feat-stream-progress';
-export const APP_CHANGELOG = `* fix(tv): update native Android MainActivity dispatchKeyEvent for watch header next button D-pad navigation
+export const APP_BRANCH = 'fix-mobile-next-ep-l';
+export const APP_CHANGELOG = `* style(details): change restart button to icon-only circular action button
+* fix(tv): update native Android MainActivity dispatchKeyEvent for watch header next button D-pad navigation
 * fix(watch): enable seamless D-pad remote navigation across header back, next episode, and server picker
 * fix(build): resolve syntax error in VideoPlayer and verify live installation on TV
 * feat(settings): disable TorBox & Private Extractor by default and update trigger % to 80-100% (5% step)
@@ -20,5 +21,4 @@ export const APP_CHANGELOG = `* fix(tv): update native Android MainActivity disp
 * fix(player): fix black screen on 90% and make Up Next popup configurable in settings
 * fix(player): fix black screen on 90% and make Up Next popup configurable in settings
 * fix(tv): wire series resume timestamp to watch navigation in details and episode grid
-* fix(player): wire resume timestamp across details, continue watching and player streamUrl
-* fix(player): add useMemo import in VideoPlayer.tsx`;
+* fix(player): wire resume timestamp across details, continue watching and player streamUrl`;
