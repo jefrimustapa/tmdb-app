@@ -22,16 +22,25 @@ export const Logo: React.FC<LogoProps> = ({ size = 'md', showText = true, classN
     xl: 'text-4xl'
   };
 
+  const iconSrc = `${import.meta.env.BASE_URL}icon.png`;
+  const fallbackSvg = `${import.meta.env.BASE_URL}favicon.svg`;
+
   return (
     <div className={`inline-flex items-center gap-2.5 select-none pointer-events-none ${className}`} aria-hidden="true">
       {/* New Circular TMDB Icon */}
       <div className={`relative ${iconSizes[size]} flex-shrink-0 flex items-center justify-center`}>
         <img
-          src="/icon.png"
+          src={iconSrc}
           alt="TMDB Streamer"
           className="w-full h-full object-contain rounded-full drop-shadow-[0_0_12px_rgba(144,85,255,0.6)]"
           loading="eager"
           decoding="async"
+          onError={(e) => {
+            const target = e.currentTarget;
+            if (target.src !== fallbackSvg) {
+              target.src = fallbackSvg;
+            }
+          }}
         />
       </div>
 
