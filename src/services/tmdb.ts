@@ -15,8 +15,8 @@ export const TMDB_READ_TOKEN = 'eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiIxYzdiOTdkZDhiMTE
 
 const IMAGE_BASE_URL = 'https://image.tmdb.org/t/p';
 
-export const TMDB_FALLBACK_POSTER = '/placeholder-poster.svg';
-export const TMDB_FALLBACK_BACKDROP = '/placeholder-backdrop.svg';
+export const TMDB_FALLBACK_POSTER = `${import.meta.env.BASE_URL}placeholder-poster.svg`;
+export const TMDB_FALLBACK_BACKDROP = `${import.meta.env.BASE_URL}placeholder-backdrop.svg`;
 
 export const tmdbImages = {
   poster: (path: string | null, size: 'w92' | 'w154' | 'w185' | 'w342' | 'w500' | 'w780' | 'original' = 'w500') =>
