@@ -72,7 +72,7 @@ export const Settings: React.FC = () => {
   const [openDropdownSlot, setOpenDropdownSlot] = useState<number | null>(null);
   const clickCountRef = useRef(0);
   const clickTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const { deviceMode, setDeviceMode, detectedPlatform, activeLayout } = useDevice();
+  const { detectedPlatform, activeLayout } = useDevice();
 
   const isAnyDropdownOpen = openDropdownSlot !== null;
 
@@ -249,9 +249,6 @@ export const Settings: React.FC = () => {
   const handleUpdate = async (partial: Partial<UserSettings>) => {
     const updated = await dbService.updateSettings(partial);
     setSettings(updated);
-    if (partial.deviceMode) {
-      setDeviceMode(partial.deviceMode);
-    }
     setSavedMessage(true);
     setTimeout(() => setSavedMessage(false), 2500);
   };
@@ -825,67 +822,7 @@ export const Settings: React.FC = () => {
           {/* ========================================================================= */}
           {activeCategory === 'display' && (
             <div className="space-y-3.5 animate-fade-in">
-              {/* Row 1: Device Experience Mode */}
-              <div
-                data-settings-row="true"
-                className="bg-hbo-card border border-hbo-border rounded-2xl p-4 shadow-lg space-y-2.5"
-              >
-                <div className="flex items-center justify-between mb-0.5">
-                  <div>
-                    <h3 className="text-sm sm:text-base font-bold font-display text-white flex items-center gap-2">
-                      <Tv2 className="w-4.5 h-4.5 text-hbo-cyan flex-shrink-0" />
-                      <span>Device Experience Mode</span>
-                    </h3>
-                    <p className="text-[11px] text-gray-400 mt-0.5">
-                      Select your preferred display format or keep Auto-Detect for responsive switching.
-                    </p>
-                  </div>
-                  <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-black/80 border border-hbo-border text-hbo-cyan font-semibold flex-shrink-0">
-                    Active: {activeLayout.toUpperCase()} ({settings.deviceMode === 'auto' ? 'Auto' : 'Override'})
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-5 gap-2.5">
-                  {[
-                    { id: 'auto', label: 'Auto Detect', icon: Monitor, desc: `Live: ${detectedPlatform.toUpperCase()}` },
-                    { id: 'tv', label: 'Android TV', icon: Tv2, desc: 'D-Pad spatial focus' },
-                    { id: 'tablet', label: 'Tablet / Pad', icon: Tablet, desc: 'Expanded grid touch' },
-                    { id: 'mobile', label: 'Mobile Phone', icon: Smartphone, desc: 'Bottom navigation' },
-                    { id: 'desktop', label: 'Desktop / PC', icon: Monitor, desc: 'Wide cinema rail' },
-                  ].map((mode) => {
-                    const Icon = mode.icon;
-                    const isSelected = settings.deviceMode === mode.id;
-                    return (
-                      <button
-                        key={mode.id}
-                        onClick={() => handleUpdate({ deviceMode: mode.id as any })}
-                        className={`p-3 rounded-xl border text-left transition-all tv-focus-target flex flex-col justify-between min-h-[84px] ${
-                          isSelected
-                            ? 'bg-gradient-to-r from-hbo-purple/40 to-hbo-cyan/20 border-hbo-cyan shadow-hbo-glow ring-1 ring-hbo-cyan/50'
-                            : 'bg-hbo-dark/60 border-hbo-border hover:bg-hbo-hover hover:border-white/20'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between w-full mb-1">
-                          <Icon className={`w-4.5 h-4.5 flex-shrink-0 ${isSelected ? 'text-hbo-cyan' : 'text-gray-400'}`} />
-                          {isSelected && (
-                            <span className="w-3.5 h-3.5 rounded-full bg-hbo-cyan text-black flex items-center justify-center flex-shrink-0 shadow-sm">
-                              <Check className="w-2.5 h-2.5 stroke-[3]" />
-                            </span>
-                          )}
-                        </div>
-                        <div>
-                          <p className="text-xs font-bold text-white leading-tight">{mode.label}</p>
-                          <p className={`text-[9px] mt-0.5 leading-snug ${isSelected ? 'text-hbo-cyan font-semibold' : 'text-gray-400'}`}>
-                            {mode.desc}
-                          </p>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Row 2: Stream Header Auto-Hide Timeout */}
+              {/* Row 1: Stream Header Auto-Hide Timeout */}
               <div
                 data-settings-row="true"
                 className="bg-hbo-card border border-hbo-border rounded-2xl p-4 shadow-lg space-y-2.5"
