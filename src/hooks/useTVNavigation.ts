@@ -41,10 +41,9 @@ export function useTVNavigation(isEnabled = true) {
                    mainContent.querySelector<HTMLElement>('[data-hero-watch-now="true"]') ||
                    mainContent.querySelector<HTMLElement>('.tv-focus-target');
         } else if (pathname === '/movies' || pathname === '/tv') {
-          // On Movies or Series catalog page: focus "All Platforms" filter button
-          target = Array.from(mainContent.querySelectorAll<HTMLElement>('button.tv-focus-target')).find(
-            b => b.textContent?.trim().toLowerCase().includes('all platform')
-          ) || mainContent.querySelector<HTMLElement>('.tv-focus-target');
+          // On Movies or Series catalog page: focus first chip in filter bar or Sort button
+          target = mainContent.querySelector<HTMLElement>('[data-tv-filter-section="true"] button.tv-focus-target') ||
+                   mainContent.querySelector<HTMLElement>('.tv-focus-target');
         } else if (pathname === '/library') {
           // On My Space (Library): focus Watch History tab button
           target = Array.from(mainContent.querySelectorAll<HTMLElement>('button.tv-focus-target')).find(
@@ -178,6 +177,74 @@ export function useTVNavigation(isEnabled = true) {
       let minDistance = Infinity;
 
       if (e.key === 'ArrowRight' || e.key === 'ArrowLeft' || e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        // Trap navigation inside active dropdown popover menu if present
+        const activePopover = document.querySelector<HTMLElement>('[data-popover-menu="true"]');
+        if (activePopover && (activePopover.contains(currentFocused) || currentFocused.getAttribute('data-popover-menu') === 'true')) {
+          const popoverItems = Array.from(
+            activePopover.querySelectorAll<HTMLElement>('.tv-focus-target')
+          ).filter(el => el.offsetParent !== null && !el.hasAttribute('disabled'));
+
+          if (popoverItems.length > 0) {
+            const currIdx = popoverItems.indexOf(currentFocused);
+            let nextPopoverItem: HTMLElement | null = null;
+
+            // Spatial navigation among items inside popover (supports 1-column lists and multi-column grids)
+            let bestDist = Infinity;
+            for (const item of popoverItems) {
+              if (item === currentFocused) continue;
+              const r = item.getBoundingClientRect();
+              let isValid = false;
+              let dist = 0;
+
+              if (e.key === 'ArrowDown' && r.top >= currentRect.bottom - 10) {
+                isValid = true;
+                const dy = Math.max(0, r.top - currentRect.bottom);
+                const dx = Math.abs((r.left + r.width / 2) - (currentRect.left + currentRect.width / 2));
+                dist = dy + dx * 0.5;
+              } else if (e.key === 'ArrowUp' && r.bottom <= currentRect.top + 10) {
+                isValid = true;
+                const dy = Math.max(0, currentRect.top - r.bottom);
+                const dx = Math.abs((r.left + r.width / 2) - (currentRect.left + currentRect.width / 2));
+                dist = dy + dx * 0.5;
+              } else if (e.key === 'ArrowRight' && r.left >= currentRect.right - 10) {
+                isValid = true;
+                const dx = Math.max(0, r.left - currentRect.right);
+                const dy = Math.abs((r.top + r.height / 2) - (currentRect.top + currentRect.height / 2));
+                dist = dx + dy * 0.5;
+              } else if (e.key === 'ArrowLeft' && r.right <= currentRect.left + 10) {
+                isValid = true;
+                const dx = Math.max(0, currentRect.left - r.right);
+                const dy = Math.abs((r.top + r.height / 2) - (currentRect.top + currentRect.height / 2));
+                dist = dx + dy * 0.5;
+              }
+
+              if (isValid && dist < bestDist) {
+                bestDist = dist;
+                nextPopoverItem = item;
+              }
+            }
+
+            // Fallback for single-column menus (ArrowDown/ArrowUp sequential if spatial bounds are tight)
+            if (!nextPopoverItem) {
+              if (e.key === 'ArrowDown' && currIdx < popoverItems.length - 1) {
+                nextPopoverItem = popoverItems[currIdx + 1];
+              } else if (e.key === 'ArrowUp' && currIdx > 0) {
+                nextPopoverItem = popoverItems[currIdx - 1];
+              }
+            }
+
+            if (nextPopoverItem) {
+              e.preventDefault();
+              nextPopoverItem.focus();
+              nextPopoverItem.scrollIntoView({ behavior: 'auto', block: 'nearest', inline: 'nearest' });
+            } else {
+              // Reached edge inside popover: boundary lock (NEVER escape to movie cards below)
+              e.preventDefault();
+            }
+            return;
+          }
+        }
+
         // Trap navigation inside active modal dialog if present
         const activeModal = document.querySelector<HTMLElement>('[data-modal-container="true"], [role="dialog"]');
         if (activeModal && (activeModal.contains(currentFocused) || currentFocused === document.body)) {
