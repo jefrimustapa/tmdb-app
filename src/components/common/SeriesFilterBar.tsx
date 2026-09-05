@@ -80,6 +80,7 @@ export const SeriesFilterBar: React.FC<SeriesFilterBarProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
   const chipsScrollRef = useRef<HTMLDivElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
 
   // Button refs for anchoring the popover
   const sortBtnRef = useRef<HTMLButtonElement>(null);
@@ -88,8 +89,20 @@ export const SeriesFilterBar: React.FC<SeriesFilterBarProps> = ({
   const yearBtnRef = useRef<HTMLButtonElement>(null);
   const ratingBtnRef = useRef<HTMLButtonElement>(null);
 
+  const getActiveTriggerRef = (type: 'platform' | 'genre' | 'year' | 'rating' | 'sort') => {
+    switch (type) {
+      case 'sort': return sortBtnRef;
+      case 'platform': return platformBtnRef;
+      case 'genre': return genreBtnRef;
+      case 'year': return yearBtnRef;
+      case 'rating': return ratingBtnRef;
+      default: return null;
+    }
+  };
+
   const [popoverLeft, setPopoverLeft] = useState<number | null>(null);
   const [popoverRight, setPopoverRight] = useState<number | null>(null);
+  const [popoverTop, setPopoverTop] = useState<number | null>(null);
   const [isFrozen, setIsFrozen] = useState(false);
 
   const activePlatform = PLATFORMS.find((p) => p.id === selectedProvider);
@@ -117,8 +130,8 @@ export const SeriesFilterBar: React.FC<SeriesFilterBarProps> = ({
       const btnRect = btnRef.current.getBoundingClientRect();
       const containerRect = containerRef.current.getBoundingClientRect();
 
-      // Desired popover width estimate (typically 260px - 320px)
-      const popoverWidth = type === 'genre' ? 320 : 256;
+      // Desired popover width estimate (typically 260px - 340px)
+      const popoverWidth = type === 'genre' ? 340 : 270;
       const margin = 16;
 
       // Center the popover under the button if possible, or align to its left
@@ -134,15 +147,35 @@ export const SeriesFilterBar: React.FC<SeriesFilterBarProps> = ({
         targetLeft = margin;
       }
 
+      // Position popover directly below the chip button, overlapping active filters section
+      const targetTop = btnRect.bottom - containerRect.top + 6;
+
       setPopoverLeft(Math.round(targetLeft));
       setPopoverRight(null);
+      setPopoverTop(Math.round(targetTop));
     } else {
       setPopoverLeft(16);
       setPopoverRight(null);
+      setPopoverTop(null);
     }
 
     setOpenDropdown(type);
   };
+
+  // Auto-focus selected or first option when dropdown opens
+  useEffect(() => {
+    if (!openDropdown || !popoverRef.current) return;
+    const timer = setTimeout(() => {
+      if (!popoverRef.current) return;
+      const selectedItem = popoverRef.current.querySelector<HTMLElement>('[data-filter-selected="true"].tv-focus-target') ||
+                           popoverRef.current.querySelector<HTMLElement>('.tv-focus-target');
+      if (selectedItem) {
+        selectedItem.focus();
+        selectedItem.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+      }
+    }, 50);
+    return () => clearTimeout(timer);
+  }, [openDropdown]);
 
   // Recalculate popover position if user scrolls chips or window resizes
   useEffect(() => {
@@ -174,26 +207,37 @@ export const SeriesFilterBar: React.FC<SeriesFilterBarProps> = ({
     return () => window.removeEventListener('scroll', handleScroll);
   }, [isTV]);
 
-  // Close dropdown on outside click or escape
+  // Close dropdown on outside click or escape/back, restoring focus to chip trigger
   useEffect(() => {
     if (!openDropdown) return;
+    const currentType = openDropdown;
     const handleClickOutside = (e: MouseEvent | TouchEvent) => {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
         setOpenDropdown(null);
+        getActiveTriggerRef(currentType)?.current?.focus();
       }
     };
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
+      if (e.key === 'Escape' || e.keyCode === 4) {
+        e.preventDefault();
+        e.stopPropagation();
         setOpenDropdown(null);
+        getActiveTriggerRef(currentType)?.current?.focus();
       }
+    };
+    const handleCustomClose = () => {
+      setOpenDropdown(null);
+      getActiveTriggerRef(currentType)?.current?.focus();
     };
     document.addEventListener('mousedown', handleClickOutside);
     document.addEventListener('touchstart', handleClickOutside);
-    document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('keydown', handleKeyDown, true);
+    window.addEventListener('tmdb_close_dropdowns', handleCustomClose);
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
       document.removeEventListener('touchstart', handleClickOutside);
-      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('keydown', handleKeyDown, true);
+      window.removeEventListener('tmdb_close_dropdowns', handleCustomClose);
     };
   }, [openDropdown]);
 
@@ -215,8 +259,8 @@ export const SeriesFilterBar: React.FC<SeriesFilterBarProps> = ({
         className={`transition-all duration-150 z-30 ${
           isFrozen
             ? isTV
-              ? 'fixed top-0 left-20 lg:left-64 right-0 px-6 py-2.5 bg-[#050508]/98 backdrop-blur-2xl border-b border-hbo-border/90 shadow-2xl'
-              : 'fixed top-[calc(max(0.75rem,env(safe-area-inset-top,20px))+3rem)] left-0 right-0 px-4 sm:px-6 py-2.5 bg-[#050508]/98 backdrop-blur-2xl border-b border-hbo-border/90 shadow-2xl'
+              ? 'fixed top-0 left-20 lg:left-64 right-0 px-6 py-2.5 bg-[#050508] border-b border-hbo-border/90 shadow-2xl'
+              : 'fixed top-[calc(max(0.75rem,env(safe-area-inset-top,20px))+3rem)] left-0 right-0 px-4 sm:px-6 py-2.5 bg-[#050508] border-b border-hbo-border/90 shadow-2xl'
             : 'relative py-2.5 bg-[#050508] border-b border-hbo-border/60 shadow-lg'
         }`}
         data-tv-filter-section="true"
@@ -337,19 +381,22 @@ export const SeriesFilterBar: React.FC<SeriesFilterBarProps> = ({
             )}
           </div>
 
-          {/* Active Dropdown Popover (Rendered at container level to prevent overflow clipping) */}
+          {/* Active Dropdown Popover (Rendered at container level to float directly over active filter badges) */}
           {openDropdown && (
             <div
+              ref={popoverRef}
+              data-popover-menu="true"
               onClick={(e) => e.stopPropagation()}
               style={{
+                top: popoverTop !== null ? `${popoverTop}px` : undefined,
                 left: popoverLeft !== null ? `${popoverLeft}px` : undefined,
                 right: popoverRight !== null ? `${popoverRight}px` : undefined
               }}
-              className="absolute top-full mt-2 max-w-[calc(100vw-1.5rem)] bg-[#0e0e17] border border-hbo-border/90 rounded-2xl shadow-[0_12px_40px_rgba(0,0,0,0.9)] z-50 p-2.5 animate-in fade-in zoom-in-95 duration-150 backdrop-blur-2xl"
+              className="absolute max-w-[calc(100vw-1.5rem)] bg-[#0e0e17] border border-hbo-border/90 rounded-2xl shadow-[0_12px_40px_rgba(0,0,0,0.95)] z-50 p-2.5 animate-in fade-in zoom-in-95 duration-150"
             >
               {/* Sort Popover Menu */}
               {openDropdown === 'sort' && (
-                <div className="w-60 sm:w-64 max-h-80 overflow-y-auto no-scrollbar space-y-1">
+                <div className="w-60 sm:w-64 max-h-80 overflow-y-auto no-scrollbar space-y-1 p-1">
                   <div className="px-3 py-1 text-[10px] font-black tracking-wider uppercase text-gray-400 border-b border-hbo-border/40 mb-1">
                     Sort Order
                   </div>
@@ -359,11 +406,13 @@ export const SeriesFilterBar: React.FC<SeriesFilterBarProps> = ({
                       <button
                         key={opt.value}
                         type="button"
+                        data-filter-selected={isSelected ? 'true' : undefined}
                         onClick={() => {
                           onSelectSort(opt.value);
                           setOpenDropdown(null);
+                          sortBtnRef.current?.focus();
                         }}
-                        className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold text-left transition ${
+                        className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold text-left transition tv-focus-target cursor-pointer ${
                           isSelected ? 'bg-hbo-cyan text-black font-extrabold' : 'text-gray-300 hover:bg-white/10 hover:text-white'
                         }`}
                       >
@@ -377,17 +426,19 @@ export const SeriesFilterBar: React.FC<SeriesFilterBarProps> = ({
 
               {/* Platform Popover Menu */}
               {openDropdown === 'platform' && (
-                <div className="w-56 max-h-80 overflow-y-auto no-scrollbar space-y-1">
+                <div className="w-56 max-h-80 overflow-y-auto no-scrollbar space-y-1 p-1">
                   <div className="px-3 py-1 text-[10px] font-black tracking-wider uppercase text-gray-400 border-b border-hbo-border/40 mb-1">
                     Streaming Platform
                   </div>
                   <button
                     type="button"
+                    data-filter-selected={!selectedProvider ? 'true' : undefined}
                     onClick={() => {
                       onSelectProvider('');
                       setOpenDropdown(null);
+                      platformBtnRef.current?.focus();
                     }}
-                    className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold text-left transition ${
+                    className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold text-left transition tv-focus-target cursor-pointer ${
                       !selectedProvider ? 'bg-hbo-cyan text-black font-extrabold' : 'text-gray-300 hover:bg-white/10 hover:text-white'
                     }`}
                   >
@@ -400,11 +451,13 @@ export const SeriesFilterBar: React.FC<SeriesFilterBarProps> = ({
                       <button
                         key={platform.id}
                         type="button"
+                        data-filter-selected={isSelected ? 'true' : undefined}
                         onClick={() => {
                           onSelectProvider(isSelected ? '' : platform.id);
                           setOpenDropdown(null);
+                          platformBtnRef.current?.focus();
                         }}
-                        className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold text-left transition ${
+                        className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold text-left transition tv-focus-target cursor-pointer ${
                           isSelected ? 'bg-hbo-cyan text-black font-extrabold' : 'text-gray-300 hover:bg-white/10 hover:text-white'
                         }`}
                       >
@@ -418,7 +471,7 @@ export const SeriesFilterBar: React.FC<SeriesFilterBarProps> = ({
 
               {/* Genres Popover Menu */}
               {openDropdown === 'genre' && (
-                <div className="w-72 sm:w-80 max-h-80 overflow-y-auto no-scrollbar">
+                <div className="w-72 sm:w-80 max-h-80 overflow-y-auto no-scrollbar p-1">
                   <div className="flex items-center justify-between px-2 py-1 border-b border-hbo-border/40 mb-2">
                     <span className="text-[10px] font-black tracking-wider uppercase text-gray-400">
                       Genres {selectedGenres.length > 0 && `(${selectedGenres.length} selected)`}
@@ -427,21 +480,22 @@ export const SeriesFilterBar: React.FC<SeriesFilterBarProps> = ({
                       <button
                         type="button"
                         onClick={() => onSelectGenres([])}
-                        className="text-[10px] font-bold text-hbo-cyan hover:underline cursor-pointer"
+                        className="text-[10px] font-bold text-hbo-cyan hover:underline cursor-pointer tv-focus-target px-1.5 py-0.5 rounded"
                       >
                         Clear All
                       </button>
                     )}
                   </div>
-                  <div className="grid grid-cols-2 gap-1.5">
+                  <div className="grid grid-cols-2 gap-1.5 p-0.5">
                     {genres.map((g) => {
                       const isSelected = selectedGenres.includes(String(g.id));
                       return (
                         <button
                           key={g.id}
                           type="button"
+                          data-filter-selected={isSelected ? 'true' : undefined}
                           onClick={() => toggleGenre(String(g.id))}
-                          className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-semibold text-left transition border ${
+                          className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-semibold text-left transition border tv-focus-target cursor-pointer ${
                             isSelected
                               ? 'bg-hbo-purple/30 text-hbo-cyan border-hbo-cyan/50 font-bold'
                               : 'bg-white/5 border-transparent text-gray-300 hover:bg-white/10 hover:text-white'
@@ -458,7 +512,7 @@ export const SeriesFilterBar: React.FC<SeriesFilterBarProps> = ({
 
               {/* Year Popover Menu */}
               {openDropdown === 'year' && (
-                <div className="w-56 max-h-72 overflow-y-auto no-scrollbar space-y-1">
+                <div className="w-56 max-h-72 overflow-y-auto no-scrollbar space-y-1 p-1">
                   <div className="px-3 py-1 text-[10px] font-black tracking-wider uppercase text-gray-400 border-b border-hbo-border/40 mb-1">
                     First Air Year / Era
                   </div>
@@ -468,11 +522,13 @@ export const SeriesFilterBar: React.FC<SeriesFilterBarProps> = ({
                       <button
                         key={y.value}
                         type="button"
+                        data-filter-selected={isSelected ? 'true' : undefined}
                         onClick={() => {
                           onSelectYear(isSelected ? '' : y.value);
                           setOpenDropdown(null);
+                          yearBtnRef.current?.focus();
                         }}
-                        className={`w-full flex items-center justify-between px-3 py-1.5 rounded-xl text-xs font-bold text-left transition ${
+                        className={`w-full flex items-center justify-between px-3 py-1.5 rounded-xl text-xs font-bold text-left transition tv-focus-target cursor-pointer ${
                           isSelected ? 'bg-yellow-500 text-black font-extrabold' : 'text-gray-300 hover:bg-white/10 hover:text-white'
                         }`}
                       >
@@ -486,7 +542,7 @@ export const SeriesFilterBar: React.FC<SeriesFilterBarProps> = ({
 
               {/* Rating Popover Menu */}
               {openDropdown === 'rating' && (
-                <div className="w-56 space-y-1">
+                <div className="w-56 space-y-1 p-1">
                   <div className="px-3 py-1 text-[10px] font-black tracking-wider uppercase text-gray-400 border-b border-hbo-border/40 mb-1">
                     Minimum Rating
                   </div>
@@ -496,11 +552,13 @@ export const SeriesFilterBar: React.FC<SeriesFilterBarProps> = ({
                       <button
                         key={r.value}
                         type="button"
+                        data-filter-selected={isSelected ? 'true' : undefined}
                         onClick={() => {
                           onSelectRating(isSelected ? '' : r.value);
                           setOpenDropdown(null);
+                          ratingBtnRef.current?.focus();
                         }}
-                        className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold text-left transition ${
+                        className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold text-left transition tv-focus-target cursor-pointer ${
                           isSelected ? 'bg-emerald-500 text-black font-extrabold' : 'text-gray-300 hover:bg-white/10 hover:text-white'
                         }`}
                       >
