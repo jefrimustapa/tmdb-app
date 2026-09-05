@@ -410,9 +410,9 @@ export const Details: React.FC = () => {
               currentSeason={lastWatched?.season || 1}
               currentEpisode={lastWatched?.episode || 1}
               hasWatchedHistory={Boolean(lastWatched)}
-              onSelectEpisode={(s, e) => {
-                const isCurrentEp = Boolean(lastWatched && lastWatched.season === s && lastWatched.episode === e);
-                const epTime = (isCurrentEp && watchProgress && watchProgress.timestamp > 15) ? watchProgress.timestamp : 0;
+              onSelectEpisode={async (s, e) => {
+                const epHistory = await dbService.getHistoryItem(tmdbId, 'tv', s, e);
+                const epTime = (epHistory && epHistory.timestamp > 15) ? epHistory.timestamp : 0;
                 setLastWatched({ season: s, episode: e });
                 navigate(`/watch/tv/${tmdbId}?s=${s}&e=${e}${epTime > 0 ? `&t=${epTime}` : ''}`);
               }}

@@ -605,17 +605,19 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     hasSeekedInitialRef.current = false;
 
     const initProgress = async () => {
-      const existing = await dbService.getHistoryItem(tmdbId, mediaType);
-      const isSameEpisode = mediaType === 'tv' ? (existing?.season === season && existing?.episode === episode) : true;
+      const existing = await dbService.getHistoryItem(
+        tmdbId,
+        mediaType,
+        mediaType === 'tv' ? season : undefined,
+        mediaType === 'tv' ? episode : undefined
+      );
       
-      const targetTimestamp = (initialTimestamp !== undefined && initialTimestamp >= 0)
+      const targetTimestamp = (initialTimestamp !== undefined && initialTimestamp > 0)
         ? initialTimestamp 
-        : (isSameEpisode && existing ? existing.timestamp : 0);
+        : (existing?.timestamp || 0);
       
       currentTimeRef.current = targetTimestamp;
-      if (targetTimestamp > 0) {
-        setResumeTimestamp(targetTimestamp);
-      }
+      setResumeTimestamp(targetTimestamp);
 
       // Provisional duration from metadata
       const provisionalDuration = (episodeRuntimeMinutes ? episodeRuntimeMinutes * 60 : 0) || (existing?.duration || 0);
@@ -623,7 +625,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
       const progressPercent = provisionalDuration > 0 && targetTimestamp > 0 
         ? Math.min(100, Math.round((targetTimestamp / provisionalDuration) * 100))
-        : (isSameEpisode && existing ? existing.progressPercent : 0);
+        : (existing?.progressPercent || 0);
 
       await dbService.saveWatchProgress({
         tmdbId,
