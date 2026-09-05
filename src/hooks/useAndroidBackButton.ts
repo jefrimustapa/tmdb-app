@@ -20,7 +20,14 @@ export const useAndroidBackButton = () => {
 
   useEffect(() => {
     const handleBackButton = async () => {
-      // 1. Check if an active modal is open and dismiss it
+      // 1. Check if an active popover dropdown menu is open and dismiss it
+      const activePopover = document.querySelector('[data-popover-menu="true"]');
+      if (activePopover) {
+        window.dispatchEvent(new CustomEvent('tmdb_close_dropdowns'));
+        return;
+      }
+
+      // 2. Check if an active modal is open and dismiss it
       const modalCloseBtn = document.querySelector('[data-modal-close]') as HTMLButtonElement | null;
       if (modalCloseBtn) {
         modalCloseBtn.click();

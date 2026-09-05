@@ -64,7 +64,9 @@
 [data-priority-dropdown-container] .tv-focus-target:focus,
 [data-priority-dropdown-container] .tv-focus-target:focus-visible,
 [data-cursor-dropdown-container] .tv-focus-target:focus,
-[data-cursor-dropdown-container] .tv-focus-target:focus-visible {
+[data-cursor-dropdown-container] .tv-focus-target:focus-visible,
+[data-popover-menu] .tv-focus-target:focus,
+[data-popover-menu] .tv-focus-target:focus-visible {
   transform: none !important;
   outline: none !important;
   border-color: transparent !important;
