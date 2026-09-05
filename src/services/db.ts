@@ -79,33 +79,61 @@ export const dbService = {
   // Watch History
   async saveWatchProgress(item: Omit<WatchHistoryItem, 'id' | 'updatedAt'>) {
     try {
-      // Find all existing records for this media to prevent and clean duplicates
-      const matches = await db.history
-        .where('[tmdbId+mediaType]')
-        .equals([item.tmdbId, item.mediaType])
-        .toArray();
+      if (item.mediaType === 'tv' && typeof item.season === 'number' && typeof item.episode === 'number') {
+        // Find existing record for this specific episode
+        const matches = await db.history
+          .where('[tmdbId+mediaType]')
+          .equals([item.tmdbId, item.mediaType])
+          .and((h) => h.season === item.season && h.episode === item.episode)
+          .toArray();
 
-      if (matches.length > 0) {
-        // Keep the first one and update it
-        const primary = matches[0];
-        await db.history.update(primary.id!, {
-          ...item,
-          updatedAt: Date.now()
-        });
+        if (matches.length > 0) {
+          const primary = matches[0];
+          await db.history.update(primary.id!, {
+            ...item,
+            updatedAt: Date.now()
+          });
 
-        // Clean up any extraneous duplicate rows if they exist
-        if (matches.length > 1) {
-          for (let i = 1; i < matches.length; i++) {
-            if (matches[i].id) {
-              await db.history.delete(matches[i].id!);
+          if (matches.length > 1) {
+            for (let i = 1; i < matches.length; i++) {
+              if (matches[i].id) {
+                await db.history.delete(matches[i].id!);
+              }
             }
           }
+        } else {
+          await db.history.add({
+            ...item,
+            updatedAt: Date.now()
+          });
         }
       } else {
-        await db.history.add({
-          ...item,
-          updatedAt: Date.now()
-        });
+        // Movie (single record per movie)
+        const matches = await db.history
+          .where('[tmdbId+mediaType]')
+          .equals([item.tmdbId, item.mediaType])
+          .toArray();
+
+        if (matches.length > 0) {
+          const primary = matches[0];
+          await db.history.update(primary.id!, {
+            ...item,
+            updatedAt: Date.now()
+          });
+
+          if (matches.length > 1) {
+            for (let i = 1; i < matches.length; i++) {
+              if (matches[i].id) {
+                await db.history.delete(matches[i].id!);
+              }
+            }
+          }
+        } else {
+          await db.history.add({
+            ...item,
+            updatedAt: Date.now()
+          });
+        }
       }
     } catch (err) {
       console.error('Failed to save watch progress:', err);
@@ -114,17 +142,60 @@ export const dbService = {
 
   async getHistory(limit = 20): Promise<WatchHistoryItem[]> {
     try {
-      return await db.history.orderBy('updatedAt').reverse().limit(limit).toArray();
+      const all = await db.history.orderBy('updatedAt').reverse().toArray();
+      const seen = new Set<string>();
+      const deduplicated: WatchHistoryItem[] = [];
+      for (const item of all) {
+        const key = `${item.mediaType}-${item.tmdbId}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          deduplicated.push(item);
+          if (deduplicated.length >= limit) break;
+        }
+      }
+      return deduplicated;
     } catch {
       return [];
     }
   },
 
-  async getHistoryItem(tmdbId: number, mediaType: 'movie' | 'tv'): Promise<WatchHistoryItem | undefined> {
+  async getHistoryItem(
+    tmdbId: number,
+    mediaType: 'movie' | 'tv',
+    season?: number,
+    episode?: number
+  ): Promise<WatchHistoryItem | undefined> {
     try {
+      if (mediaType === 'tv' && typeof season === 'number' && typeof episode === 'number') {
+        const match = await db.history
+          .where('[tmdbId+mediaType]')
+          .equals([tmdbId, mediaType])
+          .and((h) => h.season === season && h.episode === episode)
+          .first();
+        return match;
+      }
+      if (mediaType === 'tv') {
+        const matches = await db.history
+          .where('[tmdbId+mediaType]')
+          .equals([tmdbId, mediaType])
+          .reverse()
+          .sortBy('updatedAt');
+        return matches.length > 0 ? matches[0] : undefined;
+      }
       return await db.history.where({ tmdbId, mediaType }).first();
     } catch {
       return undefined;
+    }
+  },
+
+  async getTVShowHistory(tmdbId: number): Promise<WatchHistoryItem[]> {
+    try {
+      return await db.history
+        .where('[tmdbId+mediaType]')
+        .equals([tmdbId, 'tv'])
+        .toArray();
+    } catch {
+      return [];
     }
   },
 
@@ -134,9 +205,14 @@ export const dbService = {
 
   async removeFromHistory(tmdbId: number, mediaType: 'movie' | 'tv') {
     try {
-      const existing = await db.history.where({ tmdbId, mediaType }).first();
-      if (existing && existing.id) {
-        await db.history.delete(existing.id);
+      const items = await db.history
+        .where('[tmdbId+mediaType]')
+        .equals([tmdbId, mediaType])
+        .toArray();
+      for (const item of items) {
+        if (item.id) {
+          await db.history.delete(item.id);
+        }
       }
     } catch (err) {
       console.error('Failed to remove from history:', err);
