@@ -2,12 +2,15 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20260905-1220';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-movies-page-fil.20260905-1220';
+export const APP_BUILD_NUMBER = '20260905-1241';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-series-page-fil.20260905-1241';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
-export const APP_BRANCH = 'feat-movies-page-fil';
-export const APP_CHANGELOG = `* fix: implement per-episode watch progress tracking and resolve episode resume timestamp leak (fixes #48) (#49)
+export const APP_BRANCH = 'feat-series-page-fil';
+export const APP_CHANGELOG = `* feat(series): add Horror genre mapping using TMDB horror keywords in discoverTV
+* feat(series): add sticky freezing SeriesFilterBar with multi-select and scrollable chips
+* feat(movies): add sticky freezing MovieFilterBar with multi-select and scrollable chips
+* fix: implement per-episode watch progress tracking and resolve episode resume timestamp leak (fixes #48) (#49)
 * feat(device): remove device type setting override and enforce pure automatic device detection (#47)
 * fix(web): resolve app icon and favicon pathing for browser/web app deployments (#46)
 * Merge pull request #45 from jefrimustapa/feat/improve-billboard
@@ -18,7 +21,4 @@ export const APP_CHANGELOG = `* fix: implement per-episode watch progress tracki
 * feat: mobile settings Excel freeze-row tabs on navbar collision
 * style: center app icon horizontally in TV navbar
 * style: center TV sidebar navigation icon group vertically
-* style: remove background container behind TV category icons
-* fix: TV category rail left padding buffer and header body background match
-* fix: TV layout margins, background & mobile navbar offset + sticky freeze
-* feat: TV Settings 1-row-per-section vertical sliding rail navigation`;
+* style: remove background container behind TV category icons`;
