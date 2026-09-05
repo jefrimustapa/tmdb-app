@@ -22,7 +22,7 @@ export const EpisodeGrid: React.FC<EpisodeGridProps> = ({
 }) => {
   const [selectedSeason, setSelectedSeason] = useState(currentSeason || 1);
   const [seasonData, setSeasonData] = useState<TMDBSeasonDetails | null>(null);
-  const [historyItem, setHistoryItem] = useState<WatchHistoryItem | null>(null);
+  const [historyMap, setHistoryMap] = useState<Map<string, WatchHistoryItem>>(new Map());
   const [isLoading, setIsLoading] = useState(false);
 
   // Filter out season 0 (Specials) if needed or keep regular seasons
@@ -34,11 +34,19 @@ export const EpisodeGrid: React.FC<EpisodeGridProps> = ({
     }
   }, [currentSeason]);
 
-  // Load history item for progress display
+  // Load all history items for this show for per-episode progress display
   useEffect(() => {
     let active = true;
-    dbService.getHistoryItem(tvDetails.id, 'tv').then((item) => {
-      if (active && item) setHistoryItem(item);
+    dbService.getTVShowHistory(tvDetails.id).then((items) => {
+      if (active) {
+        const map = new Map<string, WatchHistoryItem>();
+        items.forEach((item) => {
+          if (item.season && item.episode) {
+            map.set(`s${item.season}e${item.episode}`, item);
+          }
+        });
+        setHistoryMap(map);
+      }
     }).catch(() => {});
     return () => { active = false; };
   }, [tvDetails.id]);
@@ -104,10 +112,10 @@ export const EpisodeGrid: React.FC<EpisodeGridProps> = ({
                 })
               : 'Air Date TBD';
 
-            const isMatchHistory = Boolean(historyItem && historyItem.season === selectedSeason && historyItem.episode === ep.episode_number);
-            const isCompleted = Boolean(isMatchHistory && historyItem && historyItem.progressPercent >= 90);
-            const isResumable = Boolean(isMatchHistory && historyItem && historyItem.progressPercent > 3 && historyItem.progressPercent < 90);
-            const epProgress = isMatchHistory && historyItem ? historyItem.progressPercent : 0;
+            const epHistory = historyMap.get(`s${selectedSeason}e${ep.episode_number}`);
+            const isCompleted = Boolean(epHistory && epHistory.progressPercent >= 90);
+            const isResumable = Boolean(epHistory && epHistory.progressPercent > 3 && epHistory.progressPercent < 90);
+            const epProgress = epHistory ? epHistory.progressPercent : 0;
 
             return (
               <button

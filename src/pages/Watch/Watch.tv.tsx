@@ -518,6 +518,7 @@ export const Watch: React.FC = () => {
         {/* Video Player (Full Viewport with dynamic bottom safe area offset in portrait) */}
         <div className={`absolute top-0 left-0 right-0 w-full z-10 ${isPortrait ? 'bottom-20' : 'bottom-0'}`}>
           <VideoPlayer
+            key={`${mediaType}-${tmdbId}-${seasonParam}-${episodeParam}`}
             mediaType={mediaType}
             tmdbId={tmdbId}
             title={title || ''}
