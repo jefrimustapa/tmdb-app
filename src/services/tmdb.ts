@@ -185,6 +185,7 @@ export const tmdbApi = {
     sort_by?: string;
     primary_release_year?: number;
     page?: number;
+    [key: string]: any;
   } = {}) =>
     tmdbFetch<TMDBResponse<TMDBMediaItem>>('/discover/movie', params),
   discoverTV: (params: {
@@ -198,8 +199,27 @@ export const tmdbApi = {
     sort_by?: string;
     first_air_date_year?: number;
     page?: number;
-  } = {}) =>
-    tmdbFetch<TMDBResponse<TMDBMediaItem>>('/discover/tv', params),
+    with_keywords?: string;
+    [key: string]: any;
+  } = {}) => {
+    const queryParams: Record<string, any> = { ...params };
+    // TMDB has no official Horror genre for TV (ID 27). If '27' is selected, map to TMDB horror keywords.
+    if (queryParams.with_genres && queryParams.with_genres.split(',').includes('27')) {
+      const genreList = queryParams.with_genres
+        .split(',')
+        .map((s: string) => s.trim())
+        .filter((id: string) => id !== '27');
+      queryParams.with_genres = genreList.length > 0 ? genreList.join(',') : undefined;
+
+      const horrorKeywords = '315058|256183|295907|250593|12339';
+      if (queryParams.with_keywords) {
+        queryParams.with_keywords = `${queryParams.with_keywords}|${horrorKeywords}`;
+      } else {
+        queryParams.with_keywords = horrorKeywords;
+      }
+    }
+    return tmdbFetch<TMDBResponse<TMDBMediaItem>>('/discover/tv', queryParams);
+  },
 
   // Person / Cast Credits
   getPersonCredits: (personId: number) =>
@@ -218,8 +238,16 @@ export const tmdbApi = {
   // Genres
   getMovieGenres: () =>
     tmdbFetch<{ genres: TMDBGenre[] }>('/genre/movie/list'),
-  getTVGenres: () =>
-    tmdbFetch<{ genres: TMDBGenre[] }>('/genre/tv/list'),
+  getTVGenres: async () => {
+    const res = await tmdbFetch<{ genres: TMDBGenre[] }>('/genre/tv/list');
+    const genres = res.genres ? [...res.genres] : [];
+    // Inject 'Horror' (ID 27 matching movies) into TV series genre list
+    if (!genres.some((g) => g.id === 27 || g.name.toLowerCase() === 'horror')) {
+      genres.push({ id: 27, name: 'Horror' });
+      genres.sort((a, b) => a.name.localeCompare(b.name));
+    }
+    return { genres };
+  },
 };
 
 /** Helper to extract content rating (PG-13, R, TV-MA, etc.) */

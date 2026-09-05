@@ -3,28 +3,29 @@ import { tmdbApi } from '../../services/tmdb';
 import type { TMDBMediaItem, TMDBGenre } from '../../types/tmdb';
 import { MediaCard } from '../../components/common/MediaCard';
 import { PLATFORMS } from '../../components/common/PlatformHubs';
-import { SortDropdown, SortOption } from '../../components/common/SortDropdown';
-import { Filter, SlidersHorizontal } from 'lucide-react';
+import { SeriesFilterBar, TV_SORT_OPTIONS } from '../../components/common/SeriesFilterBar';
 import { useSearchParams } from 'react-router-dom';
 import { useDevice } from '../../hooks/useDevice';
-
-const TV_SORT_OPTIONS: SortOption[] = [
-  { value: 'popularity.desc', label: 'Most Popular' },
-  { value: 'vote_average.desc&vote_count.gte=200', label: 'Highest Rated' },
-  { value: 'first_air_date.desc', label: 'First Air Date (Newest)' }
-];
 
 export const Series: React.FC = () => {
   const { isTV } = useDevice();
   const [searchParams, setSearchParams] = useSearchParams();
   const genreParam = searchParams.get('genre') || '';
   const providerParam = searchParams.get('provider') || '';
+  const yearParam = searchParams.get('year') || '';
+  const ratingParam = searchParams.get('rating') || '';
+  const sortParam = searchParams.get('sort') || 'popularity.desc';
 
   const [series, setSeries] = useState<TMDBMediaItem[]>([]);
   const [genres, setGenres] = useState<TMDBGenre[]>([]);
-  const [selectedGenre, setSelectedGenre] = useState<string>(genreParam);
+  const [selectedGenres, setSelectedGenres] = useState<string[]>(
+    genreParam ? genreParam.split(',').filter(Boolean) : []
+  );
   const [selectedProvider, setSelectedProvider] = useState<string>(providerParam);
-  const [sortBy, setSortBy] = useState('popularity.desc');
+  const [selectedYear, setSelectedYear] = useState<string>(yearParam);
+  const [selectedRating, setSelectedRating] = useState<string>(ratingParam);
+  const [sortBy, setSortBy] = useState<string>(sortParam);
+
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
@@ -37,9 +38,72 @@ export const Series: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (genreParam !== selectedGenre) setSelectedGenre(genreParam);
+    const currentGenresStr = selectedGenres.join(',');
+    if (genreParam !== currentGenresStr) {
+      setSelectedGenres(genreParam ? genreParam.split(',').filter(Boolean) : []);
+    }
     if (providerParam !== selectedProvider) setSelectedProvider(providerParam);
-  }, [genreParam, providerParam]);
+    if (yearParam !== selectedYear) setSelectedYear(yearParam);
+    if (ratingParam !== selectedRating) setSelectedRating(ratingParam);
+    if (sortParam !== sortBy) setSortBy(sortParam);
+  }, [genreParam, providerParam, yearParam, ratingParam, sortParam]);
+
+  const updateUrlParams = (
+    genresList: string[],
+    provider: string,
+    year: string,
+    rating: string,
+    sort: string
+  ) => {
+    const params: Record<string, string> = {};
+    if (genresList.length > 0) params.genre = genresList.join(',');
+    if (provider) params.provider = provider;
+    if (year) params.year = year;
+    if (rating) params.rating = rating;
+    if (sort && sort !== 'popularity.desc') params.sort = sort;
+    setSearchParams(params);
+  };
+
+  const buildDiscoverParams = useCallback((pNum: number) => {
+    const platformObj = PLATFORMS.find((p) => p.id === selectedProvider);
+    const combinedGenres = [selectedGenres.join(','), platformObj?.genres].filter(Boolean).join(',');
+
+    const params: Record<string, any> = {
+      with_genres: combinedGenres || undefined,
+      with_watch_providers: platformObj?.providerId,
+      watch_region: platformObj?.region || 'US',
+      with_networks: platformObj?.networks,
+      sort_by: sortBy,
+      page: pNum
+    };
+
+    if (selectedYear) {
+      if (selectedYear === '2010s') {
+        params['first_air_date.gte'] = '2010-01-01';
+        params['first_air_date.lte'] = '2019-12-31';
+      } else if (selectedYear === '2000s') {
+        params['first_air_date.gte'] = '2000-01-01';
+        params['first_air_date.lte'] = '2009-12-31';
+      } else if (selectedYear === '1990s') {
+        params['first_air_date.gte'] = '1990-01-01';
+        params['first_air_date.lte'] = '1999-12-31';
+      } else if (selectedYear === '1980s') {
+        params['first_air_date.gte'] = '1980-01-01';
+        params['first_air_date.lte'] = '1989-12-31';
+      } else if (selectedYear === 'classics') {
+        params['first_air_date.lte'] = '1979-12-31';
+      } else {
+        params['first_air_date_year'] = Number(selectedYear);
+      }
+    }
+
+    if (selectedRating) {
+      params['vote_average.gte'] = selectedRating;
+      params['vote_count.gte'] = 50;
+    }
+
+    return params;
+  }, [selectedGenres, selectedProvider, selectedYear, selectedRating, sortBy]);
 
   // Initial fetch or filter changes
   useEffect(() => {
@@ -47,17 +111,8 @@ export const Series: React.FC = () => {
       setIsLoading(true);
       setPage(1);
       try {
-        const platformObj = PLATFORMS.find((p) => p.id === selectedProvider);
-        const combinedGenres = [selectedGenre, platformObj?.genres].filter(Boolean).join(',');
-
-        const res = await tmdbApi.discoverTV({
-          with_genres: combinedGenres || undefined,
-          with_watch_providers: platformObj?.providerId,
-          watch_region: platformObj?.region || 'US',
-          with_networks: platformObj?.networks,
-          sort_by: sortBy,
-          page: 1
-        });
+        const params = buildDiscoverParams(1);
+        const res = await tmdbApi.discoverTV(params);
         setSeries(res.results || []);
         setHasMore((res.page || 1) < (res.total_pages || 1));
       } catch (err) {
@@ -67,7 +122,7 @@ export const Series: React.FC = () => {
       }
     };
     fetchInitialSeries();
-  }, [selectedGenre, selectedProvider, sortBy]);
+  }, [buildDiscoverParams]);
 
   // Load more function for infinite scroll
   const loadMoreSeries = useCallback(async () => {
@@ -75,17 +130,8 @@ export const Series: React.FC = () => {
     setIsLoadingMore(true);
     const nextPage = page + 1;
     try {
-      const platformObj = PLATFORMS.find((p) => p.id === selectedProvider);
-      const combinedGenres = [selectedGenre, platformObj?.genres].filter(Boolean).join(',');
-
-      const res = await tmdbApi.discoverTV({
-        with_genres: combinedGenres || undefined,
-        with_watch_providers: platformObj?.providerId,
-        watch_region: platformObj?.region || 'US',
-        with_networks: platformObj?.networks,
-        sort_by: sortBy,
-        page: nextPage
-      });
+      const params = buildDiscoverParams(nextPage);
+      const res = await tmdbApi.discoverTV(params);
 
       if (res.results && res.results.length > 0) {
         setSeries((prev) => {
@@ -103,7 +149,7 @@ export const Series: React.FC = () => {
     } finally {
       setIsLoadingMore(false);
     }
-  }, [page, hasMore, isLoadingMore, isLoading, selectedGenre, selectedProvider, sortBy]);
+  }, [page, hasMore, isLoadingMore, isLoading, buildDiscoverParams]);
 
   // Intersection Observer for infinite scroll trigger
   useEffect(() => {
@@ -128,22 +174,21 @@ export const Series: React.FC = () => {
     };
   }, [loadMoreSeries, hasMore, isLoading, isLoadingMore]);
 
-  const updateFilters = (newGenre: string, newProvider: string) => {
-    setSelectedGenre(newGenre);
-    setSelectedProvider(newProvider);
-
-    const params: Record<string, string> = {};
-    if (newGenre) params.genre = newGenre;
-    if (newProvider) params.provider = newProvider;
-    setSearchParams(params);
+  const handleResetFilters = () => {
+    setSelectedGenres([]);
+    setSelectedProvider('');
+    setSelectedYear('');
+    setSelectedRating('');
+    setSortBy('popularity.desc');
+    setSearchParams({});
   };
 
   const activePlatform = PLATFORMS.find((p) => p.id === selectedProvider);
 
   return (
     <div className={`min-h-screen ${isTV ? 'pt-6 sm:pt-8 pb-16 px-6 lg:px-8' : 'pt-20 sm:pt-24 pb-20 px-4 sm:px-6'} w-full max-w-full`}>
-      {/* Header & Filter Bar */}
-      <div data-tv-filter-section="true" className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-5">
+      {/* Header */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-3">
         <div>
           <h1 className="text-2xl sm:text-4xl font-extrabold font-display text-white tracking-tight flex items-center gap-2">
             <span className="w-2 h-6 bg-hbo-cyan rounded-full"></span>
@@ -158,92 +203,39 @@ export const Series: React.FC = () => {
             Over 180,000 seasons, reality programs, drama series, and animated serials
           </p>
         </div>
-
-        {/* Sorting Dropdown */}
-        <div className="flex items-center gap-3">
-          <SortDropdown
-            value={sortBy}
-            onChange={(val) => setSortBy(val)}
-            options={TV_SORT_OPTIONS}
-          />
-        </div>
       </div>
 
-      {/* Streaming Hub Filters */}
-      <div data-tv-filter-section="true" className="mb-5">
-        <div className="flex items-center gap-2 text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">
-          <SlidersHorizontal className="w-3.5 h-3.5 text-hbo-cyan" />
-          <span>Filter by Streaming Platform Hub</span>
-        </div>
-        <div className="flex items-center gap-2.5 overflow-x-auto no-scrollbar py-3 px-3.5 sm:px-4 -mx-2 sm:-mx-3 scroll-pl-4 scroll-pr-4 transform-gpu">
-          <button
-            onClick={() => updateFilters(selectedGenre, '')}
-            className={`px-4 py-2.5 rounded-xl text-xs font-extrabold whitespace-nowrap transition-all border flex items-center gap-1.5 flex-shrink-0 tv-focus-target ${
-              !selectedProvider
-                ? 'bg-hbo-cyan text-black border-white shadow-[0_0_20px_rgba(0,210,255,0.7)] ring-2 ring-hbo-cyan/50 font-black'
-                : 'bg-hbo-card text-gray-400 border-hbo-border hover:text-white hover:bg-hbo-hover'
-            }`}
-          >
-            {!selectedProvider && <span className="w-2 h-2 rounded-full bg-black animate-pulse" />}
-            <span>All Platforms</span>
-          </button>
-          {PLATFORMS.map((platform) => {
-            const isSelected = selectedProvider === platform.id;
-            return (
-              <button
-                key={platform.id}
-                onClick={() => updateFilters(selectedGenre, isSelected ? '' : platform.id)}
-                className={`px-4 py-2.5 rounded-xl text-xs font-extrabold whitespace-nowrap transition-all border flex items-center gap-2 flex-shrink-0 tv-focus-target ${
-                  isSelected
-                    ? 'bg-hbo-cyan text-black border-white shadow-[0_0_20px_rgba(0,210,255,0.7)] ring-2 ring-hbo-cyan/50 font-black'
-                    : 'bg-hbo-card text-gray-400 border-hbo-border hover:text-white hover:bg-hbo-hover'
-                }`}
-              >
-                {isSelected && <span className="w-2 h-2 rounded-full bg-black animate-pulse" />}
-                <span>{platform.name}</span>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Genre Pills */}
-      <div data-tv-filter-section="true" className="mb-6">
-        <div className="flex items-center gap-2 text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">
-          <Filter className="w-3.5 h-3.5 text-hbo-purple-light" />
-          <span>Filter by Genre</span>
-        </div>
-        <div className="flex items-center gap-2.5 overflow-x-auto no-scrollbar py-3 px-3.5 sm:px-4 -mx-2 sm:-mx-3 scroll-pl-4 scroll-pr-4 transform-gpu">
-          <button
-            onClick={() => updateFilters('', selectedProvider)}
-            className={`px-4 py-2 rounded-full text-xs font-extrabold whitespace-nowrap transition-all border flex items-center gap-1.5 flex-shrink-0 tv-focus-target ${
-              !selectedGenre
-                ? 'bg-hbo-purple-light text-white border-white shadow-[0_0_20px_rgba(144,85,255,0.8)] ring-2 ring-hbo-purple-light/60 font-black'
-                : 'bg-hbo-card text-gray-400 border-hbo-border hover:text-white hover:bg-hbo-hover'
-            }`}
-          >
-            {!selectedGenre && <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />}
-            <span>All Genres</span>
-          </button>
-          {genres.map((g) => {
-            const isSelected = selectedGenre === String(g.id);
-            return (
-              <button
-                key={g.id}
-                onClick={() => updateFilters(isSelected ? '' : String(g.id), selectedProvider)}
-                className={`px-4 py-2 rounded-full text-xs font-extrabold whitespace-nowrap transition-all border flex items-center gap-1.5 flex-shrink-0 tv-focus-target ${
-                  isSelected
-                    ? 'bg-hbo-purple-light text-white border-white shadow-[0_0_20px_rgba(144,85,255,0.8)] ring-2 ring-hbo-purple-light/60 font-black'
-                    : 'bg-hbo-card text-gray-400 border-hbo-border hover:text-white hover:bg-hbo-hover'
-                }`}
-              >
-                {isSelected && <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />}
-                <span>{g.name}</span>
-              </button>
-            );
-          })}
-        </div>
-      </div>
+      {/* Sticky Freezing SeriesFilterBar */}
+      <SeriesFilterBar
+        genres={genres}
+        selectedGenres={selectedGenres}
+        onSelectGenres={(g) => {
+          setSelectedGenres(g);
+          updateUrlParams(g, selectedProvider, selectedYear, selectedRating, sortBy);
+        }}
+        selectedProvider={selectedProvider}
+        onSelectProvider={(p) => {
+          setSelectedProvider(p);
+          updateUrlParams(selectedGenres, p, selectedYear, selectedRating, sortBy);
+        }}
+        selectedYear={selectedYear}
+        onSelectYear={(y) => {
+          setSelectedYear(y);
+          updateUrlParams(selectedGenres, selectedProvider, y, selectedRating, sortBy);
+        }}
+        selectedRating={selectedRating}
+        onSelectRating={(r) => {
+          setSelectedRating(r);
+          updateUrlParams(selectedGenres, selectedProvider, selectedYear, r, sortBy);
+        }}
+        sortBy={sortBy}
+        onSelectSort={(s) => {
+          setSortBy(s);
+          updateUrlParams(selectedGenres, selectedProvider, selectedYear, selectedRating, s);
+        }}
+        onResetFilters={handleResetFilters}
+        isTV={isTV}
+      />
 
       {/* Grid of Series Cards */}
       {isLoading ? (
