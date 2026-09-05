@@ -41,8 +41,7 @@ export const Navbar: React.FC = () => {
   };
 
   const getModeLabel = () => {
-    const name = activeLayout === 'tv' ? 'TV' : activeLayout === 'tablet' ? 'Tablet' : activeLayout === 'mobile' ? 'Mobile' : 'Desktop';
-    return deviceMode === 'auto' ? `${name} (Auto)` : `${name} (Manual)`;
+    return activeLayout === 'tv' ? 'TV' : activeLayout === 'tablet' ? 'Tablet' : activeLayout === 'mobile' ? 'Mobile' : 'Desktop';
   };
 
   return (

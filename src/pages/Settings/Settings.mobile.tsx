@@ -83,7 +83,7 @@ export const Settings: React.FC = () => {
   const [openDropdownSlot, setOpenDropdownSlot] = useState<number | null>(null);
   const clickCountRef = useRef(0);
   const clickTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const { deviceMode, setDeviceMode, detectedPlatform, activeLayout } = useDevice();
+  const { detectedPlatform, activeLayout } = useDevice();
 
   useEffect(() => {
     try {
@@ -185,9 +185,6 @@ export const Settings: React.FC = () => {
   const handleUpdate = async (partial: Partial<UserSettings>) => {
     const updated = await dbService.updateSettings(partial);
     setSettings(updated);
-    if (partial.deviceMode) {
-      setDeviceMode(partial.deviceMode);
-    }
     setSavedMessage(true);
     setTimeout(() => setSavedMessage(false), 2500);
   };
@@ -637,57 +634,6 @@ export const Settings: React.FC = () => {
             </div>
 
             <div className="bg-hbo-card border border-hbo-border rounded-2xl overflow-hidden shadow-lg divide-y divide-white/5">
-              {/* Device Experience Mode */}
-              <div className="p-4 sm:p-5 space-y-3">
-                <div className="flex items-center justify-between gap-2 flex-wrap">
-                  <div className="flex items-center gap-2">
-                    <Tv2 className="w-4 h-4 text-hbo-cyan flex-shrink-0" />
-                    <h3 className="text-sm sm:text-base font-bold text-white">Device Experience Mode</h3>
-                  </div>
-                  <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-hbo-dark border border-hbo-border text-hbo-cyan font-bold">
-                    Active: {activeLayout.toUpperCase()}
-                  </span>
-                </div>
-                <p className="text-xs text-gray-400">
-                  Select your preferred UI format or keep Auto-Detect for responsive layout adapting.
-                </p>
-
-                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 pt-1">
-                  {[
-                    { id: 'auto', label: 'Auto Detect', icon: Monitor, desc: detectedPlatform.toUpperCase() },
-                    { id: 'mobile', label: 'Mobile Phone', icon: Smartphone, desc: 'Bottom Nav' },
-                    { id: 'tablet', label: 'Tablet / Pad', icon: Tablet, desc: 'Touch Grid' },
-                    { id: 'tv', label: 'Android TV', icon: Tv2, desc: 'D-Pad Focus' },
-                    { id: 'desktop', label: 'Desktop / PC', icon: Monitor, desc: 'Wide Cinema' },
-                  ].map((mode) => {
-                    const Icon = mode.icon;
-                    const isSelected = settings.deviceMode === mode.id;
-                    return (
-                      <button
-                        key={mode.id}
-                        onClick={() => handleUpdate({ deviceMode: mode.id as any })}
-                        className={`p-3 rounded-xl border text-left transition-all flex flex-col justify-between min-h-[76px] ${
-                          isSelected
-                            ? 'bg-gradient-to-r from-hbo-purple/40 to-hbo-cyan/20 border-hbo-cyan shadow-hbo-glow'
-                            : 'bg-hbo-dark/60 border-hbo-border hover:bg-hbo-hover text-gray-300'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between w-full">
-                          <Icon className={`w-4 h-4 ${isSelected ? 'text-hbo-cyan' : 'text-gray-400'}`} />
-                          {isSelected && <Check className="w-3 h-3 text-hbo-cyan stroke-[3]" />}
-                        </div>
-                        <div>
-                          <p className="text-xs font-bold text-white leading-tight">{mode.label}</p>
-                          <p className={`text-[10px] mt-0.5 ${isSelected ? 'text-hbo-cyan font-semibold' : 'text-gray-500'}`}>
-                            {mode.desc}
-                          </p>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
               {/* Stream Header Auto-Hide Timeout */}
               <div className="p-4 sm:p-5 space-y-3">
                 <div className="flex items-center justify-between gap-2 flex-wrap">

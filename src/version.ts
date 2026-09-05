@@ -2,14 +2,17 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20260904-0950';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-improve-billboa.20260904-0950';
+export const APP_BUILD_NUMBER = '20260904-1545';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-auto-detect-dev.20260904-1545';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
-export const APP_BRANCH = 'feat-improve-billboa';
-export const APP_CHANGELOG = `* feat: add touch swipe gesture support to change billboard slides on mobile
+export const APP_BRANCH = 'feat-auto-detect-dev';
+export const APP_CHANGELOG = `* fix(web): resolve app icon and favicon pathing for browser/web app deployments (#46)
+* Merge pull request #45 from jefrimustapa/feat/improve-billboard
+* feat: add touch swipe gesture support to change billboard slides on mobile
 * fix: resolve useEffect closing bracket in HeroBanner
 * feat: HBO Max style cross-dissolve backdrop transitions and staggered typography motion in HeroBanner
+* Merge pull request #44 from jefrimustapa/feat/restructure-settings-page
 * feat: mobile settings Excel freeze-row tabs on navbar collision
 * style: center app icon horizontally in TV navbar
 * style: center TV sidebar navigation icon group vertically
@@ -18,7 +21,4 @@ export const APP_CHANGELOG = `* feat: add touch swipe gesture support to change 
 * fix: TV layout margins, background & mobile navbar offset + sticky freeze
 * feat: TV Settings 1-row-per-section vertical sliding rail navigation
 * fix(tv-nav): enforce same-row boundary on Left key so single buttons return to active Category
-* fix(tv-nav): treat child panel sections as independent horizontal rows for left-to-category navigation
-* fix(tv-nav): smooth 2-way spatial focus between sidebar, categories rail, and content cards
-* feat(settings): restructure TV and mobile settings into HBO Max category layout
-* fix(mobile): move Next Episode button below provider dropdown in watch header`;
+* fix(tv-nav): treat child panel sections as independent horizontal rows for left-to-category navigation`;

@@ -2,26 +2,11 @@ import { useState, useEffect } from 'react';
 import { dbService } from '../services/db';
 
 export function useDevice() {
-  const [deviceMode, setDeviceModeState] = useState<'auto' | 'tv' | 'mobile' | 'tablet' | 'desktop'>('auto');
   const [isTV, setIsTV] = useState(false);
   const [isTablet, setIsTablet] = useState(false);
   const [isPhone, setIsPhone] = useState(false);
 
   useEffect(() => {
-    // Load persisted setting
-    dbService.getSettings().then(s => {
-      setDeviceModeState((s.deviceMode as any) || 'auto');
-    });
-
-    const handleSettingsChanged = (e: Event) => {
-      const customEvent = e as CustomEvent<any>;
-      if (customEvent.detail && customEvent.detail.deviceMode) {
-        setDeviceModeState(customEvent.detail.deviceMode);
-      }
-    };
-
-    window.addEventListener('tmdb_settings_changed', handleSettingsChanged);
-
     const checkDevice = () => {
       const ua = navigator.userAgent.toLowerCase();
       const isTVUserAgent =
@@ -65,41 +50,23 @@ export function useDevice() {
       const isPhoneUA = ua.includes('mobile') || ua.includes('iphone') || (ua.includes('android') && !isTabletDetected);
       const isPhoneDetected = !isTVDetected && !isTabletDetected && (isPhoneUA || (hasTouch && minDimension < 600));
 
-      if (deviceMode === 'tv') {
+      // Always pure auto-detection
+      if (isTVDetected) {
         setIsTV(true);
         setIsTablet(false);
         setIsPhone(false);
-      } else if (deviceMode === 'tablet') {
+      } else if (isTabletDetected) {
         setIsTV(false);
         setIsTablet(true);
         setIsPhone(false);
-      } else if (deviceMode === 'mobile') {
+      } else if (isPhoneDetected) {
         setIsTV(false);
         setIsTablet(false);
         setIsPhone(true);
-      } else if (deviceMode === 'desktop') {
+      } else {
         setIsTV(false);
         setIsTablet(false);
         setIsPhone(false);
-      } else {
-        // Auto detection
-        if (isTVDetected) {
-          setIsTV(true);
-          setIsTablet(false);
-          setIsPhone(false);
-        } else if (isTabletDetected) {
-          setIsTV(false);
-          setIsTablet(true);
-          setIsPhone(false);
-        } else if (isPhoneDetected) {
-          setIsTV(false);
-          setIsTablet(false);
-          setIsPhone(true);
-        } else {
-          setIsTV(false);
-          setIsTablet(false);
-          setIsPhone(false);
-        }
       }
     };
 
@@ -109,14 +76,8 @@ export function useDevice() {
     return () => {
       window.removeEventListener('resize', checkDevice);
       window.removeEventListener('orientationchange', checkDevice);
-      window.removeEventListener('tmdb_settings_changed', handleSettingsChanged);
     };
-  }, [deviceMode]);
-
-  const setDeviceMode = async (mode: 'auto' | 'tv' | 'mobile' | 'tablet' | 'desktop') => {
-    setDeviceModeState(mode);
-    await dbService.updateSettings({ deviceMode: mode });
-  };
+  }, []);
 
   const detectedPlatform: 'tv' | 'tablet' | 'mobile' | 'desktop' = isTV
     ? 'tv'
@@ -126,17 +87,16 @@ export function useDevice() {
     ? 'mobile'
     : 'desktop';
 
-  const activeLayout: 'tv' | 'tablet' | 'mobile' | 'desktop' = deviceMode === 'auto' ? detectedPlatform : deviceMode;
+  const activeLayout: 'tv' | 'tablet' | 'mobile' | 'desktop' = detectedPlatform;
 
   return {
-    deviceMode,
+    deviceMode: 'auto' as const,
     isTV,
     isTablet,
     isPhone,
     isMobile: isPhone || isTablet,
     isDesktop: !isPhone && !isTablet && !isTV,
     detectedPlatform,
-    activeLayout,
-    setDeviceMode
+    activeLayout
   };
 }
