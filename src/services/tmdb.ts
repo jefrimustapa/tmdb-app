@@ -185,6 +185,7 @@ export const tmdbApi = {
     sort_by?: string;
     primary_release_year?: number;
     page?: number;
+    [key: string]: any;
   } = {}) =>
     tmdbFetch<TMDBResponse<TMDBMediaItem>>('/discover/movie', params),
   discoverTV: (params: {
@@ -198,6 +199,7 @@ export const tmdbApi = {
     sort_by?: string;
     first_air_date_year?: number;
     page?: number;
+    [key: string]: any;
   } = {}) =>
     tmdbFetch<TMDBResponse<TMDBMediaItem>>('/discover/tv', params),
 
