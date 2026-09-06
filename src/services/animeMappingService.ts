@@ -163,3 +163,25 @@ export async function resolveAnimeMalId(title: string, year?: string | number): 
   }
   return malId;
 }
+
+/**
+ * Checks if a media item (from TMDB details or list item) is Japanese Anime.
+ */
+export function isAnimeMedia(media?: {
+  genre_ids?: number[];
+  genres?: { id: number; name?: string }[];
+  original_language?: string;
+  origin_country?: string[];
+} | null): boolean {
+  if (!media) return false;
+  const genreIds = media.genre_ids || (media.genres ? media.genres.map((g) => g.id) : []);
+  const lang = media.original_language?.toLowerCase();
+  const countries = media.origin_country || [];
+
+  // TMDB Animation genre is 16; Anime keyword is 210024
+  const hasAnimation = genreIds.includes(16);
+  const hasAnimeTag = genreIds.includes(210024);
+  const isJapanese = lang === 'ja' || countries.includes('JP');
+
+  return (hasAnimation && isJapanese) || hasAnimeTag;
+}

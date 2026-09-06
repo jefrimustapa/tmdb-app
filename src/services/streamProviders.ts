@@ -251,11 +251,23 @@ export function getProviderById(id: string): StreamProvider {
   return STREAM_PROVIDERS.find(p => p.id === id) || STREAM_PROVIDERS[0];
 }
 
-export function getOrderedProviders(topProviders?: string[]): StreamProvider[] {
-  if (!topProviders || topProviders.length === 0) return STREAM_PROVIDERS;
+export function getOrderedProviders(topProviders?: string[], isAnime = false): StreamProvider[] {
+  let baseList = [...STREAM_PROVIDERS];
+
+  // If anime context, prioritize providers tagged category: 'anime' right after the top providers
+  if (isAnime) {
+    baseList.sort((a, b) => {
+      const aIsAnime = a.category === 'anime' ? 1 : 0;
+      const bIsAnime = b.category === 'anime' ? 1 : 0;
+      return bIsAnime - aIsAnime;
+    });
+  }
+
+  if (!topProviders || topProviders.length === 0) return baseList;
+
   const topList = topProviders
     .map(id => STREAM_PROVIDERS.find(p => p.id === id))
     .filter((p): p is StreamProvider => Boolean(p));
-  const restList = STREAM_PROVIDERS.filter(p => !topProviders.includes(p.id));
+  const restList = baseList.filter(p => !topProviders.includes(p.id));
   return [...topList, ...restList];
 }
