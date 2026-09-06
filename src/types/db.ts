@@ -73,7 +73,7 @@ export interface UserSettings {
   deviceMode: 'auto' | 'tv' | 'mobile' | 'tablet' | 'desktop';
   autoplayNext: boolean;
   upNextPopup?: boolean;
-  upNextTriggerPercent?: number; // e.g. 75, 80, 85, 90, 95
+  upNextTriggerPercent?: number; // e.g. 90, 92, 94, 96, 98, 100
   upNextTimeout?: number; // e.g. 5, 10, 15, 20
   adBlockShield: boolean;
   filterAdult: boolean;
