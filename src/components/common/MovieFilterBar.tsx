@@ -49,7 +49,7 @@ export const MOVIE_RATING_OPTIONS = [
 ];
 
 interface MovieFilterBarProps {
-  genres: TMDBGenre[];
+  genres?: TMDBGenre[];
   selectedGenres: string[];
   onSelectGenres: (genres: string[]) => void;
   selectedProvider: string;
@@ -120,7 +120,7 @@ export const MovieFilterBar: React.FC<MovieFilterBarProps> = ({
   const selectedRatingObj = MOVIE_RATING_OPTIONS.find((r) => r.value === selectedRating);
   const selectedSortObj = MOVIE_SORT_OPTIONS.find((s) => s.value === sortBy) || MOVIE_SORT_OPTIONS[0];
 
-  const effectiveGenres = genres && genres.length > 0 ? genres : UNIFIED_GENRES;
+  const effectiveGenres = UNIFIED_GENRES;
 
   const hasActiveFilters = Boolean(
     selectedProvider ||

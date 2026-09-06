@@ -65,7 +65,7 @@ export const SEARCH_RATING_OPTIONS = [
 ];
 
 interface SearchFilterBarProps {
-  genres: TMDBGenre[];
+  genres?: TMDBGenre[];
   selectedType: SearchTargetType;
   onSelectType: (type: SearchTargetType) => void;
   selectedMediaType?: SearchMediaType;
@@ -143,7 +143,7 @@ export const SearchFilterBar: React.FC<SearchFilterBarProps> = ({
   const selectedRatingObj = SEARCH_RATING_OPTIONS.find((r) => r.value === selectedRating);
   const selectedSortObj = SEARCH_SORT_OPTIONS.find((s) => s.value === sortBy) || SEARCH_SORT_OPTIONS[0];
 
-  const effectiveGenres = genres && genres.length > 0 ? genres : UNIFIED_GENRES;
+  const effectiveGenres = UNIFIED_GENRES;
 
   const hasActiveFilters = Boolean(
     selectedType !== 'title' ||

@@ -182,6 +182,7 @@ export const COUNTRY_OPTIONS: CountryOption[] = [
   { code: '', name: 'All Countries', flag: '🌍' },
   { code: 'US', name: 'United States', flag: '🇺🇸' },
   { code: 'GB', name: 'United Kingdom', flag: '🇬🇧' },
+  { code: 'MY', name: 'Malaysia', flag: '🇲🇾' },
   { code: 'KR', name: 'South Korea', flag: '🇰🇷' },
   { code: 'JP', name: 'Japan', flag: '🇯🇵' },
   { code: 'IN', name: 'India', flag: '🇮🇳' },
@@ -200,6 +201,7 @@ export const COUNTRY_OPTIONS: CountryOption[] = [
 export const COUNTRY_TO_LANGUAGES: Record<string, string[]> = {
   US: ['en'],
   GB: ['en'],
+  MY: ['ms', 'en', 'zh', 'ta'],
   KR: ['ko'],
   JP: ['ja'],
   IN: ['hi', 'ta', 'te', 'ml', 'kn', 'bn', 'mr', 'pa'],
@@ -296,7 +298,7 @@ export const tmdbApi = {
           continue;
         }
         const unified = UNIFIED_GENRES.find((g) => g.id === idNum || g.tvGenreId === idNum || g.movieGenreId === idNum);
-        if (unified && !unified.isCustom) {
+        if (unified) {
           mappedMovieIds.add(String(unified.movieGenreId));
         } else if (!isNaN(idNum)) {
           mappedMovieIds.add(String(idNum));
@@ -348,7 +350,7 @@ export const tmdbApi = {
           continue;
         }
         const unified = UNIFIED_GENRES.find((g) => g.id === idNum || g.movieGenreId === idNum || g.tvGenreId === idNum);
-        if (unified && !unified.isCustom) {
+        if (unified) {
           mappedTvIds.add(String(unified.tvGenreId));
         } else if (!isNaN(idNum)) {
           mappedTvIds.add(String(idNum));

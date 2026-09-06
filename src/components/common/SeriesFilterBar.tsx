@@ -48,7 +48,7 @@ export const TV_RATING_OPTIONS = [
 ];
 
 interface SeriesFilterBarProps {
-  genres: TMDBGenre[];
+  genres?: TMDBGenre[];
   selectedGenres: string[];
   onSelectGenres: (genres: string[]) => void;
   selectedProvider: string;
@@ -119,7 +119,7 @@ export const SeriesFilterBar: React.FC<SeriesFilterBarProps> = ({
   const selectedRatingObj = TV_RATING_OPTIONS.find((r) => r.value === selectedRating);
   const selectedSortObj = TV_SORT_OPTIONS.find((s) => s.value === sortBy) || TV_SORT_OPTIONS[0];
 
-  const effectiveGenres = genres && genres.length > 0 ? genres : UNIFIED_GENRES;
+  const effectiveGenres = UNIFIED_GENRES;
 
   const hasActiveFilters = Boolean(
     selectedProvider ||
