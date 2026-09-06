@@ -10,6 +10,7 @@ import type { StreamResolverType } from '../../types/db';
 import { Logo } from '../common/Logo';
 import { tmdbImages, TMDB_FALLBACK_BACKDROP } from '../../services/tmdb';
 import { resolveAnimeMalId } from '../../services/animeMappingService';
+import { resolveLari21Stream } from '../../services/lk21MappingService';
 
 interface VideoPlayerProps {
   mediaType: 'movie' | 'tv';
@@ -30,6 +31,9 @@ interface VideoPlayerProps {
   initialTimestamp?: number;
   episodeRuntimeMinutes?: number;
   isAnime?: boolean;
+  isAsian?: boolean;
+  releaseYear?: string | number;
+  originalTitle?: string;
 }
 
 export const VideoPlayer: React.FC<VideoPlayerProps> = ({
@@ -50,7 +54,10 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   onNextEpisode,
   initialTimestamp = 0,
   episodeRuntimeMinutes,
-  isAnime = false
+  isAnime = false,
+  isAsian = false,
+  releaseYear,
+  originalTitle
 }) => {
   const [iframeKey, setIframeKey] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
@@ -68,6 +75,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const [showControls, setShowControls] = useState(true);
   const [topProviders, setTopProviders] = useState<string[]>(['vidlink', 'moviesapi', 'cinesrc']);
   const [topAnimeProviders, setTopAnimeProviders] = useState<string[]>(['megaplay-anime', 'cinesrc', 'moviesapi']);
+  const [topAsianProviders, setTopAsianProviders] = useState<string[]>(['lari21-asian', 'cinesrc', 'moviesapi']);
   const [enabledResolvers, setEnabledResolvers] = useState<StreamResolverType[]>(['embed']);
 
   // Up Next state
@@ -173,6 +181,9 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         if (s.topAnimeProviders && s.topAnimeProviders.length >= 3) {
           setTopAnimeProviders(s.topAnimeProviders);
         }
+        if (s.topAsianProviders && s.topAsianProviders.length >= 3) {
+          setTopAsianProviders(s.topAsianProviders);
+        }
         if (typeof s.autoplayNext === 'boolean') {
           setAutoplayNextEnabled(s.autoplayNext);
           autoplayNextEnabledRef.current = s.autoplayNext;
@@ -200,6 +211,28 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     async function executeStreamResolution() {
       setIsExtracting(true);
       setPlayerMode('loading');
+
+      // 0. FAST PATH: If selected provider is LARI21 (Asean), resolve directly without checking TorBox or Private Extractor
+      if (providerId === 'lari21-asian' || providerId === 'lk21-asian') {
+        try {
+          console.log('[Resolver] Fast-path Asian Provider (LARI21)...');
+          const lari21Res = await resolveLari21Stream(title, releaseYear, originalTitle);
+          if (!isMounted) return;
+          if (lari21Res && lari21Res.embedUrl) {
+            console.log('[Resolver] ✅ Playing via LARI21 Embed Iframe:', lari21Res.embedUrl);
+            setResolvedLari21Url(lari21Res.embedUrl);
+            setPlayerMode('embed');
+            setDirectStreamUrl(null);
+            setDirectStreamLabel('LARI21 Embed');
+            setIsExtracting(false);
+            setExtractionFailed(false);
+            setIsLoading(false);
+            return;
+          }
+        } catch (err) {
+          console.warn('[Resolver] LARI21 resolution error:', err);
+        }
+      }
 
       // 1. Try TorBox if enabled
       if (enabledResolvers.includes('torbox') && torboxApiKey && torboxApiKey.trim()) {
@@ -245,7 +278,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
       if (!isMounted) return;
 
-      // 3. Fallback to Embed Resolver ONLY if explicitly enabled
+      // 4. Fallback to Embed Resolver ONLY if explicitly enabled
       if (enabledResolvers.includes('embed')) {
         console.log('[Resolver] Active: Embed Resolver');
         setPlayerMode('embed');
@@ -267,7 +300,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     return () => {
       isMounted = false;
     };
-  }, [enabledResolvers, tmdbId, title, mediaType, season, episode, directStreamApiUrl, torboxApiKey]);
+  }, [enabledResolvers, tmdbId, title, mediaType, season, episode, directStreamApiUrl, torboxApiKey, isAsian, providerId, releaseYear, originalTitle]);
 
   const [resumeTimestamp, setResumeTimestamp] = useState<number>(initialTimestamp || 0);
   const [resolvedMalId, setResolvedMalId] = useState<number | null>(null);
@@ -288,8 +321,19 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     };
   }, [title]);
 
+  const [resolvedLari21Url, setResolvedLari21Url] = useState<string | null>(null);
+
+
+
   const provider = getProviderById(providerId);
   const baseStreamUrl = useMemo(() => {
+    // For LARI21 Asian provider
+    if (provider.id === 'lari21-asian' || provider.id === 'lk21-asian' || provider.category === 'asian') {
+      if (resolvedLari21Url) {
+        return resolvedLari21Url;
+      }
+      return '';
+    }
     // For anime providers with resolved MAL ID, use getAnimeUrl for both TV episodes and Movies/OVAs
     if (provider.category === 'anime' && provider.getAnimeUrl && resolvedMalId) {
       return provider.getAnimeUrl(resolvedMalId, season, episode, 'sub');
@@ -298,10 +342,14 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     return mediaType === 'movie'
       ? provider.getMovieUrl(tmdbId)
       : provider.getTVUrl(tmdbId, season, episode);
-  }, [provider, resolvedMalId, mediaType, tmdbId, season, episode]);
+  }, [provider, resolvedLari21Url, resolvedMalId, mediaType, tmdbId, season, episode]);
 
   const streamUrl = useMemo(() => {
     if (!baseStreamUrl) return '';
+    // Asian / LARI21 embeds do not support custom start/t/time query parameters and can crash or show a black screen
+    if (provider.id === 'lari21-asian' || provider.id === 'lk21-asian' || provider.category === 'asian') {
+      return baseStreamUrl;
+    }
     if (resumeTimestamp <= 0) return baseStreamUrl;
 
     const sep = baseStreamUrl.includes('?') ? '&' : '?';
@@ -309,7 +357,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       return `${baseStreamUrl}${sep}start=${resumeTimestamp}`;
     }
     return `${baseStreamUrl}${sep}start=${resumeTimestamp}&t=${resumeTimestamp}&time=${resumeTimestamp}#t=${resumeTimestamp}`;
-  }, [baseStreamUrl, resumeTimestamp, provider.id]);
+  }, [baseStreamUrl, resumeTimestamp, provider.id, provider.category]);
 
   const lastSaveTimeRef = useRef<number>(0);
 
@@ -677,10 +725,12 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   }, [tmdbId, mediaType, season, episode, voteAverage, posterPath, backdropPath, stillPath, episodeTitle, episodeRuntimeMinutes, initialTimestamp]);
 
   const activeTopProviders = useMemo(() => {
-    return isAnime ? topAnimeProviders : topProviders;
-  }, [isAnime, topAnimeProviders, topProviders]);
+    if (isAnime) return topAnimeProviders;
+    if (isAsian) return topAsianProviders;
+    return topProviders;
+  }, [isAnime, isAsian, topAnimeProviders, topAsianProviders, topProviders]);
 
-  const orderedProviders = React.useMemo(() => getOrderedProviders(activeTopProviders, isAnime), [activeTopProviders, isAnime]);
+  const orderedProviders = React.useMemo(() => getOrderedProviders(activeTopProviders, isAnime, isAsian), [activeTopProviders, isAnime, isAsian]);
 
   const cycleToNextProvider = useCallback(() => {
     resetControlsTimer();

@@ -49,6 +49,7 @@ export const DEFAULT_SETTINGS: UserSettings = {
   preferredProvider: 'vidlink',
   topProviders: ['vidlink', 'moviesapi', 'cinesrc'],
   topAnimeProviders: ['megaplay-anime', 'cinesrc', 'moviesapi'],
+  topAsianProviders: ['cinesrc', '111movies', 'lari21-asian'],
   deviceMode: 'auto',
   autoplayNext: true,
   upNextPopup: true,
@@ -296,6 +297,14 @@ export const dbService = {
         'megaplay-anime',
         'cinesrc',
         'moviesapi'
+      ];
+      await db.settings.put(settings);
+    }
+    if (!settings.topAsianProviders || settings.topAsianProviders.length < 3 || settings.topAsianProviders[0] === 'lk21-asian' || (settings.topAsianProviders[0] === 'lari21-asian' && settings.topAsianProviders[1] === 'cinesrc' && settings.topAsianProviders[2] === '111movies')) {
+      settings.topAsianProviders = [
+        'cinesrc',
+        '111movies',
+        'lari21-asian'
       ];
       await db.settings.put(settings);
     }
