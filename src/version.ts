@@ -2,16 +2,13 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20260906-1342';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.fix-megaplay-anime-p.20260906-1342';
+export const APP_BUILD_NUMBER = '20260906-1400';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.fix-home-new-release.20260906-1400';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
-export const APP_BRANCH = 'fix-megaplay-anime-p';
-export const APP_CHANGELOG = `* fix(player): fix MegaPlay anime progress tracking, compact up next popup, and update trigger percent settings
-* feat(details,watch,stream): optimize details UX, instant genres/progress reset, and enhance stream playback
-* fix(asian-stream): bypass Cloudflare WAF block and resolve direct HLS for LK21 videonode streams
-* fix(lk21): bypass CORS via AndroidBridge fetchHttp and search original_title for Asian movies
-* feat: add LK21 Asian stream provider with OTF search and CSP bypass
+export const APP_BRANCH = 'fix-home-new-release';
+export const APP_CHANGELOG = `* fix(player): fix MegaPlay anime progress tracking, compact up next popup, and update trigger percent settings (#61)
+* feat(details,watch,stream): add Asian stream provider, optimize details UX, and fix watch progress reset (#60)
 * feat(stream): separate embedded server priority for anime vs other content
 * feat(watch): center title in row 1 and move episode info to row 2 with prev/next buttons (#59)
 * feat(filter): add Anime option to Movies, TV Series, and Search genre filters (#57)
@@ -21,4 +18,7 @@ export const APP_CHANGELOG = `* fix(player): fix MegaPlay anime progress trackin
 * feat(series): add sticky freezing SeriesFilterBar with multi-select and scrollable chips (#51)
 * feat(movies): add sticky freezing MovieFilterBar with multi-select and scrollable chips (#50)
 * fix: implement per-episode watch progress tracking and resolve episode resume timestamp leak (fixes #48) (#49)
-* feat(device): remove device type setting override and enforce pure automatic device detection (#47)`;
+* feat(device): remove device type setting override and enforce pure automatic device detection (#47)
+* fix(web): resolve app icon and favicon pathing for browser/web app deployments (#46)
+* Merge pull request #45 from jefrimustapa/feat/improve-billboard
+* feat: add touch swipe gesture support to change billboard slides on mobile`;
