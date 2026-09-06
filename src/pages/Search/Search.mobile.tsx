@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Search as SearchIcon, X, Clock, Trash2 } from 'lucide-react';
-import { tmdbApi } from '../../services/tmdb';
+import { tmdbApi, ANIME_GENRE_ID } from '../../services/tmdb';
 import type { TMDBMediaItem, TMDBGenre } from '../../types/tmdb';
 import { MediaCard } from '../../components/common/MediaCard';
 import { SearchFilterBar, type SearchTargetType } from '../../components/common/SearchFilterBar';
@@ -316,7 +316,15 @@ export const Search: React.FC = () => {
     if (selectedGenres.length > 0) {
       list = list.filter((item) => {
         const itemGenres = item.genre_ids ? item.genre_ids.map(String) : [];
-        return selectedGenres.some((gId) => itemGenres.includes(gId));
+        return selectedGenres.some((gId) => {
+          if (gId === String(ANIME_GENRE_ID)) {
+            return (
+              (item.genre_ids?.includes(16) && (item.original_language === 'ja' || (item as any).origin_country?.includes('JP'))) ||
+              item.genre_ids?.includes(ANIME_GENRE_ID)
+            );
+          }
+          return itemGenres.includes(gId);
+        });
       });
     }
 
