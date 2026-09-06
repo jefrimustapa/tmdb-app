@@ -140,6 +140,81 @@ async function tmdbFetch<T>(endpoint: string, params: Record<string, string | nu
 
 export const ANIME_GENRE_ID = 210024;
 
+export interface UnifiedGenre {
+  id: number;
+  name: string;
+  movieGenreId: number;
+  tvGenreId: number;
+  isCustom?: boolean;
+}
+
+export const UNIFIED_GENRES: UnifiedGenre[] = [
+  { id: 28, name: 'Action', movieGenreId: 28, tvGenreId: 10759 },
+  { id: 12, name: 'Adventure', movieGenreId: 12, tvGenreId: 10759 },
+  { id: 16, name: 'Animation', movieGenreId: 16, tvGenreId: 16 },
+  { id: ANIME_GENRE_ID, name: 'Anime', movieGenreId: ANIME_GENRE_ID, tvGenreId: ANIME_GENRE_ID, isCustom: true },
+  { id: 35, name: 'Comedy', movieGenreId: 35, tvGenreId: 35 },
+  { id: 80, name: 'Crime', movieGenreId: 80, tvGenreId: 80 },
+  { id: 99, name: 'Documentary', movieGenreId: 99, tvGenreId: 99 },
+  { id: 18, name: 'Drama', movieGenreId: 18, tvGenreId: 18 },
+  { id: 10751, name: 'Family', movieGenreId: 10751, tvGenreId: 10751 },
+  { id: 14, name: 'Fantasy', movieGenreId: 14, tvGenreId: 10765 },
+  { id: 36, name: 'History', movieGenreId: 36, tvGenreId: 36 },
+  { id: 27, name: 'Horror', movieGenreId: 27, tvGenreId: 27, isCustom: true },
+  { id: 10762, name: 'Kids', movieGenreId: 10751, tvGenreId: 10762 },
+  { id: 10402, name: 'Music', movieGenreId: 10402, tvGenreId: 10402 },
+  { id: 9648, name: 'Mystery', movieGenreId: 9648, tvGenreId: 9648 },
+  { id: 10764, name: 'Reality', movieGenreId: 10770, tvGenreId: 10764 },
+  { id: 10749, name: 'Romance', movieGenreId: 10749, tvGenreId: 10749 },
+  { id: 878, name: 'Sci-Fi', movieGenreId: 878, tvGenreId: 10765 },
+  { id: 53, name: 'Thriller', movieGenreId: 53, tvGenreId: 9648 },
+  { id: 10752, name: 'War', movieGenreId: 10752, tvGenreId: 10768 },
+  { id: 37, name: 'Western', movieGenreId: 37, tvGenreId: 37 },
+];
+
+export interface CountryOption {
+  code: string;
+  name: string;
+  flag: string;
+}
+
+export const COUNTRY_OPTIONS: CountryOption[] = [
+  { code: '', name: 'All Countries', flag: '🌍' },
+  { code: 'US', name: 'United States', flag: '🇺🇸' },
+  { code: 'GB', name: 'United Kingdom', flag: '🇬🇧' },
+  { code: 'KR', name: 'South Korea', flag: '🇰🇷' },
+  { code: 'JP', name: 'Japan', flag: '🇯🇵' },
+  { code: 'IN', name: 'India', flag: '🇮🇳' },
+  { code: 'FR', name: 'France', flag: '🇫🇷' },
+  { code: 'DE', name: 'Germany', flag: '🇩🇪' },
+  { code: 'ES', name: 'Spain', flag: '🇪🇸' },
+  { code: 'CN', name: 'China', flag: '🇨🇳' },
+  { code: 'HK', name: 'Hong Kong', flag: '🇭🇰' },
+  { code: 'ID', name: 'Indonesia', flag: '🇮🇩' },
+  { code: 'TH', name: 'Thailand', flag: '🇹🇭' },
+  { code: 'CA', name: 'Canada', flag: '🇨🇦' },
+  { code: 'AU', name: 'Australia', flag: '🇦🇺' },
+  { code: 'IT', name: 'Italy', flag: '🇮🇹' },
+];
+
+export const COUNTRY_TO_LANGUAGES: Record<string, string[]> = {
+  US: ['en'],
+  GB: ['en'],
+  KR: ['ko'],
+  JP: ['ja'],
+  IN: ['hi', 'ta', 'te', 'ml', 'kn', 'bn', 'mr', 'pa'],
+  FR: ['fr'],
+  DE: ['de'],
+  ES: ['es'],
+  CN: ['zh'],
+  HK: ['zh', 'yue', 'cn'],
+  ID: ['id'],
+  TH: ['th'],
+  CA: ['en', 'fr'],
+  AU: ['en'],
+  IT: ['it'],
+};
+
 export const tmdbApi = {
   // Trending
   getTrending: (mediaType: 'all' | 'movie' | 'tv' = 'all', timeWindow: 'day' | 'week' = 'week') =>
@@ -196,6 +271,7 @@ export const tmdbApi = {
     with_genres?: string;
     with_watch_providers?: string;
     watch_region?: string;
+    with_origin_country?: string;
     certification_country?: string;
     certification?: string;
     'certification.lte'?: string;
@@ -206,26 +282,42 @@ export const tmdbApi = {
     [key: string]: any;
   } = {}) => {
     const queryParams: Record<string, any> = { ...params };
-    // TMDB has no official Anime genre (Anime is Animation ID 16 + original language ja).
-    if (queryParams.with_genres && queryParams.with_genres.split(',').includes(String(ANIME_GENRE_ID))) {
-      const genreList = queryParams.with_genres
-        .split(',')
-        .map((s: string) => s.trim())
-        .filter((id: string) => id !== String(ANIME_GENRE_ID));
 
-      // Add Animation genre (16) if not already present
-      if (!genreList.includes('16')) {
-        genreList.push('16');
+    // Translate any selected TV/unified genres to movie genres
+    if (queryParams.with_genres) {
+      const inputIds = queryParams.with_genres.split(',').map((s: string) => s.trim()).filter(Boolean);
+      const mappedMovieIds = new Set<string>();
+      let isAnime = false;
+
+      for (const idStr of inputIds) {
+        const idNum = Number(idStr);
+        if (idNum === ANIME_GENRE_ID) {
+          isAnime = true;
+          continue;
+        }
+        const unified = UNIFIED_GENRES.find((g) => g.id === idNum || g.tvGenreId === idNum || g.movieGenreId === idNum);
+        if (unified && !unified.isCustom) {
+          mappedMovieIds.add(String(unified.movieGenreId));
+        } else if (!isNaN(idNum)) {
+          mappedMovieIds.add(String(idNum));
+        }
       }
-      queryParams.with_genres = genreList.join(',');
-      queryParams.with_original_language = 'ja';
+
+      if (isAnime) {
+        mappedMovieIds.add('16');
+        queryParams.with_original_language = 'ja';
+      }
+
+      queryParams.with_genres = mappedMovieIds.size > 0 ? Array.from(mappedMovieIds).join(',') : undefined;
     }
+
     return tmdbFetch<TMDBResponse<TMDBMediaItem>>('/discover/movie', queryParams);
   },
   discoverTV: (params: {
     with_genres?: string;
     with_watch_providers?: string;
     watch_region?: string;
+    with_origin_country?: string;
     with_networks?: string;
     certification_country?: string;
     certification?: string;
@@ -237,37 +329,47 @@ export const tmdbApi = {
     [key: string]: any;
   } = {}) => {
     const queryParams: Record<string, any> = { ...params };
-    // TMDB has no official Horror genre for TV (ID 27). If '27' is selected, map to TMDB horror keywords.
-    if (queryParams.with_genres && queryParams.with_genres.split(',').includes('27')) {
-      const genreList = queryParams.with_genres
-        .split(',')
-        .map((s: string) => s.trim())
-        .filter((id: string) => id !== '27');
-      queryParams.with_genres = genreList.length > 0 ? genreList.join(',') : undefined;
 
-      const horrorKeywords = '315058|256183|295907|250593|12339';
-      if (queryParams.with_keywords) {
-        queryParams.with_keywords = `${queryParams.with_keywords}|${horrorKeywords}`;
-      } else {
-        queryParams.with_keywords = horrorKeywords;
-      }
-    }
-    // TMDB has no official Anime genre for TV (Anime is Animation ID 16 + original language ja).
-    if (queryParams.with_genres && queryParams.with_genres.split(',').includes(String(ANIME_GENRE_ID))) {
-      const genreList = queryParams.with_genres
-        ? queryParams.with_genres
-            .split(',')
-            .map((s: string) => s.trim())
-            .filter((id: string) => id !== String(ANIME_GENRE_ID))
-        : [];
+    // Translate any selected Movie/unified genres to TV genres
+    if (queryParams.with_genres) {
+      const inputIds = queryParams.with_genres.split(',').map((s: string) => s.trim()).filter(Boolean);
+      const mappedTvIds = new Set<string>();
+      let hasHorror = false;
+      let isAnime = false;
 
-      // Add Animation genre (16) if not already present
-      if (!genreList.includes('16')) {
-        genreList.push('16');
+      for (const idStr of inputIds) {
+        const idNum = Number(idStr);
+        if (idNum === ANIME_GENRE_ID) {
+          isAnime = true;
+          continue;
+        }
+        if (idNum === 27) {
+          hasHorror = true;
+          continue;
+        }
+        const unified = UNIFIED_GENRES.find((g) => g.id === idNum || g.movieGenreId === idNum || g.tvGenreId === idNum);
+        if (unified && !unified.isCustom) {
+          mappedTvIds.add(String(unified.tvGenreId));
+        } else if (!isNaN(idNum)) {
+          mappedTvIds.add(String(idNum));
+        }
       }
-      queryParams.with_genres = genreList.join(',');
-      queryParams.with_original_language = 'ja';
+
+      if (hasHorror) {
+        const horrorKeywords = '315058|256183|295907|250593|12339';
+        queryParams.with_keywords = queryParams.with_keywords
+          ? `${queryParams.with_keywords}|${horrorKeywords}`
+          : horrorKeywords;
+      }
+
+      if (isAnime) {
+        mappedTvIds.add('16');
+        queryParams.with_original_language = 'ja';
+      }
+
+      queryParams.with_genres = mappedTvIds.size > 0 ? Array.from(mappedTvIds).join(',') : undefined;
     }
+
     return tmdbFetch<TMDBResponse<TMDBMediaItem>>('/discover/tv', queryParams);
   },
 

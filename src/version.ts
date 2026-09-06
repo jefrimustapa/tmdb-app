@@ -2,12 +2,13 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20260906-1400';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.fix-home-new-release.20260906-1400';
+export const APP_BUILD_NUMBER = '20260906-1426';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-improve-filters.20260906-1426';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
-export const APP_BRANCH = 'fix-home-new-release';
-export const APP_CHANGELOG = `* fix(player): fix MegaPlay anime progress tracking, compact up next popup, and update trigger percent settings (#61)
+export const APP_BRANCH = 'feat-improve-filters';
+export const APP_CHANGELOG = `* fix(home): exclude re-releases and sort new release movies by latest date on left (#62)
+* fix(player): fix MegaPlay anime progress tracking, compact up next popup, and update trigger percent settings (#61)
 * feat(details,watch,stream): add Asian stream provider, optimize details UX, and fix watch progress reset (#60)
 * feat(stream): separate embedded server priority for anime vs other content
 * feat(watch): center title in row 1 and move episode info to row 2 with prev/next buttons (#59)
@@ -20,5 +21,4 @@ export const APP_CHANGELOG = `* fix(player): fix MegaPlay anime progress trackin
 * fix: implement per-episode watch progress tracking and resolve episode resume timestamp leak (fixes #48) (#49)
 * feat(device): remove device type setting override and enforce pure automatic device detection (#47)
 * fix(web): resolve app icon and favicon pathing for browser/web app deployments (#46)
-* Merge pull request #45 from jefrimustapa/feat/improve-billboard
-* feat: add touch swipe gesture support to change billboard slides on mobile`;
+* Merge pull request #45 from jefrimustapa/feat/improve-billboard`;

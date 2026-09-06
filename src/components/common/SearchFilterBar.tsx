@@ -1,9 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
   Film,
+  Tv,
+  Layers,
   Filter,
   Calendar,
   Star,
+  Globe,
   Check,
   ChevronDown,
   RotateCcw,
@@ -12,6 +15,7 @@ import {
 } from 'lucide-react';
 import type { TMDBGenre } from '../../types/tmdb';
 import type { SortOption } from './SortDropdown';
+import { COUNTRY_OPTIONS, UNIFIED_GENRES } from '../../services/tmdb';
 
 export const SEARCH_SORT_OPTIONS: SortOption[] = [
   { value: 'relevance', label: 'Relevance / Popularity' },
@@ -27,6 +31,14 @@ export const SEARCH_TYPE_OPTIONS: { label: string; value: SearchTargetType }[] =
   { label: 'Title', value: 'title' },
   { label: 'Keyword', value: 'keyword' },
   { label: 'Cast / Director', value: 'cast' }
+];
+
+export type SearchMediaType = 'all' | 'movie' | 'tv';
+
+export const SEARCH_MEDIA_OPTIONS: { label: string; value: SearchMediaType; icon: string }[] = [
+  { label: 'All Titles', value: 'all', icon: 'Layers' },
+  { label: 'Movies', value: 'movie', icon: 'Film' },
+  { label: 'Series', value: 'tv', icon: 'Tv' }
 ];
 
 export const SEARCH_YEAR_OPTIONS = [
@@ -56,6 +68,10 @@ interface SearchFilterBarProps {
   genres: TMDBGenre[];
   selectedType: SearchTargetType;
   onSelectType: (type: SearchTargetType) => void;
+  selectedMediaType?: SearchMediaType;
+  onSelectMediaType?: (mediaType: SearchMediaType) => void;
+  selectedCountry?: string;
+  onSelectCountry?: (country: string) => void;
   selectedGenres: string[];
   onSelectGenres: (genres: string[]) => void;
   selectedYear: string;
@@ -72,6 +88,10 @@ export const SearchFilterBar: React.FC<SearchFilterBarProps> = ({
   genres,
   selectedType,
   onSelectType,
+  selectedMediaType = 'all',
+  onSelectMediaType,
+  selectedCountry = '',
+  onSelectCountry,
   selectedGenres,
   onSelectGenres,
   selectedYear,
@@ -83,7 +103,7 @@ export const SearchFilterBar: React.FC<SearchFilterBarProps> = ({
   onResetFilters,
   isTV = false
 }) => {
-  const [openDropdown, setOpenDropdown] = useState<'sort' | 'type' | 'genre' | 'year' | 'rating' | null>(null);
+  const [openDropdown, setOpenDropdown] = useState<'sort' | 'type' | 'media' | 'genre' | 'country' | 'year' | 'rating' | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
   const chipsScrollRef = useRef<HTMLDivElement>(null);
@@ -92,15 +112,19 @@ export const SearchFilterBar: React.FC<SearchFilterBarProps> = ({
   // Button refs for anchoring the popover
   const sortBtnRef = useRef<HTMLButtonElement>(null);
   const typeBtnRef = useRef<HTMLButtonElement>(null);
+  const mediaBtnRef = useRef<HTMLButtonElement>(null);
   const genreBtnRef = useRef<HTMLButtonElement>(null);
+  const countryBtnRef = useRef<HTMLButtonElement>(null);
   const yearBtnRef = useRef<HTMLButtonElement>(null);
   const ratingBtnRef = useRef<HTMLButtonElement>(null);
 
-  const getActiveTriggerRef = (type: 'sort' | 'type' | 'genre' | 'year' | 'rating') => {
+  const getActiveTriggerRef = (type: 'sort' | 'type' | 'media' | 'genre' | 'country' | 'year' | 'rating') => {
     switch (type) {
       case 'sort': return sortBtnRef;
       case 'type': return typeBtnRef;
+      case 'media': return mediaBtnRef;
       case 'genre': return genreBtnRef;
+      case 'country': return countryBtnRef;
       case 'year': return yearBtnRef;
       case 'rating': return ratingBtnRef;
       default: return null;
@@ -113,19 +137,25 @@ export const SearchFilterBar: React.FC<SearchFilterBarProps> = ({
   const [isFrozen, setIsFrozen] = useState(false);
 
   const selectedTypeObj = SEARCH_TYPE_OPTIONS.find((t) => t.value === selectedType) || SEARCH_TYPE_OPTIONS[0];
+  const selectedMediaObj = SEARCH_MEDIA_OPTIONS.find((m) => m.value === selectedMediaType) || SEARCH_MEDIA_OPTIONS[0];
+  const selectedCountryObj = COUNTRY_OPTIONS.find((c) => c.code === selectedCountry);
   const selectedYearObj = SEARCH_YEAR_OPTIONS.find((y) => y.value === selectedYear);
   const selectedRatingObj = SEARCH_RATING_OPTIONS.find((r) => r.value === selectedRating);
   const selectedSortObj = SEARCH_SORT_OPTIONS.find((s) => s.value === sortBy) || SEARCH_SORT_OPTIONS[0];
 
+  const effectiveGenres = genres && genres.length > 0 ? genres : UNIFIED_GENRES;
+
   const hasActiveFilters = Boolean(
     selectedType !== 'title' ||
+    selectedMediaType !== 'all' ||
+    selectedCountry ||
     selectedGenres.length > 0 ||
     selectedYear ||
     selectedRating
   );
 
   const toggleDropdown = (
-    type: 'sort' | 'type' | 'genre' | 'year' | 'rating',
+    type: 'sort' | 'type' | 'media' | 'genre' | 'country' | 'year' | 'rating',
     btnRef: React.RefObject<HTMLButtonElement | null>
   ) => {
     if (openDropdown === type) {
@@ -138,7 +168,7 @@ export const SearchFilterBar: React.FC<SearchFilterBarProps> = ({
       const containerRect = containerRef.current.getBoundingClientRect();
 
       // Desired popover width estimate (typically 260px - 340px)
-      const popoverWidth = type === 'genre' ? 340 : 270;
+      const popoverWidth = type === 'genre' ? 340 : type === 'country' ? 280 : 270;
       const margin = 16;
 
       // Center the popover under the button if possible, or align to its left
@@ -297,7 +327,7 @@ export const SearchFilterBar: React.FC<SearchFilterBarProps> = ({
               <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${openDropdown === 'sort' ? 'rotate-180' : ''}`} />
             </button>
 
-            {/* 2. Media / Search Target Type Filter Chip */}
+            {/* 2. Search Target Mode Filter Chip (Title / Keyword / Cast) */}
             <button
               ref={typeBtnRef}
               type="button"
@@ -312,12 +342,32 @@ export const SearchFilterBar: React.FC<SearchFilterBarProps> = ({
               }`}
             >
               <Film className={`w-3.5 h-3.5 ${selectedType !== 'title' || openDropdown === 'type' ? 'text-black' : 'text-hbo-cyan'}`} />
-              <span className="text-gray-400 font-normal">Type:</span>
+              <span className="text-gray-400 font-normal">Search by:</span>
               <span>{selectedTypeObj.label}</span>
               <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${openDropdown === 'type' ? 'rotate-180' : ''}`} />
             </button>
 
-            {/* 3. Genres Multi-Select Filter Chip */}
+            {/* 3. Title Type Filter Chip (All / Movies / Series) */}
+            <button
+              ref={mediaBtnRef}
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                toggleDropdown('media', mediaBtnRef);
+              }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl text-xs sm:text-sm font-bold border transition-all shadow-sm flex-shrink-0 tv-focus-target cursor-pointer ${
+                selectedMediaType !== 'all' || openDropdown === 'media'
+                  ? 'bg-hbo-cyan text-black border-white shadow-[0_0_15px_rgba(0,210,255,0.4)] ring-2 ring-hbo-cyan/50'
+                  : 'bg-hbo-card text-gray-300 border-hbo-border hover:text-white hover:border-hbo-purple-light hover:bg-hbo-hover'
+              }`}
+            >
+              <Layers className={`w-3.5 h-3.5 ${selectedMediaType !== 'all' || openDropdown === 'media' ? 'text-black' : 'text-hbo-cyan'}`} />
+              <span className="text-gray-400 font-normal">Title:</span>
+              <span>{selectedMediaObj.label}</span>
+              <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${openDropdown === 'media' ? 'rotate-180' : ''}`} />
+            </button>
+
+            {/* 4. Genres Multi-Select Filter Chip */}
             <button
               ref={genreBtnRef}
               type="button"
@@ -336,7 +386,26 @@ export const SearchFilterBar: React.FC<SearchFilterBarProps> = ({
               <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${openDropdown === 'genre' ? 'rotate-180' : ''}`} />
             </button>
 
-            {/* 4. Year / Era Filter Chip */}
+            {/* 5. Country Filter Chip */}
+            <button
+              ref={countryBtnRef}
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                toggleDropdown('country', countryBtnRef);
+              }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl text-xs sm:text-sm font-bold border transition-all shadow-sm flex-shrink-0 tv-focus-target cursor-pointer ${
+                selectedCountry || openDropdown === 'country'
+                  ? 'bg-sky-500 text-black border-white shadow-[0_0_15px_rgba(14,165,233,0.4)] ring-2 ring-sky-500/50'
+                  : 'bg-hbo-card text-gray-300 border-hbo-border hover:text-white hover:border-hbo-purple-light hover:bg-hbo-hover'
+              }`}
+            >
+              <Globe className={`w-3.5 h-3.5 ${selectedCountry || openDropdown === 'country' ? 'text-black' : 'text-sky-400'}`} />
+              <span>{selectedCountryObj && selectedCountryObj.code ? `${selectedCountryObj.flag} ${selectedCountryObj.name}` : 'Country'}</span>
+              <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${openDropdown === 'country' ? 'rotate-180' : ''}`} />
+            </button>
+
+            {/* 6. Year / Era Filter Chip */}
             <button
               ref={yearBtnRef}
               type="button"
@@ -355,7 +424,7 @@ export const SearchFilterBar: React.FC<SearchFilterBarProps> = ({
               <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${openDropdown === 'year' ? 'rotate-180' : ''}`} />
             </button>
 
-            {/* 5. Rating Filter Chip */}
+            {/* 7. Rating Filter Chip */}
             <button
               ref={ratingBtnRef}
               type="button"
@@ -431,11 +500,11 @@ export const SearchFilterBar: React.FC<SearchFilterBarProps> = ({
                 </div>
               )}
 
-              {/* Media / Target Type Popover Menu */}
+              {/* Search Target Type Popover Menu (Title / Keyword / Cast) */}
               {openDropdown === 'type' && (
                 <div className="w-56 space-y-1 p-1">
                   <div className="px-3 py-1 text-[10px] font-black tracking-wider uppercase text-gray-400 border-b border-hbo-border/40 mb-1">
-                    Search Type
+                    Search Target Mode
                   </div>
                   {SEARCH_TYPE_OPTIONS.map((t) => {
                     const isSelected = selectedType === t.value;
@@ -461,6 +530,36 @@ export const SearchFilterBar: React.FC<SearchFilterBarProps> = ({
                 </div>
               )}
 
+              {/* Title Type (All / Movies / Series) Popover Menu */}
+              {openDropdown === 'media' && (
+                <div className="w-56 space-y-1 p-1">
+                  <div className="px-3 py-1 text-[10px] font-black tracking-wider uppercase text-gray-400 border-b border-hbo-border/40 mb-1">
+                    Title Type
+                  </div>
+                  {SEARCH_MEDIA_OPTIONS.map((m) => {
+                    const isSelected = selectedMediaType === m.value;
+                    return (
+                      <button
+                        key={m.value}
+                        type="button"
+                        data-filter-selected={isSelected ? 'true' : undefined}
+                        onClick={() => {
+                          onSelectMediaType?.(m.value);
+                          setOpenDropdown(null);
+                          mediaBtnRef.current?.focus();
+                        }}
+                        className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold text-left transition tv-focus-target cursor-pointer ${
+                          isSelected ? 'bg-hbo-cyan text-black font-extrabold' : 'text-gray-300 hover:bg-white/10 hover:text-white'
+                        }`}
+                      >
+                        <span>{m.label}</span>
+                        {isSelected && <Check className="w-3.5 h-3.5 stroke-[3]" />}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
               {/* Genres Popover Menu */}
               {openDropdown === 'genre' && (
                 <div className="w-72 sm:w-80 max-h-80 overflow-y-auto no-scrollbar p-1">
@@ -479,7 +578,7 @@ export const SearchFilterBar: React.FC<SearchFilterBarProps> = ({
                     )}
                   </div>
                   <div className="grid grid-cols-2 gap-1.5 p-0.5">
-                    {genres.map((g) => {
+                    {effectiveGenres.map((g) => {
                       const isSelected = selectedGenres.includes(String(g.id));
                       return (
                         <button
@@ -499,6 +598,39 @@ export const SearchFilterBar: React.FC<SearchFilterBarProps> = ({
                       );
                     })}
                   </div>
+                </div>
+              )}
+
+              {/* Country Popover Menu */}
+              {openDropdown === 'country' && (
+                <div className="w-64 max-h-80 overflow-y-auto no-scrollbar space-y-1 p-1">
+                  <div className="px-3 py-1 text-[10px] font-black tracking-wider uppercase text-gray-400 border-b border-hbo-border/40 mb-1">
+                    Origin Country
+                  </div>
+                  {COUNTRY_OPTIONS.map((c) => {
+                    const isSelected = selectedCountry === c.code;
+                    return (
+                      <button
+                        key={c.code || 'all'}
+                        type="button"
+                        data-filter-selected={isSelected ? 'true' : undefined}
+                        onClick={() => {
+                          onSelectCountry?.(isSelected ? '' : c.code);
+                          setOpenDropdown(null);
+                          countryBtnRef.current?.focus();
+                        }}
+                        className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold text-left transition tv-focus-target cursor-pointer ${
+                          isSelected ? 'bg-sky-500 text-black font-extrabold' : 'text-gray-300 hover:bg-white/10 hover:text-white'
+                        }`}
+                      >
+                        <span className="flex items-center gap-2">
+                          <span className="text-sm">{c.flag}</span>
+                          <span>{c.name}</span>
+                        </span>
+                        {isSelected && <Check className="w-3.5 h-3.5 stroke-[3]" />}
+                      </button>
+                    );
+                  })}
                 </div>
               )}
 
@@ -569,21 +701,33 @@ export const SearchFilterBar: React.FC<SearchFilterBarProps> = ({
             <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto no-scrollbar pt-1 pb-0.5 px-4 sm:px-6 -mx-4 sm:-mx-6 w-[calc(100%+2rem)] sm:w-[calc(100%+3rem)] flex-nowrap scroll-pl-4 scroll-pr-4">
               <span className="text-[10px] font-black tracking-wider uppercase text-gray-400 flex-shrink-0 mr-0.5">Active:</span>
 
-              {/* Media / Search Type Badge */}
+              {/* Search Target Mode Badge */}
               {selectedType !== 'title' && (
                 <button
                   type="button"
                   onClick={() => onSelectType('title')}
                   className="flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-hbo-cyan/20 text-hbo-cyan border border-hbo-cyan/40 hover:bg-hbo-cyan/30 transition flex-shrink-0 cursor-pointer tv-focus-target"
                 >
-                  <span>Type: {selectedTypeObj.label}</span>
+                  <span>Search: {selectedTypeObj.label}</span>
+                  <X className="w-3 h-3" />
+                </button>
+              )}
+
+              {/* Title Type Badge (Movie / Series) */}
+              {selectedMediaType !== 'all' && (
+                <button
+                  type="button"
+                  onClick={() => onSelectMediaType?.('all')}
+                  className="flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-hbo-cyan/20 text-hbo-cyan border border-hbo-cyan/40 hover:bg-hbo-cyan/30 transition flex-shrink-0 cursor-pointer tv-focus-target"
+                >
+                  <span>Title: {selectedMediaObj.label}</span>
                   <X className="w-3 h-3" />
                 </button>
               )}
 
               {/* Genre Badges */}
               {selectedGenres.map((gId) => {
-                const genreObj = genres.find((g) => String(g.id) === gId);
+                const genreObj = effectiveGenres.find((g) => String(g.id) === gId);
                 if (!genreObj) return null;
                 return (
                   <button
@@ -597,6 +741,18 @@ export const SearchFilterBar: React.FC<SearchFilterBarProps> = ({
                   </button>
                 );
               })}
+
+              {/* Country Badge */}
+              {selectedCountry && selectedCountryObj && (
+                <button
+                  type="button"
+                  onClick={() => onSelectCountry?.('')}
+                  className="flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-sky-500/20 text-sky-400 border border-sky-500/40 hover:bg-sky-500/30 transition flex-shrink-0 cursor-pointer"
+                >
+                  <span>{selectedCountryObj.flag} {selectedCountryObj.name}</span>
+                  <X className="w-3 h-3" />
+                </button>
+              )}
 
               {/* Year Badge */}
               {selectedYear && (

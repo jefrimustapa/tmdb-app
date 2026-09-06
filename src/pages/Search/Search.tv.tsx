@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Search as SearchIcon, X, Clock, Trash2 } from 'lucide-react';
-import { tmdbApi, ANIME_GENRE_ID } from '../../services/tmdb';
+import { tmdbApi, ANIME_GENRE_ID, UNIFIED_GENRES, COUNTRY_TO_LANGUAGES } from '../../services/tmdb';
 import type { TMDBMediaItem, TMDBGenre } from '../../types/tmdb';
 import { MediaCard } from '../../components/common/MediaCard';
-import { SearchFilterBar, type SearchTargetType } from '../../components/common/SearchFilterBar';
+import { SearchFilterBar, type SearchTargetType, type SearchMediaType } from '../../components/common/SearchFilterBar';
 import {
   getRecentSearches,
   addRecentSearch,
@@ -24,6 +24,8 @@ export const Search: React.FC = () => {
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
 
   // Filter Bar State
+  const [selectedMediaType, setSelectedMediaType] = useState<SearchMediaType>('all');
+  const [selectedCountry, setSelectedCountry] = useState<string>('');
   const [selectedType, setSelectedType] = useState<SearchTargetType>('title');
   const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
   const [selectedYear, setSelectedYear] = useState('');
@@ -300,6 +302,8 @@ export const Search: React.FC = () => {
 
   const handleResetFilters = () => {
     const hadCustomType = selectedType !== 'title';
+    setSelectedMediaType('all');
+    setSelectedCountry('');
     setSelectedType('title');
     setSelectedGenres([]);
     setSelectedYear('');
@@ -314,23 +318,61 @@ export const Search: React.FC = () => {
   const filteredAndSortedResults = useMemo(() => {
     let list = [...results];
 
-    // 1. Genre Filter (match if item has any selected genre)
+    // 1. Title Type Filter ('all' | 'movie' | 'tv')
+    if (selectedMediaType !== 'all') {
+      list = list.filter((item) => {
+        const isMovie = item.media_type === 'movie' || Boolean(item.title && !item.name);
+        const isTV = item.media_type === 'tv' || Boolean(item.name && !item.title);
+        return selectedMediaType === 'movie' ? isMovie : isTV;
+      });
+    }
+
+    // 2. Country Filter
+    if (selectedCountry) {
+      list = list.filter((item) => {
+        const originCountries: string[] = (item as any).origin_country || [];
+        if (originCountries.includes(selectedCountry)) return true;
+        const langs = COUNTRY_TO_LANGUAGES[selectedCountry];
+        if (langs && item.original_language && langs.includes(item.original_language)) {
+          if (originCountries.length > 0) {
+            return originCountries.includes(selectedCountry);
+          }
+          return true;
+        }
+        return false;
+      });
+    }
+
+    // 3. Unified Genre Filter (match if item has any selected unified genre)
     if (selectedGenres.length > 0) {
       list = list.filter((item) => {
-        const itemGenres = item.genre_ids ? item.genre_ids.map(String) : [];
+        const isMovie = item.media_type === 'movie' || Boolean(item.title && !item.name);
         return selectedGenres.some((gId) => {
-          if (gId === String(ANIME_GENRE_ID)) {
-            return (
-              (item.genre_ids?.includes(16) && (item.original_language === 'ja' || (item as any).origin_country?.includes('JP'))) ||
-              item.genre_ids?.includes(ANIME_GENRE_ID)
-            );
+          const u = UNIFIED_GENRES.find((ug) => String(ug.id) === gId);
+          if (u) {
+            if (u.id === ANIME_GENRE_ID) {
+              return (
+                (item.genre_ids?.includes(16) && (item.original_language === 'ja' || (item as any).origin_country?.includes('JP'))) ||
+                item.genre_ids?.includes(ANIME_GENRE_ID)
+              );
+            }
+            if (isMovie) {
+              return u.movieGenreId ? item.genre_ids?.includes(u.movieGenreId) : false;
+            } else {
+              if (u.id === 27) {
+                // TV Horror mapping: mystery (9648) or horror (27)
+                return item.genre_ids?.includes(9648) || item.genre_ids?.includes(27);
+              }
+              return u.tvGenreId ? item.genre_ids?.includes(u.tvGenreId) : false;
+            }
           }
-          return itemGenres.includes(gId);
+          const numId = Number(gId);
+          return item.genre_ids?.includes(numId);
         });
       });
     }
 
-    // 2. Year / Era Filter
+    // 4. Year / Era Filter
     if (selectedYear) {
       list = list.filter((item) => {
         const dateStr = item.release_date || item.first_air_date || '';
@@ -352,7 +394,7 @@ export const Search: React.FC = () => {
       });
     }
 
-    // 3. Rating Filter
+    // 5. Rating Filter
     if (selectedRating) {
       const minVote = parseFloat(selectedRating);
       if (!isNaN(minVote)) {
@@ -360,7 +402,7 @@ export const Search: React.FC = () => {
       }
     }
 
-    // 4. Sort By
+    // 6. Sort By
     list.sort((a, b) => {
       switch (sortBy) {
         case 'vote_average.desc':
@@ -386,7 +428,7 @@ export const Search: React.FC = () => {
     });
 
     return list;
-  }, [results, selectedGenres, selectedYear, selectedRating, sortBy]);
+  }, [results, selectedMediaType, selectedCountry, selectedGenres, selectedYear, selectedRating, sortBy]);
 
   return (
     <div className="min-h-screen pt-24 pb-16 px-4 sm:px-8 w-full max-w-full">
@@ -465,6 +507,10 @@ export const Search: React.FC = () => {
           genres={genres}
           selectedType={selectedType}
           onSelectType={handleSelectType}
+          selectedMediaType={selectedMediaType}
+          onSelectMediaType={setSelectedMediaType}
+          selectedCountry={selectedCountry}
+          onSelectCountry={setSelectedCountry}
           selectedGenres={selectedGenres}
           onSelectGenres={setSelectedGenres}
           selectedYear={selectedYear}
