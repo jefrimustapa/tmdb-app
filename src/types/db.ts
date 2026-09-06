@@ -69,6 +69,7 @@ export interface UserSettings {
   preferredProvider: string;
   topProviders?: [string, string, string] | string[];
   topAnimeProviders?: [string, string, string] | string[];
+  topAsianProviders?: [string, string, string] | string[];
   deviceMode: 'auto' | 'tv' | 'mobile' | 'tablet' | 'desktop';
   autoplayNext: boolean;
   upNextPopup?: boolean;

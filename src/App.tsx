@@ -91,9 +91,9 @@ const AppContent: React.FC = () => {
           <Route path="/" element={<PlatformRoute tv={HomeTV} mobile={HomeMobile} />} />
           <Route path="/movies" element={<PlatformRoute tv={MoviesTV} mobile={MoviesMobile} />} />
           <Route path="/tv" element={<PlatformRoute tv={SeriesTV} mobile={SeriesMobile} />} />
-          <Route path="/details/:type/:id" element={<PlatformRoute tv={DetailsTV} mobile={DetailsMobile} />} />
-          <Route path="/movie/:id" element={<PlatformRoute tv={DetailsTV} mobile={DetailsMobile} />} />
-          <Route path="/tv/:id" element={<PlatformRoute tv={DetailsTV} mobile={DetailsMobile} />} />
+          <Route path="/details/:type/:id" element={<PlatformRoute key={location.pathname} tv={DetailsTV} mobile={DetailsMobile} />} />
+          <Route path="/movie/:id" element={<PlatformRoute key={location.pathname} tv={DetailsTV} mobile={DetailsMobile} />} />
+          <Route path="/tv/:id" element={<PlatformRoute key={location.pathname} tv={DetailsTV} mobile={DetailsMobile} />} />
           <Route path="/watch/:type/:id" element={<PlatformRoute tv={WatchTV} mobile={WatchMobile} />} />
           <Route path="/search" element={<PlatformRoute tv={SearchTV} mobile={SearchMobile} />} />
           <Route path="/library" element={<PlatformRoute tv={LibraryTV} mobile={LibraryMobile} />} />

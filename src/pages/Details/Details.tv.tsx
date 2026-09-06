@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import { Play, Heart, Bookmark, Star, ArrowLeft, Plus, Check, RotateCcw } from 'lucide-react';
 import type { TMDBMovieDetails, TMDBTVDetails, TMDBMediaItem } from '../../types/tmdb';
-import { tmdbApi, tmdbImages, extractContentRating } from '../../services/tmdb';
+import { tmdbApi, tmdbImages, extractContentRating, resolveGenresFromIds } from '../../services/tmdb';
 import { dbService } from '../../services/db';
 import { MediaRow } from '../../components/common/MediaRow';
 import { EpisodeGrid } from '../../components/player/EpisodeGrid';
@@ -11,49 +11,86 @@ import { useDevice } from '../../hooks/useDevice';
 export const Details: React.FC = () => {
   const { type, id } = useParams<{ type: 'movie' | 'tv'; id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const { isTV } = useDevice();
 
   const tmdbId = parseInt(id || '0', 10);
   const mediaType: 'movie' | 'tv' = (type === 'tv' ? 'tv' : 'movie');
 
-  const [details, setDetails] = useState<TMDBMovieDetails | TMDBTVDetails | null>(null);
+  // Instant preview from router state (0ms delay) with instantaneous genres resolution
+  const initialPreview = (location.state as { item?: TMDBMediaItem } | null)?.item;
+  const [details, setDetails] = useState<TMDBMovieDetails | TMDBTVDetails | null>(() => {
+    if (initialPreview && initialPreview.id === tmdbId) {
+      return {
+        ...initialPreview,
+        genres: resolveGenresFromIds(initialPreview.genre_ids),
+        overview: initialPreview.overview || ''
+      } as unknown as (TMDBMovieDetails | TMDBTVDetails);
+    }
+    return null;
+  });
   const [similar, setSimilar] = useState<TMDBMediaItem[]>([]);
   const [isLiked, setIsLiked] = useState(false);
   const [isWatchlist, setIsWatchlist] = useState(false);
   const [lastWatched, setLastWatched] = useState<{ season: number; episode: number } | null>(null);
   const [watchProgress, setWatchProgress] = useState<{ timestamp: number; duration: number; progressPercent: number } | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(() => !initialPreview || initialPreview.id !== tmdbId);
 
   useEffect(() => {
     if (!tmdbId) return;
 
-    const fetchDetails = async () => {
+    let isMounted = true;
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' as ScrollBehavior });
+
+    // Reset previous title state immediately so old watch time/likes don't persist
+    setWatchProgress(null);
+    setLastWatched(null);
+    setIsLiked(false);
+    setIsWatchlist(false);
+
+    const preview = (location.state as { item?: TMDBMediaItem } | null)?.item;
+    if (preview && preview.id === tmdbId) {
+      setDetails({
+        ...preview,
+        genres: resolveGenresFromIds(preview.genre_ids),
+        overview: preview.overview || ''
+      } as unknown as (TMDBMovieDetails | TMDBTVDetails));
+      setIsLoading(false);
+    } else {
+      setDetails(null);
       setIsLoading(true);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-      try {
-        let resData: TMDBMovieDetails | TMDBTVDetails;
-        if (mediaType === 'movie') {
-          resData = await tmdbApi.getMovieDetails(tmdbId);
-        } else {
-          resData = await tmdbApi.getTVDetails(tmdbId);
+    }
+
+    // Parallel fetch: TMDB details and DB status simultaneously
+    const detailsPromise = mediaType === 'movie'
+      ? tmdbApi.getMovieDetails(tmdbId)
+      : tmdbApi.getTVDetails(tmdbId);
+
+    const dbPromise = Promise.allSettled([
+      dbService.isLiked(tmdbId, mediaType),
+      dbService.isWatchlisted(tmdbId, mediaType),
+      dbService.getHistoryItem(tmdbId, mediaType)
+    ]);
+
+    Promise.all([detailsPromise, dbPromise])
+      .then(([resData, dbResults]) => {
+        if (!isMounted) return;
+
+        if (resData) {
+          setDetails(resData);
+          const recItems = (resData.similar?.results || resData.recommendations?.results || []) as TMDBMediaItem[];
+          setSimilar(recItems);
         }
-        setDetails(resData);
 
-        const recItems = (resData.similar?.results || resData.recommendations?.results || []) as TMDBMediaItem[];
-        setSimilar(recItems);
-
-        const [liked, watchlisted, historyItem] = await Promise.allSettled([
-          dbService.isLiked(tmdbId, mediaType),
-          dbService.isWatchlisted(tmdbId, mediaType),
-          dbService.getHistoryItem(tmdbId, mediaType)
-        ]);
-
+        const [liked, watchlisted, historyItem] = dbResults;
         if (liked.status === 'fulfilled') setIsLiked(liked.value);
         if (watchlisted.status === 'fulfilled') setIsWatchlist(watchlisted.value);
         if (historyItem.status === 'fulfilled' && historyItem.value) {
           const item = historyItem.value;
           if (item.season && item.episode) {
             setLastWatched({ season: item.season, episode: item.episode });
+          } else {
+            setLastWatched(null);
           }
           if (item.timestamp > 0) {
             setWatchProgress({
@@ -61,28 +98,37 @@ export const Details: React.FC = () => {
               duration: item.duration,
               progressPercent: item.progressPercent
             });
+          } else {
+            setWatchProgress(null);
           }
+        } else {
+          setLastWatched(null);
+          setWatchProgress(null);
         }
-      } catch (err) {
-        console.error('Failed to load details:', err);
-      } finally {
-        setIsLoading(false);
-        // Automatically focus the primary action button (Watch Now) once details finish loading without scrolling jump
-        setTimeout(() => {
-          window.scrollTo(0, 0);
-          const mainContent = document.querySelector('main');
-          const primaryBtn = mainContent?.querySelector<HTMLElement>('[data-details-primary="true"]') ||
-                             mainContent?.querySelector<HTMLElement>('.tv-focus-target, a, button') ||
-                             document.querySelector<HTMLElement>('.tv-focus-target');
-          if (primaryBtn) {
-            primaryBtn.focus({ preventScroll: true });
-          }
-        }, 100);
-      }
-    };
+      })
+      .catch((err) => {
+        console.error('Failed to load details in parallel:', err);
+      })
+      .finally(() => {
+        if (isMounted) {
+          setIsLoading(false);
+          // Automatically focus the primary action button (Watch Now) once details finish loading without scrolling jump
+          setTimeout(() => {
+            window.scrollTo(0, 0);
+            const mainContent = document.querySelector('main');
+            const primaryBtn = mainContent?.querySelector<HTMLElement>('[data-details-primary="true"]') ||
+                               mainContent?.querySelector<HTMLElement>('.tv-focus-target, a, button') ||
+                               document.querySelector<HTMLElement>('.tv-focus-target');
+            if (primaryBtn) {
+              primaryBtn.focus({ preventScroll: true });
+            }
+          }, 100);
+        }
+      });
 
-    window.scrollTo(0, 0);
-    fetchDetails();
+    return () => {
+      isMounted = false;
+    };
   }, [tmdbId, mediaType]);
 
   // Keep last watched season & episode and progress synchronized when returning to Details
@@ -190,7 +236,7 @@ export const Details: React.FC = () => {
 
   const title = details.title || details.name || 'Untitled';
   const isPerfMode = typeof document !== 'undefined' && document.documentElement.getAttribute('data-perf-mode') === 'true';
-  const backdropUrl = tmdbImages.backdrop(details.backdrop_path, isPerfMode ? 'w780' : 'original');
+  const backdropUrl = tmdbImages.backdrop(details.backdrop_path, isPerfMode ? 'w780' : 'w1280');
   const posterUrl = tmdbImages.poster(details.poster_path, 'w500');
   const releaseYear = (details.release_date || details.first_air_date || '').split('-')[0];
   const contentRating = extractContentRating(details);
@@ -255,15 +301,17 @@ export const Details: React.FC = () => {
 
           {/* Title & Metadata & Action Buttons */}
           <div className="flex-1 min-w-0 space-y-3.5 sm:space-y-4.5 text-center sm:text-left">
-            <div className="flex items-center justify-center sm:justify-start gap-2 flex-wrap">
+            <div className="flex items-center justify-center sm:justify-start gap-2 flex-wrap min-h-[26px]">
               <span className="px-3 py-0.5 rounded-full bg-hbo-purple/70 text-white border border-hbo-purple-light text-xs font-black uppercase tracking-wider backdrop-blur-md">
                 {mediaType === 'movie' ? 'FILM' : 'SERIES'}
               </span>
-              {contentRating && (
-                <span className="px-2.5 py-0.5 rounded-full bg-white/15 text-white border border-white/25 text-xs font-black uppercase tracking-wider backdrop-blur-md">
+              {contentRating ? (
+                <span className="px-2.5 py-0.5 rounded-full bg-white/15 text-white border border-white/25 text-xs font-black uppercase tracking-wider backdrop-blur-md animate-fade-in">
                   {contentRating}
                 </span>
-              )}
+              ) : isLoading ? (
+                <span className="w-12 h-5 rounded-full bg-white/10 border border-white/10 animate-pulse" />
+              ) : null}
             </div>
 
             <h1 className="text-2xl sm:text-4xl md:text-5xl lg:text-6xl font-black font-display tracking-tight text-white leading-tight drop-shadow-2xl">
@@ -271,25 +319,29 @@ export const Details: React.FC = () => {
             </h1>
 
             {/* Quick Meta Row */}
-            <div className="flex items-center justify-center sm:justify-start gap-3 text-xs sm:text-sm text-gray-300 font-semibold flex-wrap">
+            <div className="flex items-center justify-center sm:justify-start gap-3 text-xs sm:text-sm text-gray-300 font-semibold flex-wrap min-h-[22px]">
               <div className="flex items-center gap-1.5 font-bold text-yellow-400">
                 <Star className="w-4 h-4 fill-current" />
                 <span>{details.vote_average.toFixed(1)}</span>
               </div>
               <span>•</span>
               <span>{releaseYear}</span>
-              {details && 'runtime' in details && details.runtime > 0 && (
+              {details && 'runtime' in details && details.runtime > 0 ? (
                 <>
                   <span>•</span>
-                  <span>{details.runtime} mins</span>
+                  <span className="animate-fade-in">{details.runtime} mins</span>
                 </>
-              )}
-              {details && 'number_of_seasons' in details && (
+              ) : details && 'number_of_seasons' in details && details.number_of_seasons > 0 ? (
                 <>
                   <span>•</span>
-                  <span>{details.number_of_seasons} Season{details.number_of_seasons > 1 ? 's' : ''}</span>
+                  <span className="animate-fade-in">{details.number_of_seasons} Season{details.number_of_seasons > 1 ? 's' : ''}</span>
                 </>
-              )}
+              ) : isLoading ? (
+                <>
+                  <span>•</span>
+                  <span className="inline-block w-14 h-3.5 rounded bg-white/10 animate-pulse my-auto" />
+                </>
+              ) : null}
               {details.genres && details.genres.length > 0 && (
                 <>
                   <span>•</span>

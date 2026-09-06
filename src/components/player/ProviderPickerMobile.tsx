@@ -12,6 +12,7 @@ interface ProviderPickerMobileProps {
   serverIndex?: number;
   totalServers?: number;
   isAnime?: boolean;
+  isAsian?: boolean;
 }
 
 export const ProviderPickerMobile: React.FC<ProviderPickerMobileProps> = ({
@@ -22,12 +23,17 @@ export const ProviderPickerMobile: React.FC<ProviderPickerMobileProps> = ({
   serverIndex = 1,
   totalServers = STREAM_PROVIDERS.length,
   isAnime = false,
+  isAsian = false,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
 
   const displayProviders = React.useMemo(() => {
-    return isAnime ? getOrderedProviders(undefined, true) : STREAM_PROVIDERS;
-  }, [isAnime]);
+    return isAnime
+      ? getOrderedProviders(undefined, true, false)
+      : isAsian
+      ? getOrderedProviders(undefined, false, true)
+      : STREAM_PROVIDERS;
+  }, [isAnime, isAsian]);
 
   const selectedProvider = getProviderById(currentProviderId);
   const shortServerName = selectedProvider.name.replace(/\s*\([^)]*\)/g, '').trim();

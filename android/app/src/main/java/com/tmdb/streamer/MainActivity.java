@@ -20,6 +20,7 @@ import android.util.Log;
 import android.webkit.ConsoleMessage;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
+import android.text.TextUtils;
 import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.core.view.WindowInsetsControllerCompat;
@@ -30,8 +31,11 @@ import androidx.core.content.FileProvider;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.net.HttpURLConnection;
 import java.net.URL;
@@ -140,9 +144,12 @@ public class MainActivity extends BridgeActivity {
             }
             // Allow mixed content so HLS streams over http/https load smoothly
             settings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
+            // Enable third-party cookies so Cloudflare / cf_clearance / session cookies persist across iframes
+            android.webkit.CookieManager cookieManager = android.webkit.CookieManager.getInstance();
+            cookieManager.setAcceptCookie(true);
+            cookieManager.setAcceptThirdPartyCookies(webView, true);
             // Set modern Chrome mobile user agent to prevent 403 bot-blocking by embed providers
-            // Modern Chrome mobile user agent
-            settings.setUserAgentString("Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Mobile Safari/537.36");
+            settings.setUserAgentString("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36");
 
             // Register JS Bridge
             webView.addJavascriptInterface(new Object() {
@@ -240,6 +247,120 @@ public class MainActivity extends BridgeActivity {
                             }, 80);
                         }
                     });
+                }
+
+                @JavascriptInterface
+                public String fetchHttp(String targetUrl, String referer, String origin) {
+                    try {
+                        URL url = new URL(targetUrl);
+                        HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                        conn.setRequestMethod("GET");
+                        conn.setConnectTimeout(8000);
+                        conn.setReadTimeout(10000);
+                        conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36");
+                        conn.setRequestProperty("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8");
+                        conn.setRequestProperty("Accept-Language", "en-US,en;q=0.9,id;q=0.8");
+                        if (referer != null && !referer.isEmpty()) {
+                            conn.setRequestProperty("Referer", referer);
+                        }
+                        if (origin != null && !origin.isEmpty()) {
+                            conn.setRequestProperty("Origin", origin);
+                        }
+                        // Do NOT pass stale/corrupted cookies (especially stale cf_clearance) to videonode.de
+                        if (!targetUrl.contains("videonode.de")) {
+                            String cookie = android.webkit.CookieManager.getInstance().getCookie(targetUrl);
+                            if (cookie != null && !cookie.isEmpty()) {
+                                conn.setRequestProperty("Cookie", cookie);
+                            }
+                        }
+                        conn.connect();
+
+                        int statusCode = conn.getResponseCode();
+                        Log.i("TMDB_APP", "[AndroidBridge] fetchHttp " + targetUrl + " -> " + statusCode);
+                        for (Map.Entry<String, java.util.List<String>> header : conn.getHeaderFields().entrySet()) {
+                            if (header.getKey() != null && header.getKey().equalsIgnoreCase("set-cookie")) {
+                                for (String cookieVal : header.getValue()) {
+                                    android.webkit.CookieManager.getInstance().setCookie(targetUrl, cookieVal);
+                                }
+                            }
+                        }
+
+                        InputStream in = (statusCode >= 400) ? conn.getErrorStream() : conn.getInputStream();
+                        if (in == null) return null;
+
+                        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                        byte[] buffer = new byte[8192];
+                        int len;
+                        while ((len = in.read(buffer)) != -1) {
+                            baos.write(buffer, 0, len);
+                        }
+                        in.close();
+                        return baos.toString("UTF-8");
+                    } catch (Exception e) {
+                        Log.w("TMDB_APP", "[AndroidBridge] fetchHttp error for " + targetUrl + ": " + e.getMessage());
+                        return null;
+                    }
+                }
+
+                @JavascriptInterface
+                public String fetchHttpPost(String targetUrl, String postBody, String contentType, String referer, String origin) {
+                    try {
+                        URL url = new URL(targetUrl);
+                        HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                        conn.setRequestMethod("POST");
+                        conn.setDoOutput(true);
+                        conn.setConnectTimeout(8000);
+                        conn.setReadTimeout(10000);
+                        conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36");
+                        if (contentType != null && !contentType.isEmpty()) {
+                            conn.setRequestProperty("Content-Type", contentType);
+                        }
+                        if (referer != null && !referer.isEmpty()) {
+                            conn.setRequestProperty("Referer", referer);
+                        }
+                        if (origin != null && !origin.isEmpty()) {
+                            conn.setRequestProperty("Origin", origin);
+                        }
+                        if (!targetUrl.contains("playcdn.de") && !targetUrl.contains("videonode.de")) {
+                            String cookie = android.webkit.CookieManager.getInstance().getCookie(targetUrl);
+                            if (cookie != null && !cookie.isEmpty()) {
+                                conn.setRequestProperty("Cookie", cookie);
+                            }
+                        }
+                        if (postBody != null) {
+                            byte[] outBytes = postBody.getBytes(StandardCharsets.UTF_8);
+                            conn.setRequestProperty("Content-Length", String.valueOf(outBytes.length));
+                            try (OutputStream os = conn.getOutputStream()) {
+                                os.write(outBytes);
+                                os.flush();
+                            }
+                        }
+
+                        int statusCode = conn.getResponseCode();
+                        Log.i("TMDB_APP", "[AndroidBridge] fetchHttpPost " + targetUrl + " -> " + statusCode);
+                        for (Map.Entry<String, java.util.List<String>> header : conn.getHeaderFields().entrySet()) {
+                            if (header.getKey() != null && header.getKey().equalsIgnoreCase("set-cookie")) {
+                                for (String cookieVal : header.getValue()) {
+                                    android.webkit.CookieManager.getInstance().setCookie(targetUrl, cookieVal);
+                                }
+                            }
+                        }
+
+                        InputStream in = (statusCode >= 400) ? conn.getErrorStream() : conn.getInputStream();
+                        if (in == null) return null;
+
+                        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                        byte[] buffer = new byte[8192];
+                        int len;
+                        while ((len = in.read(buffer)) != -1) {
+                            baos.write(buffer, 0, len);
+                        }
+                        in.close();
+                        return baos.toString("UTF-8");
+                    } catch (Exception e) {
+                        Log.w("TMDB_APP", "[AndroidBridge] fetchHttpPost error for " + targetUrl + ": " + e.getMessage());
+                        return null;
+                    }
                 }
 
                 @JavascriptInterface
@@ -411,10 +532,7 @@ public class MainActivity extends BridgeActivity {
                 @Override
                 public boolean onConsoleMessage(ConsoleMessage consoleMessage) {
                     if (consoleMessage != null && consoleMessage.message() != null) {
-                        String msg = consoleMessage.message();
-                        if (msg.contains("[TMDB Streamer]") || msg.contains("Build #")) {
-                            Log.i("TMDB_APP", "[WebView JS] " + msg);
-                        }
+                        Log.i("TMDB_APP", "[WebView JS] " + consoleMessage.message());
                     }
                     return super.onConsoleMessage(consoleMessage);
                 }
@@ -466,6 +584,119 @@ public class MainActivity extends BridgeActivity {
                                 );
                                 view.evaluateJavascript(jsDispatch, null);
                             });
+                        }
+
+                        // Asian Stream & TurboVIP Anti-Hotlinking and CSP Frame Shield
+                        if ((lower.contains("videonode.de") || lower.contains("playcdn.de") || lower.contains("turbovid") || lower.contains("turboviplay") || lower.contains("turbosplayer") || lower.contains("layaricon21.com") || lower.contains("abyssplayer.com") || lower.contains("embed4me.vip")) &&
+                            !lower.contains("/cdn-cgi/")) {
+                            try {
+                                URL url = new URL(rawUrl);
+                                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                                conn.setRequestMethod(request.getMethod());
+                                Map<String, String> reqHeaders = request.getRequestHeaders();
+                                if (reqHeaders != null) {
+                                    for (Map.Entry<String, String> entry : reqHeaders.entrySet()) {
+                                        String k = entry.getKey().toLowerCase();
+                                        if (!k.equals("referer") && !k.equals("origin") && !k.equals("host") && !k.equals("user-agent")) {
+                                            conn.setRequestProperty(entry.getKey(), entry.getValue());
+                                        }
+                                    }
+                                }
+                                conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36");
+                                if (lower.contains("turbosplayer") || lower.contains("turboviplay")) {
+                                    conn.setRequestProperty("Referer", "https://turbovidhls.com/");
+                                    conn.setRequestProperty("Origin", "https://turbovidhls.com");
+                                } else if (lower.contains("turbovid")) {
+                                    conn.setRequestProperty("Referer", "https://layaricon21.com/");
+                                    conn.setRequestProperty("Origin", "https://layaricon21.com");
+                                } else if (lower.contains("playcdn.de")) {
+                                    conn.setRequestProperty("Referer", "https://videonode.de/");
+                                    conn.setRequestProperty("Origin", "https://videonode.de");
+                                } else {
+                                    conn.setRequestProperty("Referer", "https://layaricon21.com/");
+                                    conn.setRequestProperty("Origin", "https://layaricon21.com");
+                                }
+
+                                if (!lower.contains("videonode.de") && !lower.contains("playcdn.de")) {
+                                    String cookie = android.webkit.CookieManager.getInstance().getCookie(rawUrl);
+                                    if (cookie != null && !cookie.isEmpty()) {
+                                        conn.setRequestProperty("Cookie", cookie);
+                                    }
+                                }
+
+                                int statusCode = conn.getResponseCode();
+                                String contentType = conn.getContentType();
+                                String mimeType = "text/html";
+                                String encoding = "UTF-8";
+                                if (contentType != null) {
+                                    String[] parts = contentType.split(";");
+                                    mimeType = parts[0].trim();
+                                    for (String part : parts) {
+                                        if (part.trim().toLowerCase().startsWith("charset=")) {
+                                            encoding = part.trim().substring(8).trim();
+                                        }
+                                    }
+                                }
+
+                                Map<String, String> responseHeaders = new HashMap<>();
+                                responseHeaders.put("Access-Control-Allow-Origin", "*");
+                                responseHeaders.put("Access-Control-Allow-Headers", "*");
+                                // Strip frame-ancestors / Content-Security-Policy to prevent iframe blocking
+                                for (Map.Entry<String, java.util.List<String>> header : conn.getHeaderFields().entrySet()) {
+                                    if (header.getKey() != null) {
+                                        String hKey = header.getKey().toLowerCase();
+                                        if (hKey.equals("set-cookie")) {
+                                            for (String cookieVal : header.getValue()) {
+                                                android.webkit.CookieManager.getInstance().setCookie(rawUrl, cookieVal);
+                                            }
+                                        }
+                                        if (!hKey.equals("content-security-policy") && !hKey.equals("x-frame-options")) {
+                                            responseHeaders.put(header.getKey(), TextUtils.join(", ", header.getValue()));
+                                        }
+                                    }
+                                }
+
+                                InputStream in = statusCode >= 400 ? conn.getErrorStream() : conn.getInputStream();
+                                if (lower.contains("turbovid") && mimeType != null && mimeType.contains("html") && statusCode < 400) {
+                                    try {
+                                        BufferedReader reader = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8));
+                                        StringBuilder sb = new StringBuilder();
+                                        String l;
+                                        while ((l = reader.readLine()) != null) {
+                                            sb.append(l).append("\n");
+                                        }
+                                        String html = sb.toString();
+                                        String mockScript = "<script>\n" +
+                                            "try {\n" +
+                                            "  Object.defineProperty(document, 'referrer', { get: function() { return 'https://videonode.de/'; } });\n" +
+                                            "} catch(e){}\n" +
+                                            "window.open = function() { return null; };\n" +
+                                            "window.openNewTab = function() { return null; };\n" +
+                                            "window.addEventListener('DOMContentLoaded', function() {\n" +
+                                            "  setTimeout(function() {\n" +
+                                            "    var preloader = document.querySelector('.preloader');\n" +
+                                            "    if (preloader) preloader.style.display = 'none';\n" +
+                                            "    if (typeof loadPlayer === 'function') {\n" +
+                                            "      var el = document.getElementById('video_player');\n" +
+                                            "      var f = (el && el.getAttribute('data-hash')) || (typeof urlPlay !== 'undefined' ? urlPlay : '');\n" +
+                                            "      if (f) loadPlayer(f);\n" +
+                                            "    }\n" +
+                                            "  }, 350);\n" +
+                                            "});\n" +
+                                            "</script>\n";
+                                        html = html.replace("<head>", "<head>\n" + mockScript);
+                                        in = new ByteArrayInputStream(html.getBytes(StandardCharsets.UTF_8));
+                                    } catch (Exception e) {}
+                                }
+                                return new WebResourceResponse(
+                                    mimeType,
+                                    encoding,
+                                    statusCode,
+                                    conn.getResponseMessage() != null ? conn.getResponseMessage() : "OK",
+                                    responseHeaders,
+                                    in
+                                );
+                            } catch (Exception ignored) {}
                         }
 
                         // MegaPlay Anti-Hotlinking Shield: Inject required Referer/Origin headers
