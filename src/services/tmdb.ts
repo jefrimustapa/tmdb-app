@@ -180,7 +180,6 @@ export const tmdbApi = {
     with_genres?: string;
     with_watch_providers?: string;
     watch_region?: string;
-    with_networks?: string;
     certification_country?: string;
     certification?: string;
     'certification.lte'?: string;
@@ -191,20 +190,19 @@ export const tmdbApi = {
     [key: string]: any;
   } = {}) => {
     const queryParams: Record<string, any> = { ...params };
-    // TMDB has no official Anime genre (we use keyword 210024). If '210024' is in with_genres:
+    // TMDB has no official Anime genre (Anime is Animation ID 16 + original language ja).
     if (queryParams.with_genres && queryParams.with_genres.split(',').includes(String(ANIME_GENRE_ID))) {
       const genreList = queryParams.with_genres
         .split(',')
         .map((s: string) => s.trim())
         .filter((id: string) => id !== String(ANIME_GENRE_ID));
-      queryParams.with_genres = genreList.length > 0 ? genreList.join(',') : undefined;
 
-      const animeKeywords = String(ANIME_GENRE_ID);
-      if (queryParams.with_keywords) {
-        queryParams.with_keywords = `${queryParams.with_keywords}|${animeKeywords}`;
-      } else {
-        queryParams.with_keywords = animeKeywords;
+      // Add Animation genre (16) if not already present
+      if (!genreList.includes('16')) {
+        genreList.push('16');
       }
+      queryParams.with_genres = genreList.join(',');
+      queryParams.with_original_language = 'ja';
     }
     return tmdbFetch<TMDBResponse<TMDBMediaItem>>('/discover/movie', queryParams);
   },
@@ -238,20 +236,21 @@ export const tmdbApi = {
         queryParams.with_keywords = horrorKeywords;
       }
     }
-    // TMDB has no official Anime genre for TV (we use keyword 210024). If '210024' is in with_genres:
+    // TMDB has no official Anime genre for TV (Anime is Animation ID 16 + original language ja).
     if (queryParams.with_genres && queryParams.with_genres.split(',').includes(String(ANIME_GENRE_ID))) {
       const genreList = queryParams.with_genres
-        .split(',')
-        .map((s: string) => s.trim())
-        .filter((id: string) => id !== String(ANIME_GENRE_ID));
-      queryParams.with_genres = genreList.length > 0 ? genreList.join(',') : undefined;
+        ? queryParams.with_genres
+            .split(',')
+            .map((s: string) => s.trim())
+            .filter((id: string) => id !== String(ANIME_GENRE_ID))
+        : [];
 
-      const animeKeywords = String(ANIME_GENRE_ID);
-      if (queryParams.with_keywords) {
-        queryParams.with_keywords = `${queryParams.with_keywords}|${animeKeywords}`;
-      } else {
-        queryParams.with_keywords = animeKeywords;
+      // Add Animation genre (16) if not already present
+      if (!genreList.includes('16')) {
+        genreList.push('16');
       }
+      queryParams.with_genres = genreList.join(',');
+      queryParams.with_original_language = 'ja';
     }
     return tmdbFetch<TMDBResponse<TMDBMediaItem>>('/discover/tv', queryParams);
   },
