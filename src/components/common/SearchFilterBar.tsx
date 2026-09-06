@@ -21,10 +21,12 @@ export const SEARCH_SORT_OPTIONS: SortOption[] = [
   { value: 'vote_count.desc', label: 'Most Voted' }
 ];
 
-export const SEARCH_TYPE_OPTIONS = [
-  { label: 'All Media', value: 'all' },
-  { label: 'Movies', value: 'movie' },
-  { label: 'TV Series', value: 'tv' }
+export type SearchTargetType = 'title' | 'keyword' | 'cast';
+
+export const SEARCH_TYPE_OPTIONS: { label: string; value: SearchTargetType }[] = [
+  { label: 'Title', value: 'title' },
+  { label: 'Keyword', value: 'keyword' },
+  { label: 'Cast / Director', value: 'cast' }
 ];
 
 export const SEARCH_YEAR_OPTIONS = [
@@ -52,8 +54,8 @@ export const SEARCH_RATING_OPTIONS = [
 
 interface SearchFilterBarProps {
   genres: TMDBGenre[];
-  selectedType: 'all' | 'movie' | 'tv';
-  onSelectType: (type: 'all' | 'movie' | 'tv') => void;
+  selectedType: SearchTargetType;
+  onSelectType: (type: SearchTargetType) => void;
   selectedGenres: string[];
   onSelectGenres: (genres: string[]) => void;
   selectedYear: string;
@@ -116,7 +118,7 @@ export const SearchFilterBar: React.FC<SearchFilterBarProps> = ({
   const selectedSortObj = SEARCH_SORT_OPTIONS.find((s) => s.value === sortBy) || SEARCH_SORT_OPTIONS[0];
 
   const hasActiveFilters = Boolean(
-    selectedType !== 'all' ||
+    selectedType !== 'title' ||
     selectedGenres.length > 0 ||
     selectedYear ||
     selectedRating
@@ -295,7 +297,7 @@ export const SearchFilterBar: React.FC<SearchFilterBarProps> = ({
               <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${openDropdown === 'sort' ? 'rotate-180' : ''}`} />
             </button>
 
-            {/* 2. Media Type Filter Chip */}
+            {/* 2. Media / Search Target Type Filter Chip */}
             <button
               ref={typeBtnRef}
               type="button"
@@ -304,12 +306,13 @@ export const SearchFilterBar: React.FC<SearchFilterBarProps> = ({
                 toggleDropdown('type', typeBtnRef);
               }}
               className={`flex items-center gap-1.5 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl text-xs sm:text-sm font-bold border transition-all shadow-sm flex-shrink-0 tv-focus-target cursor-pointer ${
-                selectedType !== 'all' || openDropdown === 'type'
+                selectedType !== 'title' || openDropdown === 'type'
                   ? 'bg-hbo-cyan text-black border-white shadow-[0_0_15px_rgba(0,210,255,0.4)] ring-2 ring-hbo-cyan/50'
                   : 'bg-hbo-card text-gray-300 border-hbo-border hover:text-white hover:border-hbo-purple-light hover:bg-hbo-hover'
               }`}
             >
-              <Film className={`w-3.5 h-3.5 ${selectedType !== 'all' || openDropdown === 'type' ? 'text-black' : 'text-hbo-cyan'}`} />
+              <Film className={`w-3.5 h-3.5 ${selectedType !== 'title' || openDropdown === 'type' ? 'text-black' : 'text-hbo-cyan'}`} />
+              <span className="text-gray-400 font-normal">Type:</span>
               <span>{selectedTypeObj.label}</span>
               <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${openDropdown === 'type' ? 'rotate-180' : ''}`} />
             </button>
@@ -428,11 +431,11 @@ export const SearchFilterBar: React.FC<SearchFilterBarProps> = ({
                 </div>
               )}
 
-              {/* Media Type Popover Menu */}
+              {/* Media / Target Type Popover Menu */}
               {openDropdown === 'type' && (
                 <div className="w-56 space-y-1 p-1">
                   <div className="px-3 py-1 text-[10px] font-black tracking-wider uppercase text-gray-400 border-b border-hbo-border/40 mb-1">
-                    Media Type
+                    Search Type
                   </div>
                   {SEARCH_TYPE_OPTIONS.map((t) => {
                     const isSelected = selectedType === t.value;
@@ -442,7 +445,7 @@ export const SearchFilterBar: React.FC<SearchFilterBarProps> = ({
                         type="button"
                         data-filter-selected={isSelected ? 'true' : undefined}
                         onClick={() => {
-                          onSelectType(t.value as 'all' | 'movie' | 'tv');
+                          onSelectType(t.value);
                           setOpenDropdown(null);
                           typeBtnRef.current?.focus();
                         }}
@@ -566,14 +569,14 @@ export const SearchFilterBar: React.FC<SearchFilterBarProps> = ({
             <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto no-scrollbar pt-1 pb-0.5 px-4 sm:px-6 -mx-4 sm:-mx-6 w-[calc(100%+2rem)] sm:w-[calc(100%+3rem)] flex-nowrap scroll-pl-4 scroll-pr-4">
               <span className="text-[10px] font-black tracking-wider uppercase text-gray-400 flex-shrink-0 mr-0.5">Active:</span>
 
-              {/* Media Type Badge */}
-              {selectedType !== 'all' && (
+              {/* Media / Search Type Badge */}
+              {selectedType !== 'title' && (
                 <button
                   type="button"
-                  onClick={() => onSelectType('all')}
+                  onClick={() => onSelectType('title')}
                   className="flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-hbo-cyan/20 text-hbo-cyan border border-hbo-cyan/40 hover:bg-hbo-cyan/30 transition flex-shrink-0 cursor-pointer tv-focus-target"
                 >
-                  <span>{selectedTypeObj.label}</span>
+                  <span>Type: {selectedTypeObj.label}</span>
                   <X className="w-3 h-3" />
                 </button>
               )}

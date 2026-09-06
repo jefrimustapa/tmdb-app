@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Search as SearchIcon, X, Clock, Trash2, User } from 'lucide-react';
-import { tmdbApi, tmdbImages } from '../../services/tmdb';
+import { Search as SearchIcon, X, Clock, Trash2 } from 'lucide-react';
+import { tmdbApi } from '../../services/tmdb';
 import type { TMDBMediaItem, TMDBGenre } from '../../types/tmdb';
 import { MediaCard } from '../../components/common/MediaCard';
-import { SearchFilterBar } from '../../components/common/SearchFilterBar';
+import { SearchFilterBar, type SearchTargetType } from '../../components/common/SearchFilterBar';
 import {
   getRecentSearches,
   addRecentSearch,
@@ -19,13 +19,12 @@ export const Search: React.FC = () => {
   const personNameParam = searchParams.get('personName') || '';
 
   const [query, setQuery] = useState(queryParam);
-  const [personInfo, setPersonInfo] = useState<{ id: number; name: string; profile_path: string | null; department?: string } | null>(null);
   const [results, setResults] = useState<TMDBMediaItem[]>([]);
   const [genres, setGenres] = useState<TMDBGenre[]>([]);
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
 
   // Filter Bar State
-  const [selectedType, setSelectedType] = useState<'all' | 'movie' | 'tv'>('all');
+  const [selectedType, setSelectedType] = useState<SearchTargetType>('title');
   const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
   const [selectedYear, setSelectedYear] = useState('');
   const [selectedRating, setSelectedRating] = useState('');
@@ -53,78 +52,7 @@ export const Search: React.FC = () => {
     setRecentSearches(getRecentSearches());
   }, []);
 
-  // Handle URL changes
-  useEffect(() => {
-    if (personIdParam) {
-      const pId = parseInt(personIdParam, 10);
-      if (!isNaN(pId)) {
-        loadPersonFilmography(pId, personNameParam);
-        return;
-      }
-    }
-
-    if (queryParam) {
-      setPersonInfo(null);
-      setQuery(queryParam);
-      setPage(1);
-      performSearch(queryParam, 1, false);
-    } else {
-      setPersonInfo(null);
-      setResults([]);
-      setPage(1);
-      setTotalPages(1);
-      setRecentSearches(getRecentSearches());
-    }
-  }, [queryParam, personIdParam, personNameParam]);
-
-  const loadPersonFilmography = async (personId: number, fallbackName: string) => {
-    setIsLoading(true);
-    try {
-      const [creditsRes, detailsRes] = await Promise.allSettled([
-        tmdbApi.getPersonCredits(personId),
-        tmdbApi.getPersonDetails(personId)
-      ]);
-
-      if (detailsRes.status === 'fulfilled') {
-        setPersonInfo({
-          id: detailsRes.value.id,
-          name: detailsRes.value.name,
-          profile_path: detailsRes.value.profile_path,
-          department: detailsRes.value.known_for_department
-        });
-        setQuery(detailsRes.value.name);
-      } else {
-        setPersonInfo({
-          id: personId,
-          name: fallbackName || 'Actor',
-          profile_path: null
-        });
-        setQuery(fallbackName);
-      }
-
-      if (creditsRes.status === 'fulfilled') {
-        const castItems = (creditsRes.value.cast || []).map((item) => ({
-          ...item,
-          media_type: item.media_type || (item.title ? 'movie' : 'tv')
-        }));
-        const crewItems = (creditsRes.value.crew || []).map((item) => ({
-          ...item,
-          media_type: item.media_type || (item.title ? 'movie' : 'tv')
-        }));
-        const combined = [...castItems, ...crewItems];
-        const sorted = combined.sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
-        const unique = Array.from(new Map(sorted.map((item) => [item.id, item])).values());
-        setResults(unique);
-        setTotalPages(1);
-      }
-    } catch (err) {
-      console.error('Failed to load person filmography:', err);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const performSearch = async (searchTerm: string, pageNum = 1, append = false) => {
+  const performSearch = async (searchTerm: string, pageNum = 1, append = false, targetType: SearchTargetType = selectedType) => {
     const trimmed = searchTerm.trim();
     if (!trimmed) {
       setResults([]);
@@ -138,87 +66,99 @@ export const Search: React.FC = () => {
     }
 
     try {
-      const multiRes = await tmdbApi.searchMulti(trimmed, pageNum);
-      const rawResults = multiRes.results || [];
+      if (targetType === 'cast') {
+        const personRes = await tmdbApi.searchPerson(trimmed, pageNum);
+        const people = personRes.results || [];
+        if (people.length === 0) {
+          if (!append) setResults([]);
+          setTotalPages(1);
+          return;
+        }
 
-      // Check for person (actor/director) on page 1
-      if (pageNum === 1 && !personInfo) {
-        const personMatch = rawResults.find((item: any) => item.media_type === 'person');
-        if (personMatch) {
-          const p = personMatch as any;
-          setPersonInfo({
-            id: p.id,
-            name: p.name,
-            profile_path: p.profile_path,
-            department: p.known_for_department
-          });
+        const topPeople = people.slice(0, 2);
+        const creditsResults = await Promise.all(
+          topPeople.map((p) => tmdbApi.getPersonCredits(p.id).catch(() => null))
+        );
 
-          // Fetch full filmography
-          const creditsRes = await tmdbApi.getPersonCredits(p.id).catch(() => null);
-          if (creditsRes) {
-            const castItems = (creditsRes.cast || []).map((item) => ({
-              ...item,
-              media_type: item.media_type || (item.title ? 'movie' : 'tv')
-            }));
-            const crewItems = (creditsRes.crew || []).map((item) => ({
-              ...item,
-              media_type: item.media_type || (item.title ? 'movie' : 'tv')
-            }));
-            const combined = [...castItems, ...crewItems];
-            const sorted = combined.sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
-            const unique = Array.from(new Map(sorted.map((item) => [item.id, item])).values());
-            setResults(unique);
-            setTotalPages(1);
-            setIsLoading(false);
-            return;
+        const allCredits: TMDBMediaItem[] = [];
+        for (const c of creditsResults) {
+          if (c) {
+            if (c.cast) {
+              allCredits.push(...c.cast.map((item) => ({ ...item, media_type: item.media_type || (item.title ? 'movie' : 'tv') })));
+            }
+            if (c.crew) {
+              allCredits.push(...c.crew.map((item) => ({ ...item, media_type: item.media_type || (item.title ? 'movie' : 'tv') })));
+            }
           }
         }
-      }
-
-      // Filter titles (movie/tv)
-      let titleResults = rawResults.filter(
-        (item) => item.media_type === 'movie' || item.media_type === 'tv'
-      );
-
-      // Smart Keyword Discovery on page 1 if multi results are low (< 8)
-      if (pageNum === 1 && titleResults.length < 8) {
-        try {
-          const kwRes = await tmdbApi.searchKeywords(trimmed, 1);
-          if (kwRes.results && kwRes.results.length > 0) {
-            const topKw = kwRes.results[0];
-            const [movieKwRes, tvKwRes] = await Promise.allSettled([
-              tmdbApi.discoverMovies({ with_keywords: String(topKw.id), sort_by: 'popularity.desc' }),
-              tmdbApi.discoverTV({ with_keywords: String(topKw.id), sort_by: 'popularity.desc' })
-            ]);
-
-            const kwItems: TMDBMediaItem[] = [];
-            if (movieKwRes.status === 'fulfilled' && movieKwRes.value.results) {
-              kwItems.push(...movieKwRes.value.results.map((m) => ({ ...m, media_type: 'movie' as const })));
-            }
-            if (tvKwRes.status === 'fulfilled' && tvKwRes.value.results) {
-              kwItems.push(...tvKwRes.value.results.map((t) => ({ ...t, media_type: 'tv' as const })));
-            }
-
-            const existingMap = new Map(titleResults.map((i) => [i.id, i]));
-            for (const item of kwItems) {
-              if (!existingMap.has(item.id)) {
-                existingMap.set(item.id, item);
-              }
-            }
-            titleResults = Array.from(existingMap.values());
-          }
-        } catch (kwErr) {
-          console.warn('Keyword discovery skipped:', kwErr);
+        const sorted = allCredits.sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
+        const unique = Array.from(new Map(sorted.map((item) => [item.id, item])).values());
+        setTotalPages(1);
+        setResults((prev) => {
+          if (!append) return unique;
+          const existingIds = new Set(prev.map((i) => i.id));
+          const newItems = unique.filter((i) => !existingIds.has(i.id));
+          return [...prev, ...newItems];
+        });
+      } else if (targetType === 'keyword') {
+        const kwRes = await tmdbApi.searchKeywords(trimmed, 1);
+        const keywords = kwRes.results || [];
+        if (keywords.length === 0) {
+          if (!append) setResults([]);
+          setTotalPages(1);
+          return;
         }
-      }
 
-      setTotalPages(multiRes.total_pages || 1);
-      setResults((prev) => {
-        if (!append) return titleResults;
-        const existingIds = new Set(prev.map((i) => i.id));
-        const newItems = titleResults.filter((i) => !existingIds.has(i.id));
-        return [...prev, ...newItems];
-      });
+        const keywordIds = keywords.slice(0, 3).map((k) => k.id).join('|');
+        const [movieKwRes, tvKwRes] = await Promise.allSettled([
+          tmdbApi.discoverMovies({ with_keywords: keywordIds, page: pageNum, sort_by: 'popularity.desc' }),
+          tmdbApi.discoverTV({ with_keywords: keywordIds, page: pageNum, sort_by: 'popularity.desc' })
+        ]);
+
+        const kwItems: TMDBMediaItem[] = [];
+        if (movieKwRes.status === 'fulfilled' && movieKwRes.value.results) {
+          kwItems.push(...movieKwRes.value.results.map((m) => ({ ...m, media_type: 'movie' as const })));
+        }
+        if (tvKwRes.status === 'fulfilled' && tvKwRes.value.results) {
+          kwItems.push(...tvKwRes.value.results.map((t) => ({ ...t, media_type: 'tv' as const })));
+        }
+
+        const sorted = kwItems.sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
+        const unique = Array.from(new Map(sorted.map((item) => [item.id, item])).values());
+        const maxPages = Math.max(
+          movieKwRes.status === 'fulfilled' ? movieKwRes.value.total_pages || 1 : 1,
+          tvKwRes.status === 'fulfilled' ? tvKwRes.value.total_pages || 1 : 1
+        );
+        setTotalPages(maxPages);
+        setResults((prev) => {
+          if (!append) return unique;
+          const existingIds = new Set(prev.map((i) => i.id));
+          const newItems = unique.filter((i) => !existingIds.has(i.id));
+          return [...prev, ...newItems];
+        });
+      } else {
+        // targetType === 'title'
+        const multiRes = await tmdbApi.searchMulti(trimmed, pageNum);
+        const rawResults = multiRes.results || [];
+        const titleResults: TMDBMediaItem[] = [];
+
+        for (const item of rawResults) {
+          if (item.media_type === 'movie' || item.media_type === 'tv') {
+            titleResults.push({
+              ...item,
+              media_type: item.media_type || (item.title ? 'movie' : 'tv')
+            });
+          }
+        }
+
+        setTotalPages(multiRes.total_pages || 1);
+        setResults((prev) => {
+          if (!append) return titleResults;
+          const existingIds = new Set(prev.map((i) => i.id));
+          const newItems = titleResults.filter((i) => !existingIds.has(i.id));
+          return [...prev, ...newItems];
+        });
+      }
     } catch (err) {
       console.error('Search error:', err);
     } finally {
@@ -227,10 +167,36 @@ export const Search: React.FC = () => {
     }
   };
 
+  // Handle URL changes
+  useEffect(() => {
+    if (personIdParam) {
+      const pId = parseInt(personIdParam, 10);
+      if (!isNaN(pId)) {
+        const name = personNameParam || 'Cast';
+        setQuery(name);
+        setSelectedType('cast');
+        setPage(1);
+        performSearch(name, 1, false, 'cast');
+        return;
+      }
+    }
+
+    if (queryParam) {
+      setQuery(queryParam);
+      setPage(1);
+      performSearch(queryParam, 1, false, selectedType);
+    } else {
+      setResults([]);
+      setPage(1);
+      setTotalPages(1);
+      setRecentSearches(getRecentSearches());
+    }
+  }, [queryParam, personIdParam, personNameParam]);
+
   // Infinite scroll trigger on window scroll near bottom
   useEffect(() => {
     const handleScroll = () => {
-      if (personInfo || isLoading || isLoadingMore) return;
+      if (selectedType === 'cast' || isLoading || isLoadingMore) return;
       if (page >= totalPages) return;
 
       const scrollTop = window.scrollY || document.documentElement.scrollTop;
@@ -240,13 +206,13 @@ export const Search: React.FC = () => {
       if (scrollTop + clientHeight >= scrollHeight - 600) {
         const nextPage = page + 1;
         setPage(nextPage);
-        performSearch(query, nextPage, true);
+        performSearch(query, nextPage, true, selectedType);
       }
     };
 
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
-  }, [page, totalPages, query, isLoading, isLoadingMore, personInfo]);
+  }, [page, totalPages, query, isLoading, isLoadingMore, selectedType]);
 
   const [debounceTimer, setDebounceTimer] = useState<ReturnType<typeof setTimeout> | null>(null);
   const historyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -261,7 +227,6 @@ export const Search: React.FC = () => {
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
     setQuery(val);
-    setPersonInfo(null);
 
     if (debounceTimer) clearTimeout(debounceTimer);
     const t = setTimeout(() => {
@@ -298,7 +263,6 @@ export const Search: React.FC = () => {
     if (debounceTimer) clearTimeout(debounceTimer);
     if (historyTimerRef.current) clearTimeout(historyTimerRef.current);
     setQuery('');
-    setPersonInfo(null);
     setResults([]);
     setSearchParams({});
     setRecentSearches(getRecentSearches());
@@ -309,7 +273,6 @@ export const Search: React.FC = () => {
     if (historyTimerRef.current) clearTimeout(historyTimerRef.current);
     const trimmed = historyQuery.trim();
     setQuery(trimmed);
-    setPersonInfo(null);
     setSearchParams({ q: trimmed });
     const updated = addRecentSearch(trimmed);
     setRecentSearches(updated);
@@ -327,24 +290,31 @@ export const Search: React.FC = () => {
     setRecentSearches([]);
   };
 
+  const handleSelectType = (newType: SearchTargetType) => {
+    setSelectedType(newType);
+    setPage(1);
+    if (query.trim()) {
+      performSearch(query.trim(), 1, false, newType);
+    }
+  };
+
   const handleResetFilters = () => {
-    setSelectedType('all');
+    const hadCustomType = selectedType !== 'title';
+    setSelectedType('title');
     setSelectedGenres([]);
     setSelectedYear('');
     setSelectedRating('');
     setSortBy('relevance');
+    if (hadCustomType && query.trim()) {
+      performSearch(query.trim(), 1, false, 'title');
+    }
   };
 
   // Filtered & Sorted Search Results
   const filteredAndSortedResults = useMemo(() => {
     let list = [...results];
 
-    // 1. Type Filter
-    if (selectedType !== 'all') {
-      list = list.filter((item) => item.media_type === selectedType);
-    }
-
-    // 2. Genre Filter (match if item has any selected genre)
+    // 1. Genre Filter (match if item has any selected genre)
     if (selectedGenres.length > 0) {
       list = list.filter((item) => {
         const itemGenres = item.genre_ids ? item.genre_ids.map(String) : [];
@@ -352,7 +322,7 @@ export const Search: React.FC = () => {
       });
     }
 
-    // 3. Year / Era Filter
+    // 2. Year / Era Filter
     if (selectedYear) {
       list = list.filter((item) => {
         const dateStr = item.release_date || item.first_air_date || '';
@@ -374,7 +344,7 @@ export const Search: React.FC = () => {
       });
     }
 
-    // 4. Rating Filter
+    // 3. Rating Filter
     if (selectedRating) {
       const minVote = parseFloat(selectedRating);
       if (!isNaN(minVote)) {
@@ -382,7 +352,7 @@ export const Search: React.FC = () => {
       }
     }
 
-    // 5. Sort By
+    // 4. Sort By
     list.sort((a, b) => {
       switch (sortBy) {
         case 'vote_average.desc':
@@ -395,6 +365,8 @@ export const Search: React.FC = () => {
         case 'release_date.asc': {
           const dateA = a.release_date || a.first_air_date || '';
           const dateB = b.release_date || b.first_air_date || '';
+          if (!dateA) return 1;
+          if (!dateB) return -1;
           return dateA.localeCompare(dateB);
         }
         case 'vote_count.desc':
@@ -406,7 +378,7 @@ export const Search: React.FC = () => {
     });
 
     return list;
-  }, [results, selectedType, selectedGenres, selectedYear, selectedRating, sortBy]);
+  }, [results, selectedGenres, selectedYear, selectedRating, sortBy]);
 
   return (
     <div className="min-h-screen pt-24 pb-16 px-4 sm:px-8 w-full max-w-full">
@@ -477,47 +449,6 @@ export const Search: React.FC = () => {
           </div>
         )}
 
-        {/* Cast / Person Filter Banner */}
-        {personInfo && (
-          <div className="mt-4 p-4 rounded-2xl bg-gradient-to-r from-hbo-card via-hbo-purple/20 to-hbo-card border border-hbo-purple-light/40 flex items-center justify-between gap-4 shadow-xl">
-            <div className="flex items-center gap-3">
-              {personInfo.profile_path ? (
-                <img
-                  src={tmdbImages.profile(personInfo.profile_path, 'w185')}
-                  alt={personInfo.name}
-                  className="w-14 h-14 rounded-full object-cover border-2 border-hbo-cyan shadow-hbo-glow"
-                />
-              ) : (
-                <div className="w-14 h-14 rounded-full bg-hbo-purple/40 border-2 border-hbo-cyan flex items-center justify-center text-white">
-                  <User className="w-6 h-6" />
-                </div>
-              )}
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-hbo-cyan/20 text-hbo-cyan border border-hbo-cyan/30 uppercase tracking-wider">
-                    Cast Filmography
-                  </span>
-                  {personInfo.department && (
-                    <span className="text-xs text-gray-400">{personInfo.department}</span>
-                  )}
-                </div>
-                <h3 className="text-lg sm:text-xl font-bold text-white mt-0.5">{personInfo.name}</h3>
-                <p className="text-xs text-gray-400">
-                  Featuring in {results.length} movie{results.length !== 1 ? 's' : ''} & series
-                </p>
-              </div>
-            </div>
-
-            <button
-              onClick={handleClear}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-gray-300 hover:text-white text-xs font-semibold border border-white/20 transition tv-focus-target flex-shrink-0"
-              title="Clear Cast Filter"
-            >
-              <X className="w-3.5 h-3.5" />
-              <span>Clear Filter</span>
-            </button>
-          </div>
-        )}
       </div>
 
       {/* Search Filter Bar: Rendered ONLY when results exist */}
@@ -525,7 +456,7 @@ export const Search: React.FC = () => {
         <SearchFilterBar
           genres={genres}
           selectedType={selectedType}
-          onSelectType={setSelectedType}
+          onSelectType={handleSelectType}
           selectedGenres={selectedGenres}
           onSelectGenres={setSelectedGenres}
           selectedYear={selectedYear}
