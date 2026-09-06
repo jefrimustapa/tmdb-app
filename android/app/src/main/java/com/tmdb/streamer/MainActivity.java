@@ -31,9 +31,13 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.util.Map;
+import java.util.HashMap;
+import java.util.List;
 import java.util.concurrent.Executors;
 import com.getcapacitor.BridgeActivity;
 import com.getcapacitor.BridgeWebViewClient;
@@ -137,30 +141,8 @@ public class MainActivity extends BridgeActivity {
             // Allow mixed content so HLS streams over http/https load smoothly
             settings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
             // Set modern Chrome mobile user agent to prevent 403 bot-blocking by embed providers
+            // Modern Chrome mobile user agent
             settings.setUserAgentString("Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Mobile Safari/537.36");
-
-            // Attach Custom BridgeWebViewClient with AdBlock Shield
-            BridgeWebViewClient customClient = new BridgeWebViewClient(this.bridge) {
-                @Override
-                public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
-                    if (request == null || request.getUrl() == null) {
-                        return super.shouldInterceptRequest(view, request);
-                    }
-
-                    String url = request.getUrl().toString();
-                    String lowerUrl = url.toLowerCase();
-
-                    // AdBlock Shield: Block known ad/tracker scripts & domains
-                    if (isAdOrTrackerUrl(lowerUrl)) {
-                        return new WebResourceResponse("text/plain", "UTF-8", new ByteArrayInputStream("".getBytes(StandardCharsets.UTF_8)));
-                    }
-
-                    return super.shouldInterceptRequest(view, request);
-                }
-            };
-
-            this.bridge.setWebViewClient(customClient);
-            webView.setWebViewClient(customClient);
 
             // Register JS Bridge
             webView.addJavascriptInterface(new Object() {
@@ -484,6 +466,47 @@ public class MainActivity extends BridgeActivity {
                                 );
                                 view.evaluateJavascript(jsDispatch, null);
                             });
+                        }
+
+                        // MegaPlay Anti-Hotlinking Shield: Inject required Referer/Origin headers
+                        if (lower.contains("megaplay.buzz") || lower.contains("imgnex.top")) {
+                            try {
+                                URL url = new URL(rawUrl);
+                                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                                conn.setRequestMethod(request.getMethod());
+                                Map<String, String> reqHeaders = request.getRequestHeaders();
+                                if (reqHeaders != null) {
+                                    for (Map.Entry<String, String> entry : reqHeaders.entrySet()) {
+                                        conn.setRequestProperty(entry.getKey(), entry.getValue());
+                                    }
+                                }
+                                conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Mobile Safari/537.36");
+                                conn.setRequestProperty("Referer", "https://megaplay.buzz/");
+                                conn.setRequestProperty("Origin", "https://megaplay.buzz");
+
+                                int statusCode = conn.getResponseCode();
+                                String contentType = conn.getContentType();
+                                String mimeType = "text/html";
+                                String encoding = "UTF-8";
+                                if (contentType != null) {
+                                    String[] parts = contentType.split(";");
+                                    mimeType = parts[0].trim();
+                                }
+
+                                Map<String, String> responseHeaders = new HashMap<>();
+                                responseHeaders.put("Access-Control-Allow-Origin", "*");
+                                responseHeaders.put("Access-Control-Allow-Headers", "*");
+
+                                InputStream in = statusCode >= 400 ? conn.getErrorStream() : conn.getInputStream();
+                                return new WebResourceResponse(
+                                    mimeType,
+                                    encoding,
+                                    statusCode,
+                                    conn.getResponseMessage() != null ? conn.getResponseMessage() : "OK",
+                                    responseHeaders,
+                                    in
+                                );
+                            } catch (Exception ignored) {}
                         }
 
                         // Stealth 200 OK Ad/Tracker Interceptor (returns 0-byte dummy JS/CSS so anti-adblock detection never triggers)

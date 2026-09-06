@@ -9,6 +9,7 @@ import { fetchTorboxStream } from '../../services/torboxService';
 import type { StreamResolverType } from '../../types/db';
 import { Logo } from '../common/Logo';
 import { tmdbImages, TMDB_FALLBACK_BACKDROP } from '../../services/tmdb';
+import { resolveAnimeMalId } from '../../services/animeMappingService';
 
 interface VideoPlayerProps {
   mediaType: 'movie' | 'tv';
@@ -263,19 +264,42 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   }, [enabledResolvers, tmdbId, title, mediaType, season, episode, directStreamApiUrl, torboxApiKey]);
 
   const [resumeTimestamp, setResumeTimestamp] = useState<number>(initialTimestamp || 0);
+  const [resolvedMalId, setResolvedMalId] = useState<number | null>(null);
+
+  // Attempt resolving MAL ID for anime providers or anime titles
+  useEffect(() => {
+    let isCancelled = false;
+    if (!title || !title.trim()) return;
+
+    resolveAnimeMalId(title).then((id) => {
+      if (!isCancelled && id) {
+        setResolvedMalId(id);
+      }
+    }).catch(() => {});
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [title]);
 
   const provider = getProviderById(providerId);
-  const baseStreamUrl =
-    mediaType === 'movie'
+  const baseStreamUrl = useMemo(() => {
+    // For anime providers with resolved MAL ID, use getAnimeUrl for both TV episodes and Movies/OVAs
+    if (provider.category === 'anime' && provider.getAnimeUrl && resolvedMalId) {
+      return provider.getAnimeUrl(resolvedMalId, season, episode, 'sub');
+    }
+    // For standard titles or general movie/TV providers, use TMDB ID
+    return mediaType === 'movie'
       ? provider.getMovieUrl(tmdbId)
       : provider.getTVUrl(tmdbId, season, episode);
+  }, [provider, resolvedMalId, mediaType, tmdbId, season, episode]);
 
   const streamUrl = useMemo(() => {
     if (!baseStreamUrl) return '';
     if (resumeTimestamp <= 0) return baseStreamUrl;
 
     const sep = baseStreamUrl.includes('?') ? '&' : '?';
-    if (provider.id === 'vidlink') {
+    if (provider.id === 'vidlink' || provider.id === 'vidlink-anime') {
       return `${baseStreamUrl}${sep}start=${resumeTimestamp}`;
     }
     return `${baseStreamUrl}${sep}start=${resumeTimestamp}&t=${resumeTimestamp}&time=${resumeTimestamp}#t=${resumeTimestamp}`;

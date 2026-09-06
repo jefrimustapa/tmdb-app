@@ -232,6 +232,18 @@ export const STREAM_PROVIDERS: StreamProvider[] = [
     badge: 'Reliable',
     getMovieUrl: (tmdbId: number) => `https://embed.smashystream.com/playere.php?tmdb=${tmdbId}&autoplay=1`,
     getTVUrl: (tmdbId: number, s: number, e: number) => `https://embed.smashystream.com/playere.php?tmdb=${tmdbId}&season=${s}&episode=${e}&autoplay=1`
+  },
+  {
+    id: 'megaplay-anime',
+    name: 'MegaPlay (Anime)',
+    tagline: 'Dedicated HiAnime library with MAL & AniList catalog mapping',
+    badge: 'Anime',
+    category: 'anime',
+    getMovieUrl: () => '',
+    getTVUrl: () => '',
+    getAnimeUrl: (malId: number, _season?: number, episode = 1, type: 'sub' | 'dub' = 'sub') => {
+      return `https://megaplay.buzz/stream/mal/${malId}/${episode || 1}/${type}`;
+    }
   }
 ];
 
