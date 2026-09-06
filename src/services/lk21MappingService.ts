@@ -5,6 +5,7 @@
 
 interface CachedLk21Entry {
   embedUrl: string | null;
+  directHlsUrl?: string | null;
   serverMirrors: { server: string; url: string }[];
   timestamp: number;
 }
@@ -43,7 +44,7 @@ async function executeFetch(url: string, referer: string = 'https://tv12.lk21off
   // 1. If running inside Android WebView with native AndroidBridge, use it to completely bypass CORS & restrictions
   if (typeof window !== 'undefined' && (window as any).AndroidBridge?.fetchHttp) {
     try {
-      const nativeResult = (window as any).AndroidBridge.fetchHttp(url, referer, 'https://tv12.lk21official.cc');
+      const nativeResult = (window as any).AndroidBridge.fetchHttp(url, referer, referer.includes('videonode') || referer.includes('playcdn') ? 'https://videonode.de' : 'https://tv12.lk21official.cc');
       if (nativeResult && typeof nativeResult === 'string' && nativeResult.trim().length > 0) {
         return nativeResult;
       }
@@ -64,6 +65,75 @@ async function executeFetch(url: string, referer: string = 'https://tv12.lk21off
   return await res.text();
 }
 
+async function executePostJson(url: string, body: any, referer: string, origin: string): Promise<string> {
+  const jsonString = JSON.stringify(body);
+  if (typeof window !== 'undefined' && (window as any).AndroidBridge?.fetchHttpPost) {
+    try {
+      const nativeResult = (window as any).AndroidBridge.fetchHttpPost(url, jsonString, 'application/json', referer, origin);
+      if (nativeResult && typeof nativeResult === 'string' && nativeResult.trim().length > 0) {
+        return nativeResult;
+      }
+    } catch (e) {
+      console.warn('[LK21] AndroidBridge.fetchHttpPost failed:', e);
+    }
+  }
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json'
+    },
+    body: jsonString
+  });
+  if (!res.ok) {
+    throw new Error(`HTTP ${res.status} for ${url}`);
+  }
+  return await res.text();
+}
+
+/**
+ * Extract direct HLS stream URL from a videonode.de embed
+ */
+async function resolveDirectHlsFromVideonode(videonodeUrl: string): Promise<string | null> {
+  try {
+    const videonodeHtml = await executeFetch(videonodeUrl, 'https://tv12.lk21official.cc/');
+    if (!videonodeHtml) return null;
+
+    // Look for inner playcdn.de iframe
+    const playcdnMatch = videonodeHtml.match(/https:\/\/playcdn\.de\/video\.php\?[^"'\s<>]+/);
+    if (!playcdnMatch) return null;
+
+    let playcdnUrl = playcdnMatch[0].replace(/&amp;/g, '&');
+    const playcdnHtml = await executeFetch(playcdnUrl, 'https://videonode.de/');
+    if (!playcdnHtml) return null;
+
+    // Extract data object: var data = {"id":"...","token":"..."};
+    const dataMatch = playcdnHtml.match(/var\s+data\s*=\s*({[^;]+});/);
+    if (!dataMatch) return null;
+
+    const dataObj = JSON.parse(dataMatch[1]);
+    if (!dataObj || !dataObj.token) return null;
+
+    // Exchange token with playcdn.de/verify.php
+    const verifyResStr = await executePostJson(
+      'https://playcdn.de/verify.php',
+      { token: dataObj.token, is_ios: false },
+      playcdnUrl,
+      'https://playcdn.de'
+    );
+
+    const verifyRes = JSON.parse(verifyResStr);
+    if (verifyRes && verifyRes.status === 'success' && verifyRes.fileUrl) {
+      console.log('[LK21] Direct HLS stream resolved:', verifyRes.fileUrl);
+      return verifyRes.fileUrl;
+    }
+  } catch (err) {
+    console.warn('[LK21] Failed resolving direct HLS from videonode:', err);
+  }
+  return null;
+}
+
 /**
  * Searches LK21 API and extracts active videonode.de server embed URLs
  */
@@ -71,28 +141,28 @@ export async function resolveLk21Stream(
   title: string,
   year?: string | number,
   originalTitle?: string
-): Promise<{ embedUrl: string | null; serverMirrors: { server: string; url: string }[] }> {
+): Promise<{ embedUrl: string | null; directHlsUrl?: string | null; serverMirrors: { server: string; url: string }[] }> {
   if (!title || !title.trim()) {
-    return { embedUrl: null, serverMirrors: [] };
+    return { embedUrl: null, directHlsUrl: null, serverMirrors: [] };
   }
 
-  const cacheKey = getNormalizedKey(title, year);
+  const cacheKey = getNormalizedKey(originalTitle || title, year);
 
-  // 1. Check Memory Cache
-  const mem = MEMORY_CACHE.get(cacheKey);
-  if (mem && Date.now() - mem.timestamp < CACHE_TTL_MS) {
-    return { embedUrl: mem.embedUrl, serverMirrors: mem.serverMirrors || [] };
+  // Check memory cache
+  const cached = MEMORY_CACHE.get(cacheKey);
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
+    return { embedUrl: cached.embedUrl, directHlsUrl: cached.directHlsUrl, serverMirrors: cached.serverMirrors };
   }
 
-  // 2. Check Session Storage Cache
+  // Check sessionStorage
   if (typeof window !== 'undefined' && window.sessionStorage) {
     try {
-      const raw = sessionStorage.getItem(`${SESSION_CACHE_KEY_PREFIX}${cacheKey}`);
-      if (raw) {
-        const parsed = JSON.parse(raw) as CachedLk21Entry;
+      const stored = sessionStorage.getItem(`${SESSION_CACHE_KEY_PREFIX}${cacheKey}`);
+      if (stored) {
+        const parsed: CachedLk21Entry = JSON.parse(stored);
         if (Date.now() - parsed.timestamp < CACHE_TTL_MS) {
           MEMORY_CACHE.set(cacheKey, parsed);
-          return { embedUrl: parsed.embedUrl, serverMirrors: parsed.serverMirrors || [] };
+          return { embedUrl: parsed.embedUrl, directHlsUrl: parsed.directHlsUrl, serverMirrors: parsed.serverMirrors };
         }
       }
     } catch {}
@@ -189,9 +259,19 @@ export async function resolveLk21Stream(
     if (!primaryEmbedUrl && mirrors.length > 0) {
       primaryEmbedUrl = mirrors[0].url;
     }
+    // Attempt to extract direct HLS (.m3u8) stream from videonode embed
+    let directHlsUrl: string | null = null;
+    if (primaryEmbedUrl && primaryEmbedUrl.includes('videonode.de')) {
+      try {
+        directHlsUrl = await resolveDirectHlsFromVideonode(primaryEmbedUrl);
+      } catch (e) {
+        console.warn('[LK21] Direct HLS resolution failed:', e);
+      }
+    }
 
     const entry: CachedLk21Entry = {
       embedUrl: primaryEmbedUrl,
+      directHlsUrl,
       serverMirrors: mirrors,
       timestamp: Date.now()
     };
@@ -203,9 +283,9 @@ export async function resolveLk21Stream(
       } catch {}
     }
 
-    return { embedUrl: primaryEmbedUrl, serverMirrors: mirrors };
+    return { embedUrl: primaryEmbedUrl, directHlsUrl, serverMirrors: mirrors };
   } catch (err) {
     console.warn('[LK21 Resolver] Error resolving stream:', err);
-    return { embedUrl: null, serverMirrors: [] };
+    return { embedUrl: null, directHlsUrl: null, serverMirrors: [] };
   }
 }

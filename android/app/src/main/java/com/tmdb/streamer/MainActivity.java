@@ -31,6 +31,7 @@ import androidx.core.content.FileProvider;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
@@ -279,6 +280,52 @@ public class MainActivity extends BridgeActivity {
                 }
 
                 @JavascriptInterface
+                public String fetchHttpPost(String targetUrl, String postBody, String contentType, String referer, String origin) {
+                    try {
+                        URL url = new URL(targetUrl);
+                        HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                        conn.setRequestMethod("POST");
+                        conn.setDoOutput(true);
+                        conn.setConnectTimeout(8000);
+                        conn.setReadTimeout(10000);
+                        conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36");
+                        if (contentType != null && !contentType.isEmpty()) {
+                            conn.setRequestProperty("Content-Type", contentType);
+                        }
+                        if (referer != null && !referer.isEmpty()) {
+                            conn.setRequestProperty("Referer", referer);
+                        }
+                        if (origin != null && !origin.isEmpty()) {
+                            conn.setRequestProperty("Origin", origin);
+                        }
+                        if (postBody != null) {
+                            byte[] outBytes = postBody.getBytes(StandardCharsets.UTF_8);
+                            conn.setRequestProperty("Content-Length", String.valueOf(outBytes.length));
+                            try (OutputStream os = conn.getOutputStream()) {
+                                os.write(outBytes);
+                                os.flush();
+                            }
+                        }
+
+                        int statusCode = conn.getResponseCode();
+                        InputStream in = (statusCode >= 400) ? conn.getErrorStream() : conn.getInputStream();
+                        if (in == null) return null;
+
+                        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                        byte[] buffer = new byte[8192];
+                        int len;
+                        while ((len = in.read(buffer)) != -1) {
+                            baos.write(buffer, 0, len);
+                        }
+                        in.close();
+                        return baos.toString("UTF-8");
+                    } catch (Exception e) {
+                        Log.w("TMDB_APP", "[AndroidBridge] fetchHttpPost error for " + targetUrl + ": " + e.getMessage());
+                        return null;
+                    }
+                }
+
+                @JavascriptInterface
                 public boolean isAccessibilityEnabled() {
                     return StreamAccessibilityService.isRunning();
                 }
@@ -505,7 +552,8 @@ public class MainActivity extends BridgeActivity {
                         }
 
                         // LK21 & VideoNode Anti-Hotlinking and CSP Frame Shield
-                        if (lower.contains("videonode.de") || lower.contains("playcdn.de") || lower.contains("gudangvape.com")) {
+                        if ((lower.contains("videonode.de") || lower.contains("playcdn.de") || lower.contains("gudangvape.com")) &&
+                            !lower.contains("/cdn-cgi/")) {
                             try {
                                 URL url = new URL(rawUrl);
                                 HttpURLConnection conn = (HttpURLConnection) url.openConnection();
@@ -513,12 +561,20 @@ public class MainActivity extends BridgeActivity {
                                 Map<String, String> reqHeaders = request.getRequestHeaders();
                                 if (reqHeaders != null) {
                                     for (Map.Entry<String, String> entry : reqHeaders.entrySet()) {
-                                        conn.setRequestProperty(entry.getKey(), entry.getValue());
+                                        String k = entry.getKey().toLowerCase();
+                                        if (!k.equals("referer") && !k.equals("origin") && !k.equals("host") && !k.equals("user-agent")) {
+                                            conn.setRequestProperty(entry.getKey(), entry.getValue());
+                                        }
                                     }
                                 }
-                                conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Mobile Safari/537.36");
-                                conn.setRequestProperty("Referer", "https://tv12.lk21official.cc/");
-                                conn.setRequestProperty("Origin", "https://tv12.lk21official.cc");
+                                conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36");
+                                if (lower.contains("playcdn.de")) {
+                                    conn.setRequestProperty("Referer", "https://videonode.de/");
+                                    conn.setRequestProperty("Origin", "https://videonode.de");
+                                } else {
+                                    conn.setRequestProperty("Referer", "https://tv12.lk21official.cc/");
+                                    conn.setRequestProperty("Origin", "https://tv12.lk21official.cc");
+                                }
 
                                 int statusCode = conn.getResponseCode();
                                 String contentType = conn.getContentType();

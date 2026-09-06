@@ -2,12 +2,13 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20260906-0722';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-add-asian-strea.20260906-0722';
+export const APP_BUILD_NUMBER = '20260906-0734';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-add-asian-strea.20260906-0734';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
 export const APP_BRANCH = 'feat-add-asian-strea';
-export const APP_CHANGELOG = `* feat: add LK21 Asian stream provider with OTF search and CSP bypass
+export const APP_CHANGELOG = `* fix(lk21): bypass CORS via AndroidBridge fetchHttp and search original_title for Asian movies
+* feat: add LK21 Asian stream provider with OTF search and CSP bypass
 * feat(stream): separate embedded server priority for anime vs other content
 * feat(watch): center title in row 1 and move episode info to row 2 with prev/next buttons (#59)
 * feat(filter): add Anime option to Movies, TV Series, and Search genre filters (#57)
@@ -20,5 +21,4 @@ export const APP_CHANGELOG = `* feat: add LK21 Asian stream provider with OTF se
 * feat(device): remove device type setting override and enforce pure automatic device detection (#47)
 * fix(web): resolve app icon and favicon pathing for browser/web app deployments (#46)
 * Merge pull request #45 from jefrimustapa/feat/improve-billboard
-* feat: add touch swipe gesture support to change billboard slides on mobile
-* fix: resolve useEffect closing bracket in HeroBanner`;
+* feat: add touch swipe gesture support to change billboard slides on mobile`;

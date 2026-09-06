@@ -310,7 +310,17 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     if (providerId === 'lk21-asian' || isAsian) {
       resolveLk21Stream(title, releaseYear, originalTitle).then((res) => {
         if (!isCancelled) {
-          setResolvedLk21Url(res.embedUrl);
+          if (res.directHlsUrl) {
+            console.log('[VideoPlayer] Playing LK21 via direct native HLS:', res.directHlsUrl);
+            setDirectStreamUrl(res.directHlsUrl);
+            setDirectStreamLabel('LK21 Fast HLS');
+            setPlayerMode('direct');
+            setIsExtracting(false);
+            setExtractionFailed(false);
+            setIsLoading(false);
+          } else {
+            setResolvedLk21Url(res.embedUrl);
+          }
         }
       }).catch(() => {});
     }
