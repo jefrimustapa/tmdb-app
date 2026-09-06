@@ -2,12 +2,12 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20260906-1431';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-improve-filters.20260906-1431';
+export const APP_BUILD_NUMBER = '20260906-1453';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-modify-title-ca.20260906-1453';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
-export const APP_BRANCH = 'feat-improve-filters';
-export const APP_CHANGELOG = `* feat(filter): harmonize genre filters, add country filter, and add title type filter to search
+export const APP_BRANCH = 'feat-modify-title-ca';
+export const APP_CHANGELOG = `* feat: improve filters across Movies, Series, and Search (#63)
 * fix(home): exclude re-releases and sort new release movies by latest date on left (#62)
 * fix(player): fix MegaPlay anime progress tracking, compact up next popup, and update trigger percent settings (#61)
 * feat(details,watch,stream): add Asian stream provider, optimize details UX, and fix watch progress reset (#60)
