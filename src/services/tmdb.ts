@@ -152,8 +152,24 @@ export const tmdbApi = {
     tmdbFetch<TMDBResponse<TMDBMediaItem>>('/movie/top_rated', { page }),
   getUpcomingMovies: (page = 1) =>
     tmdbFetch<TMDBResponse<TMDBMediaItem>>('/movie/upcoming', { page }),
-  getNowPlayingMovies: (page = 1) =>
-    tmdbFetch<TMDBResponse<TMDBMediaItem>>('/movie/now_playing', { page }),
+  getNowPlayingMovies: async (page = 1) => {
+    const res = await tmdbFetch<TMDBResponse<TMDBMediaItem>>('/movie/now_playing', { page });
+    if (res && Array.isArray(res.results)) {
+      // Exclude theatrical re-releases whose primary release date was older than 6 months ago
+      const cutoff = new Date();
+      cutoff.setMonth(cutoff.getMonth() - 6);
+      const cutoffStr = cutoff.toISOString().split('T')[0];
+      const todayStr = new Date().toISOString().split('T')[0];
+
+      res.results = res.results
+        .filter((item) => {
+          if (!item.release_date) return false;
+          return item.release_date >= cutoffStr && item.release_date <= todayStr;
+        })
+        .sort((a, b) => (b.release_date || '').localeCompare(a.release_date || ''));
+    }
+    return res;
+  },
   getMovieDetails: (id: number) =>
     tmdbFetch<TMDBMovieDetails>(`/movie/${id}`, { append_to_response: 'credits,videos,similar,recommendations,release_dates' }),
 
