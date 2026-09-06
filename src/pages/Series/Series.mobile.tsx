@@ -12,6 +12,7 @@ export const Series: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const genreParam = searchParams.get('genre') || '';
   const providerParam = searchParams.get('provider') || '';
+  const countryParam = searchParams.get('country') || '';
   const yearParam = searchParams.get('year') || '';
   const ratingParam = searchParams.get('rating') || '';
   const sortParam = searchParams.get('sort') || 'popularity.desc';
@@ -22,6 +23,7 @@ export const Series: React.FC = () => {
     genreParam ? genreParam.split(',').filter(Boolean) : []
   );
   const [selectedProvider, setSelectedProvider] = useState<string>(providerParam);
+  const [selectedCountry, setSelectedCountry] = useState<string>(countryParam);
   const [selectedYear, setSelectedYear] = useState<string>(yearParam);
   const [selectedRating, setSelectedRating] = useState<string>(ratingParam);
   const [sortBy, setSortBy] = useState<string>(sortParam);
@@ -43,14 +45,16 @@ export const Series: React.FC = () => {
       setSelectedGenres(genreParam ? genreParam.split(',').filter(Boolean) : []);
     }
     if (providerParam !== selectedProvider) setSelectedProvider(providerParam);
+    if (countryParam !== selectedCountry) setSelectedCountry(countryParam);
     if (yearParam !== selectedYear) setSelectedYear(yearParam);
     if (ratingParam !== selectedRating) setSelectedRating(ratingParam);
     if (sortParam !== sortBy) setSortBy(sortParam);
-  }, [genreParam, providerParam, yearParam, ratingParam, sortParam]);
+  }, [genreParam, providerParam, countryParam, yearParam, ratingParam, sortParam]);
 
   const updateUrlParams = (
     genresList: string[],
     provider: string,
+    country: string,
     year: string,
     rating: string,
     sort: string
@@ -58,6 +62,7 @@ export const Series: React.FC = () => {
     const params: Record<string, string> = {};
     if (genresList.length > 0) params.genre = genresList.join(',');
     if (provider) params.provider = provider;
+    if (country) params.country = country;
     if (year) params.year = year;
     if (rating) params.rating = rating;
     if (sort && sort !== 'popularity.desc') params.sort = sort;
@@ -72,6 +77,7 @@ export const Series: React.FC = () => {
       with_genres: combinedGenres || undefined,
       with_watch_providers: platformObj?.providerId,
       watch_region: platformObj?.region || 'US',
+      with_origin_country: selectedCountry || undefined,
       with_networks: platformObj?.networks,
       sort_by: sortBy,
       page: pNum
@@ -103,7 +109,7 @@ export const Series: React.FC = () => {
     }
 
     return params;
-  }, [selectedGenres, selectedProvider, selectedYear, selectedRating, sortBy]);
+  }, [selectedGenres, selectedProvider, selectedCountry, selectedYear, selectedRating, sortBy]);
 
   // Initial fetch or filter changes
   useEffect(() => {
@@ -177,6 +183,7 @@ export const Series: React.FC = () => {
   const handleResetFilters = () => {
     setSelectedGenres([]);
     setSelectedProvider('');
+    setSelectedCountry('');
     setSelectedYear('');
     setSelectedRating('');
     setSortBy('popularity.desc');
@@ -211,27 +218,32 @@ export const Series: React.FC = () => {
         selectedGenres={selectedGenres}
         onSelectGenres={(g) => {
           setSelectedGenres(g);
-          updateUrlParams(g, selectedProvider, selectedYear, selectedRating, sortBy);
+          updateUrlParams(g, selectedProvider, selectedCountry, selectedYear, selectedRating, sortBy);
         }}
         selectedProvider={selectedProvider}
         onSelectProvider={(p) => {
           setSelectedProvider(p);
-          updateUrlParams(selectedGenres, p, selectedYear, selectedRating, sortBy);
+          updateUrlParams(selectedGenres, p, selectedCountry, selectedYear, selectedRating, sortBy);
+        }}
+        selectedCountry={selectedCountry}
+        onSelectCountry={(c) => {
+          setSelectedCountry(c);
+          updateUrlParams(selectedGenres, selectedProvider, c, selectedYear, selectedRating, sortBy);
         }}
         selectedYear={selectedYear}
         onSelectYear={(y) => {
           setSelectedYear(y);
-          updateUrlParams(selectedGenres, selectedProvider, y, selectedRating, sortBy);
+          updateUrlParams(selectedGenres, selectedProvider, selectedCountry, y, selectedRating, sortBy);
         }}
         selectedRating={selectedRating}
         onSelectRating={(r) => {
           setSelectedRating(r);
-          updateUrlParams(selectedGenres, selectedProvider, selectedYear, r, sortBy);
+          updateUrlParams(selectedGenres, selectedProvider, selectedCountry, selectedYear, r, sortBy);
         }}
         sortBy={sortBy}
         onSelectSort={(s) => {
           setSortBy(s);
-          updateUrlParams(selectedGenres, selectedProvider, selectedYear, selectedRating, s);
+          updateUrlParams(selectedGenres, selectedProvider, selectedCountry, selectedYear, selectedRating, s);
         }}
         onResetFilters={handleResetFilters}
         isTV={isTV}

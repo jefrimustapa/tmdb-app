@@ -4,6 +4,7 @@ import {
   Filter,
   Calendar,
   Star,
+  Globe,
   Check,
   ChevronDown,
   RotateCcw,
@@ -13,6 +14,7 @@ import {
 import type { TMDBGenre } from '../../types/tmdb';
 import { PLATFORMS } from './PlatformHubs';
 import type { SortOption } from './SortDropdown';
+import { COUNTRY_OPTIONS, UNIFIED_GENRES } from '../../services/tmdb';
 
 export const MOVIE_SORT_OPTIONS: SortOption[] = [
   { value: 'popularity.desc', label: 'Most Popular' },
@@ -47,11 +49,13 @@ export const MOVIE_RATING_OPTIONS = [
 ];
 
 interface MovieFilterBarProps {
-  genres: TMDBGenre[];
+  genres?: TMDBGenre[];
   selectedGenres: string[];
   onSelectGenres: (genres: string[]) => void;
   selectedProvider: string;
   onSelectProvider: (provider: string) => void;
+  selectedCountry?: string;
+  onSelectCountry?: (country: string) => void;
   selectedYear: string;
   onSelectYear: (year: string) => void;
   selectedRating: string;
@@ -68,6 +72,8 @@ export const MovieFilterBar: React.FC<MovieFilterBarProps> = ({
   onSelectGenres,
   selectedProvider,
   onSelectProvider,
+  selectedCountry = '',
+  onSelectCountry,
   selectedYear,
   onSelectYear,
   selectedRating,
@@ -77,7 +83,7 @@ export const MovieFilterBar: React.FC<MovieFilterBarProps> = ({
   onResetFilters,
   isTV = false
 }) => {
-  const [openDropdown, setOpenDropdown] = useState<'platform' | 'genre' | 'year' | 'rating' | 'sort' | null>(null);
+  const [openDropdown, setOpenDropdown] = useState<'platform' | 'genre' | 'country' | 'year' | 'rating' | 'sort' | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
   const chipsScrollRef = useRef<HTMLDivElement>(null);
@@ -87,14 +93,16 @@ export const MovieFilterBar: React.FC<MovieFilterBarProps> = ({
   const sortBtnRef = useRef<HTMLButtonElement>(null);
   const platformBtnRef = useRef<HTMLButtonElement>(null);
   const genreBtnRef = useRef<HTMLButtonElement>(null);
+  const countryBtnRef = useRef<HTMLButtonElement>(null);
   const yearBtnRef = useRef<HTMLButtonElement>(null);
   const ratingBtnRef = useRef<HTMLButtonElement>(null);
 
-  const getActiveTriggerRef = (type: 'platform' | 'genre' | 'year' | 'rating' | 'sort') => {
+  const getActiveTriggerRef = (type: 'platform' | 'genre' | 'country' | 'year' | 'rating' | 'sort') => {
     switch (type) {
       case 'sort': return sortBtnRef;
       case 'platform': return platformBtnRef;
       case 'genre': return genreBtnRef;
+      case 'country': return countryBtnRef;
       case 'year': return yearBtnRef;
       case 'rating': return ratingBtnRef;
       default: return null;
@@ -107,19 +115,23 @@ export const MovieFilterBar: React.FC<MovieFilterBarProps> = ({
   const [isFrozen, setIsFrozen] = useState(false);
 
   const activePlatform = PLATFORMS.find((p) => p.id === selectedProvider);
+  const selectedCountryObj = COUNTRY_OPTIONS.find((c) => c.code === selectedCountry);
   const selectedYearObj = MOVIE_YEAR_OPTIONS.find((y) => y.value === selectedYear);
   const selectedRatingObj = MOVIE_RATING_OPTIONS.find((r) => r.value === selectedRating);
   const selectedSortObj = MOVIE_SORT_OPTIONS.find((s) => s.value === sortBy) || MOVIE_SORT_OPTIONS[0];
 
+  const effectiveGenres = UNIFIED_GENRES;
+
   const hasActiveFilters = Boolean(
     selectedProvider ||
     selectedGenres.length > 0 ||
+    selectedCountry ||
     selectedYear ||
     selectedRating
   );
 
   const toggleDropdown = (
-    type: 'platform' | 'genre' | 'year' | 'rating' | 'sort',
+    type: 'platform' | 'genre' | 'country' | 'year' | 'rating' | 'sort',
     btnRef: React.RefObject<HTMLButtonElement | null>
   ) => {
     if (openDropdown === type) {
@@ -132,7 +144,7 @@ export const MovieFilterBar: React.FC<MovieFilterBarProps> = ({
       const containerRect = containerRef.current.getBoundingClientRect();
 
       // Desired popover width estimate (typically 260px - 340px)
-      const popoverWidth = type === 'genre' ? 340 : 270;
+      const popoverWidth = type === 'genre' ? 340 : type === 'country' ? 280 : 270;
       const margin = 16;
 
       // Center the popover under the button if possible, or align to its left
@@ -329,7 +341,26 @@ export const MovieFilterBar: React.FC<MovieFilterBarProps> = ({
               <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${openDropdown === 'genre' ? 'rotate-180' : ''}`} />
             </button>
 
-            {/* 4. Year / Era Filter Chip */}
+            {/* 4. Country Filter Chip */}
+            <button
+              ref={countryBtnRef}
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                toggleDropdown('country', countryBtnRef);
+              }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl text-xs sm:text-sm font-bold border transition-all shadow-sm flex-shrink-0 tv-focus-target cursor-pointer ${
+                selectedCountry || openDropdown === 'country'
+                  ? 'bg-sky-500 text-black border-white shadow-[0_0_15px_rgba(14,165,233,0.4)] ring-2 ring-sky-500/50'
+                  : 'bg-hbo-card text-gray-300 border-hbo-border hover:text-white hover:border-hbo-purple-light hover:bg-hbo-hover'
+              }`}
+            >
+              <Globe className={`w-3.5 h-3.5 ${selectedCountry || openDropdown === 'country' ? 'text-black' : 'text-sky-400'}`} />
+              <span>{selectedCountryObj && selectedCountryObj.code ? `${selectedCountryObj.flag} ${selectedCountryObj.name}` : 'Country'}</span>
+              <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${openDropdown === 'country' ? 'rotate-180' : ''}`} />
+            </button>
+
+            {/* 5. Year / Era Filter Chip */}
             <button
               ref={yearBtnRef}
               type="button"
@@ -348,7 +379,7 @@ export const MovieFilterBar: React.FC<MovieFilterBarProps> = ({
               <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${openDropdown === 'year' ? 'rotate-180' : ''}`} />
             </button>
 
-            {/* 5. Rating Filter Chip */}
+            {/* 6. Rating Filter Chip */}
             <button
               ref={ratingBtnRef}
               type="button"
@@ -487,7 +518,7 @@ export const MovieFilterBar: React.FC<MovieFilterBarProps> = ({
                     )}
                   </div>
                   <div className="grid grid-cols-2 gap-1.5 p-0.5">
-                    {genres.map((g) => {
+                    {effectiveGenres.map((g) => {
                       const isSelected = selectedGenres.includes(String(g.id));
                       return (
                         <button
@@ -507,6 +538,39 @@ export const MovieFilterBar: React.FC<MovieFilterBarProps> = ({
                       );
                     })}
                   </div>
+                </div>
+              )}
+
+              {/* Country Popover Menu */}
+              {openDropdown === 'country' && (
+                <div className="w-64 max-h-80 overflow-y-auto no-scrollbar space-y-1 p-1">
+                  <div className="px-3 py-1 text-[10px] font-black tracking-wider uppercase text-gray-400 border-b border-hbo-border/40 mb-1">
+                    Origin Country
+                  </div>
+                  {COUNTRY_OPTIONS.map((c) => {
+                    const isSelected = selectedCountry === c.code;
+                    return (
+                      <button
+                        key={c.code || 'all'}
+                        type="button"
+                        data-filter-selected={isSelected ? 'true' : undefined}
+                        onClick={() => {
+                          onSelectCountry?.(isSelected ? '' : c.code);
+                          setOpenDropdown(null);
+                          countryBtnRef.current?.focus();
+                        }}
+                        className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold text-left transition tv-focus-target cursor-pointer ${
+                          isSelected ? 'bg-sky-500 text-black font-extrabold' : 'text-gray-300 hover:bg-white/10 hover:text-white'
+                        }`}
+                      >
+                        <span className="flex items-center gap-2">
+                          <span className="text-sm">{c.flag}</span>
+                          <span>{c.name}</span>
+                        </span>
+                        {isSelected && <Check className="w-3.5 h-3.5 stroke-[3]" />}
+                      </button>
+                    );
+                  })}
                 </div>
               )}
 
@@ -591,7 +655,7 @@ export const MovieFilterBar: React.FC<MovieFilterBarProps> = ({
 
               {/* Genre Badges */}
               {selectedGenres.map((gId) => {
-                const genreObj = genres.find((g) => String(g.id) === gId);
+                const genreObj = effectiveGenres.find((g) => String(g.id) === gId);
                 if (!genreObj) return null;
                 return (
                   <button
@@ -605,6 +669,18 @@ export const MovieFilterBar: React.FC<MovieFilterBarProps> = ({
                   </button>
                 );
               })}
+
+              {/* Country Badge */}
+              {selectedCountry && selectedCountryObj && (
+                <button
+                  type="button"
+                  onClick={() => onSelectCountry?.('')}
+                  className="flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-sky-500/20 text-sky-400 border border-sky-500/40 hover:bg-sky-500/30 transition flex-shrink-0 cursor-pointer"
+                >
+                  <span>{selectedCountryObj.flag} {selectedCountryObj.name}</span>
+                  <X className="w-3 h-3" />
+                </button>
+              )}
 
               {/* Year Badge */}
               {selectedYear && (
