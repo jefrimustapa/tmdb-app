@@ -5,7 +5,7 @@ import type { TMDBMovieDetails, TMDBTVDetails, TMDBSeasonDetails } from '../../t
 import { VideoPlayer } from '../../components/player/VideoPlayer';
 import { ProviderPickerMobile } from '../../components/player/ProviderPickerMobile';
 import { dbService } from '../../services/db';
-import { ArrowLeft, SkipForward } from 'lucide-react';
+import { ArrowLeft, SkipForward, SkipBack } from 'lucide-react';
 
 export const Watch: React.FC = () => {
   const { type, id } = useParams<{ type: 'movie' | 'tv'; id: string }>();
@@ -262,10 +262,42 @@ export const Watch: React.FC = () => {
     return null;
   }, [mediaType, details, seasonDetails, seasonParam, episodeParam]);
 
+  const prevEpisodeInfo = React.useMemo(() => {
+    if (mediaType !== 'tv' || !details) return null;
+
+    // 1. Previous episode in the same season
+    if (episodeParam > 1) {
+      const prevInSeason = seasonDetails?.episodes?.find((e) => e.episode_number === episodeParam - 1);
+      return {
+        season: seasonParam,
+        episode: episodeParam - 1,
+        title: prevInSeason?.name,
+        stillPath: prevInSeason?.still_path || null
+      };
+    }
+
+    // 2. Previous season (e.g. S2 E1 -> S1)
+    if (seasonParam > 1) {
+      return {
+        season: seasonParam - 1,
+        episode: 1,
+        title: 'Previous Season',
+        stillPath: null
+      };
+    }
+
+    return null;
+  }, [mediaType, details, seasonDetails, seasonParam, episodeParam]);
+
   const handleNextEpisode = React.useCallback(() => {
     if (!nextEpisodeInfo) return;
     navigate(`/watch/tv/${tmdbId}?s=${nextEpisodeInfo.season}&e=${nextEpisodeInfo.episode}`, { replace: true });
   }, [nextEpisodeInfo, navigate, tmdbId]);
+
+  const handlePrevEpisode = React.useCallback(() => {
+    if (!prevEpisodeInfo) return;
+    navigate(`/watch/tv/${tmdbId}?s=${prevEpisodeInfo.season}&e=${prevEpisodeInfo.episode}`, { replace: true });
+  }, [prevEpisodeInfo, navigate, tmdbId]);
 
   if (isLoading || !details) {
     return (
@@ -289,99 +321,140 @@ export const Watch: React.FC = () => {
     >
       {/* Stream Player Area with Overlay Header */}
       <div className="relative w-full h-full flex-1 bg-black overflow-hidden group">
-        {/* Overlay Top Header Nav: Back Button (icon only), Title stacked with [S1E1] underneath, Provider Switcher & HUD */}
+        {/* Overlay Top Header Nav: Row 1 (Back + Center-aligned Title, Provider Switcher) & Row 2 (Season/Episode info + Prev/Next buttons) */}
         <div
           data-watch-header="true"
-          className={`absolute top-0 left-0 right-0 z-40 flex items-start justify-between gap-3 px-3 sm:px-6 pt-[max(0.75rem,env(safe-area-inset-top,1.75rem))] pb-5 bg-gradient-to-b from-black/95 via-black/60 to-transparent transition-all duration-300 pointer-events-auto ${
+          className={`absolute top-0 left-0 right-0 z-40 flex flex-col gap-2 px-3 sm:px-6 pt-[max(0.75rem,env(safe-area-inset-top,1.75rem))] pb-5 bg-gradient-to-b from-black/95 via-black/60 to-transparent transition-all duration-300 pointer-events-auto ${
             headerVisible ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4 pointer-events-none'
           }`}
         >
-          {/* Left: Back Button Icon Only + Title with [S1E1] underneath */}
-          <div className="flex items-start gap-3 min-w-0 flex-1 mr-2 pt-0.5">
-            <button
-              onClick={handleExitWatch}
-              id="watch-back-btn"
-              data-watch-back="true"
-              data-watch-header-item="true"
-              aria-label="Back"
-              tabIndex={0}
-              onKeyDown={(e) => {
-                if (e.key === 'ArrowRight') {
-                  e.preventDefault();
-                  const trigger = document.getElementById('watch-provider-trigger');
-                  if (trigger) {
-                    trigger.focus();
+          {/* Row 1: Back Button + Vertically Centered Title (Left) and Provider Switcher (Right) */}
+          <div className="flex items-center justify-between gap-3 w-full">
+            {/* Left: Back Button Icon Only + Vertically Centered Title */}
+            <div className="flex items-center gap-3 min-w-0 flex-1 mr-2">
+              <button
+                onClick={handleExitWatch}
+                id="watch-back-btn"
+                data-watch-back="true"
+                data-watch-header-item="true"
+                aria-label="Back"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'ArrowRight') {
+                    e.preventDefault();
+                    const trigger = document.getElementById('watch-provider-trigger');
+                    if (trigger) {
+                      trigger.focus();
+                    }
+                  } else if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    const prevBtn = document.getElementById('watch-prev-ep-btn');
+                    const nextBtn = document.getElementById('watch-next-ep-btn');
+                    if (prevBtn) {
+                      prevBtn.focus();
+                    } else if (nextBtn) {
+                      nextBtn.focus();
+                    } else {
+                      (window as any).__tmdbHeaderFocused = false;
+                      setHeaderVisible(false);
+                      (document.getElementById('watch-back-btn') as HTMLElement)?.blur();
+                      const iframe = document.querySelector<HTMLIFrameElement>('iframe');
+                      if (iframe) {
+                        try { iframe.focus(); } catch {}
+                      }
+                    }
                   }
-                } else if (e.key === 'ArrowDown') {
-                  e.preventDefault();
-                  (window as any).__tmdbHeaderFocused = false;
-                  setHeaderVisible(false);
-                  (document.getElementById('watch-back-btn') as HTMLElement)?.blur();
-                  const iframe = document.querySelector<HTMLIFrameElement>('iframe');
-                  if (iframe) {
-                    try { iframe.focus(); } catch {}
-                  }
-                }
-              }}
-              className="p-2.5 rounded-full bg-black/70 hover:bg-black text-white border border-white/20 backdrop-blur-md transition hover:scale-110 flex-shrink-0 tv-focus-target focus:outline-none focus:border-hbo-cyan focus:ring-2 focus:ring-hbo-cyan"
-              title="Go Back"
-            >
-              <ArrowLeft className="w-5 h-5" />
-            </button>
+                }}
+                className="p-2.5 rounded-full bg-black/70 hover:bg-black text-white border border-white/20 backdrop-blur-md transition hover:scale-110 flex-shrink-0 tv-focus-target focus:outline-none focus:border-hbo-cyan focus:ring-2 focus:ring-hbo-cyan"
+                title="Go Back"
+              >
+                <ArrowLeft className="w-5 h-5" />
+              </button>
 
-            <div className="flex flex-col min-w-0 flex-1">
-              <h1 className="text-sm sm:text-base md:text-lg font-black font-display text-white tracking-tight drop-shadow-md truncate max-w-[200px] sm:max-w-md">
+              <h1 className="text-sm sm:text-base md:text-lg font-black font-display text-white tracking-tight drop-shadow-md truncate flex-1 leading-normal">
                 {title}
               </h1>
-              {episodeLabel && (
-                <span className="inline-block mt-0.5 px-2 py-0.5 rounded bg-hbo-purple text-hbo-cyan border border-hbo-cyan/30 text-[10px] sm:text-xs font-black tracking-wider uppercase flex-shrink-0 shadow-sm w-max">
-                  {episodeLabel}
-                </span>
+            </div>
+
+            {/* Right: Quick Provider Switcher Dropdown */}
+            <div className="flex items-center gap-2 flex-shrink-0">
+              {enabledResolvers.includes('embed') ? (
+                <ProviderPickerMobile
+                  currentProviderId={providerId}
+                  onSelect={(p) => setProviderId(p.id)}
+                  compact={true}
+                  isProbing={isProbing}
+                  serverIndex={serverIndex}
+                />
+              ) : (
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-hbo-card/90 border border-hbo-border text-xs font-bold shadow-md">
+                  {enabledResolvers.includes('torbox') ? (
+                    <span className="text-emerald-400 font-mono flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                      <span>TorBox 4K Cloud</span>
+                    </span>
+                  ) : (
+                    <span className="text-hbo-cyan font-mono flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-hbo-cyan animate-pulse" />
+                      <span>Private Extractor</span>
+                    </span>
+                  )}
+                </div>
               )}
             </div>
           </div>
 
-          {/* Right: Quick Provider Switcher Dropdown with Next Episode Button Below */}
-          <div className="flex flex-col items-end gap-2 flex-shrink-0">
-            {enabledResolvers.includes('embed') ? (
-              <ProviderPickerMobile
-                currentProviderId={providerId}
-                onSelect={(p) => setProviderId(p.id)}
-                compact={true}
-                isProbing={isProbing}
-                serverIndex={serverIndex}
-              />
-            ) : (
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-hbo-card/90 border border-hbo-border text-xs font-bold shadow-md">
-                {enabledResolvers.includes('torbox') ? (
-                  <span className="text-emerald-400 font-mono flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                    <span>TorBox 4K Cloud</span>
+          {/* Row 2: Season & Episode Info (Left) + Episode Navigation (Prev & Next) (Right) */}
+          {mediaType === 'tv' && (episodeLabel || prevEpisodeInfo || nextEpisodeInfo) && (
+            <div className="flex items-center justify-between gap-3 w-full pl-1 sm:pl-2">
+              {/* Left: Season & Episode Label */}
+              <div className="flex items-center gap-2 min-w-0">
+                {episodeLabel && (
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-md bg-hbo-purple/90 text-hbo-cyan border border-hbo-cyan/30 text-[11px] sm:text-xs font-black tracking-wider uppercase flex-shrink-0 shadow-sm">
+                    {episodeLabel}
                   </span>
-                ) : (
-                  <span className="text-hbo-cyan font-mono flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-hbo-cyan animate-pulse" />
-                    <span>Private Extractor</span>
+                )}
+                {currentEpisode?.name && (
+                  <span className="text-xs text-white/80 font-medium truncate max-w-[180px] sm:max-w-xs">
+                    {currentEpisode.name}
                   </span>
                 )}
               </div>
-            )}
 
-            {nextEpisodeInfo && (
-              <button
-                type="button"
-                onClick={handleNextEpisode}
-                id="watch-next-ep-btn"
-                data-watch-header-item="true"
-                title={`Play Next: S${nextEpisodeInfo.season} E${nextEpisodeInfo.episode}`}
-                aria-label={`Play Next: S${nextEpisodeInfo.season} E${nextEpisodeInfo.episode}`}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-hbo-purple/70 hover:bg-hbo-purple text-hbo-cyan border border-hbo-cyan/30 text-xs font-bold backdrop-blur-md shadow-md transition active:scale-95 hover:scale-105"
-              >
-                <SkipForward className="w-3.5 h-3.5" />
-                <span className="inline">Next: S{nextEpisodeInfo.season} E{nextEpisodeInfo.episode}</span>
-              </button>
-            )}
-          </div>
+              {/* Right: Prev & Next Episode Buttons */}
+              <div className="flex items-center gap-2 flex-shrink-0 ml-auto">
+                {prevEpisodeInfo && (
+                  <button
+                    type="button"
+                    onClick={handlePrevEpisode}
+                    id="watch-prev-ep-btn"
+                    data-watch-header-item="true"
+                    title={`Play Previous: S${prevEpisodeInfo.season} E${prevEpisodeInfo.episode}`}
+                    aria-label={`Play Previous: S${prevEpisodeInfo.season} E${prevEpisodeInfo.episode}`}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/60 hover:bg-hbo-purple/80 text-white/90 hover:text-white border border-white/20 hover:border-hbo-cyan/30 text-xs font-bold backdrop-blur-md shadow-md transition active:scale-95 hover:scale-105"
+                  >
+                    <SkipBack className="w-3.5 h-3.5" />
+                    <span className="inline">Prev: S{prevEpisodeInfo.season} E{prevEpisodeInfo.episode}</span>
+                  </button>
+                )}
+
+                {nextEpisodeInfo && (
+                  <button
+                    type="button"
+                    onClick={handleNextEpisode}
+                    id="watch-next-ep-btn"
+                    data-watch-header-item="true"
+                    title={`Play Next: S${nextEpisodeInfo.season} E${nextEpisodeInfo.episode}`}
+                    aria-label={`Play Next: S${nextEpisodeInfo.season} E${nextEpisodeInfo.episode}`}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-hbo-purple/70 hover:bg-hbo-purple text-hbo-cyan border border-hbo-cyan/30 text-xs font-bold backdrop-blur-md shadow-md transition active:scale-95 hover:scale-105"
+                  >
+                    <SkipForward className="w-3.5 h-3.5" />
+                    <span className="inline">Next: S{nextEpisodeInfo.season} E{nextEpisodeInfo.episode}</span>
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Video Player (Full Viewport with dynamic bottom safe area offset in portrait) */}
