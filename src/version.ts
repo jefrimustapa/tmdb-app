@@ -2,12 +2,13 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20260906-1453';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-modify-title-ca.20260906-1453';
+export const APP_BUILD_NUMBER = '20260906-1458';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-modify-title-ca.20260906-1458';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
 export const APP_BRANCH = 'feat-modify-title-ca';
-export const APP_CHANGELOG = `* feat: improve filters across Movies, Series, and Search (#63)
+export const APP_CHANGELOG = `* feat(card): change movie badge from film to movie and float 3-dot menu using portal
+* feat: improve filters across Movies, Series, and Search (#63)
 * fix(home): exclude re-releases and sort new release movies by latest date on left (#62)
 * fix(player): fix MegaPlay anime progress tracking, compact up next popup, and update trigger percent settings (#61)
 * feat(details,watch,stream): add Asian stream provider, optimize details UX, and fix watch progress reset (#60)
@@ -20,5 +21,4 @@ export const APP_CHANGELOG = `* feat: improve filters across Movies, Series, and
 * feat(series): add sticky freezing SeriesFilterBar with multi-select and scrollable chips (#51)
 * feat(movies): add sticky freezing MovieFilterBar with multi-select and scrollable chips (#50)
 * fix: implement per-episode watch progress tracking and resolve episode resume timestamp leak (fixes #48) (#49)
-* feat(device): remove device type setting override and enforce pure automatic device detection (#47)
-* fix(web): resolve app icon and favicon pathing for browser/web app deployments (#46)`;
+* feat(device): remove device type setting override and enforce pure automatic device detection (#47)`;

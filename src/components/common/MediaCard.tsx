@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, memo } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
-import { Play, Heart, Bookmark, MoreVertical, Trash2 } from 'lucide-react';
+import { Play, Heart, Bookmark, MoreVertical, Trash2, Info } from 'lucide-react';
 import type { TMDBMediaItem } from '../../types/tmdb';
 import { tmdbImages } from '../../services/tmdb';
 import { RatingBadge } from './RatingBadge';
@@ -67,10 +67,13 @@ const MediaCardComponent: React.FC<MediaCardProps> = ({
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cardRef = useRef<HTMLDivElement>(null);
 
+  const isLandscape = variant === 'landscape';
+
   const updateMenuPosition = () => {
     if (!menuBtnRef.current) return;
     const rect = menuBtnRef.current.getBoundingClientRect();
-    const menuHeight = onDelete ? 180 : 140;
+    const buttonCount = 3 + (isLandscape ? 1 : 0) + (onDelete ? 1 : 0);
+    const menuHeight = buttonCount * 36 + (buttonCount - 1) * 6 + 16;
     let top = rect.bottom + 6;
     if (top + menuHeight > window.innerHeight - 10) {
       top = Math.max(10, rect.top - menuHeight - 6);
@@ -189,7 +192,7 @@ const MediaCardComponent: React.FC<MediaCardProps> = ({
     e.preventDefault();
     e.stopPropagation();
     setMenuOpen(false);
-    navigate(`/details/${mediaType}/${item.id}`);
+    navigate(`/details/${mediaType}/${item.id}`, { state: { item } });
   };
 
   const handleLike = async (e: React.MouseEvent) => {
@@ -260,8 +263,6 @@ const MediaCardComponent: React.FC<MediaCardProps> = ({
       }
     }
   };
-
-  const isLandscape = variant === 'landscape';
 
   return (
     <>
@@ -377,6 +378,19 @@ const MediaCardComponent: React.FC<MediaCardProps> = ({
           >
             <Play className="w-4 h-4 fill-current ml-0.5" />
           </button>
+
+          {/* Go to Details Page button for Continue Watching cards */}
+          {isLandscape && (
+            <button
+              type="button"
+              onClick={handleDetails}
+              title="Go to Details"
+              aria-label="Go to Details"
+              className="w-9 h-9 rounded-xl bg-white/10 hover:bg-white/20 text-gray-300 hover:text-white border border-white/10 flex items-center justify-center transition hover:scale-105 tv-focus-target cursor-pointer"
+            >
+              <Info className="w-4 h-4" />
+            </button>
+          )}
 
           {/* Like Icon */}
           <button
