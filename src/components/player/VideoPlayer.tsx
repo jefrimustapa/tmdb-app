@@ -346,8 +346,8 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
   const streamUrl = useMemo(() => {
     if (!baseStreamUrl) return '';
-    // Asian / LARI21 embeds do not support custom start/t/time query parameters and can crash or show a black screen
-    if (provider.id === 'lari21-asian' || provider.id === 'lk21-asian' || provider.category === 'asian') {
+    // Asian / LARI21 and MegaPlay embeds do not support custom start/t/time query parameters and can crash or show a black screen
+    if (provider.id === 'lari21-asian' || provider.id === 'lk21-asian' || provider.category === 'asian' || provider.id === 'megaplay-anime') {
       return baseStreamUrl;
     }
     if (resumeTimestamp <= 0) return baseStreamUrl;
@@ -368,6 +368,9 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     }
     if ((!totalDurationSec || totalDurationSec <= 0) && durationRef.current > 0) {
       totalDurationSec = durationRef.current;
+    }
+    if ((!totalDurationSec || totalDurationSec <= 0) && isAnime && mediaType === 'tv') {
+      totalDurationSec = 1440; // 24 minutes standard anime episode duration fallback
     }
     if (currentSec < 0) return;
 
@@ -564,12 +567,33 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           return;
         }
 
-        // 3. PlayerJS, Plyr, vidsrc, or standard event postMessages
+        // 3. MegaPlay / MegaCloud channel events & watching-log
+        if (data.channel === 'megacloud' || data.channel === 'megaplay' || data.type === 'watching-log') {
+          if (data.event === 'complete') {
+            const endDur = durationRef.current || (episodeRuntimeMinutes ? episodeRuntimeMinutes * 60 : 1440);
+            recordProgress(endDur, endDur, true);
+            return;
+          }
+          const current = data.time ?? data.currentTime ?? data.seconds ?? 0;
+          const dur = data.duration ?? data.totalDuration ?? 0;
+          if (current > 0) {
+            lastPostMessageTimeRef.current = Date.now();
+            recordProgress(current, dur);
+          }
+          return;
+        }
+
+        // 4. PlayerJS, Plyr, vidsrc, or standard event postMessages
         if (data.event === 'timeupdate' || data.event === 'progress' || data.event === 'time') {
-          lastPostMessageTimeRef.current = Date.now();
-          const current = data.currentTime ?? data.data?.currentTime ?? data.seconds ?? 0;
+          if (data.event === 'complete' || data.event === 'ended') {
+            const endDur = durationRef.current || (episodeRuntimeMinutes ? episodeRuntimeMinutes * 60 : 0);
+            if (endDur > 0) recordProgress(endDur, endDur, true);
+            return;
+          }
+          const current = data.currentTime ?? data.data?.currentTime ?? data.time ?? data.seconds ?? 0;
           const dur = data.duration ?? data.data?.duration ?? data.totalDuration ?? 0;
           if (current > 0) {
+            lastPostMessageTimeRef.current = Date.now();
             recordProgress(current, dur);
           }
         }
@@ -578,7 +602,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
     window.addEventListener('message', handlePostMessage);
     return () => window.removeEventListener('message', handlePostMessage);
-  }, [recordProgress, tmdbId, mediaType, season, episode]);
+  }, [recordProgress, tmdbId, mediaType, season, episode, episodeRuntimeMinutes]);
 
   // Universal Fallback Elapsed Watch Session Ticker (For Sandboxed Embed Providers)
   useEffect(() => {
@@ -698,7 +722,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       setResumeTimestamp(targetTimestamp);
 
       // Provisional duration from metadata
-      const provisionalDuration = (episodeRuntimeMinutes ? episodeRuntimeMinutes * 60 : 0) || (existing?.duration || 0);
+      const provisionalDuration = (episodeRuntimeMinutes ? episodeRuntimeMinutes * 60 : 0) || (existing?.duration || 0) || (isAnime && mediaType === 'tv' ? 1440 : 0);
       durationRef.current = provisionalDuration;
 
       const progressPercent = provisionalDuration > 0 && targetTimestamp > 0 
@@ -826,8 +850,11 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
               iframe.contentWindow.postMessage({ type: 'SEEK', data: { time: resumeTimestamp } }, '*');
               iframe.contentWindow.postMessage({ event: 'seek', time: resumeTimestamp }, '*');
               iframe.contentWindow.postMessage({ type: 'seek', time: resumeTimestamp }, '*');
+              iframe.contentWindow.postMessage({ channel: 'megacloud', event: 'seek', time: resumeTimestamp }, '*');
+              iframe.contentWindow.postMessage({ channel: 'megaplay', event: 'seek', time: resumeTimestamp }, '*');
               iframe.contentWindow.postMessage(JSON.stringify({ type: 'seek', time: resumeTimestamp }), '*');
               iframe.contentWindow.postMessage(JSON.stringify({ event: 'command', func: 'seekTo', args: [resumeTimestamp, true] }), '*');
+              iframe.contentWindow.postMessage(JSON.stringify({ channel: 'megacloud', event: 'seek', time: resumeTimestamp }), '*');
             }
           } catch {
             // ignore cross-origin postMessage restrictions
@@ -1140,12 +1167,12 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         </div>
       )}
 
-      {/* Up Next Episode Overlay (Appears at >= 90% or episode end) */}
+      {/* Up Next Episode Overlay (Compact & Sleek) */}
       {showUpNext && nextEpisodeInfo && (
-        <div className="absolute bottom-6 right-6 z-40 max-w-sm sm:max-w-md w-full bg-hbo-card/95 border border-hbo-cyan/40 rounded-2xl shadow-2xl p-4 backdrop-blur-xl animate-in fade-in slide-in-from-bottom-5 duration-300 transform-gpu">
-          <div className="flex items-center justify-between gap-2 mb-2.5">
-            <span className="text-[11px] font-black uppercase tracking-wider text-hbo-cyan flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-hbo-cyan animate-pulse" />
+        <div className="absolute bottom-4 right-4 sm:bottom-6 sm:right-6 z-40 w-72 sm:w-80 max-w-[calc(100vw-2rem)] bg-hbo-card/95 border border-hbo-cyan/40 rounded-2xl shadow-2xl p-3 backdrop-blur-xl animate-in fade-in slide-in-from-bottom-4 duration-300 transform-gpu">
+          <div className="flex items-center justify-between gap-2 mb-2">
+            <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-hbo-cyan flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-hbo-cyan animate-pulse" />
               Up Next in {countdown}s
             </span>
             <button
@@ -1157,12 +1184,12 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
               title="Dismiss"
               aria-label="Dismiss"
             >
-              <Minimize2 className="w-4 h-4" />
+              <Minimize2 className="w-3.5 h-3.5" />
             </button>
           </div>
 
-          <div className="flex items-center gap-3">
-            <div className="w-24 aspect-video rounded-lg overflow-hidden bg-gray-900 flex-shrink-0 border border-white/10 relative">
+          <div className="flex items-center gap-2.5">
+            <div className="w-20 aspect-video rounded-lg overflow-hidden bg-gray-900 flex-shrink-0 border border-white/10 relative">
               <img
                 src={nextEpisodeInfo.stillPath ? tmdbImages.still(nextEpisodeInfo.stillPath, 'w300') : (backdropPath ? tmdbImages.backdrop(backdropPath, 'w300') : TMDB_FALLBACK_BACKDROP)}
                 alt={nextEpisodeInfo.title || 'Next Episode'}
@@ -1171,35 +1198,35 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                 decoding="async"
               />
               <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
-                <Play className="w-5 h-5 fill-white text-white opacity-90" />
+                <Play className="w-4 h-4 fill-white text-white opacity-90" />
               </div>
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-xs text-hbo-purple-light font-bold">
-                Season {nextEpisodeInfo.season} • Episode {nextEpisodeInfo.episode}
+              <p className="text-[11px] text-hbo-purple-light font-bold truncate">
+                S{nextEpisodeInfo.season} • E{nextEpisodeInfo.episode}
               </p>
-              <h4 className="text-sm font-bold text-white truncate mt-0.5">
+              <h4 className="text-xs font-bold text-white truncate mt-0.5" title={nextEpisodeInfo.title || `Episode ${nextEpisodeInfo.episode}`}>
                 {nextEpisodeInfo.title || `Episode ${nextEpisodeInfo.episode}`}
               </h4>
             </div>
           </div>
 
           {/* Action Buttons & Countdown Bar */}
-          <div className="mt-3.5 space-y-2">
+          <div className="mt-2.5 space-y-2">
             <div className="w-full h-1 bg-white/10 rounded-full overflow-hidden">
               <div
                 className="h-full bg-gradient-to-r from-hbo-purple-light to-hbo-cyan transition-all duration-1000 ease-linear"
-                style={{ width: `${(countdown / 10) * 100}%` }}
+                style={{ width: `${Math.max(0, Math.min(100, (countdown / (upNextTimeoutRef.current || 10)) * 100))}%` }}
               />
             </div>
-            <div className="flex items-center justify-end gap-2 pt-1">
+            <div className="flex items-center justify-end gap-2 pt-0.5">
               <button
                 type="button"
                 onClick={() => {
                   setShowUpNext(false);
                   dismissedUpNextRef.current = true;
                 }}
-                className="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-semibold transition tv-focus-target"
+                className="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-white text-[11px] font-semibold transition tv-focus-target"
               >
                 Dismiss
               </button>
@@ -1210,9 +1237,9 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                   setShowUpNext(false);
                   onNextEpisode?.();
                 }}
-                className="px-4 py-1.5 rounded-xl bg-gradient-to-r from-hbo-purple to-hbo-cyan text-white text-xs font-bold shadow-hbo-glow hover:scale-105 transition flex items-center gap-1.5 tv-focus-target"
+                className="px-3 py-1 rounded-lg bg-gradient-to-r from-hbo-purple to-hbo-cyan text-white text-[11px] font-bold shadow-hbo-glow hover:scale-105 transition flex items-center gap-1 tv-focus-target"
               >
-                <Play className="w-3.5 h-3.5 fill-current" />
+                <Play className="w-3 h-3 fill-current" />
                 Play Now
               </button>
             </div>

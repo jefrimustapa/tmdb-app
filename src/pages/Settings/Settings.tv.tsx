@@ -410,12 +410,13 @@ export const Settings: React.FC = () => {
                       </span>
                     </div>
 
-                    <div className="grid grid-cols-5 gap-2">
+                    <div className="grid grid-cols-6 gap-2">
                       {[
-                        { percent: 80, label: '80%', desc: 'Early' },
-                        { percent: 85, label: '85%', desc: 'Mid' },
                         { percent: 90, label: '90%', desc: 'Default' },
-                        { percent: 95, label: '95%', desc: 'End' },
+                        { percent: 92, label: '92%', desc: 'Late' },
+                        { percent: 94, label: '94%', desc: 'Near End' },
+                        { percent: 96, label: '96%', desc: 'Credits' },
+                        { percent: 98, label: '98%', desc: 'Final' },
                         { percent: 100, label: '100%', desc: 'Finish' },
                       ].map((opt) => {
                         const isSelected = (settings.upNextTriggerPercent || 90) === opt.percent;
