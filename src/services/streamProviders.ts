@@ -244,6 +244,16 @@ export const STREAM_PROVIDERS: StreamProvider[] = [
     getAnimeUrl: (malId: number, _season?: number, episode = 1, type: 'sub' | 'dub' = 'sub') => {
       return `https://megaplay.buzz/stream/mal/${malId}/${episode || 1}/${type}`;
     }
+  },
+  {
+    id: 'lk21-asian',
+    name: 'LK21 (Asian/Indo)',
+    tagline: 'Indonesian & Asian movies with Indo subtitles via VideoNode P2P & TurboVIP',
+    badge: 'Asian',
+    category: 'asian',
+    getMovieUrl: () => '',
+    getTVUrl: () => '',
+    getAsianUrl: (resolvedUrl: string) => resolvedUrl
   }
 ];
 
@@ -251,15 +261,21 @@ export function getProviderById(id: string): StreamProvider {
   return STREAM_PROVIDERS.find(p => p.id === id) || STREAM_PROVIDERS[0];
 }
 
-export function getOrderedProviders(topProviders?: string[], isAnime = false): StreamProvider[] {
+export function getOrderedProviders(topProviders?: string[], isAnime = false, isAsian = false): StreamProvider[] {
   let baseList = [...STREAM_PROVIDERS];
 
-  // If anime context, prioritize providers tagged category: 'anime' right after the top providers
+  // If anime context, prioritize providers tagged category: 'anime'
   if (isAnime) {
     baseList.sort((a, b) => {
       const aIsAnime = a.category === 'anime' ? 1 : 0;
       const bIsAnime = b.category === 'anime' ? 1 : 0;
       return bIsAnime - aIsAnime;
+    });
+  } else if (isAsian) {
+    baseList.sort((a, b) => {
+      const aIsAsian = a.category === 'asian' ? 1 : 0;
+      const bIsAsian = b.category === 'asian' ? 1 : 0;
+      return bIsAsian - aIsAsian;
     });
   }
 

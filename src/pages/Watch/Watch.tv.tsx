@@ -7,6 +7,7 @@ import { ProviderPickerTV } from '../../components/player/ProviderPickerTV';
 import { TVVirtualCursor } from '../../components/player/TVVirtualCursor';
 import { dbService } from '../../services/db';
 import { isAnimeMedia } from '../../services/animeMappingService';
+import { isAsianMedia } from '../../services/lk21MappingService';
 import { ArrowLeft, SkipForward, SkipBack } from 'lucide-react';
 
 import type { VirtualCursorStyle } from '../../types/db';
@@ -45,6 +46,9 @@ export const Watch: React.FC = () => {
   const mediaType = (type === 'tv' ? 'tv' : 'movie') as 'movie' | 'tv';
 
   const [enabledResolvers, setEnabledResolvers] = useState<('embed' | 'private_extractor' | 'torbox')[]>(['embed']);
+
+  const isAnime = useMemo(() => isAnimeMedia(details), [details]);
+  const isAsian = useMemo(() => isAsianMedia(details), [details]);
 
   useEffect(() => {
     if (!tmdbId) return;
@@ -129,14 +133,14 @@ export const Watch: React.FC = () => {
     }, delayMs);
   }, []);
 
-  const isAnime = useMemo(() => isAnimeMedia(details), [details]);
-
   // Load default user settings for preferred provider, timeout, and virtual cursor
   useEffect(() => {
     dbService.getSettings().then((s) => {
       if (s) {
         if (!userSelectedProvider) {
-          const defaultProvider = isAnime
+          const defaultProvider = isAsian
+            ? (s.topAsianProviders?.[0] || 'lk21-asian')
+            : isAnime
             ? (s.topAnimeProviders?.[0] || 'megaplay-anime')
             : (s.topProviders?.[0] || s.preferredProvider || 'vidlink');
           setProviderId(defaultProvider);
@@ -156,7 +160,7 @@ export const Watch: React.FC = () => {
       }
       resetHeaderTimer();
     });
-  }, [isAnime, userSelectedProvider, resetHeaderTimer]);
+  }, [isAnime, isAsian, userSelectedProvider, resetHeaderTimer]);
 
   // Dynamically track portrait vs landscape across orientation changes and window resizes
   useEffect(() => {
@@ -536,6 +540,7 @@ export const Watch: React.FC = () => {
                   isProbing={isProbing}
                   serverIndex={serverIndex}
                   isAnime={isAnime}
+                  isAsian={isAsian}
                 />
               ) : (
                 <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-hbo-card/90 border border-hbo-border text-xs font-bold shadow-md">
@@ -644,6 +649,7 @@ export const Watch: React.FC = () => {
             providerId={providerId}
             initialTimestamp={timestampParam}
             isAnime={isAnime}
+            isAsian={isAsian}
             onProviderChange={(p) => {
               setUserSelectedProvider(true);
               setProviderId(p.id);

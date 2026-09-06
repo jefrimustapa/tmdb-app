@@ -20,6 +20,7 @@ import android.util.Log;
 import android.webkit.ConsoleMessage;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
+import android.text.TextUtils;
 import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.core.view.WindowInsetsControllerCompat;
@@ -466,6 +467,61 @@ public class MainActivity extends BridgeActivity {
                                 );
                                 view.evaluateJavascript(jsDispatch, null);
                             });
+                        }
+
+                        // LK21 & VideoNode Anti-Hotlinking and CSP Frame Shield
+                        if (lower.contains("videonode.de") || lower.contains("playcdn.de") || lower.contains("gudangvape.com")) {
+                            try {
+                                URL url = new URL(rawUrl);
+                                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                                conn.setRequestMethod(request.getMethod());
+                                Map<String, String> reqHeaders = request.getRequestHeaders();
+                                if (reqHeaders != null) {
+                                    for (Map.Entry<String, String> entry : reqHeaders.entrySet()) {
+                                        conn.setRequestProperty(entry.getKey(), entry.getValue());
+                                    }
+                                }
+                                conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Mobile Safari/537.36");
+                                conn.setRequestProperty("Referer", "https://tv12.lk21official.cc/");
+                                conn.setRequestProperty("Origin", "https://tv12.lk21official.cc");
+
+                                int statusCode = conn.getResponseCode();
+                                String contentType = conn.getContentType();
+                                String mimeType = "text/html";
+                                String encoding = "UTF-8";
+                                if (contentType != null) {
+                                    String[] parts = contentType.split(";");
+                                    mimeType = parts[0].trim();
+                                    for (String part : parts) {
+                                        if (part.trim().toLowerCase().startsWith("charset=")) {
+                                            encoding = part.trim().substring(8).trim();
+                                        }
+                                    }
+                                }
+
+                                Map<String, String> responseHeaders = new HashMap<>();
+                                responseHeaders.put("Access-Control-Allow-Origin", "*");
+                                responseHeaders.put("Access-Control-Allow-Headers", "*");
+                                // Strip frame-ancestors / Content-Security-Policy to prevent iframe blocking
+                                for (Map.Entry<String, java.util.List<String>> header : conn.getHeaderFields().entrySet()) {
+                                    if (header.getKey() != null) {
+                                        String hKey = header.getKey().toLowerCase();
+                                        if (!hKey.equals("content-security-policy") && !hKey.equals("x-frame-options")) {
+                                            responseHeaders.put(header.getKey(), TextUtils.join(", ", header.getValue()));
+                                        }
+                                    }
+                                }
+
+                                InputStream in = statusCode >= 400 ? conn.getErrorStream() : conn.getInputStream();
+                                return new WebResourceResponse(
+                                    mimeType,
+                                    encoding,
+                                    statusCode,
+                                    conn.getResponseMessage() != null ? conn.getResponseMessage() : "OK",
+                                    responseHeaders,
+                                    in
+                                );
+                            } catch (Exception ignored) {}
                         }
 
                         // MegaPlay Anti-Hotlinking Shield: Inject required Referer/Origin headers

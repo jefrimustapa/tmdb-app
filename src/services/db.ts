@@ -49,6 +49,7 @@ export const DEFAULT_SETTINGS: UserSettings = {
   preferredProvider: 'vidlink',
   topProviders: ['vidlink', 'moviesapi', 'cinesrc'],
   topAnimeProviders: ['megaplay-anime', 'cinesrc', 'moviesapi'],
+  topAsianProviders: ['lk21-asian', 'cinesrc', 'moviesapi'],
   deviceMode: 'auto',
   autoplayNext: true,
   upNextPopup: true,

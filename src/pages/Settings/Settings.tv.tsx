@@ -69,7 +69,7 @@ export const Settings: React.FC = () => {
 
   const [showEasterEgg, setShowEasterEgg] = useState(false);
   const easterEggScrollRef = useRef<HTMLDivElement>(null);
-  const [priorityCategoryTab, setPriorityCategoryTab] = useState<'general' | 'anime'>('general');
+  const [priorityCategoryTab, setPriorityCategoryTab] = useState<'general' | 'anime' | 'asian'>('general');
   const [openDropdownSlot, setOpenDropdownSlot] = useState<number | null>(null);
   const clickCountRef = useRef(0);
   const clickTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -698,7 +698,7 @@ export const Settings: React.FC = () => {
                   </span>
                 </div>
 
-                {/* Sub-tab: General Content vs Anime */}
+                {/* Sub-tab: General Content vs Anime vs Asian */}
                 <div className="flex items-center gap-2 p-1 bg-black/40 border border-white/10 rounded-xl w-fit">
                   <button
                     type="button"
@@ -728,10 +728,30 @@ export const Settings: React.FC = () => {
                   >
                     Anime
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPriorityCategoryTab('asian');
+                      setOpenDropdownSlot(null);
+                    }}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all tv-focus-target ${
+                      priorityCategoryTab === 'asian'
+                        ? 'bg-gradient-to-r from-amber-600 to-red-600 text-white shadow-md'
+                        : 'text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    Asian / Indo
+                  </button>
                 </div>
 
                 <div className="grid grid-cols-3 gap-2.5">
-                  {(priorityCategoryTab === 'anime'
+                  {(priorityCategoryTab === 'asian'
+                    ? [
+                        { index: 0, priorityLabel: 'Asian #1 (Primary)', badgeClass: 'bg-amber-500/20 text-amber-300 border-amber-500/40', defaultId: 'lk21-asian' },
+                        { index: 1, priorityLabel: 'Asian #2 (Failover 1)', badgeClass: 'bg-hbo-purple/30 text-hbo-purple-light border-hbo-purple/40', defaultId: 'cinesrc' },
+                        { index: 2, priorityLabel: 'Asian #3 (Failover 2)', badgeClass: 'bg-hbo-cyan/20 text-hbo-cyan border-hbo-cyan/40', defaultId: 'moviesapi' }
+                      ]
+                    : priorityCategoryTab === 'anime'
                     ? [
                         { index: 0, priorityLabel: 'Anime #1 (Primary)', badgeClass: 'bg-pink-500/20 text-pink-300 border-pink-500/40', defaultId: 'megaplay-anime' },
                         { index: 1, priorityLabel: 'Anime #2 (Failover 1)', badgeClass: 'bg-hbo-purple/30 text-hbo-purple-light border-hbo-purple/40', defaultId: 'cinesrc' },
@@ -743,8 +763,13 @@ export const Settings: React.FC = () => {
                         { index: 2, priorityLabel: '#3 Priority (Failover 2)', badgeClass: 'bg-hbo-cyan/20 text-hbo-cyan border-hbo-cyan/40', defaultId: 'cinesrc' }
                       ]
                   ).map(({ index, priorityLabel, badgeClass, defaultId }) => {
+                    const isAsianTab = priorityCategoryTab === 'asian';
                     const isAnimeTab = priorityCategoryTab === 'anime';
-                    const currentTop = isAnimeTab
+                    const currentTop = isAsianTab
+                      ? (settings.topAsianProviders && settings.topAsianProviders.length >= 3
+                          ? settings.topAsianProviders
+                          : ['lk21-asian', 'cinesrc', 'moviesapi'])
+                      : isAnimeTab
                       ? (settings.topAnimeProviders && settings.topAnimeProviders.length >= 3
                           ? settings.topAnimeProviders
                           : ['megaplay-anime', 'cinesrc', 'moviesapi'])
@@ -789,7 +814,11 @@ export const Settings: React.FC = () => {
                                     onClick={() => {
                                       const updated = [...currentTop] as [string, string, string];
                                       updated[index] = provider.id;
-                                      if (isAnimeTab) {
+                                      if (isAsianTab) {
+                                        handleUpdate({
+                                          topAsianProviders: updated
+                                        });
+                                      } else if (isAnimeTab) {
                                         handleUpdate({
                                           topAnimeProviders: updated
                                         });
@@ -818,6 +847,9 @@ export const Settings: React.FC = () => {
                                       <span className="text-[9px] text-gray-400 block leading-normal mt-0.5 truncate">{provider.tagline}</span>
                                       {provider.badge === 'Anime' && (
                                         <span className="text-[9px] text-pink-400 font-semibold block mt-0.5">Anime Specialist</span>
+                                      )}
+                                      {provider.badge === 'Asian' && (
+                                        <span className="text-[9px] text-amber-400 font-semibold block mt-0.5">Asian Specialist</span>
                                       )}
                                     </div>
                                   </button>

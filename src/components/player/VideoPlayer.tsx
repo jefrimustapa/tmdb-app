@@ -10,6 +10,7 @@ import type { StreamResolverType } from '../../types/db';
 import { Logo } from '../common/Logo';
 import { tmdbImages, TMDB_FALLBACK_BACKDROP } from '../../services/tmdb';
 import { resolveAnimeMalId } from '../../services/animeMappingService';
+import { resolveLk21Stream } from '../../services/lk21MappingService';
 
 interface VideoPlayerProps {
   mediaType: 'movie' | 'tv';
@@ -30,6 +31,7 @@ interface VideoPlayerProps {
   initialTimestamp?: number;
   episodeRuntimeMinutes?: number;
   isAnime?: boolean;
+  isAsian?: boolean;
 }
 
 export const VideoPlayer: React.FC<VideoPlayerProps> = ({
@@ -50,7 +52,8 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   onNextEpisode,
   initialTimestamp = 0,
   episodeRuntimeMinutes,
-  isAnime = false
+  isAnime = false,
+  isAsian = false
 }) => {
   const [iframeKey, setIframeKey] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
@@ -68,6 +71,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const [showControls, setShowControls] = useState(true);
   const [topProviders, setTopProviders] = useState<string[]>(['vidlink', 'moviesapi', 'cinesrc']);
   const [topAnimeProviders, setTopAnimeProviders] = useState<string[]>(['megaplay-anime', 'cinesrc', 'moviesapi']);
+  const [topAsianProviders, setTopAsianProviders] = useState<string[]>(['lk21-asian', 'cinesrc', 'moviesapi']);
   const [enabledResolvers, setEnabledResolvers] = useState<StreamResolverType[]>(['embed']);
 
   // Up Next state
@@ -172,6 +176,9 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         }
         if (s.topAnimeProviders && s.topAnimeProviders.length >= 3) {
           setTopAnimeProviders(s.topAnimeProviders);
+        }
+        if (s.topAsianProviders && s.topAsianProviders.length >= 3) {
+          setTopAsianProviders(s.topAsianProviders);
         }
         if (typeof s.autoplayNext === 'boolean') {
           setAutoplayNextEnabled(s.autoplayNext);
@@ -288,8 +295,36 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     };
   }, [title]);
 
+  const [resolvedLk21Url, setResolvedLk21Url] = useState<string | null>(null);
+
+  // Attempt resolving LK21 stream for lk21-asian provider or Asian content
+  useEffect(() => {
+    let isCancelled = false;
+    if (!title || !title.trim()) return;
+
+    // Only resolve if provider is lk21-asian or content is Asian
+    if (providerId === 'lk21-asian' || isAsian) {
+      resolveLk21Stream(title).then((res) => {
+        if (!isCancelled) {
+          setResolvedLk21Url(res.embedUrl);
+        }
+      }).catch(() => {});
+    }
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [title, providerId, isAsian]);
+
   const provider = getProviderById(providerId);
   const baseStreamUrl = useMemo(() => {
+    // For LK21 Asian provider
+    if (provider.id === 'lk21-asian' || provider.category === 'asian') {
+      if (resolvedLk21Url) {
+        return resolvedLk21Url;
+      }
+      return '';
+    }
     // For anime providers with resolved MAL ID, use getAnimeUrl for both TV episodes and Movies/OVAs
     if (provider.category === 'anime' && provider.getAnimeUrl && resolvedMalId) {
       return provider.getAnimeUrl(resolvedMalId, season, episode, 'sub');
@@ -298,7 +333,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     return mediaType === 'movie'
       ? provider.getMovieUrl(tmdbId)
       : provider.getTVUrl(tmdbId, season, episode);
-  }, [provider, resolvedMalId, mediaType, tmdbId, season, episode]);
+  }, [provider, resolvedLk21Url, resolvedMalId, mediaType, tmdbId, season, episode]);
 
   const streamUrl = useMemo(() => {
     if (!baseStreamUrl) return '';
@@ -677,10 +712,12 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   }, [tmdbId, mediaType, season, episode, voteAverage, posterPath, backdropPath, stillPath, episodeTitle, episodeRuntimeMinutes, initialTimestamp]);
 
   const activeTopProviders = useMemo(() => {
-    return isAnime ? topAnimeProviders : topProviders;
-  }, [isAnime, topAnimeProviders, topProviders]);
+    if (isAnime) return topAnimeProviders;
+    if (isAsian) return topAsianProviders;
+    return topProviders;
+  }, [isAnime, isAsian, topAnimeProviders, topAsianProviders, topProviders]);
 
-  const orderedProviders = React.useMemo(() => getOrderedProviders(activeTopProviders, isAnime), [activeTopProviders, isAnime]);
+  const orderedProviders = React.useMemo(() => getOrderedProviders(activeTopProviders, isAnime, isAsian), [activeTopProviders, isAnime, isAsian]);
 
   const cycleToNextProvider = useCallback(() => {
     resetControlsTimer();
