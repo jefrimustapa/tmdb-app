@@ -113,7 +113,11 @@ export const ProviderPickerMobile: React.FC<ProviderPickerMobileProps> = ({
                           <p className={`text-sm font-bold ${isSelected ? 'text-hbo-cyan' : 'text-white'}`}>
                             {provider.name}
                           </p>
-                          <span className="text-[10px] px-2 py-0.5 rounded-md bg-white/10 text-gray-300 font-bold whitespace-nowrap flex-shrink-0">
+                          <span className={`text-[10px] px-2 py-0.5 rounded-md font-bold whitespace-nowrap flex-shrink-0 ${
+                            provider.badge === 'Anime'
+                              ? 'bg-gradient-to-r from-pink-500/30 to-purple-500/30 text-pink-300 border border-pink-500/40'
+                              : 'bg-white/10 text-gray-300'
+                          }`}>
                             {provider.badge}
                           </span>
                         </div>

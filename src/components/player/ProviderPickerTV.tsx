@@ -230,7 +230,11 @@ export const ProviderPickerTV: React.FC<ProviderPickerTVProps> = ({
                       <p className={`text-xs sm:text-sm font-bold truncate ${isHighlighted || isSelected ? 'text-hbo-cyan' : 'text-white'}`}>
                         {provider.name}
                       </p>
-                      <span className="text-[10px] px-2 py-0.5 rounded bg-white/10 text-gray-300 font-bold whitespace-nowrap flex-shrink-0">
+                      <span className={`text-[10px] px-2 py-0.5 rounded font-bold whitespace-nowrap flex-shrink-0 ${
+                        provider.badge === 'Anime'
+                          ? 'bg-gradient-to-r from-pink-500/30 to-purple-500/30 text-pink-300 border border-pink-500/40'
+                          : 'bg-white/10 text-gray-300'
+                      }`}>
                         {provider.badge}
                       </span>
                     </div>
