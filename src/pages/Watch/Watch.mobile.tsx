@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import { tmdbApi } from '../../services/tmdb';
 import type { TMDBMovieDetails, TMDBTVDetails, TMDBSeasonDetails } from '../../types/tmdb';
 import { VideoPlayer } from '../../components/player/VideoPlayer';
 import { ProviderPickerMobile } from '../../components/player/ProviderPickerMobile';
 import { dbService } from '../../services/db';
+import { isAnimeMedia } from '../../services/animeMappingService';
 import { ArrowLeft, SkipForward } from 'lucide-react';
 
 export const Watch: React.FC = () => {
@@ -19,6 +20,7 @@ export const Watch: React.FC = () => {
   const [details, setDetails] = useState<TMDBMovieDetails | TMDBTVDetails | null>(null);
   const [seasonDetails, setSeasonDetails] = useState<TMDBSeasonDetails | null>(null);
   const [providerId, setProviderId] = useState('vidlink');
+  const [userSelectedProvider, setUserSelectedProvider] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
   const tmdbId = parseInt(id || '0', 10);
@@ -26,15 +28,22 @@ export const Watch: React.FC = () => {
 
   const [enabledResolvers, setEnabledResolvers] = useState<('embed' | 'private_extractor' | 'torbox')[]>(['embed']);
 
+  const isAnime = useMemo(() => isAnimeMedia(details), [details]);
+
   // Load default user settings for preferred provider
   useEffect(() => {
     dbService.getSettings().then((s) => {
       if (s) {
-        if (s.preferredProvider) setProviderId(s.preferredProvider);
+        if (!userSelectedProvider) {
+          const defaultProvider = isAnime
+            ? (s.topAnimeProviders?.[0] || 'megaplay-anime')
+            : (s.topProviders?.[0] || s.preferredProvider || 'vidlink');
+          setProviderId(defaultProvider);
+        }
         if (s.enabledResolvers && s.enabledResolvers.length > 0) setEnabledResolvers(s.enabledResolvers);
       }
     });
-  }, []);
+  }, [isAnime, userSelectedProvider]);
 
   useEffect(() => {
     if (!tmdbId) return;
@@ -96,11 +105,9 @@ export const Watch: React.FC = () => {
     };
   }, []);
 
-  // Load user settings for preferred provider and header auto-hide timeout
+  // Load user settings for header auto-hide timeout
   useEffect(() => {
     dbService.getSettings().then((s) => {
-      const initialProvider = s?.topProviders?.[0] || s?.preferredProvider;
-      if (initialProvider) setProviderId(initialProvider);
       if (s?.streamHeaderTimeout !== undefined) {
         setHeaderTimeoutSeconds(s.streamHeaderTimeout);
       }
@@ -346,10 +353,14 @@ export const Watch: React.FC = () => {
             {enabledResolvers.includes('embed') ? (
               <ProviderPickerMobile
                 currentProviderId={providerId}
-                onSelect={(p) => setProviderId(p.id)}
+                onSelect={(p) => {
+                  setUserSelectedProvider(true);
+                  setProviderId(p.id);
+                }}
                 compact={true}
                 isProbing={isProbing}
                 serverIndex={serverIndex}
+                isAnime={isAnime}
               />
             ) : (
               <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-hbo-card/90 border border-hbo-border text-xs font-bold shadow-md">
@@ -401,7 +412,11 @@ export const Watch: React.FC = () => {
             episodeRuntimeMinutes={mediaType === 'movie' ? ('runtime' in details ? details.runtime : undefined) : currentEpisode?.runtime}
             providerId={providerId}
             initialTimestamp={timestampParam}
-            onProviderChange={(p) => setProviderId(p.id)}
+            isAnime={isAnime}
+            onProviderChange={(p) => {
+              setUserSelectedProvider(true);
+              setProviderId(p.id);
+            }}
             onProbingStatusChange={(probing, idx) => {
               setIsProbing(probing);
               setServerIndex(idx);
