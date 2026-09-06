@@ -124,7 +124,7 @@ const MediaCardComponent: React.FC<MediaCardProps> = ({
       return;
     }
 
-    navigate(`/details/${mediaType}/${item.id}`);
+    navigate(`/details/${mediaType}/${item.id}`, { state: { item } });
   };
 
   const handleMenuToggle = (e: React.MouseEvent | React.TouchEvent) => {

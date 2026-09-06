@@ -560,16 +560,16 @@ export const Settings: React.FC = () => {
                         : 'text-gray-400 hover:text-white'
                     }`}
                   >
-                    Asian / Indo
+                    Asean
                   </button>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
                   {(priorityCategoryTab === 'asian'
                     ? [
-                        { index: 0, label: 'Asian #1 (Primary)', badgeClass: 'bg-amber-500/20 text-amber-300 border-amber-500/40', defaultId: 'lk21-asian' },
-                        { index: 1, label: 'Asian #2 (Failover 1)', badgeClass: 'bg-hbo-purple/30 text-hbo-purple-light border-hbo-purple/40', defaultId: 'cinesrc' },
-                        { index: 2, label: 'Asian #3 (Failover 2)', badgeClass: 'bg-hbo-cyan/20 text-hbo-cyan border-hbo-cyan/40', defaultId: 'moviesapi' }
+                        { index: 0, label: 'Asean #1 (Primary)', badgeClass: 'bg-amber-500/20 text-amber-300 border-amber-500/40', defaultId: 'cinesrc' },
+                        { index: 1, label: 'Asean #2 (Failover 1)', badgeClass: 'bg-hbo-purple/30 text-hbo-purple-light border-hbo-purple/40', defaultId: '111movies' },
+                        { index: 2, label: 'Asean #3 (Failover 2)', badgeClass: 'bg-hbo-cyan/20 text-hbo-cyan border-hbo-cyan/40', defaultId: 'lari21-asian' }
                       ]
                     : priorityCategoryTab === 'anime'
                     ? [
@@ -588,7 +588,7 @@ export const Settings: React.FC = () => {
                     const currentTop = isAsianTab
                       ? (settings.topAsianProviders && settings.topAsianProviders.length >= 3
                           ? settings.topAsianProviders
-                          : ['lk21-asian', 'cinesrc', 'moviesapi'])
+                          : ['cinesrc', '111movies', 'lari21-asian'])
                       : isAnimeTab
                       ? (settings.topAnimeProviders && settings.topAnimeProviders.length >= 3
                           ? settings.topAnimeProviders

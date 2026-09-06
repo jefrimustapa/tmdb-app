@@ -1,18 +1,18 @@
 /**
- * LK21 Asian / Indo Stream Mapping Service
- * Resolves TMDB media to active LK21 videonode.de embed stream URLs on the fly.
+ * LayarIcon21 & Asian Stream Mapping Service
+ * Resolves TMDB media to active LayarIcon21 / Asian fast direct HLS streams (.m3u8).
  */
 
-interface CachedLk21Entry {
+interface CachedAsianEntry {
   embedUrl: string | null;
   directHlsUrl?: string | null;
   serverMirrors: { server: string; url: string }[];
   timestamp: number;
 }
 
-const MEMORY_CACHE = new Map<string, CachedLk21Entry>();
+const MEMORY_CACHE = new Map<string, CachedAsianEntry>();
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
-const SESSION_CACHE_KEY_PREFIX = 'tmdb_lk21_';
+const SESSION_CACHE_KEY_PREFIX = 'tmdb_asian_v3_';
 
 function getNormalizedKey(title: string, year?: string | number): string {
   const cleanTitle = title.trim().toLowerCase().replace(/[^\w\s]/g, '').replace(/\s+/g, '_');
@@ -40,51 +40,27 @@ export function isAsianMedia(media?: {
   return asianLangs.includes(lang) || countries.some(c => asianCountries.includes(c));
 }
 
-async function executeFetch(url: string, referer: string = 'https://tv12.lk21official.cc/'): Promise<string> {
-  // 1. If running inside Android WebView with native AndroidBridge, use it to completely bypass CORS & restrictions
+async function executeFetch(url: string, referer: string = 'https://layaricon21.com/'): Promise<string> {
+  // 1. If running inside Android WebView with native AndroidBridge, use it to bypass CORS & restrictions
   if (typeof window !== 'undefined' && (window as any).AndroidBridge?.fetchHttp) {
     try {
-      const nativeResult = (window as any).AndroidBridge.fetchHttp(url, referer, referer.includes('videonode') || referer.includes('playcdn') ? 'https://videonode.de' : 'https://tv12.lk21official.cc');
+      const origin = url.includes('turbovid') || url.includes('turboviplay') || url.includes('turbosplayer')
+        ? 'https://turbovidhls.com'
+        : 'https://layaricon21.com';
+      const nativeResult = (window as any).AndroidBridge.fetchHttp(url, referer, origin);
       if (nativeResult && typeof nativeResult === 'string' && nativeResult.trim().length > 0) {
         return nativeResult;
       }
     } catch (e) {
-      console.warn('[LK21] AndroidBridge.fetchHttp failed, falling back to fetch:', e);
+      console.warn('[AsianResolver] AndroidBridge.fetchHttp failed, falling back to fetch:', e);
     }
   }
 
   // 2. Fallback to standard fetch
   const res = await fetch(url, {
     headers: {
-      Accept: 'application/json, text/html, text/plain, */*'
+      Accept: 'text/html,application/xhtml+xml,application/xml,application/json,*/*'
     }
-  });
-  if (!res.ok) {
-    throw new Error(`HTTP ${res.status} for ${url}`);
-  }
-  return await res.text();
-}
-
-async function executePostJson(url: string, body: any, referer: string, origin: string): Promise<string> {
-  const jsonString = JSON.stringify(body);
-  if (typeof window !== 'undefined' && (window as any).AndroidBridge?.fetchHttpPost) {
-    try {
-      const nativeResult = (window as any).AndroidBridge.fetchHttpPost(url, jsonString, 'application/json', referer, origin);
-      if (nativeResult && typeof nativeResult === 'string' && nativeResult.trim().length > 0) {
-        return nativeResult;
-      }
-    } catch (e) {
-      console.warn('[LK21] AndroidBridge.fetchHttpPost failed:', e);
-    }
-  }
-
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Accept: 'application/json'
-    },
-    body: jsonString
   });
   if (!res.ok) {
     throw new Error(`HTTP ${res.status} for ${url}`);
@@ -93,51 +69,180 @@ async function executePostJson(url: string, body: any, referer: string, origin: 
 }
 
 /**
- * Extract direct HLS stream URL from a videonode.de embed
+ * Resolves direct HLS stream from LayarIcon21 using TurboVIP / TurboVidHLS
  */
-async function resolveDirectHlsFromVideonode(videonodeUrl: string): Promise<string | null> {
+async function resolveLayarIconStream(
+  title: string,
+  year?: string | number,
+  originalTitle?: string
+): Promise<{ embedUrl: string | null; directHlsUrl: string | null; serverMirrors: { server: string; url: string }[] }> {
   try {
-    const videonodeHtml = await executeFetch(videonodeUrl, 'https://tv12.lk21official.cc/');
-    if (!videonodeHtml) return null;
+    const candidates = [
+      originalTitle?.trim(),
+      title.trim(),
+      title.replace(/[:\-–—].*$/, '').trim()
+    ].filter((q): q is string => Boolean(q && q.length > 0));
 
-    // Look for inner playcdn.de iframe
-    const playcdnMatch = videonodeHtml.match(/https:\/\/playcdn\.de\/video\.php\?[^"'\s<>]+/);
-    if (!playcdnMatch) return null;
-
-    let playcdnUrl = playcdnMatch[0].replace(/&amp;/g, '&');
-    const playcdnHtml = await executeFetch(playcdnUrl, 'https://videonode.de/');
-    if (!playcdnHtml) return null;
-
-    // Extract data object: var data = {"id":"...","token":"..."};
-    const dataMatch = playcdnHtml.match(/var\s+data\s*=\s*({[^;]+});/);
-    if (!dataMatch) return null;
-
-    const dataObj = JSON.parse(dataMatch[1]);
-    if (!dataObj || !dataObj.token) return null;
-
-    // Exchange token with playcdn.de/verify.php
-    const verifyResStr = await executePostJson(
-      'https://playcdn.de/verify.php',
-      { token: dataObj.token, is_ios: false },
-      playcdnUrl,
-      'https://playcdn.de'
-    );
-
-    const verifyRes = JSON.parse(verifyResStr);
-    if (verifyRes && verifyRes.status === 'success' && verifyRes.fileUrl) {
-      console.log('[LK21] Direct HLS stream resolved:', verifyRes.fileUrl);
-      return verifyRes.fileUrl;
+    const uniqueQueries: string[] = [];
+    for (const q of candidates) {
+      if (!uniqueQueries.some(u => u.toLowerCase() === q.toLowerCase())) {
+        uniqueQueries.push(q);
+      }
     }
+
+    // Direct slug candidate: most titles on LayarIcon21 strictly follow {clean-title}-{year}
+    const slugCandidate = (originalTitle || title)
+      .toLowerCase()
+      .replace(/[^\w\s-]/g, '')
+      .replace(/\s+/g, '-');
+    const directSlugGuess = year ? `${slugCandidate}-${year}` : slugCandidate;
+
+    const mirrors: { server: string; url: string }[] = [];
+    let directHlsUrl: string | null = null;
+    let embedUrl: string | null = null;
+    let foundSlug: string | null = null;
+
+    // 1. FAST PATH: Probe /api/pemutar with the direct slug guess first (saves 1.5 - 3 seconds of search HTML fetching)
+    try {
+      const fastApiUrl = `https://layaricon21.com/api/pemutar?slug=${encodeURIComponent(directSlugGuess)}`;
+      const fastRes = await executeFetch(fastApiUrl, `https://layaricon21.com/nonton/${directSlugGuess}`);
+      if (fastRes) {
+        const data = JSON.parse(fastRes);
+        if (data && Array.isArray(data.server) && data.server.length > 0) {
+          for (const s of data.server) {
+            if (s && s.url && s.blocked !== true) {
+              mirrors.push({ server: s.server || 'SERVER', url: s.url });
+            }
+          }
+          if (mirrors.length > 0) {
+            foundSlug = directSlugGuess;
+          }
+        }
+      }
+    } catch (_) {}
+
+    // 2. Fallback to Search only if Fast Path did not return active servers
+    if (mirrors.length === 0) {
+      // Execute unique search queries in parallel instead of slow sequential waterfall
+      const searchPromises = uniqueQueries.map(async (query) => {
+        try {
+          const searchUrl = `https://layaricon21.com/search?q=${encodeURIComponent(query)}`;
+          const searchHtml = await executeFetch(searchUrl, 'https://layaricon21.com/');
+          if (searchHtml) {
+            const matches = [...searchHtml.matchAll(/\/film\/([a-zA-Z0-9\-]+)/g)];
+            if (matches && matches.length > 0) {
+              if (year) {
+                const yearMatch = matches.find(m => m[1].includes(String(year)));
+                if (yearMatch) return yearMatch[1];
+              }
+              return matches[0][1];
+            }
+          }
+        } catch (e) {
+          console.warn(`[LayarIcon21] Search for "${query}" failed:`, e);
+        }
+        return null;
+      });
+
+      const searchResults = await Promise.all(searchPromises);
+      foundSlug = searchResults.find((s): s is string => Boolean(s)) || directSlugGuess;
+
+      // Query /api/pemutar with discovered slug
+      try {
+        const pemutarApiUrl = `https://layaricon21.com/api/pemutar?slug=${encodeURIComponent(foundSlug)}`;
+        const pemutarJsonStr = await executeFetch(pemutarApiUrl, `https://layaricon21.com/nonton/${foundSlug}`);
+        if (pemutarJsonStr) {
+          const data = JSON.parse(pemutarJsonStr);
+          if (data && Array.isArray(data.server)) {
+            for (const s of data.server) {
+              if (s && s.url && s.blocked !== true) {
+                mirrors.push({ server: s.server || 'SERVER', url: s.url });
+              }
+            }
+          }
+        }
+      } catch (apiErr) {
+        console.warn('[LayarIcon21] /api/pemutar fetch failed, trying HTML parse:', apiErr);
+      }
+    }
+
+    // 2. Secondary Fallback: Fetch watch page HTML and parse embed links if API didn't yield servers
+    const watchUrl = `https://layaricon21.com/nonton/${foundSlug}`;
+    let watchHtml = '';
+    if (mirrors.length === 0) {
+      try {
+        watchHtml = await executeFetch(watchUrl, 'https://layaricon21.com/');
+        if (watchHtml) {
+          const turbovidMatch = watchHtml.match(/https?:\/\/(?:em)?turbovid(?:hls)?\.(?:com|org)\/t\/([a-zA-Z0-9]+)/);
+          if (turbovidMatch) {
+            const vidId = turbovidMatch[1];
+            mirrors.push({ server: 'TURBOVIP', url: `https://turbovidhls.com/t/${vidId}` });
+          }
+
+          const abyssMatch = watchHtml.match(/https:\/\/(?:play\.)?abyssplayer\.com\/[a-zA-Z0-9]+/);
+          if (abyssMatch) {
+            mirrors.push({ server: 'ABYSSPLAYER', url: abyssMatch[0] });
+          }
+
+          const playcdnMatch = watchHtml.match(/https:\/\/playcdn\.de\/[^\s"'<>]+/);
+          if (playcdnMatch) {
+            mirrors.push({ server: 'PLAYCDN', url: playcdnMatch[0].replace(/&amp;/g, '&') });
+          }
+        }
+      } catch (htmlErr) {
+        console.warn('[LayarIcon21] Watch HTML fetch failed:', htmlErr);
+      }
+    }
+
+    // 3. Try servers in order: whichever works first, use it
+    for (const mirror of mirrors) {
+      if (!mirror.url) continue;
+
+      // If it's a TurboVID link, attempt to resolve direct HLS first
+      if (mirror.url.includes('turbovid')) {
+        try {
+          const turboHtml = await executeFetch(mirror.url, 'https://layaricon21.com/');
+          if (turboHtml) {
+            const m3u8Match = turboHtml.match(/https?:\/\/[^\s"'<>]+\.m3u8/);
+            if (m3u8Match) {
+              const initialM3u8 = m3u8Match[0];
+              const playlistText = await executeFetch(initialM3u8, mirror.url);
+              if (playlistText) {
+                const masterLine = playlistText
+                  .split('\n')
+                  .map(l => l.trim())
+                  .find(l => l.startsWith('http') && l.includes('.m3u8'));
+                directHlsUrl = masterLine || initialM3u8;
+              } else {
+                directHlsUrl = initialM3u8;
+              }
+            }
+          }
+        } catch (e) {
+          console.warn('[LayarIcon21] Direct HLS extraction from turbovid failed:', e);
+        }
+      }
+
+      // Found a valid embed URL that works
+      embedUrl = mirror.url;
+      break;
+    }
+
+    return {
+      embedUrl,
+      directHlsUrl,
+      serverMirrors: mirrors
+    };
   } catch (err) {
-    console.warn('[LK21] Failed resolving direct HLS from videonode:', err);
+    console.warn('[LayarIcon21 Resolver] Error:', err);
+    return { embedUrl: null, directHlsUrl: null, serverMirrors: [] };
   }
-  return null;
 }
 
 /**
- * Searches LK21 API and extracts active videonode.de server embed URLs
+ * Searches and extracts active Asian/Indo stream URLs
  */
-export async function resolveLk21Stream(
+export async function resolveLari21Stream(
   title: string,
   year?: string | number,
   originalTitle?: string
@@ -150,7 +255,7 @@ export async function resolveLk21Stream(
 
   // Check memory cache
   const cached = MEMORY_CACHE.get(cacheKey);
-  if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
+  if (cached && (cached.embedUrl || cached.directHlsUrl) && Date.now() - cached.timestamp < CACHE_TTL_MS) {
     return { embedUrl: cached.embedUrl, directHlsUrl: cached.directHlsUrl, serverMirrors: cached.serverMirrors };
   }
 
@@ -159,8 +264,8 @@ export async function resolveLk21Stream(
     try {
       const stored = sessionStorage.getItem(`${SESSION_CACHE_KEY_PREFIX}${cacheKey}`);
       if (stored) {
-        const parsed: CachedLk21Entry = JSON.parse(stored);
-        if (Date.now() - parsed.timestamp < CACHE_TTL_MS) {
+        const parsed: CachedAsianEntry = JSON.parse(stored);
+        if (parsed && (parsed.embedUrl || parsed.directHlsUrl) && Date.now() - parsed.timestamp < CACHE_TTL_MS) {
           MEMORY_CACHE.set(cacheKey, parsed);
           return { embedUrl: parsed.embedUrl, directHlsUrl: parsed.directHlsUrl, serverMirrors: parsed.serverMirrors };
         }
@@ -168,124 +273,25 @@ export async function resolveLk21Stream(
     } catch {}
   }
 
-  try {
-    // Build candidate search queries: originalTitle (often Indonesian/Asian), clean title, slugified title
-    const candidates = [
-      originalTitle?.trim(),
-      title.trim(),
-      title.replace(/[:\-–—].*$/, '').trim()
-    ].filter((q): q is string => Boolean(q && q.length > 0));
-
-    // Deduplicate candidates case-insensitively
-    const uniqueQueries: string[] = [];
-    for (const q of candidates) {
-      if (!uniqueQueries.some(u => u.toLowerCase() === q.toLowerCase())) {
-        uniqueQueries.push(q);
-      }
-    }
-
-    let items: any[] = [];
-    for (const query of uniqueQueries) {
-      try {
-        const apiUrl = `https://gudangvape.com/search.php?s=${encodeURIComponent(query)}&page=1`;
-        const resText = await executeFetch(apiUrl, 'https://tv12.lk21official.cc/');
-        const data = JSON.parse(resText);
-        if (data.data && Array.isArray(data.data) && data.data.length > 0) {
-          items = data.data;
-          break;
-        }
-      } catch (e) {
-        console.warn(`[LK21] Query "${query}" failed:`, e);
-      }
-    }
-
-    if (!items || items.length === 0) {
-      const emptyEntry: CachedLk21Entry = { embedUrl: null, serverMirrors: [], timestamp: Date.now() };
-      MEMORY_CACHE.set(cacheKey, emptyEntry);
-      return { embedUrl: null, serverMirrors: [] };
-    }
-
-    // Best match selection: prioritize exact release year if provided
-    let bestItem = items[0];
-    if (year) {
-      const matchingYear = items.find((it: any) => String(it.year) === String(year));
-      if (matchingYear) {
-        bestItem = matchingYear;
-      }
-    }
-
-    const slug = bestItem.slug;
-    if (!slug) {
-      return { embedUrl: null, serverMirrors: [] };
-    }
-
-    // Fetch the movie detail page to retrieve dynamic player embed URLs
-    const moviePageUrl = `https://tv12.lk21official.cc/${slug}`;
-    const html = await executeFetch(moviePageUrl, 'https://tv12.lk21official.cc/');
-
-    // Regex to match data-server="..." and data-url="https://videonode.de/iframe3/..."
-    const mirrors: { server: string; url: string }[] = [];
-    const mirrorMatches = html.matchAll(/data-server="([^"]+)"[^>]*data-url="([^"]+)"/g);
-    for (const match of mirrorMatches) {
-      mirrors.push({ server: match[1], url: match[2] });
-    }
-
-    if (mirrors.length === 0) {
-      // Fallback regex matching data-url first
-      const altMatches = html.matchAll(/data-url="([^"]+)"[^>]*data-server="([^"]+)"/g);
-      for (const match of altMatches) {
-        mirrors.push({ server: match[2], url: match[1] });
-      }
-    }
-
-    // Fallback: look for direct videonode iframes in HTML
-    if (mirrors.length === 0) {
-      const directIframeMatch = html.match(/https:\/\/videonode\.de\/iframe3\/[a-z0-9\-]+\/[a-zA-Z0-9_\-]+/);
-      if (directIframeMatch) {
-        mirrors.push({ server: 'p2p', url: directIframeMatch[0] });
-      }
-    }
-
-    // Prioritize P2P or TurboVIP as primary stream URL
-    const preferredOrder = ['p2p', 'turbovip', 'cast', 'hydrax'];
-    let primaryEmbedUrl: string | null = null;
-    for (const s of preferredOrder) {
-      const found = mirrors.find(m => m.server.toLowerCase() === s);
-      if (found) {
-        primaryEmbedUrl = found.url;
-        break;
-      }
-    }
-    if (!primaryEmbedUrl && mirrors.length > 0) {
-      primaryEmbedUrl = mirrors[0].url;
-    }
-    // Attempt to extract direct HLS (.m3u8) stream from videonode embed
-    let directHlsUrl: string | null = null;
-    if (primaryEmbedUrl && primaryEmbedUrl.includes('videonode.de')) {
-      try {
-        directHlsUrl = await resolveDirectHlsFromVideonode(primaryEmbedUrl);
-      } catch (e) {
-        console.warn('[LK21] Direct HLS resolution failed:', e);
-      }
-    }
-
-    const entry: CachedLk21Entry = {
-      embedUrl: primaryEmbedUrl,
-      directHlsUrl,
-      serverMirrors: mirrors,
+  // 1. First priority: LayarIcon21 (clean, fast, unblocked direct HLS)
+  const layarIconRes = await resolveLayarIconStream(title, year, originalTitle);
+  if (layarIconRes && (layarIconRes.directHlsUrl || layarIconRes.embedUrl)) {
+    const entry: CachedAsianEntry = {
+      embedUrl: layarIconRes.embedUrl,
+      directHlsUrl: layarIconRes.directHlsUrl,
+      serverMirrors: layarIconRes.serverMirrors,
       timestamp: Date.now()
     };
-
     MEMORY_CACHE.set(cacheKey, entry);
     if (typeof window !== 'undefined' && window.sessionStorage) {
       try {
         sessionStorage.setItem(`${SESSION_CACHE_KEY_PREFIX}${cacheKey}`, JSON.stringify(entry));
       } catch {}
     }
-
-    return { embedUrl: primaryEmbedUrl, directHlsUrl, serverMirrors: mirrors };
-  } catch (err) {
-    console.warn('[LK21 Resolver] Error resolving stream:', err);
-    return { embedUrl: null, directHlsUrl: null, serverMirrors: [] };
+    return entry;
   }
+
+  return { embedUrl: null, directHlsUrl: null, serverMirrors: [] };
 }
+
+export const resolveLk21Stream = resolveLari21Stream;

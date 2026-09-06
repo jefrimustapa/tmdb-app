@@ -50,39 +50,6 @@ export const Watch: React.FC = () => {
   const isAnime = useMemo(() => isAnimeMedia(details), [details]);
   const isAsian = useMemo(() => isAsianMedia(details), [details]);
 
-  useEffect(() => {
-    if (!tmdbId) return;
-
-    const fetchDetails = async () => {
-      setIsLoading(true);
-      try {
-        if (mediaType === 'movie') {
-          const res = await tmdbApi.getMovieDetails(tmdbId);
-          setDetails(res);
-        } else {
-          const res = await tmdbApi.getTVDetails(tmdbId);
-          setDetails(res);
-        }
-      } catch (err) {
-        console.error('Failed to load video details:', err);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchDetails();
-  }, [tmdbId, mediaType]);
-
-  // Fetch season details for TV series (cached in memory for 0ms back navigation)
-  useEffect(() => {
-    if (!tmdbId || mediaType !== 'tv') return;
-    let active = true;
-    tmdbApi.getSeasonDetails(tmdbId, seasonParam).then((res) => {
-      if (active) setSeasonDetails(res);
-    }).catch(() => {});
-    return () => { active = false; };
-  }, [tmdbId, mediaType, seasonParam]);
-
   const [isProbing, setIsProbing] = useState(false);
   const [serverIndex, setServerIndex] = useState(1);
   const [headerVisible, setHeaderVisible] = useState(true);
@@ -100,23 +67,16 @@ export const Watch: React.FC = () => {
     }
 
     const timeoutSec = headerTimeoutRef.current;
-    console.log('[TMDB Streamer] resetHeaderTimer called, timeoutSec:', timeoutSec);
-    if (timeoutSec === 0) {
-      console.log('[TMDB Streamer] Header auto-hide disabled (timeoutSec = 0)');
-      return;
-    }
+    if (timeoutSec === 0) return;
 
     const delayMs = (timeoutSec > 0 ? timeoutSec : 5) * 1000;
-    console.log('[TMDB Streamer] Scheduling header auto-hide in', delayMs, 'ms');
     hideTimerRef.current = setTimeout(() => {
       const isDropdownOpen = !!document.querySelector('[data-provider-dropdown-open="true"]');
       if (isDropdownOpen) {
-        console.log('[TMDB Streamer] Dropdown is open, extending header timer');
         resetHeaderTimer();
         return;
       }
 
-      console.log('[TMDB Streamer] >>> HIDING HEADER NOW (headerVisible = false) <<<');
       setHeaderVisible(false);
       window.dispatchEvent(new CustomEvent('tmdb_close_dropdowns'));
 
@@ -133,34 +93,69 @@ export const Watch: React.FC = () => {
     }, delayMs);
   }, []);
 
-  // Load default user settings for preferred provider, timeout, and virtual cursor
+  // Parallelized initial load: TMDB details, TV season details, and DB settings all fetched together
   useEffect(() => {
-    dbService.getSettings().then((s) => {
-      if (s) {
-        if (!userSelectedProvider) {
-          const defaultProvider = isAsian
-            ? (s.topAsianProviders?.[0] || 'lk21-asian')
-            : isAnime
-            ? (s.topAnimeProviders?.[0] || 'megaplay-anime')
-            : (s.topProviders?.[0] || s.preferredProvider || 'vidlink');
-          setProviderId(defaultProvider);
+    if (!tmdbId) return;
+
+    let isMounted = true;
+    setIsLoading(true);
+
+    const detailsPromise = mediaType === 'movie'
+      ? tmdbApi.getMovieDetails(tmdbId)
+      : tmdbApi.getTVDetails(tmdbId);
+
+    const seasonPromise = mediaType === 'tv'
+      ? tmdbApi.getSeasonDetails(tmdbId, seasonParam).catch(() => null)
+      : Promise.resolve(null);
+
+    const settingsPromise = dbService.getSettings().catch(() => null);
+
+    Promise.all([detailsPromise, seasonPromise, settingsPromise])
+      .then(([fetchedDetails, fetchedSeason, s]) => {
+        if (!isMounted) return;
+
+        if (fetchedDetails) setDetails(fetchedDetails);
+        if (fetchedSeason) setSeasonDetails(fetchedSeason);
+
+        if (s) {
+          if (!userSelectedProvider) {
+            const animeFlag = isAnimeMedia(fetchedDetails);
+            const asianFlag = isAsianMedia(fetchedDetails);
+            const defaultProvider = asianFlag
+              ? (s.topAsianProviders?.[0] || 'cinesrc')
+              : animeFlag
+              ? (s.topAnimeProviders?.[0] || 'megaplay-anime')
+              : (s.topProviders?.[0] || s.preferredProvider || 'vidlink');
+            setProviderId(defaultProvider);
+          }
+          if (s.streamHeaderTimeout !== undefined) {
+            setHeaderTimeoutSeconds(s.streamHeaderTimeout);
+            headerTimeoutRef.current = s.streamHeaderTimeout;
+          }
+          if (s.enabledResolvers && s.enabledResolvers.length > 0) {
+            setEnabledResolvers(s.enabledResolvers);
+          }
+          setCursorSettings({
+            enabled: s.virtualCursorEnabled ?? true,
+            clicks: s.virtualCursorClicks ?? 2,
+            timeout: s.virtualCursorTimeout ?? 10,
+            speed: s.virtualCursorSpeed ?? 'normal',
+            style: s.virtualCursorStyle ?? 'hbo_max'
+          });
         }
-        if (s.streamHeaderTimeout !== undefined) {
-          setHeaderTimeoutSeconds(s.streamHeaderTimeout);
-          headerTimeoutRef.current = s.streamHeaderTimeout;
-        }
-        if (s.enabledResolvers && s.enabledResolvers.length > 0) setEnabledResolvers(s.enabledResolvers);
-        setCursorSettings({
-          enabled: s.virtualCursorEnabled ?? true,
-          clicks: s.virtualCursorClicks ?? 2,
-          timeout: s.virtualCursorTimeout ?? 10,
-          speed: s.virtualCursorSpeed ?? 'normal',
-          style: s.virtualCursorStyle ?? 'hbo_max'
-        });
-      }
-      resetHeaderTimer();
-    });
-  }, [isAnime, isAsian, userSelectedProvider, resetHeaderTimer]);
+        resetHeaderTimer();
+      })
+      .catch((err) => {
+        console.error('Failed to load watch page data in parallel:', err);
+      })
+      .finally(() => {
+        if (isMounted) setIsLoading(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [tmdbId, mediaType, seasonParam, userSelectedProvider, resetHeaderTimer]);
 
   // Dynamically track portrait vs landscape across orientation changes and window resizes
   useEffect(() => {

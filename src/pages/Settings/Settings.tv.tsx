@@ -740,16 +740,16 @@ export const Settings: React.FC = () => {
                         : 'text-gray-400 hover:text-white'
                     }`}
                   >
-                    Asian / Indo
+                    Asean
                   </button>
                 </div>
 
                 <div className="grid grid-cols-3 gap-2.5">
                   {(priorityCategoryTab === 'asian'
                     ? [
-                        { index: 0, priorityLabel: 'Asian #1 (Primary)', badgeClass: 'bg-amber-500/20 text-amber-300 border-amber-500/40', defaultId: 'lk21-asian' },
-                        { index: 1, priorityLabel: 'Asian #2 (Failover 1)', badgeClass: 'bg-hbo-purple/30 text-hbo-purple-light border-hbo-purple/40', defaultId: 'cinesrc' },
-                        { index: 2, priorityLabel: 'Asian #3 (Failover 2)', badgeClass: 'bg-hbo-cyan/20 text-hbo-cyan border-hbo-cyan/40', defaultId: 'moviesapi' }
+                        { index: 0, priorityLabel: 'Asean #1 (Primary)', badgeClass: 'bg-amber-500/20 text-amber-300 border-amber-500/40', defaultId: 'cinesrc' },
+                        { index: 1, priorityLabel: 'Asean #2 (Failover 1)', badgeClass: 'bg-hbo-purple/30 text-hbo-purple-light border-hbo-purple/40', defaultId: '111movies' },
+                        { index: 2, priorityLabel: 'Asean #3 (Failover 2)', badgeClass: 'bg-hbo-cyan/20 text-hbo-cyan border-hbo-cyan/40', defaultId: 'lari21-asian' }
                       ]
                     : priorityCategoryTab === 'anime'
                     ? [
@@ -768,7 +768,7 @@ export const Settings: React.FC = () => {
                     const currentTop = isAsianTab
                       ? (settings.topAsianProviders && settings.topAsianProviders.length >= 3
                           ? settings.topAsianProviders
-                          : ['lk21-asian', 'cinesrc', 'moviesapi'])
+                          : ['cinesrc', '111movies', 'lari21-asian'])
                       : isAnimeTab
                       ? (settings.topAnimeProviders && settings.topAnimeProviders.length >= 3
                           ? settings.topAnimeProviders

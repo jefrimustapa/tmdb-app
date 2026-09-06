@@ -32,55 +32,60 @@ export const Watch: React.FC = () => {
   const isAnime = useMemo(() => isAnimeMedia(details), [details]);
   const isAsian = useMemo(() => isAsianMedia(details), [details]);
 
-  // Load default user settings for preferred provider
-  useEffect(() => {
-    dbService.getSettings().then((s) => {
-      if (s) {
-        if (!userSelectedProvider) {
-          const defaultProvider = isAsian
-            ? (s.topAsianProviders?.[0] || 'lk21-asian')
-            : isAnime
-            ? (s.topAnimeProviders?.[0] || 'megaplay-anime')
-            : (s.topProviders?.[0] || s.preferredProvider || 'vidlink');
-          setProviderId(defaultProvider);
-        }
-        if (s.enabledResolvers && s.enabledResolvers.length > 0) setEnabledResolvers(s.enabledResolvers);
-      }
-    });
-  }, [isAnime, isAsian, userSelectedProvider]);
-
+  // Parallelized initial load: TMDB details, TV season details, and DB settings all fetched together
   useEffect(() => {
     if (!tmdbId) return;
 
-    const fetchDetails = async () => {
-      setIsLoading(true);
-      try {
-        if (mediaType === 'movie') {
-          const res = await tmdbApi.getMovieDetails(tmdbId);
-          setDetails(res);
-        } else {
-          const res = await tmdbApi.getTVDetails(tmdbId);
-          setDetails(res);
+    let isMounted = true;
+    setIsLoading(true);
+
+    const detailsPromise = mediaType === 'movie'
+      ? tmdbApi.getMovieDetails(tmdbId)
+      : tmdbApi.getTVDetails(tmdbId);
+
+    const seasonPromise = mediaType === 'tv'
+      ? tmdbApi.getSeasonDetails(tmdbId, seasonParam).catch(() => null)
+      : Promise.resolve(null);
+
+    const settingsPromise = dbService.getSettings().catch(() => null);
+
+    Promise.all([detailsPromise, seasonPromise, settingsPromise])
+      .then(([fetchedDetails, fetchedSeason, s]) => {
+        if (!isMounted) return;
+
+        if (fetchedDetails) setDetails(fetchedDetails);
+        if (fetchedSeason) setSeasonDetails(fetchedSeason);
+
+        if (s) {
+          if (!userSelectedProvider) {
+            const animeFlag = isAnimeMedia(fetchedDetails);
+            const asianFlag = isAsianMedia(fetchedDetails);
+            const defaultProvider = asianFlag
+              ? (s.topAsianProviders?.[0] || 'cinesrc')
+              : animeFlag
+              ? (s.topAnimeProviders?.[0] || 'megaplay-anime')
+              : (s.topProviders?.[0] || s.preferredProvider || 'vidlink');
+            setProviderId(defaultProvider);
+          }
+          if (s.enabledResolvers && s.enabledResolvers.length > 0) {
+            setEnabledResolvers(s.enabledResolvers);
+          }
+          if (s.streamHeaderTimeout !== undefined) {
+            setHeaderTimeoutSeconds(s.streamHeaderTimeout);
+          }
         }
-      } catch (err) {
-        console.error('Failed to load video details:', err);
-      } finally {
-        setIsLoading(false);
-      }
+      })
+      .catch((err) => {
+        console.error('Failed to load watch page data in parallel:', err);
+      })
+      .finally(() => {
+        if (isMounted) setIsLoading(false);
+      });
+
+    return () => {
+      isMounted = false;
     };
-
-    fetchDetails();
-  }, [tmdbId, mediaType]);
-
-  // Fetch season details for TV series (cached in memory for 0ms back navigation)
-  useEffect(() => {
-    if (!tmdbId || mediaType !== 'tv') return;
-    let active = true;
-    tmdbApi.getSeasonDetails(tmdbId, seasonParam).then((res) => {
-      if (active) setSeasonDetails(res);
-    }).catch(() => {});
-    return () => { active = false; };
-  }, [tmdbId, mediaType, seasonParam]);
+  }, [tmdbId, mediaType, seasonParam, userSelectedProvider]);
 
   const [isProbing, setIsProbing] = useState(false);
   const [serverIndex, setServerIndex] = useState(1);
@@ -109,14 +114,7 @@ export const Watch: React.FC = () => {
     };
   }, []);
 
-  // Load user settings for header auto-hide timeout
-  useEffect(() => {
-    dbService.getSettings().then((s) => {
-      if (s?.streamHeaderTimeout !== undefined) {
-        setHeaderTimeoutSeconds(s.streamHeaderTimeout);
-      }
-    });
-  }, []);
+
 
   const resetHeaderTimer = React.useCallback(() => {
     setHeaderVisible(true);

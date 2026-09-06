@@ -246,10 +246,10 @@ export const STREAM_PROVIDERS: StreamProvider[] = [
     }
   },
   {
-    id: 'lk21-asian',
-    name: 'LK21 (Asian/Indo)',
-    tagline: 'Indonesian & Asian movies with Indo subtitles via VideoNode P2P & TurboVIP',
-    badge: 'Asian',
+    id: 'lari21-asian',
+    name: 'LARI21 (Asean)',
+    tagline: 'Southeast Asian & Indonesian movies with Indo subtitles via LayarIcon21 TurboVIP',
+    badge: 'Asean',
     category: 'asian',
     getMovieUrl: () => '',
     getTVUrl: () => '',
