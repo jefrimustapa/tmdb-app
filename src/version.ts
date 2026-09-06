@@ -2,14 +2,14 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20260905-1241';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-series-page-fil.20260905-1241';
+export const APP_BUILD_NUMBER = '20260906-0048';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-add-anime-strea.20260906-0048';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
-export const APP_BRANCH = 'feat-series-page-fil';
-export const APP_CHANGELOG = `* feat(series): add Horror genre mapping using TMDB horror keywords in discoverTV
-* feat(series): add sticky freezing SeriesFilterBar with multi-select and scrollable chips
-* feat(movies): add sticky freezing MovieFilterBar with multi-select and scrollable chips
+export const APP_BRANCH = 'feat-add-anime-strea';
+export const APP_CHANGELOG = `* fix(tv): enable D-pad navigation, boundary lock, and back-button dismissal in filter dropdowns (fixes #52) (#54)
+* feat(series): add sticky freezing SeriesFilterBar with multi-select and scrollable chips (#51)
+* feat(movies): add sticky freezing MovieFilterBar with multi-select and scrollable chips (#50)
 * fix: implement per-episode watch progress tracking and resolve episode resume timestamp leak (fixes #48) (#49)
 * feat(device): remove device type setting override and enforce pure automatic device detection (#47)
 * fix(web): resolve app icon and favicon pathing for browser/web app deployments (#46)
