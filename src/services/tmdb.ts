@@ -234,6 +234,8 @@ export const tmdbApi = {
     tmdbFetch<TMDBResponse<TMDBMediaItem>>('/search/movie', { query, page }),
   searchTV: (query: string, page = 1) =>
     tmdbFetch<TMDBResponse<TMDBMediaItem>>('/search/tv', { query, page }),
+  searchKeywords: (query: string, page = 1) =>
+    tmdbFetch<TMDBResponse<{ id: number; name: string }>>('/search/keyword', { query, page }),
 
   // Genres
   getMovieGenres: () =>

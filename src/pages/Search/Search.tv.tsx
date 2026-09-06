@@ -1,9 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Search as SearchIcon, X, Film, Tv, Sparkles, User, Clapperboard } from 'lucide-react';
+import { Search as SearchIcon, X, Clock, Trash2, User } from 'lucide-react';
 import { tmdbApi, tmdbImages } from '../../services/tmdb';
 import type { TMDBMediaItem, TMDBGenre } from '../../types/tmdb';
 import { MediaCard } from '../../components/common/MediaCard';
+import { SearchFilterBar } from '../../components/common/SearchFilterBar';
+import {
+  getRecentSearches,
+  addRecentSearch,
+  removeRecentSearch,
+  clearRecentSearches
+} from '../../services/searchHistoryService';
 
 export const Search: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -14,17 +21,39 @@ export const Search: React.FC = () => {
   const [query, setQuery] = useState(queryParam);
   const [personInfo, setPersonInfo] = useState<{ id: number; name: string; profile_path: string | null; department?: string } | null>(null);
   const [results, setResults] = useState<TMDBMediaItem[]>([]);
-  const [activeFilter, setActiveFilter] = useState<'all' | 'movie' | 'tv'>('all');
-  const [popularGenres, setPopularGenres] = useState<TMDBGenre[]>([]);
+  const [genres, setGenres] = useState<TMDBGenre[]>([]);
+  const [recentSearches, setRecentSearches] = useState<string[]>([]);
+
+  // Filter Bar State
+  const [selectedType, setSelectedType] = useState<'all' | 'movie' | 'tv'>('all');
+  const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
+  const [selectedYear, setSelectedYear] = useState('');
+  const [selectedRating, setSelectedRating] = useState('');
+  const [sortBy, setSortBy] = useState('relevance');
+
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
 
+  // Load genres and recent searches
   useEffect(() => {
-    tmdbApi.getMovieGenres().then((res) => setPopularGenres((res.genres || []).slice(0, 10)));
+    Promise.allSettled([tmdbApi.getMovieGenres(), tmdbApi.getTVGenres()]).then(([mRes, tvRes]) => {
+      const gMap = new Map<number, TMDBGenre>();
+      if (mRes.status === 'fulfilled' && mRes.value.genres) {
+        mRes.value.genres.forEach((g) => gMap.set(g.id, g));
+      }
+      if (tvRes.status === 'fulfilled' && tvRes.value.genres) {
+        tvRes.value.genres.forEach((g) => {
+          if (!gMap.has(g.id)) gMap.set(g.id, g);
+        });
+      }
+      setGenres(Array.from(gMap.values()).sort((a, b) => a.name.localeCompare(b.name)));
+    });
+    setRecentSearches(getRecentSearches());
   }, []);
 
+  // Handle URL changes
   useEffect(() => {
     if (personIdParam) {
       const pId = parseInt(personIdParam, 10);
@@ -44,6 +73,7 @@ export const Search: React.FC = () => {
       setResults([]);
       setPage(1);
       setTotalPages(1);
+      setRecentSearches(getRecentSearches());
     }
   }, [queryParam, personIdParam, personNameParam]);
 
@@ -77,9 +107,12 @@ export const Search: React.FC = () => {
           ...item,
           media_type: item.media_type || (item.title ? 'movie' : 'tv')
         }));
-        // Sort by popularity / vote count descending
-        const sorted = castItems.sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
-        // Remove duplicates by ID
+        const crewItems = (creditsRes.value.crew || []).map((item) => ({
+          ...item,
+          media_type: item.media_type || (item.title ? 'movie' : 'tv')
+        }));
+        const combined = [...castItems, ...crewItems];
+        const sorted = combined.sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
         const unique = Array.from(new Map(sorted.map((item) => [item.id, item])).values());
         setResults(unique);
         setTotalPages(1);
@@ -92,25 +125,100 @@ export const Search: React.FC = () => {
   };
 
   const performSearch = async (searchTerm: string, pageNum = 1, append = false) => {
-    if (!searchTerm.trim()) {
+    const trimmed = searchTerm.trim();
+    if (!trimmed) {
       setResults([]);
       return;
     }
+
     if (pageNum === 1) {
       setIsLoading(true);
+      const updated = addRecentSearch(trimmed);
+      setRecentSearches(updated);
     } else {
       setIsLoadingMore(true);
     }
+
     try {
-      const res = await tmdbApi.searchMulti(searchTerm, pageNum);
-      const filtered = (res.results || []).filter(
+      const multiRes = await tmdbApi.searchMulti(trimmed, pageNum);
+      const rawResults = multiRes.results || [];
+
+      // Check for person (actor/director) on page 1
+      if (pageNum === 1 && !personInfo) {
+        const personMatch = rawResults.find((item: any) => item.media_type === 'person');
+        if (personMatch) {
+          const p = personMatch as any;
+          setPersonInfo({
+            id: p.id,
+            name: p.name,
+            profile_path: p.profile_path,
+            department: p.known_for_department
+          });
+
+          // Fetch full filmography
+          const creditsRes = await tmdbApi.getPersonCredits(p.id).catch(() => null);
+          if (creditsRes) {
+            const castItems = (creditsRes.cast || []).map((item) => ({
+              ...item,
+              media_type: item.media_type || (item.title ? 'movie' : 'tv')
+            }));
+            const crewItems = (creditsRes.crew || []).map((item) => ({
+              ...item,
+              media_type: item.media_type || (item.title ? 'movie' : 'tv')
+            }));
+            const combined = [...castItems, ...crewItems];
+            const sorted = combined.sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
+            const unique = Array.from(new Map(sorted.map((item) => [item.id, item])).values());
+            setResults(unique);
+            setTotalPages(1);
+            setIsLoading(false);
+            return;
+          }
+        }
+      }
+
+      // Filter titles (movie/tv)
+      let titleResults = rawResults.filter(
         (item) => item.media_type === 'movie' || item.media_type === 'tv'
       );
-      setTotalPages(res.total_pages || 1);
+
+      // Smart Keyword Discovery on page 1 if multi results are low (< 8)
+      if (pageNum === 1 && titleResults.length < 8) {
+        try {
+          const kwRes = await tmdbApi.searchKeywords(trimmed, 1);
+          if (kwRes.results && kwRes.results.length > 0) {
+            const topKw = kwRes.results[0];
+            const [movieKwRes, tvKwRes] = await Promise.allSettled([
+              tmdbApi.discoverMovies({ with_keywords: String(topKw.id), sort_by: 'popularity.desc' }),
+              tmdbApi.discoverTV({ with_keywords: String(topKw.id), sort_by: 'popularity.desc' })
+            ]);
+
+            const kwItems: TMDBMediaItem[] = [];
+            if (movieKwRes.status === 'fulfilled' && movieKwRes.value.results) {
+              kwItems.push(...movieKwRes.value.results.map((m) => ({ ...m, media_type: 'movie' as const })));
+            }
+            if (tvKwRes.status === 'fulfilled' && tvKwRes.value.results) {
+              kwItems.push(...tvKwRes.value.results.map((t) => ({ ...t, media_type: 'tv' as const })));
+            }
+
+            const existingMap = new Map(titleResults.map((i) => [i.id, i]));
+            for (const item of kwItems) {
+              if (!existingMap.has(item.id)) {
+                existingMap.set(item.id, item);
+              }
+            }
+            titleResults = Array.from(existingMap.values());
+          }
+        } catch (kwErr) {
+          console.warn('Keyword discovery skipped:', kwErr);
+        }
+      }
+
+      setTotalPages(multiRes.total_pages || 1);
       setResults((prev) => {
-        if (!append) return filtered;
+        if (!append) return titleResults;
         const existingIds = new Set(prev.map((i) => i.id));
-        const newItems = filtered.filter((i) => !existingIds.has(i.id));
+        const newItems = titleResults.filter((i) => !existingIds.has(i.id));
         return [...prev, ...newItems];
       });
     } catch (err) {
@@ -162,17 +270,113 @@ export const Search: React.FC = () => {
     setPersonInfo(null);
     setResults([]);
     setSearchParams({});
+    setRecentSearches(getRecentSearches());
   };
 
-  const filteredResults = results.filter((item) => {
-    if (activeFilter === 'all') return true;
-    return item.media_type === activeFilter;
-  });
+  const handleSelectRecent = (historyQuery: string) => {
+    if (debounceTimer) clearTimeout(debounceTimer);
+    setQuery(historyQuery);
+    setPersonInfo(null);
+    setSearchParams({ q: historyQuery });
+  };
+
+  const handleRemoveRecent = (e: React.MouseEvent, item: string) => {
+    e.stopPropagation();
+    const updated = removeRecentSearch(item);
+    setRecentSearches(updated);
+  };
+
+  const handleClearAllRecent = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    clearRecentSearches();
+    setRecentSearches([]);
+  };
+
+  const handleResetFilters = () => {
+    setSelectedType('all');
+    setSelectedGenres([]);
+    setSelectedYear('');
+    setSelectedRating('');
+    setSortBy('relevance');
+  };
+
+  // Filtered & Sorted Search Results
+  const filteredAndSortedResults = useMemo(() => {
+    let list = [...results];
+
+    // 1. Type Filter
+    if (selectedType !== 'all') {
+      list = list.filter((item) => item.media_type === selectedType);
+    }
+
+    // 2. Genre Filter (match if item has any selected genre)
+    if (selectedGenres.length > 0) {
+      list = list.filter((item) => {
+        const itemGenres = item.genre_ids ? item.genre_ids.map(String) : [];
+        return selectedGenres.some((gId) => itemGenres.includes(gId));
+      });
+    }
+
+    // 3. Year / Era Filter
+    if (selectedYear) {
+      list = list.filter((item) => {
+        const dateStr = item.release_date || item.first_air_date || '';
+        if (!dateStr) return false;
+        const year = parseInt(dateStr.slice(0, 4), 10);
+        if (isNaN(year)) return false;
+
+        switch (selectedYear) {
+          case '2010s': return year >= 2010 && year <= 2019;
+          case '2000s': return year >= 2000 && year <= 2009;
+          case '1990s': return year >= 1990 && year <= 1999;
+          case '1980s': return year >= 1980 && year <= 1989;
+          case 'classics': return year < 1980;
+          default: {
+            const exactYear = parseInt(selectedYear, 10);
+            return !isNaN(exactYear) ? year === exactYear : true;
+          }
+        }
+      });
+    }
+
+    // 4. Rating Filter
+    if (selectedRating) {
+      const minVote = parseFloat(selectedRating);
+      if (!isNaN(minVote)) {
+        list = list.filter((item) => (item.vote_average || 0) >= minVote);
+      }
+    }
+
+    // 5. Sort By
+    list.sort((a, b) => {
+      switch (sortBy) {
+        case 'vote_average.desc':
+          return (b.vote_average || 0) - (a.vote_average || 0);
+        case 'release_date.desc': {
+          const dateA = a.release_date || a.first_air_date || '';
+          const dateB = b.release_date || b.first_air_date || '';
+          return dateB.localeCompare(dateA);
+        }
+        case 'release_date.asc': {
+          const dateA = a.release_date || a.first_air_date || '';
+          const dateB = b.release_date || b.first_air_date || '';
+          return dateA.localeCompare(dateB);
+        }
+        case 'vote_count.desc':
+          return (b.vote_count || 0) - (a.vote_count || 0);
+        case 'relevance':
+        default:
+          return (b.popularity || 0) - (a.popularity || 0);
+      }
+    });
+
+    return list;
+  }, [results, selectedType, selectedGenres, selectedYear, selectedRating, sortBy]);
 
   return (
     <div className="min-h-screen pt-24 pb-16 px-4 sm:px-8 w-full max-w-full">
       {/* Search Header Input */}
-      <div className="relative max-w-3xl mx-auto mb-8">
+      <div className="relative max-w-3xl mx-auto mb-4">
         <div className="relative">
           <input
             type="text"
@@ -186,12 +390,56 @@ export const Search: React.FC = () => {
           {query && (
             <button
               onClick={handleClear}
-              className="p-2 rounded-full hover:bg-white/10 text-gray-400 hover:text-white absolute right-3 top-1/2 -translate-y-1/2 transition"
+              className="p-2 rounded-full hover:bg-white/10 text-gray-400 hover:text-white absolute right-3 top-1/2 -translate-y-1/2 transition tv-focus-target"
             >
               <X className="w-5 h-5" />
             </button>
           )}
         </div>
+
+        {/* 1-Row Recent Searches History Strip (Only shown when query is empty) */}
+        {!query && recentSearches.length > 0 && (
+          <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto no-scrollbar pt-3 pb-1 px-1 flex-nowrap scroll-pl-2 scroll-pr-2">
+            <span className="flex items-center gap-1 text-[10px] font-black tracking-wider uppercase text-gray-400 flex-shrink-0 mr-0.5">
+              <Clock className="w-3 h-3 text-hbo-cyan" />
+              Recent:
+            </span>
+            {recentSearches.map((item) => (
+              <button
+                key={item}
+                type="button"
+                onClick={() => handleSelectRecent(item)}
+                className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-hbo-cyan/15 text-hbo-cyan border border-hbo-cyan/30 hover:bg-hbo-cyan/25 transition flex-shrink-0 cursor-pointer tv-focus-target group"
+              >
+                <span>{item}</span>
+                <span
+                  role="button"
+                  tabIndex={0}
+                  onClick={(e) => handleRemoveRecent(e, item)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      handleRemoveRecent(e as any, item);
+                    }
+                  }}
+                  className="p-0.5 rounded-full hover:bg-hbo-cyan/30 text-hbo-cyan/70 hover:text-white transition tv-focus-target"
+                  title="Remove from history"
+                >
+                  <X className="w-3 h-3" />
+                </span>
+              </button>
+            ))}
+            <button
+              type="button"
+              onClick={handleClearAllRecent}
+              className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold text-gray-400 hover:text-rose-400 hover:bg-rose-500/10 border border-transparent hover:border-rose-500/30 transition flex-shrink-0 cursor-pointer tv-focus-target"
+              title="Clear all recent searches"
+            >
+              <Trash2 className="w-3 h-3" />
+              <span>Clear</span>
+            </button>
+          </div>
+        )}
 
         {/* Cast / Person Filter Banner */}
         {personInfo && (
@@ -234,66 +482,25 @@ export const Search: React.FC = () => {
             </button>
           </div>
         )}
-
-        {/* Filter Pills */}
-        {results.length > 0 && (
-          <div className="flex items-center gap-2 mt-4 justify-center">
-            <button
-              onClick={() => setActiveFilter('all')}
-              className={`px-4 py-1.5 rounded-full text-xs font-bold transition border tv-focus-target ${
-                activeFilter === 'all'
-                  ? 'bg-hbo-purple text-white border-hbo-purple-light shadow-hbo-glow'
-                  : 'bg-hbo-card text-gray-300 border-hbo-border'
-              }`}
-            >
-              All ({results.length})
-            </button>
-            <button
-              onClick={() => setActiveFilter('movie')}
-              className={`px-4 py-1.5 rounded-full text-xs font-bold transition border tv-focus-target ${
-                activeFilter === 'movie'
-                  ? 'bg-hbo-purple text-white border-hbo-purple-light shadow-hbo-glow'
-                  : 'bg-hbo-card text-gray-300 border-hbo-border'
-              }`}
-            >
-              Movies ({results.filter((r) => r.media_type === 'movie').length})
-            </button>
-            <button
-              onClick={() => setActiveFilter('tv')}
-              className={`px-4 py-1.5 rounded-full text-xs font-bold transition border tv-focus-target ${
-                activeFilter === 'tv'
-                  ? 'bg-hbo-purple text-white border-hbo-purple-light shadow-hbo-glow'
-                  : 'bg-hbo-card text-gray-300 border-hbo-border'
-              }`}
-            >
-              Series ({results.filter((r) => r.media_type === 'tv').length})
-            </button>
-          </div>
-        )}
       </div>
 
-      {/* Suggested Genre Tags if no search yet */}
-      {!query && (
-        <div className="max-w-3xl mx-auto my-12 text-center">
-          <div className="flex items-center justify-center gap-2 text-sm font-bold text-gray-400 uppercase tracking-wider mb-4">
-            <Sparkles className="w-4 h-4 text-hbo-cyan" />
-            <span>Popular Categories</span>
-          </div>
-          <div className="flex flex-wrap justify-center gap-2">
-            {popularGenres.map((genre) => (
-              <button
-                key={genre.id}
-                onClick={() => {
-                  setQuery(genre.name);
-                  setSearchParams({ q: genre.name });
-                }}
-                className="px-4 py-2 rounded-xl bg-hbo-card hover:bg-hbo-hover border border-hbo-border text-xs sm:text-sm font-semibold text-gray-300 hover:text-white transition tv-focus-target"
-              >
-                {genre.name}
-              </button>
-            ))}
-          </div>
-        </div>
+      {/* Search Filter Bar: Rendered ONLY when results exist */}
+      {results.length > 0 && (
+        <SearchFilterBar
+          genres={genres}
+          selectedType={selectedType}
+          onSelectType={setSelectedType}
+          selectedGenres={selectedGenres}
+          onSelectGenres={setSelectedGenres}
+          selectedYear={selectedYear}
+          onSelectYear={setSelectedYear}
+          selectedRating={selectedRating}
+          onSelectRating={setSelectedRating}
+          sortBy={sortBy}
+          onSelectSort={setSortBy}
+          onResetFilters={handleResetFilters}
+          isTV={true}
+        />
       )}
 
       {/* Results Grid */}
@@ -303,13 +510,28 @@ export const Search: React.FC = () => {
         </div>
       ) : results.length > 0 ? (
         <div className="space-y-6">
-          <div className="grid grid-cols-5 gap-3.5 sm:gap-4 py-4 px-1">
-            {filteredResults.map((item) => (
-              <div key={item.id} className="flex justify-center">
-                <MediaCard item={item} />
-              </div>
-            ))}
-          </div>
+          {filteredAndSortedResults.length > 0 ? (
+            <div className="grid grid-cols-5 gap-3.5 sm:gap-4 py-4 px-1">
+              {filteredAndSortedResults.map((item) => (
+                <div key={`${item.media_type || 'item'}-${item.id}`} className="flex justify-center">
+                  <MediaCard item={item} />
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-16">
+              <p className="text-base sm:text-lg text-gray-400">
+                No matching titles found for the selected filter combination.
+              </p>
+              <button
+                type="button"
+                onClick={handleResetFilters}
+                className="mt-4 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold text-rose-400 bg-rose-500/10 border border-rose-500/30 hover:bg-rose-500/20 transition cursor-pointer tv-focus-target"
+              >
+                Reset All Filters
+              </button>
+            </div>
+          )}
 
           {isLoadingMore && (
             <div className="py-8 flex justify-center items-center gap-3">
@@ -329,4 +551,3 @@ export const Search: React.FC = () => {
     </div>
   );
 };
-
