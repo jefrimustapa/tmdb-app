@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, memo } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
-import { Play, Heart, Bookmark, MoreVertical, Trash2 } from 'lucide-react';
+import { Play, Heart, Bookmark, MoreVertical, Trash2, Info } from 'lucide-react';
 import type { TMDBMediaItem } from '../../types/tmdb';
 import { tmdbImages } from '../../services/tmdb';
 import { RatingBadge } from './RatingBadge';
@@ -58,11 +59,28 @@ const MediaCardComponent: React.FC<MediaCardProps> = ({
     : tmdbImages.poster(item.poster_path, isPerfMode ? 'w185' : 'w500');
 
   const [menuOpen, setMenuOpen] = useState(false);
+  const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null);
   const [isLiked, setIsLiked] = useState(false);
   const [isWatchlisted, setIsWatchlisted] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const menuBtnRef = useRef<HTMLButtonElement>(null);
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cardRef = useRef<HTMLDivElement>(null);
+
+  const isLandscape = variant === 'landscape';
+
+  const updateMenuPosition = () => {
+    if (!menuBtnRef.current) return;
+    const rect = menuBtnRef.current.getBoundingClientRect();
+    const buttonCount = 3 + (isLandscape ? 1 : 0) + (onDelete ? 1 : 0);
+    const menuHeight = buttonCount * 36 + (buttonCount - 1) * 6 + 16;
+    let top = rect.bottom + 6;
+    if (top + menuHeight > window.innerHeight - 10) {
+      top = Math.max(10, rect.top - menuHeight - 6);
+    }
+    const right = Math.max(10, window.innerWidth - rect.right);
+    setMenuPos({ top, right });
+  };
 
   // Lazy-load liked/watchlisted state only when menu is opened
   useEffect(() => {
@@ -86,17 +104,26 @@ const MediaCardComponent: React.FC<MediaCardProps> = ({
     if (!cardEl) return;
     const handleTvLongPress = (e: Event) => {
       e.stopPropagation();
-      setMenuOpen((prev) => !prev);
+      if (!menuOpen) {
+        updateMenuPosition();
+        setMenuOpen(true);
+      } else {
+        setMenuOpen(false);
+      }
     };
     cardEl.addEventListener('tv_long_press', handleTvLongPress);
     return () => cardEl.removeEventListener('tv_long_press', handleTvLongPress);
-  }, []);
+  }, [menuOpen]);
 
   // Close menu on click outside only when menu is open
   useEffect(() => {
     if (!menuOpen) return;
     const handleClickOutside = (e: MouseEvent | TouchEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      if (
+        menuRef.current && !menuRef.current.contains(target) &&
+        menuBtnRef.current && !menuBtnRef.current.contains(target)
+      ) {
         setMenuOpen(false);
       }
     };
@@ -105,6 +132,18 @@ const MediaCardComponent: React.FC<MediaCardProps> = ({
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
       document.removeEventListener('touchstart', handleClickOutside);
+    };
+  }, [menuOpen]);
+
+  // Close floating menu on scroll or resize
+  useEffect(() => {
+    if (!menuOpen) return;
+    const handleClose = () => setMenuOpen(false);
+    window.addEventListener('scroll', handleClose, { passive: true, capture: true });
+    window.addEventListener('resize', handleClose, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', handleClose, { capture: true });
+      window.removeEventListener('resize', handleClose);
     };
   }, [menuOpen]);
 
@@ -130,7 +169,12 @@ const MediaCardComponent: React.FC<MediaCardProps> = ({
   const handleMenuToggle = (e: React.MouseEvent | React.TouchEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    setMenuOpen((prev) => !prev);
+    if (!menuOpen) {
+      updateMenuPosition();
+      setMenuOpen(true);
+    } else {
+      setMenuOpen(false);
+    }
   };
 
   const handlePlay = (e: React.MouseEvent) => {
@@ -148,7 +192,7 @@ const MediaCardComponent: React.FC<MediaCardProps> = ({
     e.preventDefault();
     e.stopPropagation();
     setMenuOpen(false);
-    navigate(`/details/${mediaType}/${item.id}`);
+    navigate(`/details/${mediaType}/${item.id}`, { state: { item } });
   };
 
   const handleLike = async (e: React.MouseEvent) => {
@@ -206,7 +250,12 @@ const MediaCardComponent: React.FC<MediaCardProps> = ({
     if (e.key === 'ContextMenu' || (e.key === 'Enter' && e.altKey)) {
       e.preventDefault();
       e.stopPropagation();
-      setMenuOpen((prev) => !prev);
+      if (!menuOpen) {
+        updateMenuPosition();
+        setMenuOpen(true);
+      } else {
+        setMenuOpen(false);
+      }
     } else if (e.key === 'Enter' || e.key === ' ') {
       if (!menuOpen) {
         e.preventDefault();
@@ -215,158 +264,180 @@ const MediaCardComponent: React.FC<MediaCardProps> = ({
     }
   };
 
-  const isLandscape = variant === 'landscape';
-
   return (
-    <div
-      ref={cardRef}
-      tabIndex={0}
-      role="button"
-      aria-label={`View ${title}`}
-      onKeyDown={handleKeyDown}
-      onTouchStart={handleTouchStart}
-      onTouchEnd={handleTouchEnd}
-      onMouseDown={handleTouchStart}
-      onMouseUp={handleTouchEnd}
-      onClick={handleCardClick}
-      className={`group relative flex-shrink-0 snap-start rounded-xl overflow-hidden bg-hbo-card border border-hbo-border/40 tv-focus-target cursor-pointer focus:outline-none transform-gpu ${
-        isLandscape
-          ? 'w-[164px] sm:w-[172px] lg:w-[176px] max-w-[180px]'
-          : 'w-[130px] sm:w-[140px] lg:w-[144px] max-w-[148px]'
-      }`}
-    >
-      <div className={`block relative w-full overflow-hidden bg-gray-900 ${
-        isLandscape ? 'aspect-video' : 'aspect-[2/3]'
-      }`}>
-        <img
-          src={imageUrl}
-          alt={title}
-          loading="lazy"
-          decoding="async"
-          onError={(e) => tmdbImages.handleImgError(e, isLandscape)}
-          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-        />
+    <>
+      <div
+        ref={cardRef}
+        tabIndex={0}
+        role="button"
+        aria-label={`View ${title}`}
+        onKeyDown={handleKeyDown}
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+        onMouseDown={handleTouchStart}
+        onMouseUp={handleTouchEnd}
+        onClick={handleCardClick}
+        className={`group relative flex-shrink-0 snap-start rounded-xl overflow-hidden bg-hbo-card border border-hbo-border/40 tv-focus-target cursor-pointer focus:outline-none transform-gpu ${
+          isLandscape
+            ? 'w-[164px] sm:w-[172px] lg:w-[176px] max-w-[180px]'
+            : 'w-[130px] sm:w-[140px] lg:w-[144px] max-w-[148px]'
+        }`}
+      >
+        <div className={`block relative w-full overflow-hidden bg-gray-900 ${
+          isLandscape ? 'aspect-video' : 'aspect-[2/3]'
+        }`}>
+          <img
+            src={imageUrl}
+            alt={title}
+            loading="lazy"
+            decoding="async"
+            onError={(e) => tmdbImages.handleImgError(e, isLandscape)}
+            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+          />
 
-        {/* Pure Play Icon on Bottom-Left Corner for Landscape Continue Watching Cards */}
-        {isLandscape && (
-          <div className="absolute bottom-2 left-2.5 z-10 pointer-events-none flex items-center">
-            <Play className="w-4 h-4 text-white fill-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)] transition-all duration-200 group-hover:scale-110 group-focus:scale-110 group-hover:text-hbo-cyan group-focus:text-hbo-cyan group-hover:fill-hbo-cyan group-focus:fill-hbo-cyan" />
-          </div>
-        )}
+          {/* Pure Play Icon on Bottom-Left Corner for Landscape Continue Watching Cards */}
+          {isLandscape && (
+            <div className="absolute bottom-2 left-2.5 z-10 pointer-events-none flex items-center">
+              <Play className="w-4 h-4 text-white fill-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)] transition-all duration-200 group-hover:scale-110 group-focus:scale-110 group-hover:text-hbo-cyan group-focus:text-hbo-cyan group-hover:fill-hbo-cyan group-focus:fill-hbo-cyan" />
+            </div>
+          )}
 
-        {/* Rating badge for poster cards */}
-        {!isLandscape && item.vote_average > 0 && (
-          <div className="absolute top-2 left-2 z-10">
-            <RatingBadge score={item.vote_average} />
-          </div>
-        )}
+          {/* Rating badge for poster cards */}
+          {!isLandscape && item.vote_average > 0 && (
+            <div className="absolute top-2 left-2 z-10">
+              <RatingBadge score={item.vote_average} />
+            </div>
+          )}
 
-        {/* 3-Vertical-Dots Consolidated Menu Trigger Button */}
-        <div className="absolute top-2 right-2 z-20" ref={menuRef}>
-          <button
-            type="button"
-            onClick={handleMenuToggle}
-            aria-label="More options"
-            className="p-1 text-white/90 hover:text-white transition-all hover:scale-110 focus:outline-none drop-shadow-[0_2px_4px_rgba(0,0,0,0.85)]"
-          >
-            <MoreVertical className="w-4 h-4 text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.85)]" />
-          </button>
-
-          {/* Consolidated Menu Popup */}
-          {menuOpen && (
-            <div
-              onClick={(e) => e.stopPropagation()}
-              className="absolute top-10 right-0 bg-hbo-card/95 backdrop-blur-xl border border-hbo-purple-light/50 rounded-2xl shadow-2xl p-1.5 z-30 flex flex-col items-center gap-1.5 animate-in fade-in zoom-in-95 duration-150"
+          {/* 3-Vertical-Dots Consolidated Menu Trigger Button */}
+          <div className="absolute top-2 right-2 z-20">
+            <button
+              ref={menuBtnRef}
+              type="button"
+              onClick={handleMenuToggle}
+              aria-label="More options"
+              className="p-1 text-white/90 hover:text-white transition-all hover:scale-110 focus:outline-none drop-shadow-[0_2px_4px_rgba(0,0,0,0.85)] cursor-pointer"
             >
-              {/* Play Icon */}
-              <button
-                type="button"
-                onClick={handlePlay}
-                title="Play Now"
-                aria-label="Play Now"
-                className="w-9 h-9 rounded-xl bg-hbo-purple/40 hover:bg-hbo-purple flex items-center justify-center text-hbo-cyan border border-hbo-cyan/30 transition hover:scale-105 tv-focus-target"
-              >
-                <Play className="w-4 h-4 fill-current ml-0.5" />
-              </button>
+              <MoreVertical className="w-4 h-4 text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.85)]" />
+            </button>
+          </div>
 
-              {/* Like Icon */}
-              <button
-                type="button"
-                onClick={handleLike}
-                title={isLiked ? 'Liked' : 'Like'}
-                aria-label={isLiked ? 'Liked' : 'Like'}
-                className={`w-9 h-9 rounded-xl flex items-center justify-center border transition hover:scale-105 tv-focus-target ${
-                  isLiked
-                    ? 'bg-red-500/20 text-red-500 border-red-500/40'
-                    : 'bg-white/10 text-gray-300 border-white/10 hover:text-white hover:bg-white/20'
-                }`}
-              >
-                <Heart className={`w-4 h-4 ${isLiked ? 'fill-current' : ''}`} />
-              </button>
-
-              {/* Watchlist Icon */}
-              <button
-                type="button"
-                onClick={handleWatchlist}
-                title={isWatchlisted ? 'In Watchlist' : 'Add to Watchlist'}
-                aria-label={isWatchlisted ? 'In Watchlist' : 'Add to Watchlist'}
-                className={`w-9 h-9 rounded-xl flex items-center justify-center border transition hover:scale-105 tv-focus-target ${
-                  isWatchlisted
-                    ? 'bg-hbo-cyan/20 text-hbo-cyan border-hbo-cyan/40'
-                    : 'bg-white/10 text-gray-300 border-white/10 hover:text-white hover:bg-white/20'
-                }`}
-              >
-                <Bookmark className={`w-4 h-4 ${isWatchlisted ? 'fill-current' : ''}`} />
-              </button>
-
-              {/* Optional Delete Icon */}
-              {onDelete && (
-                <button
-                  type="button"
-                  onClick={handleDelete}
-                  title="Remove"
-                  aria-label="Remove"
-                  className="w-9 h-9 rounded-xl bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/40 flex items-center justify-center transition hover:scale-105 tv-focus-target"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              )}
+          {/* Progress Bar (Visible on both Poster and Landscape Continue Watching cards) */}
+          {progress !== undefined && progress > 0 && (
+            <div className="absolute bottom-0 left-0 right-0 h-1.5 bg-black/70 z-10 overflow-hidden">
+              <div
+                className="h-full bg-gradient-to-r from-hbo-purple-light to-hbo-cyan"
+                style={{ width: `${Math.min(100, Math.max(3, progress))}%` }}
+              />
             </div>
           )}
         </div>
 
-        {/* Progress Bar (Visible on both Poster and Landscape Continue Watching cards) */}
-        {progress !== undefined && progress > 0 && (
-          <div className="absolute bottom-0 left-0 right-0 h-1.5 bg-black/70 z-10 overflow-hidden">
-            <div
-              className="h-full bg-gradient-to-r from-hbo-purple-light to-hbo-cyan"
-              style={{ width: `${Math.min(100, Math.max(3, progress))}%` }}
-            />
-          </div>
-        )}
+        {/* Title & Metadata Footer */}
+        <div className="p-2.5">
+          <h4 className="text-xs sm:text-sm font-bold text-white line-clamp-1 group-hover:text-hbo-cyan transition-colors">
+            {title}
+          </h4>
+          {isLandscape ? (
+            <p className="text-[11px] sm:text-xs text-gray-400 truncate mt-0.5">
+              {mediaType === 'tv' && season && episode
+                ? `S${season} : E${episode}${episodeTitle ? ` • ${episodeTitle}` : ''}`
+                : (releaseYear ? `${releaseYear} • Movie` : 'Movie')}
+            </p>
+          ) : (
+            <div className="flex items-center justify-between mt-1 text-[11px] text-gray-400">
+              <span>{releaseYear || mediaType.toUpperCase()}</span>
+              <span className="uppercase text-[10px] font-bold px-1.5 py-0.5 rounded bg-hbo-purple/20 text-hbo-purple-light border border-hbo-purple/30">
+                {mediaType === 'movie' ? 'Movie' : 'Series'}
+              </span>
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Title & Metadata Footer */}
-      <div className="p-2.5">
-        <h4 className="text-xs sm:text-sm font-bold text-white line-clamp-1 group-hover:text-hbo-cyan transition-colors">
-          {title}
-        </h4>
-        {isLandscape ? (
-          <p className="text-[11px] sm:text-xs text-gray-400 truncate mt-0.5">
-            {mediaType === 'tv' && season && episode
-              ? `S${season} : E${episode}${episodeTitle ? ` • ${episodeTitle}` : ''}`
-              : (releaseYear ? `${releaseYear} • Film` : 'Film')}
-          </p>
-        ) : (
-          <div className="flex items-center justify-between mt-1 text-[11px] text-gray-400">
-            <span>{releaseYear || mediaType.toUpperCase()}</span>
-            <span className="uppercase text-[10px] font-bold px-1.5 py-0.5 rounded bg-hbo-purple/20 text-hbo-purple-light border border-hbo-purple/30">
-              {mediaType === 'movie' ? 'Film' : 'Series'}
-            </span>
-          </div>
-        )}
-      </div>
-    </div>
+      {/* Floating 3-Dot Menu Portal */}
+      {menuOpen && menuPos && typeof document !== 'undefined' && createPortal(
+        <div
+          ref={menuRef}
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            position: 'fixed',
+            top: `${menuPos.top}px`,
+            right: `${menuPos.right}px`,
+            zIndex: 99999
+          }}
+          className="bg-hbo-card/95 backdrop-blur-xl border border-hbo-purple-light/50 rounded-2xl shadow-2xl p-1.5 flex flex-col items-center gap-1.5 animate-in fade-in zoom-in-95 duration-150 pointer-events-auto"
+        >
+          {/* Play Icon */}
+          <button
+            type="button"
+            onClick={handlePlay}
+            title="Play Now"
+            aria-label="Play Now"
+            className="w-9 h-9 rounded-xl bg-hbo-purple/40 hover:bg-hbo-purple flex items-center justify-center text-hbo-cyan border border-hbo-cyan/30 transition hover:scale-105 tv-focus-target cursor-pointer"
+          >
+            <Play className="w-4 h-4 fill-current ml-0.5" />
+          </button>
+
+          {/* Go to Details Page button for Continue Watching cards */}
+          {isLandscape && (
+            <button
+              type="button"
+              onClick={handleDetails}
+              title="Go to Details"
+              aria-label="Go to Details"
+              className="w-9 h-9 rounded-xl bg-white/10 hover:bg-white/20 text-gray-300 hover:text-white border border-white/10 flex items-center justify-center transition hover:scale-105 tv-focus-target cursor-pointer"
+            >
+              <Info className="w-4 h-4" />
+            </button>
+          )}
+
+          {/* Like Icon */}
+          <button
+            type="button"
+            onClick={handleLike}
+            title={isLiked ? 'Liked' : 'Like'}
+            aria-label={isLiked ? 'Liked' : 'Like'}
+            className={`w-9 h-9 rounded-xl flex items-center justify-center border transition hover:scale-105 tv-focus-target cursor-pointer ${
+              isLiked
+                ? 'bg-red-500/20 text-red-500 border-red-500/40'
+                : 'bg-white/10 text-gray-300 border-white/10 hover:text-white hover:bg-white/20'
+            }`}
+          >
+            <Heart className={`w-4 h-4 ${isLiked ? 'fill-current' : ''}`} />
+          </button>
+
+          {/* Watchlist Icon */}
+          <button
+            type="button"
+            onClick={handleWatchlist}
+            title={isWatchlisted ? 'In Watchlist' : 'Add to Watchlist'}
+            aria-label={isWatchlisted ? 'In Watchlist' : 'Add to Watchlist'}
+            className={`w-9 h-9 rounded-xl flex items-center justify-center border transition hover:scale-105 tv-focus-target cursor-pointer ${
+              isWatchlisted
+                ? 'bg-hbo-cyan/20 text-hbo-cyan border-hbo-cyan/40'
+                : 'bg-white/10 text-gray-300 border-white/10 hover:text-white hover:bg-white/20'
+            }`}
+          >
+            <Bookmark className={`w-4 h-4 ${isWatchlisted ? 'fill-current' : ''}`} />
+          </button>
+
+          {/* Optional Delete Icon */}
+          {onDelete && (
+            <button
+              type="button"
+              onClick={handleDelete}
+              title="Remove"
+              aria-label="Remove"
+              className="w-9 h-9 rounded-xl bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/40 flex items-center justify-center transition hover:scale-105 tv-focus-target cursor-pointer"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          )}
+        </div>,
+        document.body
+      )}
+    </>
   );
 };
 
