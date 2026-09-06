@@ -346,7 +346,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
   const streamUrl = useMemo(() => {
     if (!baseStreamUrl) return '';
-    // Asian / LARI21 and MegaPlay embeds do not support custom start/t/time multi-query parameters
+    // Asian / LARI21 and MegaPlay embeds do not support custom start/t/time query parameters and can crash or show a black screen
     if (provider.id === 'lari21-asian' || provider.id === 'lk21-asian' || provider.category === 'asian' || provider.id === 'megaplay-anime') {
       return baseStreamUrl;
     }

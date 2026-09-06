@@ -2,12 +2,13 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20260906-1327';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.fix-megaplay-anime-p.20260906-1327';
+export const APP_BUILD_NUMBER = '20260906-1342';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.fix-megaplay-anime-p.20260906-1342';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
 export const APP_BRANCH = 'fix-megaplay-anime-p';
-export const APP_CHANGELOG = `* feat(details,watch,stream): optimize details UX, instant genres/progress reset, and enhance stream playback
+export const APP_CHANGELOG = `* fix(player): fix MegaPlay anime progress tracking, compact up next popup, and update trigger percent settings
+* feat(details,watch,stream): optimize details UX, instant genres/progress reset, and enhance stream playback
 * fix(asian-stream): bypass Cloudflare WAF block and resolve direct HLS for LK21 videonode streams
 * fix(lk21): bypass CORS via AndroidBridge fetchHttp and search original_title for Asian movies
 * feat: add LK21 Asian stream provider with OTF search and CSP bypass
@@ -20,5 +21,4 @@ export const APP_CHANGELOG = `* feat(details,watch,stream): optimize details UX,
 * feat(series): add sticky freezing SeriesFilterBar with multi-select and scrollable chips (#51)
 * feat(movies): add sticky freezing MovieFilterBar with multi-select and scrollable chips (#50)
 * fix: implement per-episode watch progress tracking and resolve episode resume timestamp leak (fixes #48) (#49)
-* feat(device): remove device type setting override and enforce pure automatic device detection (#47)
-* fix(web): resolve app icon and favicon pathing for browser/web app deployments (#46)`;
+* feat(device): remove device type setting override and enforce pure automatic device detection (#47)`;
