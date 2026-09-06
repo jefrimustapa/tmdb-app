@@ -39,12 +39,38 @@ export function isAsianMedia(media?: {
   return asianLangs.includes(lang) || countries.some(c => asianCountries.includes(c));
 }
 
+async function executeFetch(url: string, referer: string = 'https://tv12.lk21official.cc/'): Promise<string> {
+  // 1. If running inside Android WebView with native AndroidBridge, use it to completely bypass CORS & restrictions
+  if (typeof window !== 'undefined' && (window as any).AndroidBridge?.fetchHttp) {
+    try {
+      const nativeResult = (window as any).AndroidBridge.fetchHttp(url, referer, 'https://tv12.lk21official.cc');
+      if (nativeResult && typeof nativeResult === 'string' && nativeResult.trim().length > 0) {
+        return nativeResult;
+      }
+    } catch (e) {
+      console.warn('[LK21] AndroidBridge.fetchHttp failed, falling back to fetch:', e);
+    }
+  }
+
+  // 2. Fallback to standard fetch
+  const res = await fetch(url, {
+    headers: {
+      Accept: 'application/json, text/html, text/plain, */*'
+    }
+  });
+  if (!res.ok) {
+    throw new Error(`HTTP ${res.status} for ${url}`);
+  }
+  return await res.text();
+}
+
 /**
  * Searches LK21 API and extracts active videonode.de server embed URLs
  */
 export async function resolveLk21Stream(
   title: string,
-  year?: string | number
+  year?: string | number,
+  originalTitle?: string
 ): Promise<{ embedUrl: string | null; serverMirrors: { server: string; url: string }[] }> {
   if (!title || !title.trim()) {
     return { embedUrl: null, serverMirrors: [] };
@@ -73,21 +99,35 @@ export async function resolveLk21Stream(
   }
 
   try {
-    const cleanQuery = title.trim();
-    const apiUrl = `https://gudangvape.com/search.php?s=${encodeURIComponent(cleanQuery)}&page=1`;
+    // Build candidate search queries: originalTitle (often Indonesian/Asian), clean title, slugified title
+    const candidates = [
+      originalTitle?.trim(),
+      title.trim(),
+      title.replace(/[:\-–—].*$/, '').trim()
+    ].filter((q): q is string => Boolean(q && q.length > 0));
 
-    const res = await fetch(apiUrl, {
-      headers: {
-        Accept: 'application/json, text/plain, */*'
+    // Deduplicate candidates case-insensitively
+    const uniqueQueries: string[] = [];
+    for (const q of candidates) {
+      if (!uniqueQueries.some(u => u.toLowerCase() === q.toLowerCase())) {
+        uniqueQueries.push(q);
       }
-    });
-
-    if (!res.ok) {
-      throw new Error(`LK21 search failed with status: ${res.status}`);
     }
 
-    const data = await res.json();
-    const items = data.data || [];
+    let items: any[] = [];
+    for (const query of uniqueQueries) {
+      try {
+        const apiUrl = `https://gudangvape.com/search.php?s=${encodeURIComponent(query)}&page=1`;
+        const resText = await executeFetch(apiUrl, 'https://tv12.lk21official.cc/');
+        const data = JSON.parse(resText);
+        if (data.data && Array.isArray(data.data) && data.data.length > 0) {
+          items = data.data;
+          break;
+        }
+      } catch (e) {
+        console.warn(`[LK21] Query "${query}" failed:`, e);
+      }
+    }
 
     if (!items || items.length === 0) {
       const emptyEntry: CachedLk21Entry = { embedUrl: null, serverMirrors: [], timestamp: Date.now() };
@@ -111,12 +151,7 @@ export async function resolveLk21Stream(
 
     // Fetch the movie detail page to retrieve dynamic player embed URLs
     const moviePageUrl = `https://tv12.lk21official.cc/${slug}`;
-    const pageRes = await fetch(moviePageUrl);
-    if (!pageRes.ok) {
-      throw new Error(`Failed to load LK21 movie page: ${pageRes.status}`);
-    }
-
-    const html = await pageRes.text();
+    const html = await executeFetch(moviePageUrl, 'https://tv12.lk21official.cc/');
 
     // Regex to match data-server="..." and data-url="https://videonode.de/iframe3/..."
     const mirrors: { server: string; url: string }[] = [];

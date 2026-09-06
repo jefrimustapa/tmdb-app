@@ -32,6 +32,8 @@ interface VideoPlayerProps {
   episodeRuntimeMinutes?: number;
   isAnime?: boolean;
   isAsian?: boolean;
+  releaseYear?: string | number;
+  originalTitle?: string;
 }
 
 export const VideoPlayer: React.FC<VideoPlayerProps> = ({
@@ -53,7 +55,9 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   initialTimestamp = 0,
   episodeRuntimeMinutes,
   isAnime = false,
-  isAsian = false
+  isAsian = false,
+  releaseYear,
+  originalTitle
 }) => {
   const [iframeKey, setIframeKey] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
@@ -304,7 +308,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
     // Only resolve if provider is lk21-asian or content is Asian
     if (providerId === 'lk21-asian' || isAsian) {
-      resolveLk21Stream(title).then((res) => {
+      resolveLk21Stream(title, releaseYear, originalTitle).then((res) => {
         if (!isCancelled) {
           setResolvedLk21Url(res.embedUrl);
         }
@@ -314,7 +318,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     return () => {
       isCancelled = true;
     };
-  }, [title, providerId, isAsian]);
+  }, [title, releaseYear, originalTitle, providerId, isAsian]);
 
   const provider = getProviderById(providerId);
   const baseStreamUrl = useMemo(() => {

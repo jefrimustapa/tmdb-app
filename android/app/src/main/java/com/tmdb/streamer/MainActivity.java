@@ -244,6 +244,41 @@ public class MainActivity extends BridgeActivity {
                 }
 
                 @JavascriptInterface
+                public String fetchHttp(String targetUrl, String referer, String origin) {
+                    try {
+                        URL url = new URL(targetUrl);
+                        HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                        conn.setRequestMethod("GET");
+                        conn.setConnectTimeout(8000);
+                        conn.setReadTimeout(10000);
+                        conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36");
+                        if (referer != null && !referer.isEmpty()) {
+                            conn.setRequestProperty("Referer", referer);
+                        }
+                        if (origin != null && !origin.isEmpty()) {
+                            conn.setRequestProperty("Origin", origin);
+                        }
+                        conn.connect();
+
+                        int statusCode = conn.getResponseCode();
+                        InputStream in = (statusCode >= 400) ? conn.getErrorStream() : conn.getInputStream();
+                        if (in == null) return null;
+
+                        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                        byte[] buffer = new byte[8192];
+                        int len;
+                        while ((len = in.read(buffer)) != -1) {
+                            baos.write(buffer, 0, len);
+                        }
+                        in.close();
+                        return baos.toString("UTF-8");
+                    } catch (Exception e) {
+                        Log.w("TMDB_APP", "[AndroidBridge] fetchHttp error for " + targetUrl + ": " + e.getMessage());
+                        return null;
+                    }
+                }
+
+                @JavascriptInterface
                 public boolean isAccessibilityEnabled() {
                     return StreamAccessibilityService.isRunning();
                 }

@@ -650,6 +650,8 @@ export const Watch: React.FC = () => {
             initialTimestamp={timestampParam}
             isAnime={isAnime}
             isAsian={isAsian}
+            releaseYear={releaseYear}
+            originalTitle={details.original_title || details.original_name}
             onProviderChange={(p) => {
               setUserSelectedProvider(true);
               setProviderId(p.id);
