@@ -2,12 +2,14 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20260906-0048';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-add-anime-strea.20260906-0048';
+export const APP_BUILD_NUMBER = '20260906-0158';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-improve-search-.20260906-0158';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
-export const APP_BRANCH = 'feat-add-anime-strea';
-export const APP_CHANGELOG = `* fix(tv): enable D-pad navigation, boundary lock, and back-button dismissal in filter dropdowns (fixes #52) (#54)
+export const APP_BRANCH = 'feat-improve-search-';
+export const APP_CHANGELOG = `* feat(search): add 1-row history, search filter bar, cast and keyword discovery
+* feat(player): add MegaPlay anime streaming provider with MAL ID mapping and anti-hotlink shield (#55)
+* fix(tv): enable D-pad navigation, boundary lock, and back-button dismissal in filter dropdowns (fixes #52) (#54)
 * feat(series): add sticky freezing SeriesFilterBar with multi-select and scrollable chips (#51)
 * feat(movies): add sticky freezing MovieFilterBar with multi-select and scrollable chips (#50)
 * fix: implement per-episode watch progress tracking and resolve episode resume timestamp leak (fixes #48) (#49)
@@ -19,6 +21,4 @@ export const APP_CHANGELOG = `* fix(tv): enable D-pad navigation, boundary lock,
 * feat: HBO Max style cross-dissolve backdrop transitions and staggered typography motion in HeroBanner
 * Merge pull request #44 from jefrimustapa/feat/restructure-settings-page
 * feat: mobile settings Excel freeze-row tabs on navbar collision
-* style: center app icon horizontally in TV navbar
-* style: center TV sidebar navigation icon group vertically
-* style: remove background container behind TV category icons`;
+* style: center app icon horizontally in TV navbar`;

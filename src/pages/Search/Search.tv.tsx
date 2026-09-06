@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Search as SearchIcon, X, Clock, Trash2, User } from 'lucide-react';
 import { tmdbApi, tmdbImages } from '../../services/tmdb';
@@ -133,8 +133,6 @@ export const Search: React.FC = () => {
 
     if (pageNum === 1) {
       setIsLoading(true);
-      const updated = addRecentSearch(trimmed);
-      setRecentSearches(updated);
     } else {
       setIsLoadingMore(true);
     }
@@ -251,6 +249,14 @@ export const Search: React.FC = () => {
   }, [page, totalPages, query, isLoading, isLoadingMore, personInfo]);
 
   const [debounceTimer, setDebounceTimer] = useState<ReturnType<typeof setTimeout> | null>(null);
+  const historyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (historyTimerRef.current) clearTimeout(historyTimerRef.current);
+      if (debounceTimer) clearTimeout(debounceTimer);
+    };
+  }, [debounceTimer]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
@@ -262,10 +268,35 @@ export const Search: React.FC = () => {
       setSearchParams(val ? { q: val } : {});
     }, 250);
     setDebounceTimer(t);
+
+    if (historyTimerRef.current) {
+      clearTimeout(historyTimerRef.current);
+    }
+    const trimmed = val.trim();
+    if (trimmed) {
+      historyTimerRef.current = setTimeout(() => {
+        const updated = addRecentSearch(trimmed);
+        setRecentSearches(updated);
+      }, 800);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      if (historyTimerRef.current) clearTimeout(historyTimerRef.current);
+      if (debounceTimer) clearTimeout(debounceTimer);
+      const trimmed = query.trim();
+      setSearchParams(trimmed ? { q: trimmed } : {});
+      if (trimmed) {
+        const updated = addRecentSearch(trimmed);
+        setRecentSearches(updated);
+      }
+    }
   };
 
   const handleClear = () => {
     if (debounceTimer) clearTimeout(debounceTimer);
+    if (historyTimerRef.current) clearTimeout(historyTimerRef.current);
     setQuery('');
     setPersonInfo(null);
     setResults([]);
@@ -275,9 +306,13 @@ export const Search: React.FC = () => {
 
   const handleSelectRecent = (historyQuery: string) => {
     if (debounceTimer) clearTimeout(debounceTimer);
-    setQuery(historyQuery);
+    if (historyTimerRef.current) clearTimeout(historyTimerRef.current);
+    const trimmed = historyQuery.trim();
+    setQuery(trimmed);
     setPersonInfo(null);
-    setSearchParams({ q: historyQuery });
+    setSearchParams({ q: trimmed });
+    const updated = addRecentSearch(trimmed);
+    setRecentSearches(updated);
   };
 
   const handleRemoveRecent = (e: React.MouseEvent, item: string) => {
@@ -382,6 +417,7 @@ export const Search: React.FC = () => {
             type="text"
             value={query}
             onChange={handleInputChange}
+            onKeyDown={handleKeyDown}
             placeholder="Search by movie, TV show, anime, or director..."
             autoFocus
             className="w-full pl-14 pr-12 py-4 bg-hbo-card/90 border-2 border-hbo-border rounded-2xl text-base sm:text-lg text-white placeholder-gray-400 focus:outline-none focus:border-hbo-purple-light focus:shadow-hbo-glow transition-all tv-focus-target"
