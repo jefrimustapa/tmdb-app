@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Server, ChevronDown, Check, ShieldCheck, X } from 'lucide-react';
-import { STREAM_PROVIDERS, getProviderById } from '../../services/streamProviders';
+import { STREAM_PROVIDERS, getProviderById, getOrderedProviders } from '../../services/streamProviders';
 import type { StreamProvider } from '../../types/stream';
 
 interface ProviderPickerMobileProps {
@@ -11,6 +11,7 @@ interface ProviderPickerMobileProps {
   isProbing?: boolean;
   serverIndex?: number;
   totalServers?: number;
+  isAnime?: boolean;
 }
 
 export const ProviderPickerMobile: React.FC<ProviderPickerMobileProps> = ({
@@ -20,8 +21,13 @@ export const ProviderPickerMobile: React.FC<ProviderPickerMobileProps> = ({
   isProbing = false,
   serverIndex = 1,
   totalServers = STREAM_PROVIDERS.length,
+  isAnime = false,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
+
+  const displayProviders = React.useMemo(() => {
+    return isAnime ? getOrderedProviders(undefined, true) : STREAM_PROVIDERS;
+  }, [isAnime]);
 
   const selectedProvider = getProviderById(currentProviderId);
   const shortServerName = selectedProvider.name.replace(/\s*\([^)]*\)/g, '').trim();
@@ -96,7 +102,7 @@ export const ProviderPickerMobile: React.FC<ProviderPickerMobileProps> = ({
                 className="flex-1 overflow-y-auto px-4 py-3 space-y-2.5 touch-pan-y overscroll-contain"
                 style={{ WebkitOverflowScrolling: 'touch' }}
               >
-                {STREAM_PROVIDERS.map((provider) => {
+                {displayProviders.map((provider) => {
                   const isSelected = provider.id === currentProviderId;
                   return (
                     <button

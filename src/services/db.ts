@@ -48,6 +48,7 @@ export const DEFAULT_SETTINGS: UserSettings = {
   id: 'current_settings',
   preferredProvider: 'vidlink',
   topProviders: ['vidlink', 'moviesapi', 'cinesrc'],
+  topAnimeProviders: ['megaplay-anime', 'cinesrc', 'moviesapi'],
   deviceMode: 'auto',
   autoplayNext: true,
   upNextPopup: true,
@@ -273,7 +274,7 @@ export const dbService = {
 
   // Settings
   async getSettings(): Promise<UserSettings> {
-    if (cachedSettings && cachedSettings.topProviders && cachedSettings.topProviders.length >= 3) {
+    if (cachedSettings && cachedSettings.topProviders && cachedSettings.topProviders.length >= 3 && cachedSettings.topAnimeProviders && cachedSettings.topAnimeProviders.length >= 3) {
       return cachedSettings;
     }
     let settings = await db.settings.get('current_settings');
@@ -287,6 +288,14 @@ export const dbService = {
         settings.preferredProvider || 'vidlink',
         'moviesapi',
         'cinesrc'
+      ];
+      await db.settings.put(settings);
+    }
+    if (!settings.topAnimeProviders || settings.topAnimeProviders.length < 3) {
+      settings.topAnimeProviders = [
+        'megaplay-anime',
+        'cinesrc',
+        'moviesapi'
       ];
       await db.settings.put(settings);
     }

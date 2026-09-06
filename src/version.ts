@@ -2,12 +2,12 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20260906-0231';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-add-anime-genre.20260906-0231';
+export const APP_BUILD_NUMBER = '20260906-0256';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-separate-anime-.20260906-0256';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
-export const APP_BRANCH = 'feat-add-anime-genre';
-export const APP_CHANGELOG = `* feat(filter): add anime genre option to movies, series, and search filters
+export const APP_BRANCH = 'feat-separate-anime-';
+export const APP_CHANGELOG = `* feat(filter): add Anime option to Movies, TV Series, and Search genre filters (#57)
 * feat(search): 1-row history with 800ms debounce, sticky search filter bar (title/keyword/cast) (#56)
 * feat(player): add MegaPlay anime streaming provider with MAL ID mapping and anti-hotlink shield (#55)
 * fix(tv): enable D-pad navigation, boundary lock, and back-button dismissal in filter dropdowns (fixes #52) (#54)

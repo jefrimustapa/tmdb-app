@@ -68,6 +68,7 @@ export interface UserSettings {
   id: string; // 'current_settings'
   preferredProvider: string;
   topProviders?: [string, string, string] | string[];
+  topAnimeProviders?: [string, string, string] | string[];
   deviceMode: 'auto' | 'tv' | 'mobile' | 'tablet' | 'desktop';
   autoplayNext: boolean;
   upNextPopup?: boolean;

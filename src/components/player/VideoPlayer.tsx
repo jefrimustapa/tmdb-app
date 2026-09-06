@@ -29,6 +29,7 @@ interface VideoPlayerProps {
   onNextEpisode?: () => void;
   initialTimestamp?: number;
   episodeRuntimeMinutes?: number;
+  isAnime?: boolean;
 }
 
 export const VideoPlayer: React.FC<VideoPlayerProps> = ({
@@ -48,7 +49,8 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   nextEpisodeInfo,
   onNextEpisode,
   initialTimestamp = 0,
-  episodeRuntimeMinutes
+  episodeRuntimeMinutes,
+  isAnime = false
 }) => {
   const [iframeKey, setIframeKey] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
@@ -65,6 +67,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showControls, setShowControls] = useState(true);
   const [topProviders, setTopProviders] = useState<string[]>(['vidlink', 'moviesapi', 'cinesrc']);
+  const [topAnimeProviders, setTopAnimeProviders] = useState<string[]>(['megaplay-anime', 'cinesrc', 'moviesapi']);
   const [enabledResolvers, setEnabledResolvers] = useState<StreamResolverType[]>(['embed']);
 
   // Up Next state
@@ -166,6 +169,9 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         }
         if (s.topProviders && s.topProviders.length >= 3) {
           setTopProviders(s.topProviders);
+        }
+        if (s.topAnimeProviders && s.topAnimeProviders.length >= 3) {
+          setTopAnimeProviders(s.topAnimeProviders);
         }
         if (typeof s.autoplayNext === 'boolean') {
           setAutoplayNextEnabled(s.autoplayNext);
@@ -670,7 +676,11 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     initProgress();
   }, [tmdbId, mediaType, season, episode, voteAverage, posterPath, backdropPath, stillPath, episodeTitle, episodeRuntimeMinutes, initialTimestamp]);
 
-  const orderedProviders = React.useMemo(() => getOrderedProviders(topProviders), [topProviders]);
+  const activeTopProviders = useMemo(() => {
+    return isAnime ? topAnimeProviders : topProviders;
+  }, [isAnime, topAnimeProviders, topProviders]);
+
+  const orderedProviders = React.useMemo(() => getOrderedProviders(activeTopProviders, isAnime), [activeTopProviders, isAnime]);
 
   const cycleToNextProvider = useCallback(() => {
     resetControlsTimer();

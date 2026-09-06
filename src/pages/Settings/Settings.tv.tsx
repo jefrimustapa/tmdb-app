@@ -69,6 +69,7 @@ export const Settings: React.FC = () => {
 
   const [showEasterEgg, setShowEasterEgg] = useState(false);
   const easterEggScrollRef = useRef<HTMLDivElement>(null);
+  const [priorityCategoryTab, setPriorityCategoryTab] = useState<'general' | 'anime'>('general');
   const [openDropdownSlot, setOpenDropdownSlot] = useState<number | null>(null);
   const clickCountRef = useRef(0);
   const clickTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -697,21 +698,65 @@ export const Settings: React.FC = () => {
                   </span>
                 </div>
 
+                {/* Sub-tab: General Content vs Anime */}
+                <div className="flex items-center gap-2 p-1 bg-black/40 border border-white/10 rounded-xl w-fit">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPriorityCategoryTab('general');
+                      setOpenDropdownSlot(null);
+                    }}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all tv-focus-target ${
+                      priorityCategoryTab === 'general'
+                        ? 'bg-hbo-purple text-white shadow-md'
+                        : 'text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    Movies & Series
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPriorityCategoryTab('anime');
+                      setOpenDropdownSlot(null);
+                    }}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all tv-focus-target ${
+                      priorityCategoryTab === 'anime'
+                        ? 'bg-gradient-to-r from-pink-600 to-purple-600 text-white shadow-md'
+                        : 'text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    Anime
+                  </button>
+                </div>
+
                 <div className="grid grid-cols-3 gap-2.5">
-                  {[
-                    { index: 0, priorityLabel: '#1 Priority (Primary)', badgeClass: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40', defaultId: 'vidlink' },
-                    { index: 1, priorityLabel: '#2 Priority (Failover 1)', badgeClass: 'bg-hbo-purple/30 text-hbo-purple-light border-hbo-purple/40', defaultId: 'moviesapi' },
-                    { index: 2, priorityLabel: '#3 Priority (Failover 2)', badgeClass: 'bg-hbo-cyan/20 text-hbo-cyan border-hbo-cyan/40', defaultId: 'cinesrc' }
-                  ].map(({ index, priorityLabel, badgeClass, defaultId }) => {
-                    const currentTop = settings.topProviders && settings.topProviders.length >= 3
-                      ? settings.topProviders
-                      : ['vidlink', 'moviesapi', 'cinesrc'];
+                  {(priorityCategoryTab === 'anime'
+                    ? [
+                        { index: 0, priorityLabel: 'Anime #1 (Primary)', badgeClass: 'bg-pink-500/20 text-pink-300 border-pink-500/40', defaultId: 'megaplay-anime' },
+                        { index: 1, priorityLabel: 'Anime #2 (Failover 1)', badgeClass: 'bg-hbo-purple/30 text-hbo-purple-light border-hbo-purple/40', defaultId: 'cinesrc' },
+                        { index: 2, priorityLabel: 'Anime #3 (Failover 2)', badgeClass: 'bg-hbo-cyan/20 text-hbo-cyan border-hbo-cyan/40', defaultId: 'moviesapi' }
+                      ]
+                    : [
+                        { index: 0, priorityLabel: '#1 Priority (Primary)', badgeClass: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40', defaultId: 'vidlink' },
+                        { index: 1, priorityLabel: '#2 Priority (Failover 1)', badgeClass: 'bg-hbo-purple/30 text-hbo-purple-light border-hbo-purple/40', defaultId: 'moviesapi' },
+                        { index: 2, priorityLabel: '#3 Priority (Failover 2)', badgeClass: 'bg-hbo-cyan/20 text-hbo-cyan border-hbo-cyan/40', defaultId: 'cinesrc' }
+                      ]
+                  ).map(({ index, priorityLabel, badgeClass, defaultId }) => {
+                    const isAnimeTab = priorityCategoryTab === 'anime';
+                    const currentTop = isAnimeTab
+                      ? (settings.topAnimeProviders && settings.topAnimeProviders.length >= 3
+                          ? settings.topAnimeProviders
+                          : ['megaplay-anime', 'cinesrc', 'moviesapi'])
+                      : (settings.topProviders && settings.topProviders.length >= 3
+                          ? settings.topProviders
+                          : ['vidlink', 'moviesapi', 'cinesrc']);
                     const selectedId = currentTop[index] || defaultId;
                     const selectedProviderObj = STREAM_PROVIDERS.find(p => p.id === selectedId) || STREAM_PROVIDERS[0];
 
                     return (
                       <div
-                        key={index}
+                        key={`${priorityCategoryTab}-${index}`}
                         className="bg-hbo-dark/70 border border-hbo-border/90 rounded-xl p-2.5 flex flex-col justify-between gap-1.5"
                       >
                         <div className="flex items-center justify-between gap-1">
@@ -744,10 +789,16 @@ export const Settings: React.FC = () => {
                                     onClick={() => {
                                       const updated = [...currentTop] as [string, string, string];
                                       updated[index] = provider.id;
-                                      handleUpdate({
-                                        topProviders: updated,
-                                        preferredProvider: updated[0]
-                                      });
+                                      if (isAnimeTab) {
+                                        handleUpdate({
+                                          topAnimeProviders: updated
+                                        });
+                                      } else {
+                                        handleUpdate({
+                                          topProviders: updated,
+                                          preferredProvider: updated[0]
+                                        });
+                                      }
                                       setOpenDropdownSlot(null);
                                       setTimeout(() => {
                                         document.getElementById(`priority-server-btn-${index}`)?.focus();
@@ -765,6 +816,9 @@ export const Settings: React.FC = () => {
                                         {isSelected && <Check className="w-3 h-3 text-hbo-cyan flex-shrink-0" />}
                                       </div>
                                       <span className="text-[9px] text-gray-400 block leading-normal mt-0.5 truncate">{provider.tagline}</span>
+                                      {provider.badge === 'Anime' && (
+                                        <span className="text-[9px] text-pink-400 font-semibold block mt-0.5">Anime Specialist</span>
+                                      )}
                                     </div>
                                   </button>
                                 );

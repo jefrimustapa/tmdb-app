@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Server, ChevronDown, Check, ShieldCheck } from 'lucide-react';
-import { STREAM_PROVIDERS, getProviderById } from '../../services/streamProviders';
+import { STREAM_PROVIDERS, getProviderById, getOrderedProviders } from '../../services/streamProviders';
 import type { StreamProvider } from '../../types/stream';
 
 interface ProviderPickerTVProps {
@@ -10,6 +10,7 @@ interface ProviderPickerTVProps {
   isProbing?: boolean;
   serverIndex?: number;
   totalServers?: number;
+  isAnime?: boolean;
 }
 
 export const ProviderPickerTV: React.FC<ProviderPickerTVProps> = ({
@@ -19,14 +20,19 @@ export const ProviderPickerTV: React.FC<ProviderPickerTVProps> = ({
   isProbing = false,
   serverIndex = 1,
   totalServers = STREAM_PROVIDERS.length,
+  isAnime = false,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
+  const displayProviders = React.useMemo(() => {
+    return isAnime ? getOrderedProviders(undefined, true) : STREAM_PROVIDERS;
+  }, [isAnime]);
+
   const selectedProvider = getProviderById(currentProviderId);
   const shortServerName = selectedProvider.name.replace(/\s*\([^)]*\)/g, '').trim();
 
-  const selectedIndex = Math.max(0, STREAM_PROVIDERS.findIndex(p => p.id === currentProviderId));
+  const selectedIndex = Math.max(0, displayProviders.findIndex(p => p.id === currentProviderId));
   const [highlightedIndex, setHighlightedIndex] = useState(selectedIndex);
   const highlightedIndexRef = useRef(selectedIndex);
   highlightedIndexRef.current = highlightedIndex;
@@ -171,7 +177,7 @@ export const ProviderPickerTV: React.FC<ProviderPickerTVProps> = ({
 
           {/* Scrollable Server Items Container */}
           <div className="p-2 space-y-1.5 overflow-y-auto max-h-[min(320px,calc(100vh-140px))] focus-scroll-container">
-            {STREAM_PROVIDERS.map((provider, idx) => {
+            {displayProviders.map((provider, idx) => {
               const isSelected = provider.id === currentProviderId;
               const isHighlighted = idx === highlightedIndex;
               return (
@@ -191,7 +197,7 @@ export const ProviderPickerTV: React.FC<ProviderPickerTVProps> = ({
                   onKeyDown={(e) => {
                     if (e.key === 'ArrowDown') {
                       e.preventDefault();
-                      const next = (idx + 1) % STREAM_PROVIDERS.length;
+                      const next = (idx + 1) % displayProviders.length;
                       setHighlightedIndex(next);
                       const nextBtn = document.getElementById(`provider-item-${next}`);
                       if (nextBtn) {
@@ -200,7 +206,7 @@ export const ProviderPickerTV: React.FC<ProviderPickerTVProps> = ({
                       }
                     } else if (e.key === 'ArrowUp') {
                       e.preventDefault();
-                      const prev = (idx - 1 + STREAM_PROVIDERS.length) % STREAM_PROVIDERS.length;
+                      const prev = (idx - 1 + displayProviders.length) % displayProviders.length;
                       setHighlightedIndex(prev);
                       const prevBtn = document.getElementById(`provider-item-${prev}`);
                       if (prevBtn) {
