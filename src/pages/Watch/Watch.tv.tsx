@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import { tmdbApi } from '../../services/tmdb';
 import type { TMDBMovieDetails, TMDBTVDetails, TMDBSeasonDetails } from '../../types/tmdb';
@@ -6,6 +6,7 @@ import { VideoPlayer } from '../../components/player/VideoPlayer';
 import { ProviderPickerTV } from '../../components/player/ProviderPickerTV';
 import { TVVirtualCursor } from '../../components/player/TVVirtualCursor';
 import { dbService } from '../../services/db';
+import { isAnimeMedia } from '../../services/animeMappingService';
 import { ArrowLeft, SkipForward } from 'lucide-react';
 
 import type { VirtualCursorStyle } from '../../types/db';
@@ -22,6 +23,7 @@ export const Watch: React.FC = () => {
   const [details, setDetails] = useState<TMDBMovieDetails | TMDBTVDetails | null>(null);
   const [seasonDetails, setSeasonDetails] = useState<TMDBSeasonDetails | null>(null);
   const [providerId, setProviderId] = useState('vidlink');
+  const [userSelectedProvider, setUserSelectedProvider] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
   const [cursorActive, setCursorActive] = useState(false);
@@ -127,11 +129,18 @@ export const Watch: React.FC = () => {
     }, delayMs);
   }, []);
 
+  const isAnime = useMemo(() => isAnimeMedia(details), [details]);
+
   // Load default user settings for preferred provider, timeout, and virtual cursor
   useEffect(() => {
     dbService.getSettings().then((s) => {
       if (s) {
-        if (s.preferredProvider) setProviderId(s.preferredProvider);
+        if (!userSelectedProvider) {
+          const defaultProvider = isAnime
+            ? (s.topAnimeProviders?.[0] || 'megaplay-anime')
+            : (s.topProviders?.[0] || s.preferredProvider || 'vidlink');
+          setProviderId(defaultProvider);
+        }
         if (s.streamHeaderTimeout !== undefined) {
           setHeaderTimeoutSeconds(s.streamHeaderTimeout);
           headerTimeoutRef.current = s.streamHeaderTimeout;
@@ -147,7 +156,7 @@ export const Watch: React.FC = () => {
       }
       resetHeaderTimer();
     });
-  }, [resetHeaderTimer]);
+  }, [isAnime, userSelectedProvider, resetHeaderTimer]);
 
   // Dynamically track portrait vs landscape across orientation changes and window resizes
   useEffect(() => {
@@ -492,10 +501,14 @@ export const Watch: React.FC = () => {
             {enabledResolvers.includes('embed') ? (
               <ProviderPickerTV
                 currentProviderId={providerId}
-                onSelect={(p) => setProviderId(p.id)}
+                onSelect={(p) => {
+                  setUserSelectedProvider(true);
+                  setProviderId(p.id);
+                }}
                 compact={true}
                 isProbing={isProbing}
                 serverIndex={serverIndex}
+                isAnime={isAnime}
               />
             ) : (
               <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-hbo-card/90 border border-hbo-border text-xs font-bold shadow-md">
@@ -532,7 +545,11 @@ export const Watch: React.FC = () => {
             episodeRuntimeMinutes={mediaType === 'movie' ? ('runtime' in details ? details.runtime : undefined) : currentEpisode?.runtime}
             providerId={providerId}
             initialTimestamp={timestampParam}
-            onProviderChange={(p) => setProviderId(p.id)}
+            isAnime={isAnime}
+            onProviderChange={(p) => {
+              setUserSelectedProvider(true);
+              setProviderId(p.id);
+            }}
             onProbingStatusChange={(probing, idx) => {
               setIsProbing(probing);
               setServerIndex(idx);
