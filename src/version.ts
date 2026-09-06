@@ -2,13 +2,12 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20260906-0207';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-improve-search-.20260906-0207';
+export const APP_BUILD_NUMBER = '20260906-0225';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-add-anime-genre.20260906-0225';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
-export const APP_BRANCH = 'feat-improve-search-';
-export const APP_CHANGELOG = `* feat(search): add 800ms debounce before saving search query to history
-* feat(search): add 1-row history, search filter bar, cast and keyword discovery
+export const APP_BRANCH = 'feat-add-anime-genre';
+export const APP_CHANGELOG = `* feat(search): 1-row history with 800ms debounce, sticky search filter bar (title/keyword/cast) (#56)
 * feat(player): add MegaPlay anime streaming provider with MAL ID mapping and anti-hotlink shield (#55)
 * fix(tv): enable D-pad navigation, boundary lock, and back-button dismissal in filter dropdowns (fixes #52) (#54)
 * feat(series): add sticky freezing SeriesFilterBar with multi-select and scrollable chips (#51)
@@ -21,4 +20,5 @@ export const APP_CHANGELOG = `* feat(search): add 800ms debounce before saving s
 * fix: resolve useEffect closing bracket in HeroBanner
 * feat: HBO Max style cross-dissolve backdrop transitions and staggered typography motion in HeroBanner
 * Merge pull request #44 from jefrimustapa/feat/restructure-settings-page
-* feat: mobile settings Excel freeze-row tabs on navbar collision`;
+* feat: mobile settings Excel freeze-row tabs on navbar collision
+* style: center app icon horizontally in TV navbar`;
