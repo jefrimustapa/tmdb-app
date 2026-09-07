@@ -20,9 +20,24 @@ function getNormalizedKey(title: string, year?: string | number): string {
 }
 
 /**
- * Checks whether a media item is of Asian, Indonesian, or Malaysian origin
+ * Checks whether a media item is of Korean origin
  */
-export function isAsianMedia(media?: {
+export function isKoreanMedia(media?: {
+  genre_ids?: number[];
+  genres?: { id: number; name?: string }[];
+  original_language?: string;
+  origin_country?: string[];
+} | null): boolean {
+  if (!media) return false;
+  const lang = media.original_language?.toLowerCase() || '';
+  const countries = media.origin_country || [];
+  return lang === 'ko' || countries.includes('KR');
+}
+
+/**
+ * Checks whether a media item is of ASEAN origin (Indonesian, Malaysian, Thai, Vietnamese, Filipino, Singaporean, Cambodian, Lao, Burmese, Bruneian, Timorese)
+ */
+export function isAseanMedia(media?: {
   genre_ids?: number[];
   genres?: { id: number; name?: string }[];
   original_language?: string;
@@ -32,12 +47,18 @@ export function isAsianMedia(media?: {
   const lang = media.original_language?.toLowerCase() || '';
   const countries = media.origin_country || [];
 
-  // Southeast Asian & East Asian languages:
-  // id: Indonesian, ms: Malay, ko: Korean, zh: Chinese, th: Thai, vi: Vietnamese, tl: Tagalog, jv: Javanese
-  const asianLangs = ['id', 'ms', 'ko', 'zh', 'th', 'vi', 'tl', 'jv'];
-  const asianCountries = ['ID', 'MY', 'KR', 'CN', 'TH', 'VN', 'PH', 'HK', 'TW', 'SG'];
+  // Exclude Korean media from ASEAN
+  if (lang === 'ko' || countries.includes('KR')) return false;
 
-  return asianLangs.includes(lang) || countries.some(c => asianCountries.includes(c));
+  // ASEAN 10 + Timor-Leste:
+  // ID: Indonesia, MY: Malaysia, TH: Thailand, VN: Vietnam, PH: Philippines
+  // SG: Singapore, KH: Cambodia, LA: Laos, MM: Myanmar, BN: Brunei, TL: Timor-Leste
+  const aseanCountries = ['ID', 'MY', 'TH', 'VN', 'PH', 'SG', 'KH', 'LA', 'MM', 'BN', 'TL'];
+  // id: Indonesian, ms: Malay, th: Thai, vi: Vietnamese, tl: Tagalog,
+  // jv: Javanese, km: Khmer, lo: Lao, my: Burmese, tet: Tetum
+  const aseanLangs = ['id', 'ms', 'th', 'vi', 'tl', 'jv', 'km', 'lo', 'my', 'tet'];
+
+  return aseanLangs.includes(lang) || countries.some(c => aseanCountries.includes(c));
 }
 
 async function executeFetch(url: string, referer: string = 'https://layaricon21.com/'): Promise<string> {

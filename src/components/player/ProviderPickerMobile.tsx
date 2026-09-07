@@ -13,6 +13,7 @@ interface ProviderPickerMobileProps {
   totalServers?: number;
   isAnime?: boolean;
   isAsian?: boolean;
+  isKorean?: boolean;
 }
 
 export const ProviderPickerMobile: React.FC<ProviderPickerMobileProps> = ({
@@ -24,16 +25,19 @@ export const ProviderPickerMobile: React.FC<ProviderPickerMobileProps> = ({
   totalServers = STREAM_PROVIDERS.length,
   isAnime = false,
   isAsian = false,
+  isKorean = false,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
 
   const displayProviders = React.useMemo(() => {
-    return isAnime
-      ? getOrderedProviders(undefined, true, false)
+    return isKorean
+      ? getOrderedProviders(undefined, false, false, true)
+      : isAnime
+      ? getOrderedProviders(undefined, true, false, false)
       : isAsian
-      ? getOrderedProviders(undefined, false, true)
+      ? getOrderedProviders(undefined, false, true, false)
       : STREAM_PROVIDERS;
-  }, [isAnime, isAsian]);
+  }, [isAnime, isAsian, isKorean]);
 
   const selectedProvider = getProviderById(currentProviderId);
   const shortServerName = selectedProvider.name.replace(/\s*\([^)]*\)/g, '').trim();
@@ -128,6 +132,10 @@ export const ProviderPickerMobile: React.FC<ProviderPickerMobileProps> = ({
                           <span className={`text-[10px] px-2 py-0.5 rounded-md font-bold whitespace-nowrap flex-shrink-0 ${
                             provider.badge === 'Anime'
                               ? 'bg-gradient-to-r from-pink-500/30 to-purple-500/30 text-pink-300 border border-pink-500/40'
+                              : provider.badge === 'K-Drama'
+                              ? 'bg-gradient-to-r from-rose-500/30 to-pink-500/30 text-rose-300 border border-rose-500/40'
+                              : provider.badge === 'Asean'
+                              ? 'bg-gradient-to-r from-amber-500/30 to-red-500/30 text-amber-300 border border-amber-500/40'
                               : 'bg-white/10 text-gray-300'
                           }`}>
                             {provider.badge}

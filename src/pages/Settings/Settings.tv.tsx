@@ -69,7 +69,7 @@ export const Settings: React.FC = () => {
 
   const [showEasterEgg, setShowEasterEgg] = useState(false);
   const easterEggScrollRef = useRef<HTMLDivElement>(null);
-  const [priorityCategoryTab, setPriorityCategoryTab] = useState<'general' | 'anime' | 'asian'>('general');
+  const [priorityCategoryTab, setPriorityCategoryTab] = useState<'general' | 'anime' | 'asian' | 'korean'>('general');
   const [openDropdownSlot, setOpenDropdownSlot] = useState<number | null>(null);
   const clickCountRef = useRef(0);
   const clickTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -494,6 +494,57 @@ export const Settings: React.FC = () => {
                 </>
               )}
 
+              {/* Row 4: Watch Progress Update Interval (Embed / KissKH) */}
+              <div
+                data-settings-row="true"
+                className="bg-hbo-card border border-hbo-border rounded-2xl p-4 shadow-lg space-y-2.5"
+              >
+                <div className="flex items-center justify-between mb-0.5">
+                  <div>
+                    <h4 className="text-xs font-bold text-gray-200 uppercase tracking-wider flex items-center gap-1.5">
+                      <Clock className="w-3.5 h-3.5 text-hbo-cyan flex-shrink-0" />
+                      <span>Watch Progress Update Interval</span>
+                    </h4>
+                    <p className="text-[11px] text-gray-400 mt-0.5">
+                      How frequently playback progress is tracked and saved for web embed streams (e.g. KissKH).
+                    </p>
+                  </div>
+                  <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-black/80 border border-hbo-border text-hbo-cyan font-bold flex-shrink-0">
+                    {settings.watchProgressTickerInterval || 5}s
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-5 gap-2">
+                  {[
+                    { seconds: 1, label: '1s', desc: 'Realtime' },
+                    { seconds: 2, label: '2s', desc: 'Mobile Default' },
+                    { seconds: 3, label: '3s', desc: 'Frequent' },
+                    { seconds: 5, label: '5s', desc: 'TV Default' },
+                    { seconds: 10, label: '10s', desc: 'Eco Mode' },
+                  ].map((opt) => {
+                    const currentVal = settings.watchProgressTickerInterval || 5;
+                    const isSelected = currentVal === opt.seconds;
+                    return (
+                      <button
+                        key={opt.seconds}
+                        type="button"
+                        onClick={() => handleUpdate({ watchProgressTickerInterval: opt.seconds })}
+                        className={`py-2.5 px-1.5 rounded-xl border text-center transition-all tv-focus-target flex flex-col items-center justify-center gap-0.5 ${
+                          isSelected
+                            ? 'bg-hbo-purple/40 border-hbo-cyan text-white font-bold shadow-lg ring-1 ring-hbo-cyan/50'
+                            : 'bg-hbo-dark/60 border-hbo-border hover:bg-hbo-hover hover:border-white/20 text-gray-300'
+                        }`}
+                      >
+                        <span className="text-sm font-bold text-white leading-none">{opt.label}</span>
+                        <span className={`text-[9px] ${isSelected ? 'text-hbo-cyan font-semibold' : 'text-gray-500'}`}>
+                          {opt.desc}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
               {/* Row 4: Stream Engine - TorBox Debrid */}
               {(() => {
                 const currentEnabled = settings.enabledResolvers && settings.enabledResolvers.length > 0
@@ -743,10 +794,30 @@ export const Settings: React.FC = () => {
                   >
                     Asean
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPriorityCategoryTab('korean');
+                      setOpenDropdownSlot(null);
+                    }}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all tv-focus-target ${
+                      priorityCategoryTab === 'korean'
+                        ? 'bg-gradient-to-r from-rose-600 to-pink-600 text-white shadow-md'
+                        : 'text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    Korean
+                  </button>
                 </div>
 
                 <div className="grid grid-cols-3 gap-2.5">
-                  {(priorityCategoryTab === 'asian'
+                  {(priorityCategoryTab === 'korean'
+                    ? [
+                        { index: 0, priorityLabel: 'Korean #1 (Primary)', badgeClass: 'bg-rose-500/20 text-rose-300 border-rose-500/40', defaultId: 'kisskh-kdrama' },
+                        { index: 1, priorityLabel: 'Korean #2 (Failover 1)', badgeClass: 'bg-hbo-purple/30 text-hbo-purple-light border-hbo-purple/40', defaultId: 'cinesrc' },
+                        { index: 2, priorityLabel: 'Korean #3 (Failover 2)', badgeClass: 'bg-hbo-cyan/20 text-hbo-cyan border-hbo-cyan/40', defaultId: 'moviesapi' }
+                      ]
+                    : priorityCategoryTab === 'asian'
                     ? [
                         { index: 0, priorityLabel: 'Asean #1 (Primary)', badgeClass: 'bg-amber-500/20 text-amber-300 border-amber-500/40', defaultId: 'cinesrc' },
                         { index: 1, priorityLabel: 'Asean #2 (Failover 1)', badgeClass: 'bg-hbo-purple/30 text-hbo-purple-light border-hbo-purple/40', defaultId: '111movies' },
@@ -764,9 +835,14 @@ export const Settings: React.FC = () => {
                         { index: 2, priorityLabel: '#3 Priority (Failover 2)', badgeClass: 'bg-hbo-cyan/20 text-hbo-cyan border-hbo-cyan/40', defaultId: 'cinesrc' }
                       ]
                   ).map(({ index, priorityLabel, badgeClass, defaultId }) => {
+                    const isKoreanTab = priorityCategoryTab === 'korean';
                     const isAsianTab = priorityCategoryTab === 'asian';
                     const isAnimeTab = priorityCategoryTab === 'anime';
-                    const currentTop = isAsianTab
+                    const currentTop = isKoreanTab
+                      ? (settings.topKoreanProviders && settings.topKoreanProviders.length >= 3
+                          ? settings.topKoreanProviders
+                          : ['kisskh-kdrama', 'cinesrc', 'moviesapi'])
+                      : isAsianTab
                       ? (settings.topAsianProviders && settings.topAsianProviders.length >= 3
                           ? settings.topAsianProviders
                           : ['cinesrc', '111movies', 'lari21-asian'])
@@ -815,7 +891,11 @@ export const Settings: React.FC = () => {
                                     onClick={() => {
                                       const updated = [...currentTop] as [string, string, string];
                                       updated[index] = provider.id;
-                                      if (isAsianTab) {
+                                      if (isKoreanTab) {
+                                        handleUpdate({
+                                          topKoreanProviders: updated
+                                        });
+                                      } else if (isAsianTab) {
                                         handleUpdate({
                                           topAsianProviders: updated
                                         });

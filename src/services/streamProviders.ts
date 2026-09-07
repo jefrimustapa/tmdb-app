@@ -254,6 +254,16 @@ export const STREAM_PROVIDERS: StreamProvider[] = [
     getMovieUrl: () => '',
     getTVUrl: () => '',
     getAsianUrl: (resolvedUrl: string) => resolvedUrl
+  },
+  {
+    id: 'kisskh-kdrama',
+    name: 'KissKH (K-Drama)',
+    tagline: 'Dedicated Korean & Asian drama catalog with multi-language subtitles',
+    badge: 'K-Drama',
+    category: 'korean',
+    getMovieUrl: () => '',
+    getTVUrl: () => '',
+    getKoreanUrl: (resolvedUrl: string) => resolvedUrl
   }
 ];
 
@@ -261,7 +271,7 @@ export function getProviderById(id: string): StreamProvider {
   return STREAM_PROVIDERS.find(p => p.id === id) || STREAM_PROVIDERS[0];
 }
 
-export function getOrderedProviders(topProviders?: string[], isAnime = false, isAsian = false): StreamProvider[] {
+export function getOrderedProviders(topProviders?: string[], isAnime = false, isAsian = false, isKorean = false): StreamProvider[] {
   let baseList = [...STREAM_PROVIDERS];
 
   // If anime context, prioritize providers tagged category: 'anime'
@@ -270,6 +280,12 @@ export function getOrderedProviders(topProviders?: string[], isAnime = false, is
       const aIsAnime = a.category === 'anime' ? 1 : 0;
       const bIsAnime = b.category === 'anime' ? 1 : 0;
       return bIsAnime - aIsAnime;
+    });
+  } else if (isKorean) {
+    baseList.sort((a, b) => {
+      const aIsKorean = a.category === 'korean' ? 1 : 0;
+      const bIsKorean = b.category === 'korean' ? 1 : 0;
+      return bIsKorean - aIsKorean;
     });
   } else if (isAsian) {
     baseList.sort((a, b) => {

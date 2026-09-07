@@ -2,12 +2,12 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20260906-1458';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-modify-title-ca.20260906-1458';
+export const APP_BUILD_NUMBER = '20260907-1036';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-add-korean-embe.20260907-1036';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
-export const APP_BRANCH = 'feat-modify-title-ca';
-export const APP_CHANGELOG = `* feat(card): change movie badge from film to movie and float 3-dot menu using portal
+export const APP_BRANCH = 'feat-add-korean-embe';
+export const APP_CHANGELOG = `* feat(card): modify title card badges, floating menu, and continue watch details button (#64)
 * feat: improve filters across Movies, Series, and Search (#63)
 * fix(home): exclude re-releases and sort new release movies by latest date on left (#62)
 * fix(player): fix MegaPlay anime progress tracking, compact up next popup, and update trigger percent settings (#61)
