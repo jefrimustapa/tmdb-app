@@ -387,9 +387,23 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
   const streamUrl = useMemo(() => {
     if (!baseStreamUrl) return '';
-    // KissKH, Asian / LARI21 and MegaPlay embeds do not support custom start/t/time query parameters and can crash or show a black screen
-    if (provider.id === 'kisskh-kdrama' || provider.id === 'kisskh' || provider.category === 'korean' || provider.id === 'lari21-asian' || provider.id === 'lk21-asian' || provider.category === 'asian' || provider.id === 'megaplay-anime') {
+    // LARI21 and MegaPlay embeds do not support custom start/t/time query parameters and can crash or show a black screen
+    if (provider.id === 'lari21-asian' || provider.id === 'lk21-asian' || provider.category === 'asian' || provider.id === 'megaplay-anime') {
       return baseStreamUrl;
+    }
+    // KissKH supports hash fragment #t= for seamless auto-resume or restart via injected observer
+    if (provider.id === 'kisskh-kdrama' || provider.id === 'kisskh' || provider.category === 'korean') {
+      if (initialTimestamp === 0) {
+        return `${baseStreamUrl}#t=0`;
+      }
+      if (resumeTimestamp > 0) {
+        return `${baseStreamUrl}#t=${resumeTimestamp}`;
+      }
+      return baseStreamUrl;
+    }
+    if (initialTimestamp === 0) {
+      const sep = baseStreamUrl.includes('?') ? '&' : '?';
+      return `${baseStreamUrl}${sep}start=0&t=0&time=0#t=0`;
     }
     if (resumeTimestamp <= 0) return baseStreamUrl;
 
@@ -398,7 +412,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       return `${baseStreamUrl}${sep}start=${resumeTimestamp}`;
     }
     return `${baseStreamUrl}${sep}start=${resumeTimestamp}&t=${resumeTimestamp}&time=${resumeTimestamp}#t=${resumeTimestamp}`;
-  }, [baseStreamUrl, resumeTimestamp, provider.id, provider.category]);
+  }, [baseStreamUrl, resumeTimestamp, initialTimestamp, provider.id, provider.category]);
 
   const lastSaveTimeRef = useRef<number>(0);
 
@@ -625,6 +639,22 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           return;
         }
 
+        // 3b. KissKH Isolated Player playback events
+        if (data.type === 'kisskh' || data.channel === 'kisskh') {
+          if (data.event === 'ended') {
+            const endDur = durationRef.current || data.duration || (episodeRuntimeMinutes ? episodeRuntimeMinutes * 60 : 0);
+            if (endDur > 0) recordProgress(endDur, endDur, true);
+            return;
+          }
+          const current = data.currentTime ?? data.time ?? data.seconds ?? 0;
+          const dur = data.duration ?? 0;
+          if (current > 0) {
+            lastPostMessageTimeRef.current = Date.now();
+            recordProgress(current, dur);
+          }
+          return;
+        }
+
         // 4. PlayerJS, Plyr, vidsrc, or standard event postMessages
         if (data.event === 'timeupdate' || data.event === 'progress' || data.event === 'time') {
           if (data.event === 'complete' || data.event === 'ended') {
@@ -796,7 +826,8 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         mediaType === 'tv' ? episode : undefined
       );
       
-      const targetTimestamp = (initialTimestamp !== undefined && initialTimestamp > 0)
+      const isExplicitRestart = initialTimestamp === 0;
+      const targetTimestamp = (initialTimestamp !== undefined && initialTimestamp >= 0)
         ? initialTimestamp 
         : (existing?.timestamp || 0);
       
@@ -807,9 +838,9 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       const provisionalDuration = (episodeRuntimeMinutes ? episodeRuntimeMinutes * 60 : 0) || (existing?.duration || 0) || (isAnime && mediaType === 'tv' ? 1440 : 0);
       durationRef.current = provisionalDuration;
 
-      const progressPercent = provisionalDuration > 0 && targetTimestamp > 0 
+      const progressPercent = (!isExplicitRestart && provisionalDuration > 0 && targetTimestamp > 0)
         ? Math.min(100, Math.round((targetTimestamp / provisionalDuration) * 100))
-        : (existing?.progressPercent || 0);
+        : (isExplicitRestart ? 0 : (existing?.progressPercent || 0));
 
       await dbService.saveWatchProgress({
         tmdbId,
@@ -929,15 +960,19 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             iframe.contentWindow.postMessage(JSON.stringify({ method: 'setMuted', value: false }), '*');
             iframe.contentWindow.postMessage(JSON.stringify({ method: 'setVolume', value: 1 }), '*');
 
-            if (resumeTimestamp > 0) {
-              iframe.contentWindow.postMessage({ type: 'SEEK', data: { time: resumeTimestamp } }, '*');
-              iframe.contentWindow.postMessage({ event: 'seek', time: resumeTimestamp }, '*');
-              iframe.contentWindow.postMessage({ type: 'seek', time: resumeTimestamp }, '*');
-              iframe.contentWindow.postMessage({ channel: 'megacloud', event: 'seek', time: resumeTimestamp }, '*');
-              iframe.contentWindow.postMessage({ channel: 'megaplay', event: 'seek', time: resumeTimestamp }, '*');
-              iframe.contentWindow.postMessage(JSON.stringify({ type: 'seek', time: resumeTimestamp }), '*');
-              iframe.contentWindow.postMessage(JSON.stringify({ event: 'command', func: 'seekTo', args: [resumeTimestamp, true] }), '*');
-              iframe.contentWindow.postMessage(JSON.stringify({ channel: 'megacloud', event: 'seek', time: resumeTimestamp }), '*');
+            const seekTime = (initialTimestamp === 0) ? 0 : (resumeTimestamp > 0 ? resumeTimestamp : -1);
+            if (seekTime >= 0) {
+              iframe.contentWindow.postMessage({ type: 'SEEK', data: { time: seekTime } }, '*');
+              iframe.contentWindow.postMessage({ event: 'seek', time: seekTime }, '*');
+              iframe.contentWindow.postMessage({ type: 'seek', time: seekTime }, '*');
+              iframe.contentWindow.postMessage({ channel: 'kisskh', type: 'seek', time: seekTime }, '*');
+              iframe.contentWindow.postMessage({ channel: 'kisskh', event: 'seek', time: seekTime }, '*');
+              iframe.contentWindow.postMessage({ channel: 'megacloud', event: 'seek', time: seekTime }, '*');
+              iframe.contentWindow.postMessage({ channel: 'megaplay', event: 'seek', time: seekTime }, '*');
+              iframe.contentWindow.postMessage(JSON.stringify({ type: 'seek', time: seekTime }), '*');
+              iframe.contentWindow.postMessage(JSON.stringify({ channel: 'kisskh', type: 'seek', time: seekTime }), '*');
+              iframe.contentWindow.postMessage(JSON.stringify({ event: 'command', func: 'seekTo', args: [seekTime, true] }), '*');
+              iframe.contentWindow.postMessage(JSON.stringify({ channel: 'megacloud', event: 'seek', time: seekTime }), '*');
             }
           } catch {
             // ignore cross-origin postMessage restrictions
