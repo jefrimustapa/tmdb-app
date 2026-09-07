@@ -2,12 +2,13 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20260907-1036';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-add-korean-embe.20260907-1036';
+export const APP_BUILD_NUMBER = '20260907-1307';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-better-progress.20260907-1307';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
-export const APP_BRANCH = 'feat-add-korean-embe';
-export const APP_CHANGELOG = `* feat(card): modify title card badges, floating menu, and continue watch details button (#64)
+export const APP_BRANCH = 'feat-better-progress';
+export const APP_CHANGELOG = `* feat(player): add Korean embed provider (KissKH) with isolated player & progress tracking
+* feat(card): modify title card badges, floating menu, and continue watch details button (#64)
 * feat: improve filters across Movies, Series, and Search (#63)
 * fix(home): exclude re-releases and sort new release movies by latest date on left (#62)
 * fix(player): fix MegaPlay anime progress tracking, compact up next popup, and update trigger percent settings (#61)
@@ -20,5 +21,4 @@ export const APP_CHANGELOG = `* feat(card): modify title card badges, floating m
 * fix(tv): enable D-pad navigation, boundary lock, and back-button dismissal in filter dropdowns (fixes #52) (#54)
 * feat(series): add sticky freezing SeriesFilterBar with multi-select and scrollable chips (#51)
 * feat(movies): add sticky freezing MovieFilterBar with multi-select and scrollable chips (#50)
-* fix: implement per-episode watch progress tracking and resolve episode resume timestamp leak (fixes #48) (#49)
-* feat(device): remove device type setting override and enforce pure automatic device detection (#47)`;
+* fix: implement per-episode watch progress tracking and resolve episode resume timestamp leak (fixes #48) (#49)`;

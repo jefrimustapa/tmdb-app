@@ -777,7 +777,7 @@ public class MainActivity extends BridgeActivity {
                                         String injectScript = "<script>\n" +
                                             "window.open = function() { return null; };\n" +
                                             "window.openNewTab = function() { return null; };\n" +
-                                            "// Move <mat-caption-button> next to <mat-quality-control>\n" +
+                                            "// 1. Move <mat-caption-button> next to <mat-quality-control>\n" +
                                             "(function moveCaptionBtn() {\n" +
                                             "  var timer = setInterval(function() {\n" +
                                             "    var caption = document.querySelector('mat-caption-button');\n" +
@@ -788,6 +788,71 @@ public class MainActivity extends BridgeActivity {
                                             "      }\n" +
                                             "    }\n" +
                                             "  }, 200);\n" +
+                                            "})();\n" +
+                                            "// 2. Playback Observer & Seek Bridge for Progress Tracking\n" +
+                                            "(function setupKisskhBridge() {\n" +
+                                            "  var attachedVideo = null;\n" +
+                                            "  var initialSeekDone = false;\n" +
+                                            "  function getInitialResumeTime() {\n" +
+                                            "    try {\n" +
+                                            "      var match = window.location.hash.match(/t=(\\d+)/) || window.location.search.match(/[?&]t=(\\d+)/);\n" +
+                                            "      if (match && match[1]) return parseFloat(match[1]);\n" +
+                                            "    } catch (e) {}\n" +
+                                            "    return 0;\n" +
+                                            "  }\n" +
+                                            "  function sendMsg(evt, cur, dur) {\n" +
+                                            "    try {\n" +
+                                            "      var payload = { type: 'kisskh', channel: 'kisskh', event: evt, currentTime: cur, duration: dur };\n" +
+                                            "      if (window.parent && window.parent !== window) {\n" +
+                                            "        window.parent.postMessage(payload, '*');\n" +
+                                            "      }\n" +
+                                            "      if (window.AndroidBridge && typeof window.AndroidBridge.onNativePlaybackState === 'function') {\n" +
+                                            "        window.AndroidBridge.onNativePlaybackState(evt === 'timeupdate' || evt === 'play', cur, dur);\n" +
+                                            "      }\n" +
+                                            "    } catch (e) {}\n" +
+                                            "  }\n" +
+                                            "  function attach(v) {\n" +
+                                            "    if (!v || v === attachedVideo) return;\n" +
+                                            "    attachedVideo = v;\n" +
+                                            "    v.addEventListener('timeupdate', function() {\n" +
+                                            "      if (v.duration > 0 && v.currentTime > 0) {\n" +
+                                            "        sendMsg('timeupdate', v.currentTime, v.duration);\n" +
+                                            "      }\n" +
+                                            "    });\n" +
+                                            "    v.addEventListener('playing', function() {\n" +
+                                            "      sendMsg('play', v.currentTime, v.duration || 0);\n" +
+                                            "      if (!initialSeekDone) {\n" +
+                                            "        var resumeTime = getInitialResumeTime();\n" +
+                                            "        if (resumeTime !== null && resumeTime >= 0) {\n" +
+                                            "          initialSeekDone = true;\n" +
+                                            "          v.currentTime = resumeTime;\n" +
+                                            "        }\n" +
+                                            "      }\n" +
+                                            "    });\n" +
+                                            "    v.addEventListener('pause', function() {\n" +
+                                            "      sendMsg('pause', v.currentTime, v.duration || 0);\n" +
+                                            "    });\n" +
+                                            "    v.addEventListener('ended', function() {\n" +
+                                            "      sendMsg('ended', v.duration || v.currentTime, v.duration || v.currentTime);\n" +
+                                            "    });\n" +
+                                            "  }\n" +
+                                            "  window.addEventListener('message', function(e) {\n" +
+                                            "    try {\n" +
+                                            "      var d = typeof e.data === 'string' ? JSON.parse(e.data) : e.data;\n" +
+                                            "      if (d && (d.type === 'seek' || d.type === 'SEEK' || d.event === 'seek') && (d.time !== undefined && d.time !== null)) {\n" +
+                                            "        var target = parseFloat(d.time);\n" +
+                                            "        var vid = attachedVideo || document.querySelector('video');\n" +
+                                            "        if (vid && !isNaN(target) && target >= 0) {\n" +
+                                            "          initialSeekDone = true;\n" +
+                                            "          vid.currentTime = target;\n" +
+                                            "        }\n" +
+                                            "      }\n" +
+                                            "    } catch (e) {}\n" +
+                                            "  });\n" +
+                                            "  setInterval(function() {\n" +
+                                            "    var vid = document.querySelector('video');\n" +
+                                            "    if (vid && vid !== attachedVideo) attach(vid);\n" +
+                                            "  }, 500);\n" +
                                             "})();\n" +
                                             "</script>\n";
 
