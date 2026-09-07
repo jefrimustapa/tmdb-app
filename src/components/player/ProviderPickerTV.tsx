@@ -12,6 +12,7 @@ interface ProviderPickerTVProps {
   totalServers?: number;
   isAnime?: boolean;
   isAsian?: boolean;
+  isKorean?: boolean;
 }
 
 export const ProviderPickerTV: React.FC<ProviderPickerTVProps> = ({
@@ -23,15 +24,17 @@ export const ProviderPickerTV: React.FC<ProviderPickerTVProps> = ({
   totalServers = STREAM_PROVIDERS.length,
   isAnime = false,
   isAsian = false,
+  isKorean = false,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const displayProviders = React.useMemo(() => {
-    if (isAsian) return getOrderedProviders(undefined, false, true);
-    if (isAnime) return getOrderedProviders(undefined, true, false);
+    if (isKorean) return getOrderedProviders(undefined, false, false, true);
+    if (isAsian) return getOrderedProviders(undefined, false, true, false);
+    if (isAnime) return getOrderedProviders(undefined, true, false, false);
     return STREAM_PROVIDERS;
-  }, [isAnime, isAsian]);
+  }, [isAnime, isAsian, isKorean]);
 
   const selectedProvider = getProviderById(currentProviderId);
   const shortServerName = selectedProvider.name.replace(/\s*\([^)]*\)/g, '').trim();
@@ -243,6 +246,10 @@ export const ProviderPickerTV: React.FC<ProviderPickerTVProps> = ({
                       <span className={`text-[10px] px-2 py-0.5 rounded font-bold whitespace-nowrap flex-shrink-0 ${
                         provider.badge === 'Anime'
                           ? 'bg-gradient-to-r from-pink-500/30 to-purple-500/30 text-pink-300 border border-pink-500/40'
+                          : provider.badge === 'K-Drama'
+                          ? 'bg-gradient-to-r from-rose-500/30 to-pink-500/30 text-rose-300 border border-rose-500/40'
+                          : provider.badge === 'Asean'
+                          ? 'bg-gradient-to-r from-amber-500/30 to-red-500/30 text-amber-300 border border-amber-500/40'
                           : 'bg-white/10 text-gray-300'
                       }`}>
                         {provider.badge}

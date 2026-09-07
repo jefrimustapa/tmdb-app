@@ -11,6 +11,7 @@ import { Logo } from '../common/Logo';
 import { tmdbImages, TMDB_FALLBACK_BACKDROP } from '../../services/tmdb';
 import { resolveAnimeMalId } from '../../services/animeMappingService';
 import { resolveLari21Stream } from '../../services/lk21MappingService';
+import { resolveKisskhStream } from '../../services/kisskhMappingService';
 
 interface VideoPlayerProps {
   mediaType: 'movie' | 'tv';
@@ -32,6 +33,7 @@ interface VideoPlayerProps {
   episodeRuntimeMinutes?: number;
   isAnime?: boolean;
   isAsian?: boolean;
+  isKorean?: boolean;
   releaseYear?: string | number;
   originalTitle?: string;
 }
@@ -56,6 +58,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   episodeRuntimeMinutes,
   isAnime = false,
   isAsian = false,
+  isKorean = false,
   releaseYear,
   originalTitle
 }) => {
@@ -76,6 +79,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const [topProviders, setTopProviders] = useState<string[]>(['vidlink', 'moviesapi', 'cinesrc']);
   const [topAnimeProviders, setTopAnimeProviders] = useState<string[]>(['megaplay-anime', 'cinesrc', 'moviesapi']);
   const [topAsianProviders, setTopAsianProviders] = useState<string[]>(['lari21-asian', 'cinesrc', 'moviesapi']);
+  const [topKoreanProviders, setTopKoreanProviders] = useState<string[]>(['kisskh-kdrama', 'cinesrc', 'moviesapi']);
   const [enabledResolvers, setEnabledResolvers] = useState<StreamResolverType[]>(['embed']);
 
   // Up Next state
@@ -84,6 +88,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const [autoplayNextEnabled, setAutoplayNextEnabled] = useState(true);
   const [upNextTriggerPercent, setUpNextTriggerPercent] = useState(90);
   const [upNextTimeout, setUpNextTimeout] = useState(10);
+  const [tickerIntervalSec, setTickerIntervalSec] = useState(5);
 
   const dismissedUpNextRef = useRef(false);
   const nextEpisodeTriggeredRef = useRef(false);
@@ -91,6 +96,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const autoplayNextEnabledRef = useRef(true);
   const upNextTriggerPercentRef = useRef(90);
   const upNextTimeoutRef = useRef(10);
+  const tickerIntervalRef = useRef(5);
   const showUpNextRef = useRef(false);
   const nextEpisodeInfoRef = useRef(nextEpisodeInfo);
   const onNextEpisodeRef = useRef(onNextEpisode);
@@ -184,6 +190,9 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         if (s.topAsianProviders && s.topAsianProviders.length >= 3) {
           setTopAsianProviders(s.topAsianProviders);
         }
+        if (s.topKoreanProviders && s.topKoreanProviders.length >= 3) {
+          setTopKoreanProviders(s.topKoreanProviders);
+        }
         if (typeof s.autoplayNext === 'boolean') {
           setAutoplayNextEnabled(s.autoplayNext);
           autoplayNextEnabledRef.current = s.autoplayNext;
@@ -195,6 +204,10 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         if (typeof s.upNextTimeout === 'number') {
           setUpNextTimeout(s.upNextTimeout);
           upNextTimeoutRef.current = s.upNextTimeout;
+        }
+        if (typeof s.watchProgressTickerInterval === 'number' && s.watchProgressTickerInterval >= 1 && s.watchProgressTickerInterval <= 10) {
+          setTickerIntervalSec(s.watchProgressTickerInterval);
+          tickerIntervalRef.current = s.watchProgressTickerInterval;
         }
       }
     });
@@ -231,6 +244,28 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           }
         } catch (err) {
           console.warn('[Resolver] LARI21 resolution error:', err);
+        }
+      }
+
+      // 0b. FAST PATH: If selected provider is KissKH (Korean), resolve directly to isolated embed player
+      if (providerId === 'kisskh-kdrama' || providerId === 'kisskh') {
+        try {
+          console.log('[Resolver] Fast-path Korean Provider (KissKH)...');
+          const kisskhRes = await resolveKisskhStream(title, releaseYear, season, episode, originalTitle);
+          if (!isMounted) return;
+          if (kisskhRes && kisskhRes.embedUrl) {
+            console.log('[Resolver] ✅ Playing via KissKH Isolated Player:', kisskhRes.embedUrl);
+            setResolvedKisskhUrl(kisskhRes.embedUrl);
+            setPlayerMode('embed');
+            setDirectStreamUrl(null);
+            setDirectStreamLabel('KissKH Player');
+            setIsExtracting(false);
+            setExtractionFailed(false);
+            setIsLoading(false);
+            return;
+          }
+        } catch (err) {
+          console.warn('[Resolver] KissKH resolution error:', err);
         }
       }
 
@@ -322,11 +357,17 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   }, [title]);
 
   const [resolvedLari21Url, setResolvedLari21Url] = useState<string | null>(null);
-
-
+  const [resolvedKisskhUrl, setResolvedKisskhUrl] = useState<string | null>(null);
 
   const provider = getProviderById(providerId);
   const baseStreamUrl = useMemo(() => {
+    // For KissKH Korean provider
+    if (provider.id === 'kisskh-kdrama' || provider.id === 'kisskh' || provider.category === 'korean') {
+      if (resolvedKisskhUrl) {
+        return resolvedKisskhUrl;
+      }
+      return '';
+    }
     // For LARI21 Asian provider
     if (provider.id === 'lari21-asian' || provider.id === 'lk21-asian' || provider.category === 'asian') {
       if (resolvedLari21Url) {
@@ -342,12 +383,12 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     return mediaType === 'movie'
       ? provider.getMovieUrl(tmdbId)
       : provider.getTVUrl(tmdbId, season, episode);
-  }, [provider, resolvedLari21Url, resolvedMalId, mediaType, tmdbId, season, episode]);
+  }, [provider, resolvedKisskhUrl, resolvedLari21Url, resolvedMalId, mediaType, tmdbId, season, episode]);
 
   const streamUrl = useMemo(() => {
     if (!baseStreamUrl) return '';
-    // Asian / LARI21 and MegaPlay embeds do not support custom start/t/time query parameters and can crash or show a black screen
-    if (provider.id === 'lari21-asian' || provider.id === 'lk21-asian' || provider.category === 'asian' || provider.id === 'megaplay-anime') {
+    // KissKH, Asian / LARI21 and MegaPlay embeds do not support custom start/t/time query parameters and can crash or show a black screen
+    if (provider.id === 'kisskh-kdrama' || provider.id === 'kisskh' || provider.category === 'korean' || provider.id === 'lari21-asian' || provider.id === 'lk21-asian' || provider.category === 'asian' || provider.id === 'megaplay-anime') {
       return baseStreamUrl;
     }
     if (resumeTimestamp <= 0) return baseStreamUrl;
@@ -406,8 +447,9 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       }, 50);
     }
 
-    // Throttled save to IndexedDB
-    if (force || now - lastSaveTimeRef.current >= 10000 || progressPercent >= 95) {
+    // Throttled save to IndexedDB (matches user configured ticker interval)
+    const throttleMs = Math.max(1000, (tickerIntervalRef.current || 5) * 1000);
+    if (force || now - lastSaveTimeRef.current >= throttleMs || progressPercent >= 95) {
       lastSaveTimeRef.current = now;
       dbService.saveWatchProgress({
         tmdbId,
@@ -608,6 +650,9 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   useEffect(() => {
     if (playerMode !== 'embed' || hasError || allFailed) return;
 
+    const intervalSec = Math.min(10, Math.max(1, tickerIntervalSec || tickerIntervalRef.current || 5));
+    const intervalMs = intervalSec * 1000;
+
     const tickerInterval = setInterval(() => {
       // If the window/document is hidden or paused in background, do not tick
       if (typeof document !== 'undefined' && document.hidden) return;
@@ -615,14 +660,14 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       // If we recently received real postMessage time within the last 20 seconds, defer to postMessage
       if (Date.now() - lastPostMessageTimeRef.current < 20000) return;
 
-      // Otherwise, advance elapsed watch session time smoothly (10s increments)
-      const nextTime = (currentTimeRef.current || 0) + 10;
+      // Otherwise, advance elapsed watch session time smoothly by user-configured interval seconds
+      const nextTime = (currentTimeRef.current || 0) + intervalSec;
       const fallbackDur = durationRef.current || (episodeRuntimeMinutes ? episodeRuntimeMinutes * 60 : 0);
       recordProgress(nextTime, fallbackDur);
-    }, 10000);
+    }, intervalMs);
 
     return () => clearInterval(tickerInterval);
-  }, [playerMode, hasError, allFailed, recordProgress, episodeRuntimeMinutes]);
+  }, [playerMode, hasError, allFailed, recordProgress, episodeRuntimeMinutes, tickerIntervalSec]);
 
   // HLS Player attachment for direct streams
   useEffect(() => {
@@ -631,7 +676,44 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         if (hlsRef.current) {
           hlsRef.current.destroy();
         }
-        const hls = new Hls({ enableWorker: true });
+
+        const hls = new Hls({
+          enableWorker: false,
+          lowLatencyMode: false,
+          backBufferLength: 90,
+          fragLoadingMaxRetry: 5,
+          fragLoadingRetryDelay: 1000,
+          fragLoadingTimeOut: 25000
+        });
+
+        hls.on(Hls.Events.ERROR, (_event, data) => {
+          console.warn('[HLS] Error encountered:', data.type, data.details, 'fatal:', data.fatal, 'url:', data.frag?.url, 'response:', data.response);
+          if (data.fatal) {
+            switch (data.type) {
+              case Hls.ErrorTypes.NETWORK_ERROR:
+                console.warn('[HLS] Fatal network error encountered, attempting recovery...');
+                hls.startLoad();
+                break;
+              case Hls.ErrorTypes.MEDIA_ERROR:
+                console.warn('[HLS] Fatal media error encountered, attempting recovery...');
+                hls.recoverMediaError();
+                break;
+              default:
+                console.error('[HLS] Unrecoverable error, falling back to embed player.');
+                hls.destroy();
+                setPlayerMode('embed');
+                setDirectStreamUrl(null);
+                break;
+            }
+          }
+        });
+
+        hls.on(Hls.Events.MANIFEST_PARSED, () => {
+          console.log('[HLS] Manifest parsed successfully, starting playback.');
+          setIsLoading(false);
+          videoRef.current?.play().catch(() => {});
+        });
+
         hls.loadSource(directStreamUrl);
         hls.attachMedia(videoRef.current);
         hlsRef.current = hls;
@@ -749,12 +831,13 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   }, [tmdbId, mediaType, season, episode, voteAverage, posterPath, backdropPath, stillPath, episodeTitle, episodeRuntimeMinutes, initialTimestamp]);
 
   const activeTopProviders = useMemo(() => {
+    if (isKorean) return topKoreanProviders;
     if (isAnime) return topAnimeProviders;
     if (isAsian) return topAsianProviders;
     return topProviders;
-  }, [isAnime, isAsian, topAnimeProviders, topAsianProviders, topProviders]);
+  }, [isAnime, isAsian, isKorean, topAnimeProviders, topAsianProviders, topKoreanProviders, topProviders]);
 
-  const orderedProviders = React.useMemo(() => getOrderedProviders(activeTopProviders, isAnime, isAsian), [activeTopProviders, isAnime, isAsian]);
+  const orderedProviders = React.useMemo(() => getOrderedProviders(activeTopProviders, isAnime, isAsian, isKorean), [activeTopProviders, isAnime, isAsian, isKorean]);
 
   const cycleToNextProvider = useCallback(() => {
     resetControlsTimer();
