@@ -43,6 +43,10 @@ export function getDefaultPerformanceMode(): boolean {
   return isBridgeTV || isTVUserAgent;
 }
 
+export function getDefaultTickerInterval(): number {
+  return getDefaultPerformanceMode() ? 5 : 2;
+}
+
 // Defaults for Settings
 export const DEFAULT_SETTINGS: UserSettings = {
   id: 'current_settings',
@@ -50,11 +54,13 @@ export const DEFAULT_SETTINGS: UserSettings = {
   topProviders: ['vidlink', 'moviesapi', 'cinesrc'],
   topAnimeProviders: ['megaplay-anime', 'cinesrc', 'moviesapi'],
   topAsianProviders: ['cinesrc', '111movies', 'lari21-asian'],
+  topKoreanProviders: ['kisskh-kdrama', 'cinesrc', 'moviesapi'],
   deviceMode: 'auto',
   autoplayNext: true,
   upNextPopup: true,
   upNextTriggerPercent: 90,
   upNextTimeout: 10,
+  watchProgressTickerInterval: getDefaultTickerInterval(),
   adBlockShield: true,
   filterAdult: true,
   filterUnreleased: true,
@@ -308,6 +314,14 @@ export const dbService = {
       ];
       await db.settings.put(settings);
     }
+    if (!settings.topKoreanProviders || settings.topKoreanProviders.length < 3) {
+      settings.topKoreanProviders = [
+        'kisskh-kdrama',
+        'cinesrc',
+        'moviesapi'
+      ];
+      await db.settings.put(settings);
+    }
     if (!settings.streamResolver) {
       settings.streamResolver = settings.directStreamMode ? 'private_extractor' : 'embed';
       await db.settings.put(settings);
@@ -322,6 +336,10 @@ export const dbService = {
     }
     if (settings.performanceMode === undefined) {
       settings.performanceMode = getDefaultPerformanceMode();
+      await db.settings.put(settings);
+    }
+    if (settings.watchProgressTickerInterval === undefined || settings.watchProgressTickerInterval < 1 || settings.watchProgressTickerInterval > 10) {
+      settings.watchProgressTickerInterval = getDefaultTickerInterval();
       await db.settings.put(settings);
     }
     cachedSettings = settings;

@@ -3,11 +3,12 @@ export interface StreamProvider {
   name: string;
   tagline: string;
   badge: string;
-  category?: 'general' | 'anime' | 'asian';
+  category?: 'general' | 'anime' | 'asian' | 'korean';
   getMovieUrl: (tmdbId: number) => string;
   getTVUrl: (tmdbId: number, season: number, episode: number) => string;
   getAnimeUrl?: (malId: number, season?: number, episode?: number, type?: 'sub' | 'dub') => string;
   getAsianUrl?: (resolvedUrl: string) => string;
+  getKoreanUrl?: (resolvedUrl: string) => string;
 }
 
 export interface ActiveStream {

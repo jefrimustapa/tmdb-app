@@ -302,6 +302,7 @@ public class MainActivity extends BridgeActivity {
                     }
                 }
 
+
                 @JavascriptInterface
                 public String fetchHttpPost(String targetUrl, String postBody, String contentType, String referer, String origin) {
                     try {
@@ -698,6 +699,117 @@ public class MainActivity extends BridgeActivity {
                                 );
                             } catch (Exception ignored) {}
                         }
+
+                        // KissKH Embed Player Isolation & Anti-Hotlinking Shield
+                        if (lower.contains("kisskh.do") && (lower.contains("/drama/") || lower.contains("/player")) && !lower.contains("/api/") && !lower.contains("/cdn-cgi/")) {
+                            try {
+                                URL url = new URL(rawUrl);
+                                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                                conn.setRequestMethod(request.getMethod());
+                                conn.setConnectTimeout(15000);
+                                conn.setReadTimeout(15000);
+                                Map<String, String> reqHeaders = request.getRequestHeaders();
+                                if (reqHeaders != null) {
+                                    for (Map.Entry<String, String> entry : reqHeaders.entrySet()) {
+                                        String k = entry.getKey().toLowerCase();
+                                        if (!k.equals("referer") && !k.equals("origin") && !k.equals("host") && !k.equals("user-agent")) {
+                                            conn.setRequestProperty(entry.getKey(), entry.getValue());
+                                        }
+                                    }
+                                }
+                                conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36");
+                                conn.setRequestProperty("Referer", "https://kisskh.do/");
+                                conn.setRequestProperty("Origin", "https://kisskh.do");
+
+                                int statusCode = conn.getResponseCode();
+                                String contentType = conn.getContentType();
+                                String mimeType = "text/html";
+                                String encoding = "UTF-8";
+                                if (contentType != null) {
+                                    String[] parts = contentType.split(";");
+                                    mimeType = parts[0].trim();
+                                }
+
+                                Map<String, String> responseHeaders = new HashMap<>();
+                                responseHeaders.put("Access-Control-Allow-Origin", "*");
+                                responseHeaders.put("Access-Control-Allow-Headers", "*");
+                                for (Map.Entry<String, java.util.List<String>> header : conn.getHeaderFields().entrySet()) {
+                                    if (header.getKey() != null) {
+                                        String hKey = header.getKey().toLowerCase();
+                                        if (!hKey.equals("content-security-policy") && !hKey.equals("x-frame-options")) {
+                                            responseHeaders.put(header.getKey(), TextUtils.join(", ", header.getValue()));
+                                        }
+                                    }
+                                }
+
+                                InputStream in = statusCode >= 400 ? conn.getErrorStream() : conn.getInputStream();
+                                if (mimeType != null && mimeType.contains("html") && statusCode < 400) {
+                                    try {
+                                        BufferedReader reader = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8));
+                                        StringBuilder sb = new StringBuilder();
+                                        String l;
+                                        while ((l = reader.readLine()) != null) {
+                                            sb.append(l).append("\n");
+                                        }
+                                        String html = sb.toString();
+                                        
+                                        // Show ONLY <app-watch> fullscreen, reset margin of main parent to 0, hide <mat-toolbar> & next episode button
+                                        String isolatedCss = "<style id=\"tmdb-isolated-player\">\n" +
+                                            "/* 1. Reset root & containers to 0 margin/padding */\n" +
+                                            "html, body, app-root, mat-sidenav-container, mat-sidenav-content { width: 100vw !important; height: 100vh !important; margin: 0 !important; padding: 0 !important; overflow: hidden !important; background: #000 !important; }\n" +
+                                            "/* 2. Set margin of <main> parent to 0 for all sides & remove min-height offset */\n" +
+                                            "mat-sidenav-content > div, main:has(app-drama), main:has(router-outlet), mat-sidenav-content main { margin: 0 !important; padding: 0 !important; min-height: 100vh !important; height: 100vh !important; width: 100vw !important; }\n" +
+                                            "/* 3. Hide mat-toolbar */\n" +
+                                            "mat-toolbar, .mat-toolbar, app-footer, footer { display: none !important; height: 0 !important; max-height: 0 !important; visibility: hidden !important; margin: 0 !important; padding: 0 !important; }\n" +
+                                            "/* 4. Hide Next Episode button in player */\n" +
+                                            "#nextEP, [mattooltip='Next Episode'], button[routerlink*='Episode-'] { display: none !important; visibility: hidden !important; opacity: 0 !important; pointer-events: none !important; }\n" +
+                                            "/* 5. Hide all non-player sibling elements (info card, comments, related episodes, footer) */\n" +
+                                            "app-drama > .row > div:not(:first-child), app-drama mat-card, app-drama .list, app-drama .action-btn, .comments, .comment-section, .related-list { display: none !important; height: 0 !important; visibility: hidden !important; margin: 0 !important; padding: 0 !important; }\n" +
+                                            "/* 6. Stretch <app-watch>, <mat-video>, and videoplayer to fill fullscreen */\n" +
+                                            "app-drama, app-drama > .row, app-drama > .row > div:first-child { width: 100vw !important; height: 100vh !important; max-width: 100vw !important; max-height: 100vh !important; flex: 0 0 100vw !important; margin: 0 !important; padding: 0 !important; }\n" +
+                                            "app-watch, app-watch mat-video, app-watch .videoplayer, app-watch video, app-watch iframe, app-watch .embed-responsive, app-watch .embed-responsive-item { display: block !important; width: 100vw !important; height: 100vh !important; max-width: 100vw !important; max-height: 100vh !important; margin: 0 !important; padding: 0 !important; }\n" +
+                                            "/* 7. Ensure mat-caption-button matches bottom control toolbar styling */\n" +
+                                            ".videoplayer .controls .right mat-caption-button { display: inline-flex !important; align-items: center !important; justify-content: center !important; }\n" +
+                                            "/* 8. Hide mat-fullscreen-button in player */\n" +
+                                            "mat-fullscreen-button, .videoplayer mat-fullscreen-button { display: none !important; visibility: hidden !important; opacity: 0 !important; pointer-events: none !important; width: 0 !important; height: 0 !important; }\n" +
+                                            "</style>\n";
+
+                                        String injectScript = "<script>\n" +
+                                            "window.open = function() { return null; };\n" +
+                                            "window.openNewTab = function() { return null; };\n" +
+                                            "// Move <mat-caption-button> next to <mat-quality-control>\n" +
+                                            "(function moveCaptionBtn() {\n" +
+                                            "  var timer = setInterval(function() {\n" +
+                                            "    var caption = document.querySelector('mat-caption-button');\n" +
+                                            "    var quality = document.querySelector('mat-quality-control');\n" +
+                                            "    if (caption && quality && quality.parentElement) {\n" +
+                                            "      if (caption.parentElement !== quality.parentElement) {\n" +
+                                            "        quality.parentElement.insertBefore(caption, quality);\n" +
+                                            "      }\n" +
+                                            "    }\n" +
+                                            "  }, 200);\n" +
+                                            "})();\n" +
+                                            "</script>\n";
+
+                                        html = html.replace("<head>", "<head>\n" + isolatedCss + injectScript);
+                                        in = new ByteArrayInputStream(html.getBytes(StandardCharsets.UTF_8));
+                                    } catch (Exception e) {}
+                                }
+
+                                return new WebResourceResponse(
+                                    mimeType,
+                                    encoding,
+                                    statusCode,
+                                    conn.getResponseMessage() != null ? conn.getResponseMessage() : "OK",
+                                    responseHeaders,
+                                    in
+                                );
+                            } catch (Exception ignored) {}
+                        }
+
+                        // Note: KissKH video streams (.ts, .m3u8) are NOT intercepted here.
+                        // When played inside an <iframe>, the iframe's native browser context handles
+                        // all HLS byte-ranges, cookies, and Cloudflare streaming directly without middleman stalls.
 
                         // MegaPlay Anti-Hotlinking Shield: Inject required Referer/Origin headers
                         if (lower.contains("megaplay.buzz") || lower.contains("imgnex.top")) {

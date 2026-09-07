@@ -70,11 +70,13 @@ export interface UserSettings {
   topProviders?: [string, string, string] | string[];
   topAnimeProviders?: [string, string, string] | string[];
   topAsianProviders?: [string, string, string] | string[];
+  topKoreanProviders?: [string, string, string] | string[];
   deviceMode: 'auto' | 'tv' | 'mobile' | 'tablet' | 'desktop';
   autoplayNext: boolean;
   upNextPopup?: boolean;
   upNextTriggerPercent?: number; // e.g. 90, 92, 94, 96, 98, 100
   upNextTimeout?: number; // e.g. 5, 10, 15, 20
+  watchProgressTickerInterval?: number; // Progress ticker frequency in seconds (1-10s; default 5s for TV, 2s for Mobile)
   adBlockShield: boolean;
   filterAdult: boolean;
   filterUnreleased?: boolean;

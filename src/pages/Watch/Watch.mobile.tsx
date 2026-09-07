@@ -6,7 +6,7 @@ import { VideoPlayer } from '../../components/player/VideoPlayer';
 import { ProviderPickerMobile } from '../../components/player/ProviderPickerMobile';
 import { dbService } from '../../services/db';
 import { isAnimeMedia } from '../../services/animeMappingService';
-import { isAsianMedia } from '../../services/lk21MappingService';
+import { isAseanMedia, isKoreanMedia } from '../../services/lk21MappingService';
 import { ArrowLeft, SkipForward, SkipBack } from 'lucide-react';
 
 export const Watch: React.FC = () => {
@@ -29,8 +29,9 @@ export const Watch: React.FC = () => {
 
   const [enabledResolvers, setEnabledResolvers] = useState<('embed' | 'private_extractor' | 'torbox')[]>(['embed']);
 
+  const isKorean = useMemo(() => isKoreanMedia(details), [details]);
   const isAnime = useMemo(() => isAnimeMedia(details), [details]);
-  const isAsian = useMemo(() => isAsianMedia(details), [details]);
+  const isAsian = useMemo(() => isAseanMedia(details), [details]);
 
   // Parallelized initial load: TMDB details, TV season details, and DB settings all fetched together
   useEffect(() => {
@@ -58,9 +59,12 @@ export const Watch: React.FC = () => {
 
         if (s) {
           if (!userSelectedProvider) {
+            const koreanFlag = isKoreanMedia(fetchedDetails);
             const animeFlag = isAnimeMedia(fetchedDetails);
-            const asianFlag = isAsianMedia(fetchedDetails);
-            const defaultProvider = asianFlag
+            const asianFlag = isAseanMedia(fetchedDetails);
+            const defaultProvider = koreanFlag
+              ? (s.topKoreanProviders?.[0] || 'kisskh-kdrama')
+              : asianFlag
               ? (s.topAsianProviders?.[0] || 'cinesrc')
               : animeFlag
               ? (s.topAnimeProviders?.[0] || 'megaplay-anime')
@@ -399,6 +403,7 @@ export const Watch: React.FC = () => {
                   serverIndex={serverIndex}
                   isAnime={isAnime}
                   isAsian={isAsian}
+                  isKorean={isKorean}
                 />
               ) : (
                 <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-hbo-card/90 border border-hbo-border text-xs font-bold shadow-md">
@@ -490,6 +495,7 @@ export const Watch: React.FC = () => {
             initialTimestamp={timestampParam}
             isAnime={isAnime}
             isAsian={isAsian}
+            isKorean={isKorean}
             releaseYear={releaseYear}
             originalTitle={details.original_title || details.original_name}
             onProviderChange={(p) => {
