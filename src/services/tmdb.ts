@@ -12,13 +12,16 @@ import {
   ADULT_KEYWORDS_CSV,
   getExplicitAdultRating,
   isExplicitAdultCertification,
-  isMediaExplicitAdult
+  checkMovieIsExplicitAdult,
+  checkTVIsExplicitAdult,
+  clearExplicitRatingCache
 } from './contentRatingFilter';
 
 export {
   getExplicitAdultRating,
   isExplicitAdultCertification,
-  isMediaExplicitAdult
+  checkMovieIsExplicitAdult,
+  checkTVIsExplicitAdult
 };
 
 const TMDB_BASE_URL = 'https://api.themoviedb.org/3';
@@ -53,7 +56,10 @@ const CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes in-memory cache for instant 0
 
 // Clear cache on settings changes
 if (typeof window !== 'undefined') {
-  window.addEventListener('tmdb_settings_changed', () => apiCache.clear());
+  window.addEventListener('tmdb_settings_changed', () => {
+    apiCache.clear();
+    clearExplicitRatingCache();
+  });
 }
 
 async function tmdbFetch<T>(endpoint: string, params: Record<string, string | number> = {}): Promise<T> {
@@ -144,9 +150,48 @@ async function tmdbFetch<T>(endpoint: string, params: Record<string, string | nu
 
   const data = await res.json();
 
-  // Filter adult items if filterAdult is active
-  if (filterAdult && data && Array.isArray(data.results)) {
+  // Filter adult items and explicit sexual/adult ratings if filterAdult is active
+  if (filterAdult && data && Array.isArray(data.results) && data.results.length > 0) {
+    // 1. Initial fast filter by item.adult flag
     data.results = data.results.filter((item: any) => !item.adult);
+
+    // 2. Deep filter by release dates / content ratings for movies, tv, and search/trending lists
+    const fetchReleaseDates = async (id: number) => {
+      const relUrl = `${TMDB_BASE_URL}/movie/${id}/release_dates?api_key=${TMDB_API_KEY}`;
+      const relRes = await fetch(relUrl, {
+        headers: { Authorization: `Bearer ${TMDB_READ_TOKEN}` }
+      });
+      return relRes.ok ? relRes.json() : null;
+    };
+
+    const fetchContentRatings = async (id: number) => {
+      const crUrl = `${TMDB_BASE_URL}/tv/${id}/content_ratings?api_key=${TMDB_API_KEY}`;
+      const crRes = await fetch(crUrl, {
+        headers: { Authorization: `Bearer ${TMDB_READ_TOKEN}` }
+      });
+      return crRes.ok ? crRes.json() : null;
+    };
+
+    const isMovieEndpoint = endpoint.includes('/movie') || endpoint.includes('mediaType=movie');
+    const isTvEndpoint = endpoint.includes('/tv') || endpoint.includes('mediaType=tv');
+
+    const filteredResults = await Promise.all(
+      data.results.map(async (item: any) => {
+        if (!item || !item.id) return item;
+        const itemType = item.media_type || (item.title ? 'movie' : (item.name ? 'tv' : (isTvEndpoint ? 'tv' : 'movie')));
+        
+        if (itemType === 'movie') {
+          const isAdult = await checkMovieIsExplicitAdult(item.id, fetchReleaseDates);
+          return isAdult ? null : item;
+        } else if (itemType === 'tv') {
+          const isAdult = await checkTVIsExplicitAdult(item.id, fetchContentRatings);
+          return isAdult ? null : item;
+        }
+        return item;
+      })
+    );
+
+    data.results = filteredResults.filter(Boolean);
   }
 
   // Filter unreleased/future items if filterUnreleased is active (except explicit upcoming endpoints)

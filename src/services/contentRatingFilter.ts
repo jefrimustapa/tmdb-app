@@ -141,11 +141,59 @@ export function getExplicitAdultRating(details: TMDBMovieDetails | TMDBTVDetails
 }
 
 /**
- * Comprehensive check if a media item is explicit adult content,
- * checking the explicit flag, sexual ratings across countries, or title/adult metadata.
+ * In-memory cache for media ID -> explicit adult boolean
  */
-export function isMediaExplicitAdult(details: TMDBMovieDetails | TMDBTVDetails | null): boolean {
-  if (!details) return false;
-  if (details.adult) return true;
-  return Boolean(getExplicitAdultRating(details));
+const explicitRatingCache = new Map<string, boolean>();
+
+/**
+ * Check if a movie has explicit adult/sexual certification by fetching release_dates.
+ * Uses in-memory cache to ensure fast subsequent lookups.
+ */
+export async function checkMovieIsExplicitAdult(
+  movieId: number,
+  fetchReleaseDates: (id: number) => Promise<any>
+): Promise<boolean> {
+  const cacheKey = `m_${movieId}`;
+  if (explicitRatingCache.has(cacheKey)) {
+    return explicitRatingCache.get(cacheKey)!;
+  }
+
+  try {
+    const data = await fetchReleaseDates(movieId);
+    const hasExplicit = Boolean(getExplicitAdultMovieRating({ release_dates: data } as any));
+    explicitRatingCache.set(cacheKey, hasExplicit);
+    return hasExplicit;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Check if a TV series has explicit adult/sexual certification by fetching content_ratings.
+ * Uses in-memory cache to ensure fast subsequent lookups.
+ */
+export async function checkTVIsExplicitAdult(
+  tvId: number,
+  fetchContentRatings: (id: number) => Promise<any>
+): Promise<boolean> {
+  const cacheKey = `t_${tvId}`;
+  if (explicitRatingCache.has(cacheKey)) {
+    return explicitRatingCache.get(cacheKey)!;
+  }
+
+  try {
+    const data = await fetchContentRatings(tvId);
+    const hasExplicit = Boolean(getExplicitAdultTVRating({ content_ratings: data } as any));
+    explicitRatingCache.set(cacheKey, hasExplicit);
+    return hasExplicit;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Clear the explicit rating cache (e.g. on settings change).
+ */
+export function clearExplicitRatingCache(): void {
+  explicitRatingCache.clear();
 }
