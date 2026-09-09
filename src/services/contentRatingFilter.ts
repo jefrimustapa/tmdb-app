@@ -149,6 +149,14 @@ const explicitRatingCache = new Map<string, boolean>();
  * Check if a movie has explicit adult/sexual certification by fetching release_dates.
  * Uses in-memory cache to ensure fast subsequent lookups.
  */
+// Unrated / uncertified strings
+const UNRATED_RATINGS = new Set(['NR', 'UNRATED', 'NOT RATED', 'NOT-RATED', 'NONE', '0']);
+
+/**
+ * Check if a movie has explicit adult/sexual certification by fetching release_dates.
+ * Uses in-memory cache to ensure fast subsequent lookups.
+ * If no certification is found or unrated, it is treated as explicit adult content.
+ */
 export async function checkMovieIsExplicitAdult(
   movieId: number,
   fetchReleaseDates: (id: number) => Promise<any>
@@ -160,20 +168,26 @@ export async function checkMovieIsExplicitAdult(
 
   try {
     const data = await fetchReleaseDates(movieId);
-    const hasExplicit = Boolean(getExplicitAdultMovieRating({ release_dates: data } as any));
-    explicitRatingCache.set(cacheKey, hasExplicit);
-    // Also populate resolved certification cache so cards get it instantly!
     const cert = extractMovieCertification(data);
     resolvedRatingCache.set(`movie_${movieId}`, cert);
-    return hasExplicit;
+
+    const hasExplicit = Boolean(getExplicitAdultMovieRating({ release_dates: data } as any));
+    // If it has explicit rating, OR no certification at all, OR marked unrated -> treat as explicit/adult
+    const isUncertifiedOrUnrated = !cert || UNRATED_RATINGS.has(cert.toUpperCase().trim());
+    const result = hasExplicit || isUncertifiedOrUnrated;
+
+    explicitRatingCache.set(cacheKey, result);
+    return result;
   } catch {
-    return false;
+    // If fetching fails or unrated/no data, treat as explicit/adult when filter is active
+    return true;
   }
 }
 
 /**
  * Check if a TV series has explicit adult/sexual certification by fetching content_ratings.
  * Uses in-memory cache to ensure fast subsequent lookups.
+ * If no certification is found or unrated, it is treated as explicit adult content.
  */
 export async function checkTVIsExplicitAdult(
   tvId: number,
@@ -186,14 +200,19 @@ export async function checkTVIsExplicitAdult(
 
   try {
     const data = await fetchContentRatings(tvId);
-    const hasExplicit = Boolean(getExplicitAdultTVRating({ content_ratings: data } as any));
-    explicitRatingCache.set(cacheKey, hasExplicit);
-    // Also populate resolved certification cache so cards get it instantly!
     const cert = extractTVCertification(data);
     resolvedRatingCache.set(`tv_${tvId}`, cert);
-    return hasExplicit;
+
+    const hasExplicit = Boolean(getExplicitAdultTVRating({ content_ratings: data } as any));
+    // If it has explicit rating, OR no certification at all, OR marked unrated -> treat as explicit/adult
+    const isUncertifiedOrUnrated = !cert || UNRATED_RATINGS.has(cert.toUpperCase().trim());
+    const result = hasExplicit || isUncertifiedOrUnrated;
+
+    explicitRatingCache.set(cacheKey, result);
+    return result;
   } catch {
-    return false;
+    // If fetching fails or unrated/no data, treat as explicit/adult when filter is active
+    return true;
   }
 }
 

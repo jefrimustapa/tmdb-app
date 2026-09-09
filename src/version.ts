@@ -2,12 +2,13 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20260909-2228';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-improve-adult-f.20260909-2228';
+export const APP_BUILD_NUMBER = '20260909-2257';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-improve-adult-f.20260909-2257';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
 export const APP_BRANCH = 'feat-improve-adult-f';
-export const APP_CHANGELOG = `* feat(card): add lightweight cached certification badge to title cards
+export const APP_CHANGELOG = `* fix(cert): remove duplicate card footer badge and improve priority certification resolution
+* feat(card): add lightweight cached certification badge to title cards
 * fix(filter): perform deep adult & sexual rating filtering on catalog items
 * feat(filter): expand SafeSearch with worldwide explicit adult and sexual rating filters
 * fix(ui): prevent touch scroll hang and cancel long press on move (#67)
@@ -20,5 +21,4 @@ export const APP_CHANGELOG = `* feat(card): add lightweight cached certification
 * feat(details,watch,stream): add Asian stream provider, optimize details UX, and fix watch progress reset (#60)
 * feat(stream): separate embedded server priority for anime vs other content
 * feat(watch): center title in row 1 and move episode info to row 2 with prev/next buttons (#59)
-* feat(filter): add Anime option to Movies, TV Series, and Search genre filters (#57)
-* feat(search): 1-row history with 800ms debounce, sticky search filter bar (title/keyword/cast) (#56)`;
+* feat(filter): add Anime option to Movies, TV Series, and Search genre filters (#57)`;
