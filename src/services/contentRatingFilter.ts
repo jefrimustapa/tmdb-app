@@ -192,8 +192,97 @@ export async function checkTVIsExplicitAdult(
 }
 
 /**
- * Clear the explicit rating cache (e.g. on settings change).
+ * In-memory cache for media ID -> extracted certification string (e.g. "PG-13", "18SX", "19", "R")
+ */
+const resolvedRatingCache = new Map<string, string | null>();
+
+/**
+ * Extract certification string from release_dates results (for movies).
+ */
+export function extractMovieCertification(releaseDatesData: any): string | null {
+  if (!releaseDatesData?.results || !Array.isArray(releaseDatesData.results)) return null;
+  const mockDetails = { release_dates: releaseDatesData };
+  const explicit = getExplicitAdultMovieRating(mockDetails as any);
+  if (explicit) return explicit;
+
+  // Fallback to US
+  const us = releaseDatesData.results.find((r: any) => r.iso_3166_1 === 'US');
+  if (us && Array.isArray(us.release_dates)) {
+    const m = us.release_dates.find((d: any) => d.certification && d.certification.trim().length > 0);
+    if (m) return m.certification.trim();
+  }
+
+  // Fallback to any country
+  for (const c of releaseDatesData.results) {
+    if (Array.isArray(c.release_dates)) {
+      const m = c.release_dates.find((d: any) => d.certification && d.certification.trim().length > 0);
+      if (m) return m.certification.trim();
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Extract certification string from content_ratings results (for TV).
+ */
+export function extractTVCertification(contentRatingsData: any): string | null {
+  if (!contentRatingsData?.results || !Array.isArray(contentRatingsData.results)) return null;
+  const mockDetails = { content_ratings: contentRatingsData };
+  const explicit = getExplicitAdultTVRating(mockDetails as any);
+  if (explicit) return explicit;
+
+  // Fallback to US
+  const us = contentRatingsData.results.find((r: any) => r.iso_3166_1 === 'US');
+  if (us && us.rating && us.rating.trim().length > 0) return us.rating.trim();
+
+  // Fallback to any country
+  const anyMatch = contentRatingsData.results.find((r: any) => r.rating && r.rating.trim().length > 0);
+  if (anyMatch) return anyMatch.rating.trim();
+
+  return null;
+}
+
+/**
+ * Get or fetch the content rating certification for a movie or TV series.
+ * Caches in memory for 0ms subsequent lookups.
+ */
+export async function getResolvedMediaCertification(
+  mediaId: number,
+  mediaType: 'movie' | 'tv',
+  fetcher: (id: number, type: 'movie' | 'tv') => Promise<any>
+): Promise<string | null> {
+  const cacheKey = `${mediaType}_${mediaId}`;
+  if (resolvedRatingCache.has(cacheKey)) {
+    return resolvedRatingCache.get(cacheKey) || null;
+  }
+
+  try {
+    const rawData = await fetcher(mediaId, mediaType);
+    const cert = mediaType === 'movie'
+      ? extractMovieCertification(rawData)
+      : extractTVCertification(rawData);
+
+    resolvedRatingCache.set(cacheKey, cert);
+    return cert;
+  } catch {
+    resolvedRatingCache.set(cacheKey, null);
+    return null;
+  }
+}
+
+/**
+ * Synchronously check if a rating certification is already cached in memory.
+ */
+export function getCachedMediaCertification(mediaId: number, mediaType: 'movie' | 'tv'): string | null | undefined {
+  const cacheKey = `${mediaType}_${mediaId}`;
+  return resolvedRatingCache.get(cacheKey);
+}
+
+/**
+ * Clear all rating caches (e.g. on settings change).
  */
 export function clearExplicitRatingCache(): void {
   explicitRatingCache.clear();
+  resolvedRatingCache.clear();
 }

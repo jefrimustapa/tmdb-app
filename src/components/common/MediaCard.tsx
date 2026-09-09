@@ -3,8 +3,9 @@ import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { Play, Heart, Bookmark, MoreVertical, Trash2, Info } from 'lucide-react';
 import type { TMDBMediaItem } from '../../types/tmdb';
-import { tmdbImages } from '../../services/tmdb';
+import { tmdbImages, tmdbApi, getCachedMediaCertification } from '../../services/tmdb';
 import { RatingBadge } from './RatingBadge';
+import { CertBadge } from './CertBadge';
 import { dbService } from '../../services/db';
 
 interface MediaCardProps {
@@ -97,6 +98,30 @@ const MediaCardComponent: React.FC<MediaCardProps> = ({
     });
     return () => { active = false; };
   }, [menuOpen, item.id, mediaType]);
+
+  // Lazy-load certification rating with zero blocking, using in-memory cache
+  const [certification, setCertification] = useState<string | null>(() => {
+    return getCachedMediaCertification(item.id, mediaType) || null;
+  });
+
+  useEffect(() => {
+    let active = true;
+    const cached = getCachedMediaCertification(item.id, mediaType);
+    if (cached !== undefined) {
+      setCertification(cached);
+      return;
+    }
+
+    tmdbApi.getCertification(item.id, mediaType).then((cert) => {
+      if (active) {
+        setCertification(cert);
+      }
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [item.id, mediaType]);
 
   // Listen for TV long press custom event
   useEffect(() => {
@@ -310,10 +335,11 @@ const MediaCardComponent: React.FC<MediaCardProps> = ({
             </div>
           )}
 
-          {/* Rating badge for poster cards */}
-          {!isLandscape && item.vote_average > 0 && (
-            <div className="absolute top-2 left-2 z-10">
-              <RatingBadge score={item.vote_average} />
+          {/* Badges on Top-Left: Star Rating and Content Certification */}
+          {!isLandscape && (item.vote_average > 0 || certification) && (
+            <div className="absolute top-2 left-2 z-10 flex items-center gap-1.5 flex-wrap max-w-[calc(100%-36px)]">
+              {item.vote_average > 0 && <RatingBadge score={item.vote_average} />}
+              {certification && <CertBadge certification={certification} size="xs" />}
             </div>
           )}
 
@@ -347,17 +373,23 @@ const MediaCardComponent: React.FC<MediaCardProps> = ({
             {title}
           </h4>
           {isLandscape ? (
-            <p className="text-[11px] sm:text-xs text-gray-400 truncate mt-0.5">
-              {mediaType === 'tv' && season && episode
-                ? `S${season} : E${episode}${episodeTitle ? ` • ${episodeTitle}` : ''}`
-                : (releaseYear ? `${releaseYear} • Movie` : 'Movie')}
-            </p>
+            <div className="flex items-center gap-1.5 mt-0.5">
+              <p className="text-[11px] sm:text-xs text-gray-400 truncate flex-1 min-w-0">
+                {mediaType === 'tv' && season && episode
+                  ? `S${season} : E${episode}${episodeTitle ? ` • ${episodeTitle}` : ''}`
+                  : (releaseYear ? `${releaseYear} • Movie` : 'Movie')}
+              </p>
+              {certification && <CertBadge certification={certification} size="xs" />}
+            </div>
           ) : (
-            <div className="flex items-center justify-between mt-1 text-[11px] text-gray-400">
-              <span>{releaseYear || mediaType.toUpperCase()}</span>
-              <span className="uppercase text-[10px] font-bold px-1.5 py-0.5 rounded bg-hbo-purple/20 text-hbo-purple-light border border-hbo-purple/30">
-                {mediaType === 'movie' ? 'Movie' : 'Series'}
-              </span>
+            <div className="flex items-center justify-between mt-1 text-[11px] text-gray-400 gap-1">
+              <span className="truncate">{releaseYear || mediaType.toUpperCase()}</span>
+              <div className="flex items-center gap-1 flex-shrink-0">
+                {certification && <CertBadge certification={certification} size="xs" />}
+                <span className="uppercase text-[10px] font-bold px-1.5 py-0.5 rounded bg-hbo-purple/20 text-hbo-purple-light border border-hbo-purple/30">
+                  {mediaType === 'movie' ? 'Movie' : 'Series'}
+                </span>
+              </div>
             </div>
           )}
         </div>

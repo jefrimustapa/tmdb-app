@@ -2,12 +2,13 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20260909-2148';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-improve-adult-f.20260909-2148';
+export const APP_BUILD_NUMBER = '20260909-2223';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-improve-adult-f.20260909-2223';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
 export const APP_BRANCH = 'feat-improve-adult-f';
-export const APP_CHANGELOG = `* feat(filter): expand SafeSearch with worldwide explicit adult and sexual rating filters
+export const APP_CHANGELOG = `* fix(filter): perform deep adult & sexual rating filtering on catalog items
+* feat(filter): expand SafeSearch with worldwide explicit adult and sexual rating filters
 * fix(ui): prevent touch scroll hang and cancel long press on move (#67)
 * fix(player): fix restart from beginning for embed providers and improve KissKH progress tracking (#66)
 * feat(player): add Korean embed provider (KissKH) with isolated player & progress tracking (#65)
@@ -20,5 +21,4 @@ export const APP_CHANGELOG = `* feat(filter): expand SafeSearch with worldwide e
 * feat(watch): center title in row 1 and move episode info to row 2 with prev/next buttons (#59)
 * feat(filter): add Anime option to Movies, TV Series, and Search genre filters (#57)
 * feat(search): 1-row history with 800ms debounce, sticky search filter bar (title/keyword/cast) (#56)
-* feat(player): add MegaPlay anime streaming provider with MAL ID mapping and anti-hotlink shield (#55)
-* fix(tv): enable D-pad navigation, boundary lock, and back-button dismissal in filter dropdowns (fixes #52) (#54)`;
+* feat(player): add MegaPlay anime streaming provider with MAL ID mapping and anti-hotlink shield (#55)`;

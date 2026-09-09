@@ -14,14 +14,17 @@ import {
   isExplicitAdultCertification,
   checkMovieIsExplicitAdult,
   checkTVIsExplicitAdult,
-  clearExplicitRatingCache
+  clearExplicitRatingCache,
+  getResolvedMediaCertification,
+  getCachedMediaCertification
 } from './contentRatingFilter';
 
 export {
   getExplicitAdultRating,
   isExplicitAdultCertification,
   checkMovieIsExplicitAdult,
-  checkTVIsExplicitAdult
+  checkTVIsExplicitAdult,
+  getCachedMediaCertification
 };
 
 const TMDB_BASE_URL = 'https://api.themoviedb.org/3';
@@ -338,6 +341,14 @@ export const tmdbApi = {
     tmdbFetch<TMDBResponse<TMDBMediaItem>>(`/${type}/${id}/recommendations`, { page }),
   getSimilar: (type: 'movie' | 'tv', id: number, page = 1) =>
     tmdbFetch<TMDBResponse<TMDBMediaItem>>(`/${type}/${id}/similar`, { page }),
+
+  // Cached Content Rating Certification
+  getCertification: (id: number, type: 'movie' | 'tv'): Promise<string | null> => {
+    return getResolvedMediaCertification(id, type, async (mediaId, mediaType) => {
+      const endpoint = mediaType === 'movie' ? `/movie/${mediaId}/release_dates` : `/tv/${mediaId}/content_ratings`;
+      return tmdbFetch<any>(endpoint);
+    });
+  },
 
   // Discovery & Filtering
   discoverMovies: (params: {
