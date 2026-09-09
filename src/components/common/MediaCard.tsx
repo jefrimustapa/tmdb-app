@@ -385,7 +385,6 @@ const MediaCardComponent: React.FC<MediaCardProps> = ({
             <div className="flex items-center justify-between mt-1 text-[11px] text-gray-400 gap-1">
               <span className="truncate">{releaseYear || mediaType.toUpperCase()}</span>
               <div className="flex items-center gap-1 flex-shrink-0">
-                {certification && <CertBadge certification={certification} size="xs" />}
                 <span className="uppercase text-[10px] font-bold px-1.5 py-0.5 rounded bg-hbo-purple/20 text-hbo-purple-light border border-hbo-purple/30">
                   {mediaType === 'movie' ? 'Movie' : 'Series'}
                 </span>

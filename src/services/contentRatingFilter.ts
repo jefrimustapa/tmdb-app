@@ -162,6 +162,9 @@ export async function checkMovieIsExplicitAdult(
     const data = await fetchReleaseDates(movieId);
     const hasExplicit = Boolean(getExplicitAdultMovieRating({ release_dates: data } as any));
     explicitRatingCache.set(cacheKey, hasExplicit);
+    // Also populate resolved certification cache so cards get it instantly!
+    const cert = extractMovieCertification(data);
+    resolvedRatingCache.set(`movie_${movieId}`, cert);
     return hasExplicit;
   } catch {
     return false;
@@ -185,6 +188,9 @@ export async function checkTVIsExplicitAdult(
     const data = await fetchContentRatings(tvId);
     const hasExplicit = Boolean(getExplicitAdultTVRating({ content_ratings: data } as any));
     explicitRatingCache.set(cacheKey, hasExplicit);
+    // Also populate resolved certification cache so cards get it instantly!
+    const cert = extractTVCertification(data);
+    resolvedRatingCache.set(`tv_${tvId}`, cert);
     return hasExplicit;
   } catch {
     return false;
@@ -196,6 +202,8 @@ export async function checkTVIsExplicitAdult(
  */
 const resolvedRatingCache = new Map<string, string | null>();
 
+const PRIORITY_CERT_COUNTRIES = ['US', 'GB', 'AU', 'CA', 'SG', 'MY', 'KR', 'JP'];
+
 /**
  * Extract certification string from release_dates results (for movies).
  */
@@ -205,11 +213,13 @@ export function extractMovieCertification(releaseDatesData: any): string | null 
   const explicit = getExplicitAdultMovieRating(mockDetails as any);
   if (explicit) return explicit;
 
-  // Fallback to US
-  const us = releaseDatesData.results.find((r: any) => r.iso_3166_1 === 'US');
-  if (us && Array.isArray(us.release_dates)) {
-    const m = us.release_dates.find((d: any) => d.certification && d.certification.trim().length > 0);
-    if (m) return m.certification.trim();
+  // Check priority countries first (US, GB, AU, etc.)
+  for (const code of PRIORITY_CERT_COUNTRIES) {
+    const country = releaseDatesData.results.find((r: any) => r.iso_3166_1 === code);
+    if (country && Array.isArray(country.release_dates)) {
+      const m = country.release_dates.find((d: any) => d.certification && d.certification.trim().length > 0);
+      if (m) return m.certification.trim();
+    }
   }
 
   // Fallback to any country
@@ -232,9 +242,13 @@ export function extractTVCertification(contentRatingsData: any): string | null {
   const explicit = getExplicitAdultTVRating(mockDetails as any);
   if (explicit) return explicit;
 
-  // Fallback to US
-  const us = contentRatingsData.results.find((r: any) => r.iso_3166_1 === 'US');
-  if (us && us.rating && us.rating.trim().length > 0) return us.rating.trim();
+  // Check priority countries first (US, GB, AU, etc.)
+  for (const code of PRIORITY_CERT_COUNTRIES) {
+    const country = contentRatingsData.results.find((r: any) => r.iso_3166_1 === code);
+    if (country && country.rating && country.rating.trim().length > 0) {
+      return country.rating.trim();
+    }
+  }
 
   // Fallback to any country
   const anyMatch = contentRatingsData.results.find((r: any) => r.rating && r.rating.trim().length > 0);
