@@ -229,11 +229,11 @@ aside .tv-focus-target:focus-visible .tv-nav-label,
   contain: layout style;
 }
 
-/* 7. Dedicated hardware compositing layer for horizontal content rails */
+/* 7. Dedicated compositing and fluid touch panning for horizontal content rails */
 [data-content-rail="true"] .overflow-x-auto {
-  transform: translateZ(0);
-  will-change: scroll-position;
-  scroll-behavior: smooth;
+  touch-action: pan-x pan-y;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
 }
 
 [data-perf-mode="true"] [data-content-rail="true"] .overflow-x-auto {
