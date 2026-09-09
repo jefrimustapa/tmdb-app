@@ -2,12 +2,13 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20260909-1431';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.fix-scroll-hang.20260909-1431';
+export const APP_BUILD_NUMBER = '20260909-1455';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-improve-adult-f.20260909-1455';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
-export const APP_BRANCH = 'fix-scroll-hang';
-export const APP_CHANGELOG = `* fix(player): fix restart from beginning for embed providers and improve KissKH progress tracking (#66)
+export const APP_BRANCH = 'feat-improve-adult-f';
+export const APP_CHANGELOG = `* fix(ui): prevent touch scroll hang and cancel long press on move (#67)
+* fix(player): fix restart from beginning for embed providers and improve KissKH progress tracking (#66)
 * feat(player): add Korean embed provider (KissKH) with isolated player & progress tracking (#65)
 * feat(card): modify title card badges, floating menu, and continue watch details button (#64)
 * feat: improve filters across Movies, Series, and Search (#63)
@@ -20,5 +21,4 @@ export const APP_CHANGELOG = `* fix(player): fix restart from beginning for embe
 * feat(search): 1-row history with 800ms debounce, sticky search filter bar (title/keyword/cast) (#56)
 * feat(player): add MegaPlay anime streaming provider with MAL ID mapping and anti-hotlink shield (#55)
 * fix(tv): enable D-pad navigation, boundary lock, and back-button dismissal in filter dropdowns (fixes #52) (#54)
-* feat(series): add sticky freezing SeriesFilterBar with multi-select and scrollable chips (#51)
-* feat(movies): add sticky freezing MovieFilterBar with multi-select and scrollable chips (#50)`;
+* feat(series): add sticky freezing SeriesFilterBar with multi-select and scrollable chips (#51)`;

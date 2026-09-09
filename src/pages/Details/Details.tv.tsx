@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import { Play, Heart, Bookmark, Star, ArrowLeft, Plus, Check, RotateCcw } from 'lucide-react';
 import type { TMDBMovieDetails, TMDBTVDetails, TMDBMediaItem } from '../../types/tmdb';
-import { tmdbApi, tmdbImages, extractContentRating, resolveGenresFromIds } from '../../services/tmdb';
+import { tmdbApi, tmdbImages, extractContentRating, resolveGenresFromIds, isExplicitAdultCertification } from '../../services/tmdb';
 import { dbService } from '../../services/db';
 import { MediaRow } from '../../components/common/MediaRow';
 import { EpisodeGrid } from '../../components/player/EpisodeGrid';
@@ -306,9 +306,22 @@ export const Details: React.FC = () => {
                 {mediaType === 'movie' ? 'FILM' : 'SERIES'}
               </span>
               {contentRating ? (
-                <span className="px-2.5 py-0.5 rounded-full bg-white/15 text-white border border-white/25 text-xs font-black uppercase tracking-wider backdrop-blur-md animate-fade-in">
-                  {contentRating}
-                </span>
+                <>
+                  <span
+                    className={`px-2.5 py-0.5 rounded-full text-xs font-black uppercase tracking-wider backdrop-blur-md animate-fade-in ${
+                      isExplicitAdultCertification(contentRating)
+                        ? 'bg-rose-950/70 text-rose-300 border border-rose-500/60 shadow-sm shadow-rose-950'
+                        : 'bg-white/15 text-white border border-white/25'
+                    }`}
+                  >
+                    {contentRating}
+                  </span>
+                  {isExplicitAdultCertification(contentRating) && (
+                    <span className="px-2 py-0.5 rounded-full bg-red-950/60 text-red-300 border border-red-500/40 text-[10px] font-black uppercase tracking-wider backdrop-blur-md">
+                      Explicit 18+
+                    </span>
+                  )}
+                </>
               ) : isLoading ? (
                 <span className="w-12 h-5 rounded-full bg-white/10 border border-white/10 animate-pulse" />
               ) : null}

@@ -8,6 +8,18 @@ import type {
 } from '../types/tmdb';
 
 import { dbService } from './db';
+import {
+  ADULT_KEYWORDS_CSV,
+  getExplicitAdultRating,
+  isExplicitAdultCertification,
+  isMediaExplicitAdult
+} from './contentRatingFilter';
+
+export {
+  getExplicitAdultRating,
+  isExplicitAdultCertification,
+  isMediaExplicitAdult
+};
 
 const TMDB_BASE_URL = 'https://api.themoviedb.org/3';
 export const TMDB_API_KEY = '1c7b97dd8b1108d34ffdd5280fa13ac6';
@@ -67,6 +79,13 @@ async function tmdbFetch<T>(endpoint: string, params: Record<string, string | nu
       url.searchParams.set('certification_country', 'US');
       url.searchParams.set('certification.lte', 'PG');
     }
+    if (filterAdult) {
+      const existingWithout = url.searchParams.get('without_keywords');
+      url.searchParams.set(
+        'without_keywords',
+        existingWithout ? `${existingWithout},${ADULT_KEYWORDS_CSV}` : ADULT_KEYWORDS_CSV
+      );
+    }
   } else if (endpoint.includes('/discover/tv')) {
     if (filterUnreleased && !params['first_air_date.lte']) {
       url.searchParams.set('first_air_date.lte', todayStr);
@@ -77,6 +96,13 @@ async function tmdbFetch<T>(endpoint: string, params: Record<string, string | nu
     } else if (maturityLevel === 'family') {
       url.searchParams.set('certification_country', 'US');
       url.searchParams.set('certification.lte', 'TV-PG');
+    }
+    if (filterAdult) {
+      const existingWithout = url.searchParams.get('without_keywords');
+      url.searchParams.set(
+        'without_keywords',
+        existingWithout ? `${existingWithout},${ADULT_KEYWORDS_CSV}` : ADULT_KEYWORDS_CSV
+      );
     }
   }
 
@@ -461,9 +487,13 @@ export function resolveGenresFromIds(genreIds?: number[]): { id: number; name: s
     .filter((g) => g.name.length > 0);
 }
 
-/** Helper to extract content rating (PG-13, R, TV-MA, etc.) */
+/** Helper to extract content rating (PG-13, R, TV-MA, 18SX, 19, R18+, etc.) */
 export function extractContentRating(details: TMDBMovieDetails | TMDBTVDetails | null): string | null {
   if (!details) return null;
+
+  // Check for explicit sexual/adult certification across all countries first
+  const explicitRating = getExplicitAdultRating(details);
+  if (explicitRating) return explicitRating;
 
   // If Movie
   if ('release_dates' in details && details.release_dates?.results) {

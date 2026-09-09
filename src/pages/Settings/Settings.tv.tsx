@@ -1269,7 +1269,7 @@ export const Settings: React.FC = () => {
                     <span>Filter Adult & Explicit Content</span>
                   </h4>
                   <p className="text-[11px] text-gray-400">
-                    SafeSearch mode: Excludes 18+ adult rated media from search queries and catalogs.
+                    SafeSearch mode: Excludes explicit sexual and adult rated media (18SX, 19, R18+, NC-17, R21, Cat III, softcore) from search queries and catalogs.
                   </p>
                 </div>
 
