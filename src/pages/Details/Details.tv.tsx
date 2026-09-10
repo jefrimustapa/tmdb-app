@@ -80,6 +80,15 @@ export const Details: React.FC = () => {
           setDetails(resData);
           const recItems = (resData.similar?.results || resData.recommendations?.results || []) as TMDBMediaItem[];
           setSimilar(recItems);
+
+          // Deep adult filtering in background without delaying details page load
+          if (recItems.length > 0) {
+            tmdbApi.filterRecommendationsAsync(recItems, mediaType).then((cleaned) => {
+              if (isMounted && cleaned) {
+                setSimilar(cleaned);
+              }
+            }).catch(() => {});
+          }
         }
 
         const [liked, watchlisted, historyItem] = dbResults;

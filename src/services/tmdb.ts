@@ -214,17 +214,32 @@ async function tmdbFetch<T>(endpoint: string, params: Record<string, string | nu
     return filtered;
   };
 
+  // Helper for fast synchronous adult filtering (item.adult + Strategy 5 text check)
+  const fastFilterMediaItemList = (items: any[]): any[] => {
+    if (!Array.isArray(items) || items.length === 0) return items;
+    let filtered = items.filter((item: any) => !item?.adult);
+    if (settings.performanceMode !== true) {
+      filtered = filtered.filter((item: any) => {
+        if (!item) return false;
+        const textToCheck = `${item.title || item.name || ''} ${item.overview || ''}`;
+        return !containsExplicitAdultText(textToCheck);
+      });
+    }
+    return filtered;
+  };
+
   // Filter adult items and explicit sexual/adult ratings if filterAdult is active
   if (filterAdult && data) {
     if (Array.isArray(data.results) && data.results.length > 0) {
       data.results = await filterMediaItemList(data.results);
     }
-    // Also filter nested similar / recommendations from append_to_response on details endpoints
+    // Fast-filter nested similar / recommendations from append_to_response on details endpoints
+    // so details pages load instantaneously without blocking on 40 sub-requests
     if (data.similar && Array.isArray(data.similar.results) && data.similar.results.length > 0) {
-      data.similar.results = await filterMediaItemList(data.similar.results);
+      data.similar.results = fastFilterMediaItemList(data.similar.results);
     }
     if (data.recommendations && Array.isArray(data.recommendations.results) && data.recommendations.results.length > 0) {
-      data.recommendations.results = await filterMediaItemList(data.recommendations.results);
+      data.recommendations.results = fastFilterMediaItemList(data.recommendations.results);
     }
   }
 
@@ -388,6 +403,60 @@ export const tmdbApi = {
     tmdbFetch<TMDBResponse<TMDBMediaItem>>(`/${type}/${id}/recommendations`, { page }),
   getSimilar: (type: 'movie' | 'tv', id: number, page = 1) =>
     tmdbFetch<TMDBResponse<TMDBMediaItem>>(`/${type}/${id}/similar`, { page }),
+
+  /**
+   * Asynchronously deep-filters recommendation/similar items in the background
+   * without blocking details page load time.
+   */
+  filterRecommendationsAsync: async (
+    items: TMDBMediaItem[],
+    defaultMediaType: 'movie' | 'tv' = 'movie'
+  ): Promise<TMDBMediaItem[]> => {
+    if (!Array.isArray(items) || items.length === 0) return items;
+    const settings = await dbService.getSettings();
+    if (settings.filterAdult === false || settings.performanceMode === true) {
+      return items;
+    }
+
+    const fetchReleaseDates = async (id: number) => {
+      const relUrl = `${TMDB_BASE_URL}/movie/${id}/release_dates?api_key=${TMDB_API_KEY}`;
+      const relRes = await fetch(relUrl, {
+        headers: { Authorization: `Bearer ${TMDB_READ_TOKEN}` }
+      });
+      return relRes.ok ? relRes.json() : null;
+    };
+
+    const fetchContentRatings = async (id: number) => {
+      const crUrl = `${TMDB_BASE_URL}/tv/${id}/content_ratings?api_key=${TMDB_API_KEY}`;
+      const crRes = await fetch(crUrl, {
+        headers: { Authorization: `Bearer ${TMDB_READ_TOKEN}` }
+      });
+      return crRes.ok ? crRes.json() : null;
+    };
+
+    // Filter up to top 20 recommendations
+    const slice = items.slice(0, 20);
+    const rest = items.slice(20);
+
+    const checkedSlice = await Promise.all(
+      slice.map(async (item: any) => {
+        if (!item || !item.id) return item;
+        const itemType = item.media_type || (item.title ? 'movie' : (item.name ? 'tv' : defaultMediaType));
+        const genreIds = Array.isArray(item.genre_ids) ? item.genre_ids : (Array.isArray(item.genres) ? item.genres.map((g: any) => g.id) : undefined);
+
+        if (itemType === 'movie') {
+          const isAdult = await checkMovieIsExplicitAdult(item.id, fetchReleaseDates, genreIds);
+          return isAdult ? null : item;
+        } else if (itemType === 'tv') {
+          const isAdult = await checkTVIsExplicitAdult(item.id, fetchContentRatings, genreIds);
+          return isAdult ? null : item;
+        }
+        return item;
+      })
+    );
+
+    return [...checkedSlice.filter(Boolean) as TMDBMediaItem[], ...rest];
+  },
 
   // Cached Content Rating Certification
   getCertification: (id: number, type: 'movie' | 'tv'): Promise<string | null> => {

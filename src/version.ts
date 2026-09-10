@@ -2,12 +2,13 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20260910-0923';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-improve-adult-f.20260910-0923';
+export const APP_BUILD_NUMBER = '20260910-1025';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-improve-adult-f.20260910-1025';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
 export const APP_BRANCH = 'feat-improve-adult-f';
-export const APP_CHANGELOG = `* feat(filter): add explicit 18+ and unrated filters for Romance and Drama
+export const APP_CHANGELOG = `* feat(filter): apply adult & rating filter to Home page and More Like This recommendations
+* feat(filter): add explicit 18+ and unrated filters for Romance and Drama
 * feat(filter): filter romance titles with 19+ certification or no certification
 * feat(filter): remove strategy 1 certification rating filtering; use strategies 3, 4, 5 and skip 4, 5 in performance mode
 * feat(filter): implement Strategies 1, 3, 4, 5 with conditional performance mode bypass
@@ -20,5 +21,4 @@ export const APP_CHANGELOG = `* feat(filter): add explicit 18+ and unrated filte
 * fix(ui): prevent touch scroll hang and cancel long press on move (#67)
 * fix(player): fix restart from beginning for embed providers and improve KissKH progress tracking (#66)
 * feat(player): add Korean embed provider (KissKH) with isolated player & progress tracking (#65)
-* feat(card): modify title card badges, floating menu, and continue watch details button (#64)
-* feat: improve filters across Movies, Series, and Search (#63)`;
+* feat(card): modify title card badges, floating menu, and continue watch details button (#64)`;
