@@ -152,8 +152,8 @@ export function containsExplicitAdultText(text?: string | null): boolean {
 }
 
 /**
- * Scan movie release dates across all countries for an explicit sexual/adult certification or descriptor (Strategy 1 & 4).
- * Returns the matched certification or reason if found, or null otherwise.
+ * Scan movie release dates across all countries for explicit sexual/adult descriptors or notes (Strategy 4).
+ * Returns the matched descriptor or reason if found, or null otherwise.
  */
 export function getExplicitAdultMovieRating(details: TMDBMovieDetails | null): string | null {
   if (!details || !('release_dates' in details) || !details.release_dates?.results) {
@@ -161,14 +161,10 @@ export function getExplicitAdultMovieRating(details: TMDBMovieDetails | null): s
   }
 
   for (const country of details.release_dates.results) {
-    const code = country.iso_3166_1;
     if (!Array.isArray(country.release_dates)) continue;
 
     for (const rdItem of country.release_dates) {
       const rd = rdItem as any;
-      if (rd.certification && isExplicitAdultCertification(rd.certification, code)) {
-        return rd.certification.trim();
-      }
       // Strategy 4: Check descriptors & notes
       if (rd.note && containsExplicitAdultText(rd.note)) {
         return 'Explicit Note';
@@ -187,8 +183,8 @@ export function getExplicitAdultMovieRating(details: TMDBMovieDetails | null): s
 }
 
 /**
- * Scan TV content ratings across all countries for an explicit sexual/adult certification (Strategy 1 & 4).
- * Returns the matched certification if found, or null otherwise.
+ * Scan TV content ratings across all countries for explicit sexual/adult descriptors (Strategy 4).
+ * Returns the matched descriptor or reason if found, or null otherwise.
  */
 export function getExplicitAdultTVRating(details: TMDBTVDetails | null): string | null {
   if (!details || !('content_ratings' in details) || !details.content_ratings?.results) {
@@ -197,11 +193,7 @@ export function getExplicitAdultTVRating(details: TMDBTVDetails | null): string 
 
   for (const entryItem of details.content_ratings.results) {
     const entry = entryItem as any;
-    const code = entry.iso_3166_1;
-    if (entry.rating && isExplicitAdultCertification(entry.rating, code)) {
-      return entry.rating.trim();
-    }
-    // Check descriptors on TV content ratings if present
+    // Strategy 4: Check descriptors on TV content ratings if present
     if (entry.descriptors && Array.isArray(entry.descriptors)) {
       for (const desc of entry.descriptors) {
         if (typeof desc === 'string' && containsExplicitAdultText(desc)) {
@@ -234,16 +226,8 @@ export function getExplicitAdultRating(details: TMDBMovieDetails | TMDBTVDetails
 const explicitRatingCache = new Map<string, boolean>();
 
 /**
- * Check if a movie has explicit adult/sexual certification by fetching release_dates.
+ * Check if a movie has explicit adult/sexual content by checking release descriptors & notes (Strategy 4).
  * Uses in-memory cache to ensure fast subsequent lookups.
- */
-// Unrated / uncertified strings
-const UNRATED_RATINGS = new Set(['NR', 'UNRATED', 'NOT RATED', 'NOT-RATED', 'NONE', '0']);
-
-/**
- * Check if a movie has explicit adult/sexual certification by fetching release_dates.
- * Uses in-memory cache to ensure fast subsequent lookups.
- * If no certification is found or unrated, it is treated as explicit adult content.
  */
 export async function checkMovieIsExplicitAdult(
   movieId: number,
@@ -260,22 +244,16 @@ export async function checkMovieIsExplicitAdult(
     resolvedRatingCache.set(`movie_${movieId}`, cert);
 
     const hasExplicit = Boolean(getExplicitAdultMovieRating({ release_dates: data } as any));
-    // If it has explicit rating, OR no certification at all, OR marked unrated -> treat as explicit/adult
-    const isUncertifiedOrUnrated = !cert || UNRATED_RATINGS.has(cert.toUpperCase().trim());
-    const result = hasExplicit || isUncertifiedOrUnrated;
-
-    explicitRatingCache.set(cacheKey, result);
-    return result;
+    explicitRatingCache.set(cacheKey, hasExplicit);
+    return hasExplicit;
   } catch {
-    // If fetching fails or unrated/no data, treat as explicit/adult when filter is active
-    return true;
+    return false;
   }
 }
 
 /**
- * Check if a TV series has explicit adult/sexual certification by fetching content_ratings.
+ * Check if a TV series has explicit adult/sexual content by checking content descriptors (Strategy 4).
  * Uses in-memory cache to ensure fast subsequent lookups.
- * If no certification is found or unrated, it is treated as explicit adult content.
  */
 export async function checkTVIsExplicitAdult(
   tvId: number,
@@ -292,15 +270,10 @@ export async function checkTVIsExplicitAdult(
     resolvedRatingCache.set(`tv_${tvId}`, cert);
 
     const hasExplicit = Boolean(getExplicitAdultTVRating({ content_ratings: data } as any));
-    // If it has explicit rating, OR no certification at all, OR marked unrated -> treat as explicit/adult
-    const isUncertifiedOrUnrated = !cert || UNRATED_RATINGS.has(cert.toUpperCase().trim());
-    const result = hasExplicit || isUncertifiedOrUnrated;
-
-    explicitRatingCache.set(cacheKey, result);
-    return result;
+    explicitRatingCache.set(cacheKey, hasExplicit);
+    return hasExplicit;
   } catch {
-    // If fetching fails or unrated/no data, treat as explicit/adult when filter is active
-    return true;
+    return false;
   }
 }
 
@@ -316,9 +289,6 @@ const PRIORITY_CERT_COUNTRIES = ['US', 'GB', 'AU', 'CA', 'SG', 'MY', 'KR', 'JP']
  */
 export function extractMovieCertification(releaseDatesData: any): string | null {
   if (!releaseDatesData?.results || !Array.isArray(releaseDatesData.results)) return null;
-  const mockDetails = { release_dates: releaseDatesData };
-  const explicit = getExplicitAdultMovieRating(mockDetails as any);
-  if (explicit) return explicit;
 
   // Check priority countries first (US, GB, AU, etc.)
   for (const code of PRIORITY_CERT_COUNTRIES) {
@@ -345,9 +315,6 @@ export function extractMovieCertification(releaseDatesData: any): string | null 
  */
 export function extractTVCertification(contentRatingsData: any): string | null {
   if (!contentRatingsData?.results || !Array.isArray(contentRatingsData.results)) return null;
-  const mockDetails = { content_ratings: contentRatingsData };
-  const explicit = getExplicitAdultTVRating(mockDetails as any);
-  if (explicit) return explicit;
 
   // Check priority countries first (US, GB, AU, etc.)
   for (const code of PRIORITY_CERT_COUNTRIES) {
