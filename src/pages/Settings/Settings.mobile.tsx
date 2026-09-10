@@ -233,7 +233,7 @@ export const Settings: React.FC = () => {
         <div
           className={`transition-all duration-150 z-30 ${
             isFilterFrozen
-              ? 'fixed top-[calc(max(0.75rem,env(safe-area-inset-top,20px))+3rem)] left-0 right-0 px-3.5 sm:px-6 py-2.5 bg-[#050508]/98 backdrop-blur-2xl border-b border-hbo-border/80 shadow-2xl overflow-x-auto no-scrollbar'
+              ? 'fixed top-[calc(max(0.75rem,env(safe-area-inset-top,20px))+3rem)] left-0 right-0 px-3.5 sm:px-6 py-2.5 bg-[#050508] border-b border-hbo-border/80 shadow-2xl overflow-x-auto no-scrollbar'
               : 'relative -mx-3.5 sm:-mx-6 px-3.5 sm:px-6 py-2.5 bg-[#050508] border-b border-hbo-border/60 mb-6 overflow-x-auto no-scrollbar shadow-lg'
           }`}
         >
@@ -891,13 +891,16 @@ export const Settings: React.FC = () => {
                   Limit discovery catalog recommendations to age-appropriate certification tiers.
                 </p>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 pt-1">
                   {[
-                    { id: 'all', label: 'All Ratings', desc: 'Unrestricted (R, TV-MA, PG-13, PG, G)' },
-                    { id: 'pg13', label: 'Teens & Below', desc: 'Up to PG-13 / TV-14 (Excludes R & TV-MA)' },
-                    { id: 'family', label: 'Family & Kids', desc: 'Up to PG / TV-PG (Family friendly only)' },
+                    { id: 'all', label: 'All Ratings (18+)', desc: 'Unrestricted: R, TV-MA, NC-17, 18, 21+' },
+                    { id: 'mature', label: 'Young Adult (16+)', desc: 'Up to R / 15 / 16 (Excludes NC-17, 18SX)' },
+                    { id: 'teen', label: 'Teens (13+)', desc: 'Up to PG-13 / 12A / TV-14 (Excludes R)' },
+                    { id: 'older_kids', label: 'Older Kids (7+)', desc: 'Up to PG / TV-PG (Gentle scares, fantasy)' },
+                    { id: 'kids', label: 'Little Kids (All Ages)', desc: 'Strictly G / U / TV-Y / TV-G (Preschool & family)' },
                   ].map((lvl) => {
-                    const isSelected = (settings.maturityLevel || 'all') === lvl.id;
+                    const currentMaturity = settings.maturityLevel === 'pg13' ? 'teen' : settings.maturityLevel === 'family' ? 'older_kids' : (settings.maturityLevel || 'all');
+                    const isSelected = currentMaturity === lvl.id;
                     return (
                       <button
                         key={lvl.id}
@@ -929,7 +932,7 @@ export const Settings: React.FC = () => {
                     <h3 className="text-sm sm:text-base font-bold text-white">Filter Adult & Explicit Content</h3>
                   </div>
                   <p className="text-xs text-gray-400 mt-1">
-                    SafeSearch: Excludes 18+ adult rated media from search queries and catalogs.
+                    SafeSearch: Excludes explicit sexual and adult rated media (18SX, 19, R18+, NC-17, R21, Cat III, softcore) from search queries and catalogs.
                   </p>
                 </div>
 

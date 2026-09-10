@@ -20,6 +20,7 @@ export interface TMDBMediaItem {
   genre_ids?: number[];
   popularity: number;
   original_language: string;
+  adult?: boolean;
 }
 
 export interface TMDBMovieDetails extends TMDBMediaItem {

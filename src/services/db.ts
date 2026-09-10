@@ -1,11 +1,12 @@
 import Dexie, { type Table } from 'dexie';
-import type { WatchHistoryItem, LikedItem, WatchlistItem, UserSettings } from '../types/db';
+import type { WatchHistoryItem, LikedItem, WatchlistItem, UserSettings, RatingCacheItem } from '../types/db';
 
 export class TMDBStreamerDB extends Dexie {
   history!: Table<WatchHistoryItem, number>;
   likes!: Table<LikedItem, number>;
   watchlist!: Table<WatchlistItem, number>;
   settings!: Table<UserSettings, string>;
+  ratingCache!: Table<RatingCacheItem, string>;
 
   constructor() {
     super('TMDBStreamerDB');
@@ -14,6 +15,13 @@ export class TMDBStreamerDB extends Dexie {
       likes: '++id, tmdbId, [tmdbId+mediaType], addedAt',
       watchlist: '++id, tmdbId, [tmdbId+mediaType], addedAt',
       settings: 'id'
+    });
+    this.version(2).stores({
+      history: '++id, tmdbId, [tmdbId+mediaType], updatedAt',
+      likes: '++id, tmdbId, [tmdbId+mediaType], addedAt',
+      watchlist: '++id, tmdbId, [tmdbId+mediaType], addedAt',
+      settings: 'id',
+      ratingCache: 'id, cachedAt'
     });
   }
 }
@@ -359,5 +367,35 @@ export const dbService = {
       window.dispatchEvent(new CustomEvent('tmdb_settings_changed', { detail: updated }));
     }
     return updated;
+  },
+
+  // Content Rating Persistent Cache
+  async getRatingCacheItem(id: string): Promise<string | boolean | null | undefined> {
+    try {
+      const entry = await db.ratingCache.get(id);
+      return entry !== undefined ? entry.value : undefined;
+    } catch {
+      return undefined;
+    }
+  },
+
+  async setRatingCacheItem(id: string, value: string | boolean | null): Promise<void> {
+    try {
+      await db.ratingCache.put({
+        id,
+        value,
+        cachedAt: Date.now()
+      });
+    } catch (err) {
+      console.warn('Failed to cache rating in IndexedDB:', err);
+    }
+  },
+
+  async clearRatingCache(): Promise<void> {
+    try {
+      await db.ratingCache.clear();
+    } catch (err) {
+      console.warn('Failed to clear rating cache from IndexedDB:', err);
+    }
   }
 };
