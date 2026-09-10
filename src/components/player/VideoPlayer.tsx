@@ -391,8 +391,8 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     if (provider.id === 'lari21-asian' || provider.id === 'lk21-asian' || provider.category === 'asian' || provider.id === 'megaplay-anime') {
       return baseStreamUrl;
     }
-    // KissKH supports hash fragment #t= for seamless auto-resume or restart via injected observer
-    if (provider.id === 'kisskh-kdrama' || provider.id === 'kisskh' || provider.category === 'korean') {
+    // KissKH and CineSrc support hash fragment #t= (and query params) for seamless auto-resume via injected observer
+    if (provider.id === 'kisskh-kdrama' || provider.id === 'kisskh' || provider.category === 'korean' || provider.id === 'cinesrc') {
       if (initialTimestamp === 0) {
         return `${baseStreamUrl}#t=0`;
       }
@@ -641,6 +641,22 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
         // 3b. KissKH Isolated Player playback events
         if (data.type === 'kisskh' || data.channel === 'kisskh') {
+          if (data.event === 'ended') {
+            const endDur = durationRef.current || data.duration || (episodeRuntimeMinutes ? episodeRuntimeMinutes * 60 : 0);
+            if (endDur > 0) recordProgress(endDur, endDur, true);
+            return;
+          }
+          const current = data.currentTime ?? data.time ?? data.seconds ?? 0;
+          const dur = data.duration ?? 0;
+          if (current > 0) {
+            lastPostMessageTimeRef.current = Date.now();
+            recordProgress(current, dur);
+          }
+          return;
+        }
+
+        // 3c. CineSrc Embed Player playback events
+        if (data.type === 'cinesrc' || data.channel === 'cinesrc') {
           if (data.event === 'ended') {
             const endDur = durationRef.current || data.duration || (episodeRuntimeMinutes ? episodeRuntimeMinutes * 60 : 0);
             if (endDur > 0) recordProgress(endDur, endDur, true);
