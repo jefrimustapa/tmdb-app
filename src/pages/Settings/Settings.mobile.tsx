@@ -35,7 +35,11 @@ import {
   Percent,
   SlidersHorizontal,
   Layers,
-  Info
+  Info,
+  Download,
+  Upload,
+  HardDrive,
+  Save
 } from 'lucide-react';
 
 type MobileCategory = 'all' | 'playback' | 'display' | 'content' | 'system';
@@ -50,6 +54,83 @@ export const Settings: React.FC = () => {
   const [activeCategory, setActiveCategory] = useState<MobileCategory>('all');
   const [isFilterFrozen, setIsFilterFrozen] = useState(false);
   const filterSentinelRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [backupStatusMsg, setBackupStatusMsg] = useState<{ text: string; isError?: boolean } | null>(null);
+  const [backupMeta, setBackupMeta] = useState(() => dbService.getPersistentBackupMeta());
+
+  const handleBackupNow = async () => {
+    try {
+      const ok = await dbService.backupToPersistentStorage();
+      if (ok) {
+        setBackupStatusMsg({ text: 'Persistent backup created successfully!' });
+        setBackupMeta(dbService.getPersistentBackupMeta());
+      } else {
+        setBackupStatusMsg({ text: 'Backup failed or device bridge not available.', isError: true });
+      }
+    } catch (err: any) {
+      setBackupStatusMsg({ text: err?.message || 'Backup failed', isError: true });
+    }
+    setTimeout(() => setBackupStatusMsg(null), 4000);
+  };
+
+  const handleRestoreNow = async () => {
+    try {
+      const res = await dbService.restoreFromPersistentStorage();
+      if (res && res.success) {
+        setBackupStatusMsg({ text: `Restored: ${res.count?.history || 0} history, ${res.count?.watchlist || 0} watchlist, ${res.count?.likes || 0} likes!` });
+        const refreshed = await dbService.getSettings();
+        setSettings(refreshed);
+      } else {
+        setBackupStatusMsg({ text: 'No backup file found or restore failed.', isError: true });
+      }
+    } catch (err: any) {
+      setBackupStatusMsg({ text: err?.message || 'Restore failed', isError: true });
+    }
+    setTimeout(() => setBackupStatusMsg(null), 5000);
+  };
+
+  const handleExportJson = async () => {
+    try {
+      const json = await dbService.exportAllData();
+      const blob = new Blob([json], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `tmdb_backup_${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      setBackupStatusMsg({ text: 'Backup JSON downloaded!' });
+    } catch (err: any) {
+      setBackupStatusMsg({ text: 'Export failed: ' + err?.message, isError: true });
+    }
+    setTimeout(() => setBackupStatusMsg(null), 4000);
+  };
+
+  const handleImportJson = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      try {
+        const text = evt.target?.result as string;
+        const res = await dbService.importAllData(text);
+        if (res.success) {
+          setBackupStatusMsg({ text: `Imported: ${res.count.history} history, ${res.count.watchlist} watchlist, ${res.count.likes} likes!` });
+          const refreshed = await dbService.getSettings();
+          setSettings(refreshed);
+        } else {
+          setBackupStatusMsg({ text: 'Import failed: Invalid backup file format', isError: true });
+        }
+      } catch (err: any) {
+        setBackupStatusMsg({ text: 'Import error: ' + err?.message, isError: true });
+      }
+      setTimeout(() => setBackupStatusMsg(null), 5000);
+    };
+    reader.readAsText(file);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
 
   useEffect(() => {
     const handleScroll = () => {
@@ -1132,6 +1213,86 @@ export const Settings: React.FC = () => {
                       </>
                     )}
                   </button>
+                </div>
+              </div>
+
+              {/* Data & Persistent Storage Card */}
+              <div className="p-4 sm:p-5 space-y-3.5 border-b border-white/5 bg-white/[0.01]">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <h4 className="text-xs font-bold text-gray-200 flex items-center gap-2">
+                      <HardDrive className="w-3.5 h-3.5 text-hbo-cyan" />
+                      <span>Persistent Storage & Backup</span>
+                    </h4>
+                    <p className="text-[11px] text-gray-400 mt-0.5">
+                      Saves your history, settings, and watchlist outside app storage so they survive app uninstalls.
+                    </p>
+                  </div>
+                  {backupMeta.available && (
+                    <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 text-[10px] font-mono flex-shrink-0">
+                      Auto-Protected
+                    </span>
+                  )}
+                </div>
+
+                {backupStatusMsg && (
+                  <div className={`p-2.5 rounded-xl text-xs flex items-center gap-2 ${
+                    backupStatusMsg.isError ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30' : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                  }`}>
+                    {backupStatusMsg.isError ? <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" /> : <Check className="w-3.5 h-3.5 flex-shrink-0" />}
+                    <span>{backupStatusMsg.text}</span>
+                  </div>
+                )}
+
+                {backupMeta.timestamp > 0 && (
+                  <p className="text-[10px] text-gray-500 font-mono">
+                    Last backup: {new Date(backupMeta.timestamp).toLocaleString()}
+                  </p>
+                )}
+
+                <div className="grid grid-cols-2 gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={handleBackupNow}
+                    className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-semibold text-white transition active:scale-95"
+                  >
+                    <Save className="w-3.5 h-3.5 text-hbo-cyan" />
+                    <span>Backup Now</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleRestoreNow}
+                    className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-semibold text-white transition active:scale-95"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Restore from Storage</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleExportJson}
+                    className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-semibold text-gray-300 hover:text-white transition active:scale-95"
+                  >
+                    <Download className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>Export JSON</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-semibold text-gray-300 hover:text-white transition active:scale-95"
+                  >
+                    <Upload className="w-3.5 h-3.5 text-purple-400" />
+                    <span>Import JSON</span>
+                  </button>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".json,application/json"
+                    onChange={handleImportJson}
+                    className="hidden"
+                  />
                 </div>
               </div>
 

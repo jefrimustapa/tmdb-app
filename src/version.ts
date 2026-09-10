@@ -2,12 +2,13 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20260910-1508';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-improve-watch-p.20260910-1508';
+export const APP_BUILD_NUMBER = '20260910-1633';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-persistent-stor.20260910-1633';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
-export const APP_BRANCH = 'feat-improve-watch-p';
-export const APP_CHANGELOG = `* fix(scroll): resolve vertical scroll unresponsiveness on mobile rails and card touch (#70)
+export const APP_BRANCH = 'feat-persistent-stor';
+export const APP_CHANGELOG = `* feat(player): VidLink auto-unmute injection and episode title conditional fade (#71)
+* fix(scroll): resolve vertical scroll unresponsiveness on mobile rails and card touch (#70)
 * feat(player): improve CineSrc watch progress tracking and auto-resume (#69)
 * feat(filter): adult filtering, unified rating country priority, 5-tier maturity & optimizations (#68)
 * fix(ui): prevent touch scroll hang and cancel long press on move (#67)
@@ -20,5 +21,4 @@ export const APP_CHANGELOG = `* fix(scroll): resolve vertical scroll unresponsiv
 * feat(details,watch,stream): add Asian stream provider, optimize details UX, and fix watch progress reset (#60)
 * feat(stream): separate embedded server priority for anime vs other content
 * feat(watch): center title in row 1 and move episode info to row 2 with prev/next buttons (#59)
-* feat(filter): add Anime option to Movies, TV Series, and Search genre filters (#57)
-* feat(search): 1-row history with 800ms debounce, sticky search filter bar (title/keyword/cast) (#56)`;
+* feat(filter): add Anime option to Movies, TV Series, and Search genre filters (#57)`;

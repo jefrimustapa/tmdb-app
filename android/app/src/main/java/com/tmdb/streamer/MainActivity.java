@@ -523,6 +523,77 @@ public class MainActivity extends BridgeActivity {
                         }
                     });
                 }
+
+                @JavascriptInterface
+                public boolean savePersistentBackup(String jsonContent) {
+                    if (jsonContent == null || jsonContent.trim().isEmpty()) return false;
+                    try {
+                        File backupFile = getPersistentBackupFile(true);
+                        if (backupFile == null) {
+                            Log.e("TMDB_APP", "[PersistentStorage] Could not resolve backup file path");
+                            return false;
+                        }
+                        File tempFile = new File(backupFile.getParentFile(), backupFile.getName() + ".tmp");
+                        try (FileOutputStream fos = new FileOutputStream(tempFile)) {
+                            fos.write(jsonContent.getBytes(StandardCharsets.UTF_8));
+                            fos.flush();
+                        }
+                        if (backupFile.exists()) {
+                            backupFile.delete();
+                        }
+                        boolean renamed = tempFile.renameTo(backupFile);
+                        Log.i("TMDB_APP", "[PersistentStorage] Backup saved successfully to " + backupFile.getAbsolutePath() + " (success=" + renamed + ")");
+                        return renamed;
+                    } catch (Exception e) {
+                        Log.e("TMDB_APP", "[PersistentStorage] Failed to save backup: " + e.getMessage(), e);
+                        return false;
+                    }
+                }
+
+                @JavascriptInterface
+                public String readPersistentBackup() {
+                    try {
+                        File backupFile = getPersistentBackupFile(false);
+                        if (backupFile == null || !backupFile.exists() || backupFile.length() == 0) {
+                            return null;
+                        }
+                        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                        try (InputStream is = new java.io.FileInputStream(backupFile)) {
+                            byte[] buf = new byte[8192];
+                            int read;
+                            while ((read = is.read(buf)) != -1) {
+                                baos.write(buf, 0, read);
+                            }
+                        }
+                        String json = baos.toString("UTF-8");
+                        Log.i("TMDB_APP", "[PersistentStorage] Read backup (" + json.length() + " chars) from " + backupFile.getAbsolutePath());
+                        return json;
+                    } catch (Exception e) {
+                        Log.e("TMDB_APP", "[PersistentStorage] Failed to read backup: " + e.getMessage(), e);
+                        return null;
+                    }
+                }
+
+                @JavascriptInterface
+                public boolean hasPersistentBackup() {
+                    File backupFile = getPersistentBackupFile(false);
+                    return backupFile != null && backupFile.exists() && backupFile.length() > 0;
+                }
+
+                @JavascriptInterface
+                public long getPersistentBackupTimestamp() {
+                    File backupFile = getPersistentBackupFile(false);
+                    if (backupFile != null && backupFile.exists()) {
+                        return backupFile.lastModified();
+                    }
+                    return 0L;
+                }
+
+                @JavascriptInterface
+                public String getPersistentBackupLocation() {
+                    File backupFile = getPersistentBackupFile(false);
+                    return backupFile != null ? backupFile.getAbsolutePath() : "";
+                }
             }, "AndroidBridge");
 
             // Handle alert, confirm, and multi-window popups
@@ -1620,6 +1691,46 @@ public class MainActivity extends BridgeActivity {
         } catch (Exception e) {
             Log.e("TMDB_APP", "[Update] Failed to launch package installer: " + e.getMessage(), e);
         }
+    }
+
+    private File getPersistentBackupFile(boolean createDirs) {
+        try {
+            // Target 1: Public Documents directory (/sdcard/Documents/TMDBStreamer/)
+            File docsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS);
+            if (docsDir != null) {
+                File appDir = new File(docsDir, "TMDBStreamer");
+                if (createDirs && !appDir.exists()) {
+                    appDir.mkdirs();
+                }
+                if (appDir.exists() || createDirs) {
+                    return new File(appDir, "tmdb_backup.json");
+                }
+            }
+
+            // Target 2: Public Download directory (/sdcard/Download/TMDBStreamer/)
+            File downloadDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
+            if (downloadDir != null) {
+                File appDir = new File(downloadDir, "TMDBStreamer");
+                if (createDirs && !appDir.exists()) {
+                    appDir.mkdirs();
+                }
+                if (appDir.exists() || createDirs) {
+                    return new File(appDir, "tmdb_backup.json");
+                }
+            }
+
+            // Fallback: App-scoped external files directory
+            File extFilesDir = getExternalFilesDir(null);
+            if (extFilesDir != null) {
+                if (createDirs && !extFilesDir.exists()) {
+                    extFilesDir.mkdirs();
+                }
+                return new File(extFilesDir, "tmdb_backup.json");
+            }
+        } catch (Exception e) {
+            Log.e("TMDB_APP", "[PersistentStorage] Error resolving backup file: " + e.getMessage(), e);
+        }
+        return null;
     }
 
     @Override
