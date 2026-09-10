@@ -191,22 +191,30 @@ async function tmdbFetch<T>(endpoint: string, params: Record<string, string | nu
       const isTvEndpoint = endpoint.includes('/tv') || endpoint.includes('mediaType=tv');
       const fallbackType = defaultMediaType || (isTvEndpoint ? 'tv' : isMovieEndpoint ? 'movie' : undefined);
 
-      const deepFiltered = await Promise.all(
-        filtered.map(async (item: any) => {
-          if (!item || !item.id) return item;
-          const itemType = item.media_type || (item.title ? 'movie' : (item.name ? 'tv' : fallbackType || 'movie'));
-          const genreIds = Array.isArray(item.genre_ids) ? item.genre_ids : (Array.isArray(item.genres) ? item.genres.map((g: any) => g.id) : undefined);
+      // Concurrency-limited batching (batches of 5) to prevent network congestion
+      const BATCH_SIZE = 5;
+      const deepFiltered: any[] = [];
 
-          if (itemType === 'movie') {
-            const isAdult = await checkMovieIsExplicitAdult(item.id, fetchReleaseDates, genreIds);
-            return isAdult ? null : item;
-          } else if (itemType === 'tv') {
-            const isAdult = await checkTVIsExplicitAdult(item.id, fetchContentRatings, genreIds);
-            return isAdult ? null : item;
-          }
-          return item;
-        })
-      );
+      for (let i = 0; i < filtered.length; i += BATCH_SIZE) {
+        const batch = filtered.slice(i, i + BATCH_SIZE);
+        const batchResults = await Promise.all(
+          batch.map(async (item: any) => {
+            if (!item || !item.id) return item;
+            const itemType = item.media_type || (item.title ? 'movie' : (item.name ? 'tv' : fallbackType || 'movie'));
+            const genreIds = Array.isArray(item.genre_ids) ? item.genre_ids : (Array.isArray(item.genres) ? item.genres.map((g: any) => g.id) : undefined);
+
+            if (itemType === 'movie') {
+              const isAdult = await checkMovieIsExplicitAdult(item.id, fetchReleaseDates, genreIds);
+              return isAdult ? null : item;
+            } else if (itemType === 'tv') {
+              const isAdult = await checkTVIsExplicitAdult(item.id, fetchContentRatings, genreIds);
+              return isAdult ? null : item;
+            }
+            return item;
+          })
+        );
+        deepFiltered.push(...batchResults);
+      }
 
       filtered = deepFiltered.filter(Boolean);
     }
@@ -434,26 +442,32 @@ export const tmdbApi = {
       return crRes.ok ? crRes.json() : null;
     };
 
-    // Filter up to top 20 recommendations
+    // Filter up to top 20 recommendations in batches of 5 to avoid network congestion
     const slice = items.slice(0, 20);
     const rest = items.slice(20);
+    const BATCH_SIZE = 5;
+    const checkedSlice: any[] = [];
 
-    const checkedSlice = await Promise.all(
-      slice.map(async (item: any) => {
-        if (!item || !item.id) return item;
-        const itemType = item.media_type || (item.title ? 'movie' : (item.name ? 'tv' : defaultMediaType));
-        const genreIds = Array.isArray(item.genre_ids) ? item.genre_ids : (Array.isArray(item.genres) ? item.genres.map((g: any) => g.id) : undefined);
+    for (let i = 0; i < slice.length; i += BATCH_SIZE) {
+      const batch = slice.slice(i, i + BATCH_SIZE);
+      const batchResults = await Promise.all(
+        batch.map(async (item: any) => {
+          if (!item || !item.id) return item;
+          const itemType = item.media_type || (item.title ? 'movie' : (item.name ? 'tv' : defaultMediaType));
+          const genreIds = Array.isArray(item.genre_ids) ? item.genre_ids : (Array.isArray(item.genres) ? item.genres.map((g: any) => g.id) : undefined);
 
-        if (itemType === 'movie') {
-          const isAdult = await checkMovieIsExplicitAdult(item.id, fetchReleaseDates, genreIds);
-          return isAdult ? null : item;
-        } else if (itemType === 'tv') {
-          const isAdult = await checkTVIsExplicitAdult(item.id, fetchContentRatings, genreIds);
-          return isAdult ? null : item;
-        }
-        return item;
-      })
-    );
+          if (itemType === 'movie') {
+            const isAdult = await checkMovieIsExplicitAdult(item.id, fetchReleaseDates, genreIds);
+            return isAdult ? null : item;
+          } else if (itemType === 'tv') {
+            const isAdult = await checkTVIsExplicitAdult(item.id, fetchContentRatings, genreIds);
+            return isAdult ? null : item;
+          }
+          return item;
+        })
+      );
+      checkedSlice.push(...batchResults);
+    }
 
     return [...checkedSlice.filter(Boolean) as TMDBMediaItem[], ...rest];
   },

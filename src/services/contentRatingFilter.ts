@@ -1,4 +1,5 @@
 import type { TMDBMovieDetails, TMDBTVDetails } from '../types/tmdb';
+import { dbService } from './db';
 
 /**
  * Worldwide Content Rating & Adult Filter Registry
@@ -260,15 +261,32 @@ export async function checkMovieIsExplicitAdult(
 ): Promise<boolean> {
   const isRomance = Array.isArray(genreIds) && genreIds.includes(ROMANCE_GENRE_ID);
   const isDrama = Array.isArray(genreIds) && genreIds.includes(DRAMA_GENRE_ID);
+
+  // Optimization 1: When genres are known and title is neither Romance nor Drama,
+  // genre-specific adult rules (18+ / 19+ / none) never match.
+  if (Array.isArray(genreIds) && !isRomance && !isDrama) {
+    return false;
+  }
+
   const cacheKey = `m_${movieId}_r${isRomance ? 1 : 0}_d${isDrama ? 1 : 0}`;
   if (explicitRatingCache.has(cacheKey)) {
     return explicitRatingCache.get(cacheKey)!;
   }
 
+  // Optimization 2: Check IndexedDB persistent cache
+  try {
+    const persisted = await dbService.getRatingCacheItem(cacheKey);
+    if (typeof persisted === 'boolean') {
+      explicitRatingCache.set(cacheKey, persisted);
+      return persisted;
+    }
+  } catch {}
+
   try {
     const data = await fetchReleaseDates(movieId);
     const cert = extractMovieCertification(data);
     resolvedRatingCache.set(`movie_${movieId}`, cert);
+    dbService.setRatingCacheItem(`movie_${movieId}`, cert).catch(() => {});
 
     // Strategy 4: Explicit descriptors or notes in release dates
     const hasExplicitDescriptor = Boolean(getExplicitAdultMovieRating({ release_dates: data } as any));
@@ -300,6 +318,7 @@ export async function checkMovieIsExplicitAdult(
 
     const result = hasExplicitDescriptor || romanceMatch || dramaMatch;
     explicitRatingCache.set(cacheKey, result);
+    dbService.setRatingCacheItem(cacheKey, result).catch(() => {});
     return result;
   } catch {
     return false;
@@ -314,7 +333,7 @@ export async function checkMovieIsExplicitAdult(
  * - "none" (uncertified) + Drama
  * - "none" (uncertified) + Romance
  * - "19 / 19+" + Romance
- * Uses in-memory cache to ensure fast subsequent lookups.
+ * Uses in-memory and IndexedDB persistent cache to ensure fast subsequent lookups.
  */
 export async function checkTVIsExplicitAdult(
   tvId: number,
@@ -323,15 +342,32 @@ export async function checkTVIsExplicitAdult(
 ): Promise<boolean> {
   const isRomance = Array.isArray(genreIds) && genreIds.includes(ROMANCE_GENRE_ID);
   const isDrama = Array.isArray(genreIds) && genreIds.includes(DRAMA_GENRE_ID);
+
+  // Optimization 1: When genres are known and title is neither Romance nor Drama,
+  // genre-specific adult rules (18+ / 19+ / none) never match.
+  if (Array.isArray(genreIds) && !isRomance && !isDrama) {
+    return false;
+  }
+
   const cacheKey = `t_${tvId}_r${isRomance ? 1 : 0}_d${isDrama ? 1 : 0}`;
   if (explicitRatingCache.has(cacheKey)) {
     return explicitRatingCache.get(cacheKey)!;
   }
 
+  // Optimization 2: Check IndexedDB persistent cache
+  try {
+    const persisted = await dbService.getRatingCacheItem(cacheKey);
+    if (typeof persisted === 'boolean') {
+      explicitRatingCache.set(cacheKey, persisted);
+      return persisted;
+    }
+  } catch {}
+
   try {
     const data = await fetchContentRatings(tvId);
     const cert = extractTVCertification(data);
     resolvedRatingCache.set(`tv_${tvId}`, cert);
+    dbService.setRatingCacheItem(`tv_${tvId}`, cert).catch(() => {});
 
     // Strategy 4: Explicit descriptors on TV content ratings
     const hasExplicitDescriptor = Boolean(getExplicitAdultTVRating({ content_ratings: data } as any));
@@ -359,6 +395,7 @@ export async function checkTVIsExplicitAdult(
 
     const result = hasExplicitDescriptor || romanceMatch || dramaMatch;
     explicitRatingCache.set(cacheKey, result);
+    dbService.setRatingCacheItem(cacheKey, result).catch(() => {});
     return result;
   } catch {
     return false;
@@ -433,6 +470,15 @@ export async function getResolvedMediaCertification(
     return resolvedRatingCache.get(cacheKey) || null;
   }
 
+  // Check IndexedDB persistent cache
+  try {
+    const persisted = await dbService.getRatingCacheItem(cacheKey);
+    if (typeof persisted === 'string') {
+      resolvedRatingCache.set(cacheKey, persisted);
+      return persisted;
+    }
+  } catch {}
+
   try {
     const rawData = await fetcher(mediaId, mediaType);
     const cert = mediaType === 'movie'
@@ -440,6 +486,7 @@ export async function getResolvedMediaCertification(
       : extractTVCertification(rawData);
 
     resolvedRatingCache.set(cacheKey, cert);
+    dbService.setRatingCacheItem(cacheKey, cert).catch(() => {});
     return cert;
   } catch {
     resolvedRatingCache.set(cacheKey, null);
@@ -461,4 +508,5 @@ export function getCachedMediaCertification(mediaId: number, mediaType: 'movie' 
 export function clearExplicitRatingCache(): void {
   explicitRatingCache.clear();
   resolvedRatingCache.clear();
+  dbService.clearRatingCache().catch(() => {});
 }

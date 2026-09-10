@@ -40,6 +40,12 @@ export interface WatchlistItem {
   addedAt: number;
 }
 
+export interface RatingCacheItem {
+  id: string; // e.g. 'movie_123', 'tv_456', 'm_123_r1_d0', etc.
+  value: string | boolean | null;
+  cachedAt: number;
+}
+
 export type VirtualCursorStyle =
   | 'hbo_max'
   | 'netflix'
