@@ -407,15 +407,18 @@ export async function checkTVIsExplicitAdult(
  */
 const resolvedRatingCache = new Map<string, string | null>();
 
-const PRIORITY_CERT_COUNTRIES = ['US', 'GB', 'AU', 'CA', 'SG', 'MY', 'KR', 'JP'];
+export const PRIORITY_CERT_COUNTRIES = ['US', 'GB', 'AU', 'CA', 'SG', 'MY', 'KR', 'JP'];
 
 /**
  * Extract certification string from release_dates results (for movies).
+ * Follows priority order:
+ * 1. ['US', 'GB', 'AU', 'CA', 'SG', 'MY', 'KR', 'JP']
+ * 2. Other countries sorted alphabetically (excluding priority countries)
  */
 export function extractMovieCertification(releaseDatesData: any): string | null {
   if (!releaseDatesData?.results || !Array.isArray(releaseDatesData.results)) return null;
 
-  // Check priority countries first (US, GB, AU, etc.)
+  // 1. Check priority countries first in specified order
   for (const code of PRIORITY_CERT_COUNTRIES) {
     const country = releaseDatesData.results.find((r: any) => r.iso_3166_1 === code);
     if (country && Array.isArray(country.release_dates)) {
@@ -424,8 +427,13 @@ export function extractMovieCertification(releaseDatesData: any): string | null 
     }
   }
 
-  // Fallback to any country
-  for (const c of releaseDatesData.results) {
+  // 2. Fallback: other countries ordered alphabetically (excluding priority countries)
+  const prioritySet = new Set(PRIORITY_CERT_COUNTRIES);
+  const otherCountries = releaseDatesData.results
+    .filter((r: any) => r && r.iso_3166_1 && !prioritySet.has(r.iso_3166_1))
+    .sort((a: any, b: any) => (a.iso_3166_1 || '').localeCompare(b.iso_3166_1 || ''));
+
+  for (const c of otherCountries) {
     if (Array.isArray(c.release_dates)) {
       const m = c.release_dates.find((d: any) => d.certification && d.certification.trim().length > 0);
       if (m) return m.certification.trim();
@@ -437,11 +445,14 @@ export function extractMovieCertification(releaseDatesData: any): string | null 
 
 /**
  * Extract certification string from content_ratings results (for TV).
+ * Follows priority order:
+ * 1. ['US', 'GB', 'AU', 'CA', 'SG', 'MY', 'KR', 'JP']
+ * 2. Other countries sorted alphabetically (excluding priority countries)
  */
 export function extractTVCertification(contentRatingsData: any): string | null {
   if (!contentRatingsData?.results || !Array.isArray(contentRatingsData.results)) return null;
 
-  // Check priority countries first (US, GB, AU, etc.)
+  // 1. Check priority countries first in specified order
   for (const code of PRIORITY_CERT_COUNTRIES) {
     const country = contentRatingsData.results.find((r: any) => r.iso_3166_1 === code);
     if (country && country.rating && country.rating.trim().length > 0) {
@@ -449,9 +460,17 @@ export function extractTVCertification(contentRatingsData: any): string | null {
     }
   }
 
-  // Fallback to any country
-  const anyMatch = contentRatingsData.results.find((r: any) => r.rating && r.rating.trim().length > 0);
-  if (anyMatch) return anyMatch.rating.trim();
+  // 2. Fallback: other countries ordered alphabetically (excluding priority countries)
+  const prioritySet = new Set(PRIORITY_CERT_COUNTRIES);
+  const otherCountries = contentRatingsData.results
+    .filter((r: any) => r && r.iso_3166_1 && !prioritySet.has(r.iso_3166_1))
+    .sort((a: any, b: any) => (a.iso_3166_1 || '').localeCompare(b.iso_3166_1 || ''));
+
+  for (const c of otherCountries) {
+    if (c.rating && c.rating.trim().length > 0) {
+      return c.rating.trim();
+    }
+  }
 
   return null;
 }

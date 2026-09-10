@@ -2,12 +2,13 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20260910-1055';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-improve-adult-f.20260910-1055';
+export const APP_BUILD_NUMBER = '20260910-1110';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-improve-adult-f.20260910-1110';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
 export const APP_BRANCH = 'feat-improve-adult-f';
-export const APP_CHANGELOG = `* style(settings): set filter bar background to solid opaque in sticky frozen state
+export const APP_CHANGELOG = `* feat(settings): expand maturity rating filter to 5-tier streaming industry standard
+* style(settings): set filter bar background to solid opaque in sticky frozen state
 * perf(filter): optimize rating filter with genre short-circuit, IndexedDB persistence, and request batching
 * perf(details): optimize details page load time by unblocking similar media deep filtering
 * feat(filter): apply adult & rating filter to Home page and More Like This recommendations
@@ -20,5 +21,4 @@ export const APP_CHANGELOG = `* style(settings): set filter bar background to so
 * fix(cert): remove duplicate card footer badge and improve priority certification resolution
 * feat(card): add lightweight cached certification badge to title cards
 * fix(filter): perform deep adult & sexual rating filtering on catalog items
-* feat(filter): expand SafeSearch with worldwide explicit adult and sexual rating filters
-* fix(ui): prevent touch scroll hang and cancel long press on move (#67)`;
+* feat(filter): expand SafeSearch with worldwide explicit adult and sexual rating filters`;

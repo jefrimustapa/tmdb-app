@@ -17,7 +17,9 @@ import {
   clearExplicitRatingCache,
   getResolvedMediaCertification,
   getCachedMediaCertification,
-  containsExplicitAdultText
+  containsExplicitAdultText,
+  extractMovieCertification,
+  extractTVCertification
 } from './contentRatingFilter';
 
 export {
@@ -702,25 +704,13 @@ export function extractContentRating(details: TMDBMovieDetails | TMDBTVDetails |
   if (explicitRating) return explicitRating;
 
   // If Movie
-  if ('release_dates' in details && details.release_dates?.results) {
-    const usResult = details.release_dates.results.find((r) => r.iso_3166_1 === 'US');
-    if (usResult) {
-      const match = usResult.release_dates.find((d) => d.certification && d.certification.trim().length > 0);
-      if (match) return match.certification;
-    }
-    // Fallback to any country certification
-    for (const country of details.release_dates.results) {
-      const match = country.release_dates.find((d) => d.certification && d.certification.trim().length > 0);
-      if (match) return match.certification;
-    }
+  if ('release_dates' in details && details.release_dates) {
+    return extractMovieCertification(details.release_dates);
   }
 
   // If TV
-  if ('content_ratings' in details && details.content_ratings?.results) {
-    const usResult = details.content_ratings.results.find((r) => r.iso_3166_1 === 'US');
-    if (usResult && usResult.rating) return usResult.rating;
-    const anyResult = details.content_ratings.results.find((r) => r.rating && r.rating.trim().length > 0);
-    if (anyResult) return anyResult.rating;
+  if ('content_ratings' in details && details.content_ratings) {
+    return extractTVCertification(details.content_ratings);
   }
 
   return null;
