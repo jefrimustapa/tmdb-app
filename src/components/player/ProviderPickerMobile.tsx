@@ -51,17 +51,14 @@ export const ProviderPickerMobile: React.FC<ProviderPickerMobileProps> = ({
     <div className="relative inline-block text-left">
       <button
         onClick={() => setIsOpen(true)}
-        className="flex items-center gap-2 px-3 py-1.5 rounded-xl border backdrop-blur-md transition-all active:scale-95 bg-black/60 border-white/20 text-gray-200"
+        className="flex items-center gap-2 px-3 py-1.5 rounded-full border transition-all active:scale-95 bg-black/60 hover:bg-black/80 border-white/15 text-gray-200 shadow-sm"
         title="Switch Streaming Server"
       >
-        <Server className="w-4 h-4 text-hbo-cyan flex-shrink-0" />
+        <Server className="w-3.5 h-3.5 text-hbo-cyan flex-shrink-0" />
         <div className="text-left">
           <div className="flex items-center gap-1.5">
-            <span className="text-xs font-bold text-white tracking-wide truncate max-w-[110px]">
-              {compact ? shortServerName : selectedProvider.name}
-            </span>
-            <span className="text-[10px] font-extrabold px-1.5 py-0.5 rounded bg-hbo-purple text-hbo-cyan border border-hbo-cyan/30 uppercase tracking-wider flex-shrink-0">
-              {serverIndex}/{totalServers}
+            <span className="text-xs font-semibold text-white tracking-wide truncate max-w-[120px]">
+              {shortServerName}
             </span>
           </div>
           {isProbing && (
@@ -83,7 +80,7 @@ export const ProviderPickerMobile: React.FC<ProviderPickerMobileProps> = ({
               aria-label="Close modal background"
             />
 
-            <div className="relative z-10 w-full h-[88vh] max-h-[90vh] flex flex-col rounded-t-3xl bg-hbo-card border-t border-white/20 shadow-2xl overflow-hidden animate-slide-up">
+            <div className="relative z-10 w-full h-[88vh] max-h-[90vh] flex flex-col rounded-t-3xl bg-hbo-card border-t border-white/20 shadow-2xl overflow-hidden animate-slide-up pb-[max(1rem,env(safe-area-inset-bottom,1.25rem))]">
               {/* Drag Handle & Header */}
               <div className="flex flex-col items-center pt-2 pb-2 px-4 border-b border-white/10 flex-shrink-0 bg-hbo-card">
                 <div className="w-12 h-1.5 rounded-full bg-white/25 mb-3" />
@@ -92,9 +89,6 @@ export const ProviderPickerMobile: React.FC<ProviderPickerMobileProps> = ({
                     <ShieldCheck className="w-4 h-4 text-green-400 flex-shrink-0" />
                     <span className="text-xs font-black uppercase tracking-wider text-white">
                       Select Stream Server
-                    </span>
-                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-hbo-purple text-hbo-cyan font-bold">
-                      {STREAM_PROVIDERS.length} Mirrors
                     </span>
                   </div>
                   <button
@@ -109,41 +103,38 @@ export const ProviderPickerMobile: React.FC<ProviderPickerMobileProps> = ({
 
               {/* Scrollable Server List */}
               <div
-                className="flex-1 overflow-y-auto px-4 py-3 space-y-2.5 touch-pan-y overscroll-contain"
+                className="flex-1 overflow-y-auto px-4 py-3 space-y-2 touch-pan-y overscroll-contain"
                 style={{ WebkitOverflowScrolling: 'touch' }}
               >
                 {displayProviders.map((provider) => {
                   const isSelected = provider.id === currentProviderId;
+                  const cleanName = provider.name.replace(/\s*\([^)]*\)/g, '').trim();
                   return (
                     <button
                       key={provider.id}
                       onClick={() => handleSelect(provider)}
-                      className={`w-full flex items-center justify-between gap-3 px-4 py-3.5 rounded-2xl text-left transition-all active:scale-[0.98] ${
+                      className={`w-full flex items-center justify-between gap-3 px-4 py-3 rounded-2xl text-left transition-all active:scale-[0.98] ${
                         isSelected
                           ? 'bg-gradient-to-r from-hbo-purple/50 to-hbo-cyan/20 border-2 border-hbo-cyan text-white shadow-lg shadow-hbo-cyan/20'
                           : 'bg-white/5 hover:bg-white/10 border border-white/10 text-gray-300'
                       }`}
                     >
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <p className={`text-sm font-bold ${isSelected ? 'text-hbo-cyan' : 'text-white'}`}>
-                            {provider.name}
-                          </p>
-                          <span className={`text-[10px] px-2 py-0.5 rounded-md font-bold whitespace-nowrap flex-shrink-0 ${
-                            provider.badge === 'Anime'
-                              ? 'bg-gradient-to-r from-pink-500/30 to-purple-500/30 text-pink-300 border border-pink-500/40'
-                              : provider.badge === 'K-Drama'
-                              ? 'bg-gradient-to-r from-rose-500/30 to-pink-500/30 text-rose-300 border border-rose-500/40'
-                              : provider.badge === 'Asean'
-                              ? 'bg-gradient-to-r from-amber-500/30 to-red-500/30 text-amber-300 border border-amber-500/40'
-                              : 'bg-white/10 text-gray-300'
-                          }`}>
-                            {provider.badge}
-                          </span>
-                        </div>
-                        <p className="text-xs text-gray-400 mt-1 leading-snug">
-                          {provider.tagline}
+                      <div className="min-w-0 flex-1 flex items-center gap-2">
+                        <p className={`text-sm font-bold truncate ${isSelected ? 'text-hbo-cyan' : 'text-white'}`}>
+                          {cleanName}
                         </p>
+                        <span className="text-white/40 text-xs select-none">•</span>
+                        <span className={`text-[10px] px-2 py-0.5 rounded-md font-bold whitespace-nowrap flex-shrink-0 ${
+                          provider.badge === 'Anime'
+                            ? 'bg-gradient-to-r from-pink-500/30 to-purple-500/30 text-pink-300 border border-pink-500/40'
+                            : provider.badge === 'K-Drama'
+                            ? 'bg-gradient-to-r from-rose-500/30 to-pink-500/30 text-rose-300 border border-rose-500/40'
+                            : provider.badge === 'Asean'
+                            ? 'bg-gradient-to-r from-amber-500/30 to-red-500/30 text-amber-300 border border-amber-500/40'
+                            : 'bg-white/10 text-gray-300'
+                        }`}>
+                          {provider.badge}
+                        </span>
                       </div>
                       {isSelected && <Check className="w-5 h-5 text-hbo-cyan flex-shrink-0 ml-2" />}
                     </button>
