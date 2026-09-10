@@ -8,6 +8,27 @@ import type {
 } from '../types/tmdb';
 
 import { dbService } from './db';
+import {
+  ADULT_KEYWORDS_CSV,
+  getExplicitAdultRating,
+  isExplicitAdultCertification,
+  checkMovieIsExplicitAdult,
+  checkTVIsExplicitAdult,
+  clearExplicitRatingCache,
+  getResolvedMediaCertification,
+  getCachedMediaCertification,
+  containsExplicitAdultText,
+  extractMovieCertification,
+  extractTVCertification
+} from './contentRatingFilter';
+
+export {
+  getExplicitAdultRating,
+  isExplicitAdultCertification,
+  checkMovieIsExplicitAdult,
+  checkTVIsExplicitAdult,
+  getCachedMediaCertification
+};
 
 const TMDB_BASE_URL = 'https://api.themoviedb.org/3';
 export const TMDB_API_KEY = '1c7b97dd8b1108d34ffdd5280fa13ac6';
@@ -41,7 +62,10 @@ const CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes in-memory cache for instant 0
 
 // Clear cache on settings changes
 if (typeof window !== 'undefined') {
-  window.addEventListener('tmdb_settings_changed', () => apiCache.clear());
+  window.addEventListener('tmdb_settings_changed', () => {
+    apiCache.clear();
+    clearExplicitRatingCache();
+  });
 }
 
 async function tmdbFetch<T>(endpoint: string, params: Record<string, string | number> = {}): Promise<T> {
@@ -60,23 +84,57 @@ async function tmdbFetch<T>(endpoint: string, params: Record<string, string | nu
     if (filterUnreleased && !params['primary_release_date.lte']) {
       url.searchParams.set('primary_release_date.lte', todayStr);
     }
-    if (maturityLevel === 'pg13') {
+    if (maturityLevel === 'mature') {
+      // 16+ / 17+: Up to R (excludes NC-17, explicit adult)
+      url.searchParams.set('certification_country', 'US');
+      url.searchParams.set('certification.lte', 'R');
+    } else if (maturityLevel === 'teen' || maturityLevel === 'pg13') {
+      // 13+: Up to PG-13 (excludes R, NC-17)
       url.searchParams.set('certification_country', 'US');
       url.searchParams.set('certification.lte', 'PG-13');
-    } else if (maturityLevel === 'family') {
+    } else if (maturityLevel === 'older_kids' || maturityLevel === 'family') {
+      // 7+: Up to PG (excludes PG-13, R)
       url.searchParams.set('certification_country', 'US');
       url.searchParams.set('certification.lte', 'PG');
+    } else if (maturityLevel === 'kids') {
+      // 0+: Strictly G / All Ages
+      url.searchParams.set('certification_country', 'US');
+      url.searchParams.set('certification.lte', 'G');
+    }
+    if (filterAdult) {
+      const existingWithout = url.searchParams.get('without_keywords');
+      url.searchParams.set(
+        'without_keywords',
+        existingWithout ? `${existingWithout},${ADULT_KEYWORDS_CSV}` : ADULT_KEYWORDS_CSV
+      );
     }
   } else if (endpoint.includes('/discover/tv')) {
     if (filterUnreleased && !params['first_air_date.lte']) {
       url.searchParams.set('first_air_date.lte', todayStr);
     }
-    if (maturityLevel === 'pg13') {
+    if (maturityLevel === 'mature') {
+      // 16+: Up to TV-14 / mild TV-MA
+      url.searchParams.set('certification_country', 'US');
+      url.searchParams.set('certification.lte', 'TV-MA');
+    } else if (maturityLevel === 'teen' || maturityLevel === 'pg13') {
+      // 13+: Up to TV-14
       url.searchParams.set('certification_country', 'US');
       url.searchParams.set('certification.lte', 'TV-14');
-    } else if (maturityLevel === 'family') {
+    } else if (maturityLevel === 'older_kids' || maturityLevel === 'family') {
+      // 7+: Up to TV-PG
       url.searchParams.set('certification_country', 'US');
       url.searchParams.set('certification.lte', 'TV-PG');
+    } else if (maturityLevel === 'kids') {
+      // 0+: Strictly TV-Y / TV-G
+      url.searchParams.set('certification_country', 'US');
+      url.searchParams.set('certification.lte', 'TV-G');
+    }
+    if (filterAdult) {
+      const existingWithout = url.searchParams.get('without_keywords');
+      url.searchParams.set(
+        'without_keywords',
+        existingWithout ? `${existingWithout},${ADULT_KEYWORDS_CSV}` : ADULT_KEYWORDS_CSV
+      );
     }
   }
 
@@ -118,19 +176,127 @@ async function tmdbFetch<T>(endpoint: string, params: Record<string, string | nu
 
   const data = await res.json();
 
-  // Filter adult items if filterAdult is active
-  if (filterAdult && data && Array.isArray(data.results)) {
-    data.results = data.results.filter((item: any) => !item.adult);
+  // Helper to filter adult/NSFW items from any TMDB item array (e.g. data.results, data.similar.results, data.recommendations.results)
+  const filterMediaItemList = async (items: any[], defaultMediaType?: 'movie' | 'tv'): Promise<any[]> => {
+    if (!Array.isArray(items) || items.length === 0) return items;
+
+    // Fast filter by item.adult flag
+    let filtered = items.filter((item: any) => !item?.adult);
+
+    const isPerfMode = settings.performanceMode === true;
+    if (!isPerfMode) {
+      // Strategy 5: Filter by title and overview heuristics (immediate synchronous check)
+      filtered = filtered.filter((item: any) => {
+        if (!item) return false;
+        const textToCheck = `${item.title || item.name || ''} ${item.overview || ''}`;
+        return !containsExplicitAdultText(textToCheck);
+      });
+
+      // Strategy 4 & genre rules: Deep filter by release dates / content ratings & descriptors across all countries
+      const fetchReleaseDates = async (id: number) => {
+        const relUrl = `${TMDB_BASE_URL}/movie/${id}/release_dates?api_key=${TMDB_API_KEY}`;
+        const relRes = await fetch(relUrl, {
+          headers: { Authorization: `Bearer ${TMDB_READ_TOKEN}` }
+        });
+        return relRes.ok ? relRes.json() : null;
+      };
+
+      const fetchContentRatings = async (id: number) => {
+        const crUrl = `${TMDB_BASE_URL}/tv/${id}/content_ratings?api_key=${TMDB_API_KEY}`;
+        const crRes = await fetch(crUrl, {
+          headers: { Authorization: `Bearer ${TMDB_READ_TOKEN}` }
+        });
+        return crRes.ok ? crRes.json() : null;
+      };
+
+      const isMovieEndpoint = endpoint.includes('/movie') || endpoint.includes('mediaType=movie');
+      const isTvEndpoint = endpoint.includes('/tv') || endpoint.includes('mediaType=tv');
+      const fallbackType = defaultMediaType || (isTvEndpoint ? 'tv' : isMovieEndpoint ? 'movie' : undefined);
+
+      // Concurrency-limited batching (batches of 5) to prevent network congestion
+      const BATCH_SIZE = 5;
+      const deepFiltered: any[] = [];
+
+      for (let i = 0; i < filtered.length; i += BATCH_SIZE) {
+        const batch = filtered.slice(i, i + BATCH_SIZE);
+        const batchResults = await Promise.all(
+          batch.map(async (item: any) => {
+            if (!item || !item.id) return item;
+            const itemType = item.media_type || (item.title ? 'movie' : (item.name ? 'tv' : fallbackType || 'movie'));
+            const genreIds = Array.isArray(item.genre_ids) ? item.genre_ids : (Array.isArray(item.genres) ? item.genres.map((g: any) => g.id) : undefined);
+
+            if (itemType === 'movie') {
+              const isAdult = await checkMovieIsExplicitAdult(item.id, fetchReleaseDates, genreIds);
+              return isAdult ? null : item;
+            } else if (itemType === 'tv') {
+              const isAdult = await checkTVIsExplicitAdult(item.id, fetchContentRatings, genreIds);
+              return isAdult ? null : item;
+            }
+            return item;
+          })
+        );
+        deepFiltered.push(...batchResults);
+      }
+
+      filtered = deepFiltered.filter(Boolean);
+    }
+
+    return filtered;
+  };
+
+  // Helper for fast synchronous adult filtering (item.adult + Strategy 5 text check)
+  const fastFilterMediaItemList = (items: any[]): any[] => {
+    if (!Array.isArray(items) || items.length === 0) return items;
+    let filtered = items.filter((item: any) => !item?.adult);
+    if (settings.performanceMode !== true) {
+      filtered = filtered.filter((item: any) => {
+        if (!item) return false;
+        const textToCheck = `${item.title || item.name || ''} ${item.overview || ''}`;
+        return !containsExplicitAdultText(textToCheck);
+      });
+    }
+    return filtered;
+  };
+
+  // Filter adult items and explicit sexual/adult ratings if filterAdult is active
+  if (filterAdult && data) {
+    if (Array.isArray(data.results) && data.results.length > 0) {
+      data.results = await filterMediaItemList(data.results);
+    }
+    // Fast-filter nested similar / recommendations from append_to_response on details endpoints
+    // so details pages load instantaneously without blocking on 40 sub-requests
+    if (data.similar && Array.isArray(data.similar.results) && data.similar.results.length > 0) {
+      data.similar.results = fastFilterMediaItemList(data.similar.results);
+    }
+    if (data.recommendations && Array.isArray(data.recommendations.results) && data.recommendations.results.length > 0) {
+      data.recommendations.results = fastFilterMediaItemList(data.recommendations.results);
+    }
   }
 
   // Filter unreleased/future items if filterUnreleased is active (except explicit upcoming endpoints)
-  if (filterUnreleased && !endpoint.includes('/upcoming') && data && Array.isArray(data.results)) {
-    data.results = data.results.filter((item: any) => {
-      if (item.release_date && item.release_date > todayStr) return false;
-      if (item.first_air_date && item.first_air_date > todayStr) return false;
-      if (item.status === 'Planned' || item.status === 'In Production' || item.status === 'Post Production') return false;
-      return true;
-    });
+  if (filterUnreleased && !endpoint.includes('/upcoming') && data) {
+    if (Array.isArray(data.results)) {
+      data.results = data.results.filter((item: any) => {
+        if (item.release_date && item.release_date > todayStr) return false;
+        if (item.first_air_date && item.first_air_date > todayStr) return false;
+        if (item.status === 'Planned' || item.status === 'In Production' || item.status === 'Post Production') return false;
+        return true;
+      });
+    }
+    if (data.similar && Array.isArray(data.similar.results)) {
+      data.similar.results = data.similar.results.filter((item: any) => {
+        if (item.release_date && item.release_date > todayStr) return false;
+        if (item.first_air_date && item.first_air_date > todayStr) return false;
+        return true;
+      });
+    }
+    if (data.recommendations && Array.isArray(data.recommendations.results)) {
+      data.recommendations.results = data.recommendations.results.filter((item: any) => {
+        if (item.release_date && item.release_date > todayStr) return false;
+        if (item.first_air_date && item.first_air_date > todayStr) return false;
+        return true;
+      });
+    }
   }
 
   apiCache.set(cacheKey, { data, expiry: Date.now() + CACHE_TTL_MS });
@@ -267,6 +433,74 @@ export const tmdbApi = {
     tmdbFetch<TMDBResponse<TMDBMediaItem>>(`/${type}/${id}/recommendations`, { page }),
   getSimilar: (type: 'movie' | 'tv', id: number, page = 1) =>
     tmdbFetch<TMDBResponse<TMDBMediaItem>>(`/${type}/${id}/similar`, { page }),
+
+  /**
+   * Asynchronously deep-filters recommendation/similar items in the background
+   * without blocking details page load time.
+   */
+  filterRecommendationsAsync: async (
+    items: TMDBMediaItem[],
+    defaultMediaType: 'movie' | 'tv' = 'movie'
+  ): Promise<TMDBMediaItem[]> => {
+    if (!Array.isArray(items) || items.length === 0) return items;
+    const settings = await dbService.getSettings();
+    if (settings.filterAdult === false || settings.performanceMode === true) {
+      return items;
+    }
+
+    const fetchReleaseDates = async (id: number) => {
+      const relUrl = `${TMDB_BASE_URL}/movie/${id}/release_dates?api_key=${TMDB_API_KEY}`;
+      const relRes = await fetch(relUrl, {
+        headers: { Authorization: `Bearer ${TMDB_READ_TOKEN}` }
+      });
+      return relRes.ok ? relRes.json() : null;
+    };
+
+    const fetchContentRatings = async (id: number) => {
+      const crUrl = `${TMDB_BASE_URL}/tv/${id}/content_ratings?api_key=${TMDB_API_KEY}`;
+      const crRes = await fetch(crUrl, {
+        headers: { Authorization: `Bearer ${TMDB_READ_TOKEN}` }
+      });
+      return crRes.ok ? crRes.json() : null;
+    };
+
+    // Filter up to top 20 recommendations in batches of 5 to avoid network congestion
+    const slice = items.slice(0, 20);
+    const rest = items.slice(20);
+    const BATCH_SIZE = 5;
+    const checkedSlice: any[] = [];
+
+    for (let i = 0; i < slice.length; i += BATCH_SIZE) {
+      const batch = slice.slice(i, i + BATCH_SIZE);
+      const batchResults = await Promise.all(
+        batch.map(async (item: any) => {
+          if (!item || !item.id) return item;
+          const itemType = item.media_type || (item.title ? 'movie' : (item.name ? 'tv' : defaultMediaType));
+          const genreIds = Array.isArray(item.genre_ids) ? item.genre_ids : (Array.isArray(item.genres) ? item.genres.map((g: any) => g.id) : undefined);
+
+          if (itemType === 'movie') {
+            const isAdult = await checkMovieIsExplicitAdult(item.id, fetchReleaseDates, genreIds);
+            return isAdult ? null : item;
+          } else if (itemType === 'tv') {
+            const isAdult = await checkTVIsExplicitAdult(item.id, fetchContentRatings, genreIds);
+            return isAdult ? null : item;
+          }
+          return item;
+        })
+      );
+      checkedSlice.push(...batchResults);
+    }
+
+    return [...checkedSlice.filter(Boolean) as TMDBMediaItem[], ...rest];
+  },
+
+  // Cached Content Rating Certification
+  getCertification: (id: number, type: 'movie' | 'tv'): Promise<string | null> => {
+    return getResolvedMediaCertification(id, type, async (mediaId, mediaType) => {
+      const endpoint = mediaType === 'movie' ? `/movie/${mediaId}/release_dates` : `/tv/${mediaId}/content_ratings`;
+      return tmdbFetch<any>(endpoint);
+    });
+  },
 
   // Discovery & Filtering
   discoverMovies: (params: {
@@ -461,30 +695,22 @@ export function resolveGenresFromIds(genreIds?: number[]): { id: number; name: s
     .filter((g) => g.name.length > 0);
 }
 
-/** Helper to extract content rating (PG-13, R, TV-MA, etc.) */
+/** Helper to extract content rating (PG-13, R, TV-MA, 18SX, 19, R18+, etc.) */
 export function extractContentRating(details: TMDBMovieDetails | TMDBTVDetails | null): string | null {
   if (!details) return null;
 
+  // Check for explicit sexual/adult certification across all countries first
+  const explicitRating = getExplicitAdultRating(details);
+  if (explicitRating) return explicitRating;
+
   // If Movie
-  if ('release_dates' in details && details.release_dates?.results) {
-    const usResult = details.release_dates.results.find((r) => r.iso_3166_1 === 'US');
-    if (usResult) {
-      const match = usResult.release_dates.find((d) => d.certification && d.certification.trim().length > 0);
-      if (match) return match.certification;
-    }
-    // Fallback to any country certification
-    for (const country of details.release_dates.results) {
-      const match = country.release_dates.find((d) => d.certification && d.certification.trim().length > 0);
-      if (match) return match.certification;
-    }
+  if ('release_dates' in details && details.release_dates) {
+    return extractMovieCertification(details.release_dates);
   }
 
   // If TV
-  if ('content_ratings' in details && details.content_ratings?.results) {
-    const usResult = details.content_ratings.results.find((r) => r.iso_3166_1 === 'US');
-    if (usResult && usResult.rating) return usResult.rating;
-    const anyResult = details.content_ratings.results.find((r) => r.rating && r.rating.trim().length > 0);
-    if (anyResult) return anyResult.rating;
+  if ('content_ratings' in details && details.content_ratings) {
+    return extractTVCertification(details.content_ratings);
   }
 
   return null;

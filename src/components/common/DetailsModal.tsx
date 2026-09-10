@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { X, Play, Heart, Bookmark, Star, Calendar, Clock, Film, ShieldAlert } from 'lucide-react';
 import type { TMDBMediaItem, TMDBMovieDetails, TMDBTVDetails } from '../../types/tmdb';
-import { tmdbApi, tmdbImages, extractContentRating } from '../../services/tmdb';
+import { tmdbApi, tmdbImages, extractContentRating, isExplicitAdultCertification } from '../../services/tmdb';
 import { dbService } from '../../services/db';
 
 interface DetailsModalProps {
@@ -137,9 +137,22 @@ export const DetailsModal: React.FC<DetailsModalProps> = ({ item, onClose }) => 
                   {mediaType === 'movie' ? 'Movie' : 'TV Series'}
                 </span>
                 {contentRating && (
-                  <span className="px-2 py-0.5 rounded bg-white/20 text-white border border-white/30 text-xs font-black uppercase tracking-wider">
-                    {contentRating}
-                  </span>
+                  <>
+                    <span
+                      className={`px-2 py-0.5 rounded text-xs font-black uppercase tracking-wider ${
+                        isExplicitAdultCertification(contentRating)
+                          ? 'bg-rose-950/80 text-rose-300 border border-rose-500/60 shadow-sm'
+                          : 'bg-white/20 text-white border border-white/30'
+                      }`}
+                    >
+                      {contentRating}
+                    </span>
+                    {isExplicitAdultCertification(contentRating) && (
+                      <span className="px-2 py-0.5 rounded bg-red-950/70 text-red-300 border border-red-500/40 text-[10px] font-black uppercase tracking-wider">
+                        Explicit 18+
+                      </span>
+                    )}
+                  </>
                 )}
               </div>
               <h2 className="text-2xl sm:text-4xl font-black font-display text-white tracking-tight leading-tight">

@@ -1228,13 +1228,16 @@ export const Settings: React.FC = () => {
                   </p>
                 </div>
 
-                <div className="grid grid-cols-3 gap-2.5">
+                <div className="grid grid-cols-2 lg:grid-cols-3 gap-2.5">
                   {[
-                    { id: 'all', label: 'All Ratings', desc: 'Unrestricted (R, TV-MA, PG-13, PG, G)' },
-                    { id: 'pg13', label: 'Teens & Below', desc: 'Up to PG-13 / TV-14 (Excludes R & TV-MA)' },
-                    { id: 'family', label: 'Family & Kids', desc: 'Up to PG / TV-PG (Family friendly only)' },
+                    { id: 'all', label: 'All Ratings (18+)', desc: 'Unrestricted: R, TV-MA, NC-17, 18, 21+' },
+                    { id: 'mature', label: 'Young Adult (16+)', desc: 'Up to R / 15 / 16 (Excludes NC-17, 18SX)' },
+                    { id: 'teen', label: 'Teens (13+)', desc: 'Up to PG-13 / 12A / TV-14 (Excludes R)' },
+                    { id: 'older_kids', label: 'Older Kids (7+)', desc: 'Up to PG / TV-PG (Gentle scares, fantasy)' },
+                    { id: 'kids', label: 'Little Kids (All Ages)', desc: 'Strictly G / U / TV-Y / TV-G (Preschool & family)' },
                   ].map((lvl) => {
-                    const isSelected = (settings.maturityLevel || 'all') === lvl.id;
+                    const currentMaturity = settings.maturityLevel === 'pg13' ? 'teen' : settings.maturityLevel === 'family' ? 'older_kids' : (settings.maturityLevel || 'all');
+                    const isSelected = currentMaturity === lvl.id;
                     return (
                       <button
                         key={lvl.id}
@@ -1269,7 +1272,7 @@ export const Settings: React.FC = () => {
                     <span>Filter Adult & Explicit Content</span>
                   </h4>
                   <p className="text-[11px] text-gray-400">
-                    SafeSearch mode: Excludes 18+ adult rated media from search queries and catalogs.
+                    SafeSearch mode: Excludes explicit sexual and adult rated media (18SX, 19, R18+, NC-17, R21, Cat III, softcore) from search queries and catalogs.
                   </p>
                 </div>
 
