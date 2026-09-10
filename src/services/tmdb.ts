@@ -195,12 +195,13 @@ async function tmdbFetch<T>(endpoint: string, params: Record<string, string | nu
         data.results.map(async (item: any) => {
           if (!item || !item.id) return item;
           const itemType = item.media_type || (item.title ? 'movie' : (item.name ? 'tv' : (isTvEndpoint ? 'tv' : 'movie')));
+          const genreIds = Array.isArray(item.genre_ids) ? item.genre_ids : (Array.isArray(item.genres) ? item.genres.map((g: any) => g.id) : undefined);
           
           if (itemType === 'movie') {
-            const isAdult = await checkMovieIsExplicitAdult(item.id, fetchReleaseDates);
+            const isAdult = await checkMovieIsExplicitAdult(item.id, fetchReleaseDates, genreIds);
             return isAdult ? null : item;
           } else if (itemType === 'tv') {
-            const isAdult = await checkTVIsExplicitAdult(item.id, fetchContentRatings);
+            const isAdult = await checkTVIsExplicitAdult(item.id, fetchContentRatings, genreIds);
             return isAdult ? null : item;
           }
           return item;

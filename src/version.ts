@@ -2,12 +2,13 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20260910-0629';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-improve-adult-f.20260910-0629';
+export const APP_BUILD_NUMBER = '20260910-0908';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-improve-adult-f.20260910-0908';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
 export const APP_BRANCH = 'feat-improve-adult-f';
-export const APP_CHANGELOG = `* feat(filter): implement Strategies 1, 3, 4, 5 with conditional performance mode bypass
+export const APP_CHANGELOG = `* feat(filter): remove strategy 1 certification rating filtering; use strategies 3, 4, 5 and skip 4, 5 in performance mode
+* feat(filter): implement Strategies 1, 3, 4, 5 with conditional performance mode bypass
 * feat(filter): expand adult and explicit ratings to cover all 18+, sexual, erotic, nudity, porn, and adultery content
 * fix(filter): treat uncertified or unrated titles as explicit content
 * fix(cert): remove duplicate card footer badge and improve priority certification resolution
@@ -20,5 +21,4 @@ export const APP_CHANGELOG = `* feat(filter): implement Strategies 1, 3, 4, 5 wi
 * feat(card): modify title card badges, floating menu, and continue watch details button (#64)
 * feat: improve filters across Movies, Series, and Search (#63)
 * fix(home): exclude re-releases and sort new release movies by latest date on left (#62)
-* fix(player): fix MegaPlay anime progress tracking, compact up next popup, and update trigger percent settings (#61)
-* feat(details,watch,stream): add Asian stream provider, optimize details UX, and fix watch progress reset (#60)`;
+* fix(player): fix MegaPlay anime progress tracking, compact up next popup, and update trigger percent settings (#61)`;
