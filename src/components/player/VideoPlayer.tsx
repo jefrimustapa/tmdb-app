@@ -392,6 +392,18 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     if (provider.id === 'lari21-asian' || provider.id === 'lk21-asian' || provider.category === 'asian' || provider.id === 'megaplay-anime') {
       return baseStreamUrl;
     }
+    // CineSrc: pass continueprompt=false to suppress the "Resume watching?" dialog, and pass t= for auto-resume
+    if (provider.id === 'cinesrc') {
+      const sep = baseStreamUrl.includes('?') ? '&' : '?';
+      if (initialTimestamp === 0) {
+        return `${baseStreamUrl}${sep}continueprompt=false&t=0#t=0`;
+      }
+      if (resumeTimestamp > 0) {
+        return `${baseStreamUrl}${sep}continueprompt=false&t=${resumeTimestamp}#t=${resumeTimestamp}`;
+      }
+      return `${baseStreamUrl}${sep}continueprompt=false`;
+    }
+
     // KissKH supports hash fragment #t= for seamless auto-resume or restart via injected observer
     if (provider.id === 'kisskh-kdrama' || provider.id === 'kisskh' || provider.category === 'korean') {
       if (initialTimestamp === 0) {
