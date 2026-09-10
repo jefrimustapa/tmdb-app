@@ -2,12 +2,13 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20260910-0550';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-improve-adult-f.20260910-0550';
+export const APP_BUILD_NUMBER = '20260910-0616';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-improve-adult-f.20260910-0616';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
 export const APP_BRANCH = 'feat-improve-adult-f';
-export const APP_CHANGELOG = `* fix(filter): treat uncertified or unrated titles as explicit content
+export const APP_CHANGELOG = `* feat(filter): expand adult and explicit ratings to cover all 18+, sexual, erotic, nudity, porn, and adultery content
+* fix(filter): treat uncertified or unrated titles as explicit content
 * fix(cert): remove duplicate card footer badge and improve priority certification resolution
 * feat(card): add lightweight cached certification badge to title cards
 * fix(filter): perform deep adult & sexual rating filtering on catalog items
@@ -20,5 +21,4 @@ export const APP_CHANGELOG = `* fix(filter): treat uncertified or unrated titles
 * fix(home): exclude re-releases and sort new release movies by latest date on left (#62)
 * fix(player): fix MegaPlay anime progress tracking, compact up next popup, and update trigger percent settings (#61)
 * feat(details,watch,stream): add Asian stream provider, optimize details UX, and fix watch progress reset (#60)
-* feat(stream): separate embedded server priority for anime vs other content
-* feat(watch): center title in row 1 and move episode info to row 2 with prev/next buttons (#59)`;
+* feat(stream): separate embedded server priority for anime vs other content`;

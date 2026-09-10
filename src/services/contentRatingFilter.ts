@@ -140,9 +140,20 @@ export function isExplicitAdultCertification(cert?: string | null, countryCode?:
   return false;
 }
 
+// Regex patterns for explicit sexual, nudity, pornographic, and erotic content in descriptors, notes, or overviews
+const EXPLICIT_TEXT_REGEX = /\b(porn|porno|pornography|pornographic|erotic|erotica|softcore|hentai|full[- ]frontal nudity|explicit sex|hardcore sex|sexual violence|sensual massage|sex scene|adultery|infidelity|extramarital sex|erotic thriller)\b/i;
+
 /**
- * Scan movie release dates across all countries for an explicit sexual/adult certification.
- * Returns the matched certification if found, or null otherwise.
+ * Check if a text description, note, or overview contains explicit sexual / adult keywords (Strategy 5).
+ */
+export function containsExplicitAdultText(text?: string | null): boolean {
+  if (!text) return false;
+  return EXPLICIT_TEXT_REGEX.test(text);
+}
+
+/**
+ * Scan movie release dates across all countries for an explicit sexual/adult certification or descriptor (Strategy 1 & 4).
+ * Returns the matched certification or reason if found, or null otherwise.
  */
 export function getExplicitAdultMovieRating(details: TMDBMovieDetails | null): string | null {
   if (!details || !('release_dates' in details) || !details.release_dates?.results) {
@@ -153,9 +164,21 @@ export function getExplicitAdultMovieRating(details: TMDBMovieDetails | null): s
     const code = country.iso_3166_1;
     if (!Array.isArray(country.release_dates)) continue;
 
-    for (const rd of country.release_dates) {
+    for (const rdItem of country.release_dates) {
+      const rd = rdItem as any;
       if (rd.certification && isExplicitAdultCertification(rd.certification, code)) {
         return rd.certification.trim();
+      }
+      // Strategy 4: Check descriptors & notes
+      if (rd.note && containsExplicitAdultText(rd.note)) {
+        return 'Explicit Note';
+      }
+      if (Array.isArray(rd.descriptors)) {
+        for (const desc of rd.descriptors) {
+          if (typeof desc === 'string' && containsExplicitAdultText(desc)) {
+            return 'Explicit Descriptor';
+          }
+        }
       }
     }
   }
@@ -164,7 +187,7 @@ export function getExplicitAdultMovieRating(details: TMDBMovieDetails | null): s
 }
 
 /**
- * Scan TV content ratings across all countries for an explicit sexual/adult certification.
+ * Scan TV content ratings across all countries for an explicit sexual/adult certification (Strategy 1 & 4).
  * Returns the matched certification if found, or null otherwise.
  */
 export function getExplicitAdultTVRating(details: TMDBTVDetails | null): string | null {
@@ -172,10 +195,19 @@ export function getExplicitAdultTVRating(details: TMDBTVDetails | null): string 
     return null;
   }
 
-  for (const entry of details.content_ratings.results) {
+  for (const entryItem of details.content_ratings.results) {
+    const entry = entryItem as any;
     const code = entry.iso_3166_1;
     if (entry.rating && isExplicitAdultCertification(entry.rating, code)) {
       return entry.rating.trim();
+    }
+    // Check descriptors on TV content ratings if present
+    if (entry.descriptors && Array.isArray(entry.descriptors)) {
+      for (const desc of entry.descriptors) {
+        if (typeof desc === 'string' && containsExplicitAdultText(desc)) {
+          return 'Explicit Descriptor';
+        }
+      }
     }
   }
 
