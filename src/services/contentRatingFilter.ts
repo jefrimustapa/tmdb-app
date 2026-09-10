@@ -5,29 +5,44 @@ import type { TMDBMovieDetails, TMDBTVDetails } from '../types/tmdb';
  * Identifies explicit sexual, erotic, and adult rating certifications worldwide.
  */
 
-// Explicit sexual and restricted adult certifications across TMDB countries
+// Explicit sexual, restricted adult, erotic, and pornographic certifications across TMDB countries
 export const EXPLICIT_SEXUAL_RATINGS = [
   '18SX',    // Malaysia (LPF) - Explicit sexual content, nudity, eroticism
+  '18PL',    // Malaysia (LPF) - Various elements including sex/nudity/violence
+  '18SG',    // Malaysia (LPF) - Graphic horror / terror
+  '18PA',    // Malaysia (LPF) - Sensitive themes
+  '18+',     // Taiwan (18+ restricted), Russia (18+), Vietnam, Ukraine, Czech, etc.
+  '18',      // UK (BBFC 18), Brazil (18), Singapore (18), Netherlands, Spain, France, etc.
+  'M18',     // Singapore (IMDA M18)
   '19',      // South Korea (KMRB) - 19+ / No Minors (erotic/explicit adult)
   'R18+',    // Japan (Eirin), Australia (ACB), New Zealand
   'R-18',    // Japan / Philippines
   'R 18+',   // Australia
   'NC-17',   // United States (MPAA) - Explicit sexual content
+  'NC17',    // United States
   'R18',     // United Kingdom (BBFC) - Hardcore pornography / licensed sex shops
   'X 18+',   // Australia (ACB) - Sexually explicit films
   'X18+',    // Australia / South Africa
   'X18',     // South Africa (FPB) - Restricted adult premises only
   'XX',      // South Africa (FPB) - Prohibited
   'XXX',     // International explicit
+  'P',       // Portugal (Pornography rating)
   'R21',     // Singapore (IMDA) - Restricted 21 for explicit sexual content
   'CAT III', // Hong Kong (OFTA) - Category III adult/erotic cinema
   'III',     // Hong Kong (OFTA) - Category III
   '21+',     // Indonesia (LSF) - Adult 21+
-  'D',       // Mexico (RTC) - Adult cinema legally prohibited under 18
-  'X'        // Spain (ICAA), France, Bulgaria, Philippines - Adult/pornographic
+  '21',      // Adult 21
+  'D',       // Mexico (RTC) / Indonesia TV - Adult cinema legally prohibited under 18
+  'C',       // Mexico (RTC) - Adult 18+ only
+  'A',       // India CBFC (Adults only 18+)
+  'SAM 18',  // Argentina (SAM 18)
+  'K18',     // Finland (K18), Greece (K18)
+  'N-18',    // Lithuania (N-18)
+  'M/18',    // Portugal (M/18)
+  'X'        // Spain (ICAA), France, Bulgaria, Philippines, Portugal - Adult/pornographic
 ] as const;
 
-// TMDB Keyword IDs for adult / erotica / softcore / hentai / explicit nudity
+// TMDB Keyword IDs for adult / erotica / softcore / hentai / explicit nudity / adultery / infidelity / porn
 export const ADULT_KEYWORD_IDS = [
   256466, // erotic
   325693, // erotica
@@ -38,7 +53,25 @@ export const ADULT_KEYWORD_IDS = [
   302868, // erotic comedy
   298666, // erotic romance
   380575, // female full frontal nudity
-  367629  // male frontal nudity
+  367629, // male frontal nudity
+  281741, // nudity
+  359980, // female nudity
+  380475, // male nudity
+  359981, // female frontal nudity
+  381106, // sexual
+  349634, // explicit
+  347060, // explicite sex
+  267122, // sex
+  155301, // rough sex
+  356759, // porn
+  155139, // porn parody
+  7344,   // porn star
+  596,    // adultery
+  180393, // suspicion of adultery
+  357928, // adultério
+  1326,   // infidelity
+  363320, // marital infidelity
+  34094   // extramarital affair
 ];
 
 export const ADULT_KEYWORDS_CSV = ADULT_KEYWORD_IDS.join(',');
@@ -57,12 +90,24 @@ export function isExplicitAdultCertification(cert?: string | null, countryCode?:
   const normalized = raw.toUpperCase().replace(/\s+/g, '');
 
   if (EXPLICIT_RATINGS_SET.has(normalized)) {
-    // For single-letter 'D' or 'X', verify country context if provided
-    if (normalized === 'D' && countryCode && countryCode.toUpperCase() !== 'MX') {
+    // For single-letter 'D', verify country context if provided (Mexico or Indonesia)
+    if (normalized === 'D' && countryCode && !['MX', 'ID'].includes(countryCode.toUpperCase())) {
+      return false;
+    }
+    // For single-letter 'C', verify country context (Mexico or Argentina)
+    if (normalized === 'C' && countryCode && !['MX', 'AR'].includes(countryCode.toUpperCase())) {
+      return false;
+    }
+    // For single-letter 'A', verify country context (India or Chile)
+    if (normalized === 'A' && countryCode && !['IN', 'CL'].includes(countryCode.toUpperCase())) {
+      return false;
+    }
+    // For single-letter 'P', verify country context (Portugal)
+    if (normalized === 'P' && countryCode && countryCode.toUpperCase() !== 'PT') {
       return false;
     }
     if (normalized === 'X' && countryCode) {
-      const xCountries = ['ES', 'FR', 'PH', 'BG', 'HU', 'US', 'AU'];
+      const xCountries = ['ES', 'FR', 'PH', 'BG', 'HU', 'US', 'AU', 'PT'];
       if (!xCountries.includes(countryCode.toUpperCase())) return false;
     }
     if (normalized === 'III' && countryCode && countryCode.toUpperCase() !== 'HK') {
@@ -71,14 +116,25 @@ export function isExplicitAdultCertification(cert?: string | null, countryCode?:
     return true;
   }
 
-  // Regex checks for formatted variations (e.g. "Cat. III", "R-18+", "18 SX", "18-SX")
+  // Regex checks for formatted variations (e.g. "Cat. III", "18+", "R-18+", "18 SX", "M18", "+18")
   if (/^18\s*[-_]?\s*SX$/i.test(raw)) return true;
+  if (/^18\s*[-_]?\s*PL$/i.test(raw)) return true;
+  if (/^18\s*[-_]?\s*SG$/i.test(raw)) return true;
+  if (/^18\s*[-_]?\s*PA$/i.test(raw)) return true;
+  if (/^18\s*\+?$/i.test(raw)) return true;
+  if (/^\+?18$/i.test(raw)) return true;
+  if (/^M\s*[-_]?\s*18\+?$/i.test(raw)) return true;
   if (/^R\s*[-_]?\s*18\s*\+?$/i.test(raw)) return true;
   if (/^X\s*[-_]?\s*18\s*\+?$/i.test(raw)) return true;
-  if (/^NC\s*[-_]?\s*17$/i.test(raw)) return true;
+  if (/^K\s*[-_]?\s*18\s*\+?$/i.test(raw)) return true;
+  if (/^N\s*[-_]?\s*18\s*\+?$/i.test(raw)) return true;
+  if (/^M\s*\/\s*18$/i.test(raw)) return true;
+  if (/^SAM\s*[-_]?\s*18$/i.test(raw)) return true;
+  if (/^19\s*\+?$/i.test(raw)) return true;
+  if (/^21\s*\+?$/i.test(raw)) return true;
   if (/^R\s*[-_]?\s*21$/i.test(raw)) return true;
+  if (/^NC\s*[-_]?\s*17$/i.test(raw)) return true;
   if (/^CAT(EGORY)?\s*[-_.]?\s*III$/i.test(raw)) return true;
-  if (/^21\s*\+$/i.test(raw)) return true;
   if (/^XXX+$/i.test(raw)) return true;
 
   return false;
