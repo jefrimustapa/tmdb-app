@@ -226,16 +226,31 @@ export function getExplicitAdultRating(details: TMDBMovieDetails | TMDBTVDetails
 const explicitRatingCache = new Map<string, boolean>();
 
 /**
- * Romance genre ID in TMDB
+ * Genre IDs in TMDB
  */
 export const ROMANCE_GENRE_ID = 10749;
+export const DRAMA_GENRE_ID = 18;
 
 // Unrated / uncertified strings
 const UNRATED_RATINGS = new Set(['NR', 'UNRATED', 'NOT RATED', 'NOT-RATED', 'NONE', '0']);
 
 /**
+ * Check if a certification string represents an explicit / restricted 18+ rating
+ * (e.g., 18SX, 18PL, 18SG, 18+, 18, R18+, R-18, R18, X18+, X 18+, M18, NC-17, CAT III, 21+, etc.)
+ */
+function isExplicit18PlusRating(cert?: string | null, countryCode?: string): boolean {
+  if (!cert) return false;
+  return isExplicitAdultCertification(cert, countryCode) || /^(R\s*[-_]?\s*18\+?|X\s*[-_]?\s*18\+?|18\s*[-_]?\s*SX|18\s*[-_]?\s*PL|18\s*\+?|\+?18|M\s*[-_]?\s*18\+?|NC\s*[-_]?\s*17|CAT(EGORY)?\s*[-_.]?\s*III|21\s*\+?)$/i.test(cert.trim());
+}
+
+/**
  * Check if a movie has explicit adult/sexual content by checking release descriptors & notes (Strategy 4),
- * or if it is Romance genre with rating 19+ or no certification.
+ * or genre-specific combinations:
+ * - "explicit 18+" + Romance
+ * - "explicit 18+" + Drama
+ * - "none" (uncertified) + Drama
+ * - "none" (uncertified) + Romance
+ * - "19 / 19+" + Romance
  * Uses in-memory cache to ensure fast subsequent lookups.
  */
 export async function checkMovieIsExplicitAdult(
@@ -244,7 +259,8 @@ export async function checkMovieIsExplicitAdult(
   genreIds?: number[]
 ): Promise<boolean> {
   const isRomance = Array.isArray(genreIds) && genreIds.includes(ROMANCE_GENRE_ID);
-  const cacheKey = `m_${movieId}_${isRomance ? 'rom' : 'gen'}`;
+  const isDrama = Array.isArray(genreIds) && genreIds.includes(DRAMA_GENRE_ID);
+  const cacheKey = `m_${movieId}_r${isRomance ? 1 : 0}_d${isDrama ? 1 : 0}`;
   if (explicitRatingCache.has(cacheKey)) {
     return explicitRatingCache.get(cacheKey)!;
   }
@@ -257,21 +273,32 @@ export async function checkMovieIsExplicitAdult(
     // Strategy 4: Explicit descriptors or notes in release dates
     const hasExplicitDescriptor = Boolean(getExplicitAdultMovieRating({ release_dates: data } as any));
 
-    // Romance-specific rule:
-    // - certification: 19 / 19+ and genre: romance
-    // - no certification / unrated and genre: romance
-    let romanceAdultMatch = false;
-    if (isRomance) {
-      const isUncertified = !cert || UNRATED_RATINGS.has(cert.toUpperCase().trim());
-      const has19 = data?.results && Array.isArray(data.results) && data.results.some((c: any) =>
-        Array.isArray(c.release_dates) && c.release_dates.some((rd: any) =>
-          rd.certification && /^19\+?$/i.test(rd.certification.trim())
-        )
-      );
-      romanceAdultMatch = Boolean(isUncertified || has19);
-    }
+    const isUncertified = !cert || UNRATED_RATINGS.has(cert.toUpperCase().trim());
 
-    const result = hasExplicitDescriptor || romanceAdultMatch;
+    // Check if any country has 19+ rating
+    const has19 = data?.results && Array.isArray(data.results) && data.results.some((c: any) =>
+      Array.isArray(c.release_dates) && c.release_dates.some((rd: any) =>
+        rd.certification && /^19\+?$/i.test(rd.certification.trim())
+      )
+    );
+
+    // Check if any country has an explicit 18+ rating
+    const hasExplicit18 = data?.results && Array.isArray(data.results) && data.results.some((c: any) =>
+      Array.isArray(c.release_dates) && c.release_dates.some((rd: any) =>
+        rd.certification && isExplicit18PlusRating(rd.certification, c.iso_3166_1)
+      )
+    );
+
+    // Genre-specific filtering rules:
+    // 1. rating: "explicit 18+" + genre: romance
+    // 2. rating: "explicit 18+" + genre: drama
+    // 3. rating: none + genre: drama
+    // 4. rating: none + genre: romance
+    // 5. rating: 19+ + genre: romance
+    const romanceMatch = isRomance && (hasExplicit18 || isUncertified || has19);
+    const dramaMatch = isDrama && (hasExplicit18 || isUncertified);
+
+    const result = hasExplicitDescriptor || romanceMatch || dramaMatch;
     explicitRatingCache.set(cacheKey, result);
     return result;
   } catch {
@@ -281,7 +308,12 @@ export async function checkMovieIsExplicitAdult(
 
 /**
  * Check if a TV series has explicit adult/sexual content by checking content descriptors (Strategy 4),
- * or if it is Romance genre with rating 19+ or no certification.
+ * or genre-specific combinations:
+ * - "explicit 18+" + Romance
+ * - "explicit 18+" + Drama
+ * - "none" (uncertified) + Drama
+ * - "none" (uncertified) + Romance
+ * - "19 / 19+" + Romance
  * Uses in-memory cache to ensure fast subsequent lookups.
  */
 export async function checkTVIsExplicitAdult(
@@ -290,7 +322,8 @@ export async function checkTVIsExplicitAdult(
   genreIds?: number[]
 ): Promise<boolean> {
   const isRomance = Array.isArray(genreIds) && genreIds.includes(ROMANCE_GENRE_ID);
-  const cacheKey = `t_${tvId}_${isRomance ? 'rom' : 'gen'}`;
+  const isDrama = Array.isArray(genreIds) && genreIds.includes(DRAMA_GENRE_ID);
+  const cacheKey = `t_${tvId}_r${isRomance ? 1 : 0}_d${isDrama ? 1 : 0}`;
   if (explicitRatingCache.has(cacheKey)) {
     return explicitRatingCache.get(cacheKey)!;
   }
@@ -303,19 +336,28 @@ export async function checkTVIsExplicitAdult(
     // Strategy 4: Explicit descriptors on TV content ratings
     const hasExplicitDescriptor = Boolean(getExplicitAdultTVRating({ content_ratings: data } as any));
 
-    // Romance-specific rule:
-    // - certification: 19 / 19+ and genre: romance
-    // - no certification / unrated and genre: romance
-    let romanceAdultMatch = false;
-    if (isRomance) {
-      const isUncertified = !cert || UNRATED_RATINGS.has(cert.toUpperCase().trim());
-      const has19 = data?.results && Array.isArray(data.results) && data.results.some((c: any) =>
-        c.rating && /^19\+?$/i.test(c.rating.trim())
-      );
-      romanceAdultMatch = Boolean(isUncertified || has19);
-    }
+    const isUncertified = !cert || UNRATED_RATINGS.has(cert.toUpperCase().trim());
 
-    const result = hasExplicitDescriptor || romanceAdultMatch;
+    // Check if any country has 19+ rating
+    const has19 = data?.results && Array.isArray(data.results) && data.results.some((c: any) =>
+      c.rating && /^19\+?$/i.test(c.rating.trim())
+    );
+
+    // Check if any country has an explicit 18+ rating
+    const hasExplicit18 = data?.results && Array.isArray(data.results) && data.results.some((c: any) =>
+      c.rating && isExplicit18PlusRating(c.rating, c.iso_3166_1)
+    );
+
+    // Genre-specific filtering rules:
+    // 1. rating: "explicit 18+" + genre: romance
+    // 2. rating: "explicit 18+" + genre: drama
+    // 3. rating: none + genre: drama
+    // 4. rating: none + genre: romance
+    // 5. rating: 19+ + genre: romance
+    const romanceMatch = isRomance && (hasExplicit18 || isUncertified || has19);
+    const dramaMatch = isDrama && (hasExplicit18 || isUncertified);
+
+    const result = hasExplicitDescriptor || romanceMatch || dramaMatch;
     explicitRatingCache.set(cacheKey, result);
     return result;
   } catch {
