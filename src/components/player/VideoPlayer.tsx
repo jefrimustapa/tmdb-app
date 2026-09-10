@@ -78,7 +78,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const [showControls, setShowControls] = useState(true);
   const [topProviders, setTopProviders] = useState<string[]>(['vidlink', 'moviesapi', 'cinesrc']);
   const [topAnimeProviders, setTopAnimeProviders] = useState<string[]>(['megaplay-anime', 'cinesrc', 'moviesapi']);
-  const [topAsianProviders, setTopAsianProviders] = useState<string[]>(['lari21-asian', 'cinesrc', 'moviesapi']);
+  const [topAsianProviders, setTopAsianProviders] = useState<string[]>(['vidlink', '111movies', 'lari21-asian']);
   const [topKoreanProviders, setTopKoreanProviders] = useState<string[]>(['kisskh-kdrama', 'cinesrc', 'moviesapi']);
   const [enabledResolvers, setEnabledResolvers] = useState<StreamResolverType[]>(['embed']);
 
@@ -392,16 +392,16 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     if (provider.id === 'lari21-asian' || provider.id === 'lk21-asian' || provider.category === 'asian' || provider.id === 'megaplay-anime') {
       return baseStreamUrl;
     }
-    // CineSrc: pass continueprompt=false to suppress the "Resume watching?" dialog, and pass t= for auto-resume
+    // CineSrc: pass continueprompt=false to suppress the "Resume watching?" dialog, autonext=false to disable native upnext overlay, and pass t= for auto-resume
     if (provider.id === 'cinesrc') {
       const sep = baseStreamUrl.includes('?') ? '&' : '?';
       if (initialTimestamp === 0) {
-        return `${baseStreamUrl}${sep}continueprompt=false&t=0#t=0`;
+        return `${baseStreamUrl}${sep}continueprompt=false&autonext=false&t=0#t=0`;
       }
       if (resumeTimestamp > 0) {
-        return `${baseStreamUrl}${sep}continueprompt=false&t=${resumeTimestamp}#t=${resumeTimestamp}`;
+        return `${baseStreamUrl}${sep}continueprompt=false&autonext=false&t=${resumeTimestamp}#t=${resumeTimestamp}`;
       }
-      return `${baseStreamUrl}${sep}continueprompt=false`;
+      return `${baseStreamUrl}${sep}continueprompt=false&autonext=false`;
     }
 
     // KissKH supports hash fragment #t= for seamless auto-resume or restart via injected observer
@@ -1042,15 +1042,49 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       } catch {}
     };
 
+    // Inject CSS to hide CineSrc native episode selector button once iframe loads
+    const styleCineSrcIframe = () => {
+      try {
+        const iframe = playerContainerRef.current?.querySelector('iframe');
+        if (iframe && (iframe.src.includes('cinesrc') || provider.id === 'cinesrc')) {
+          const doc = iframe.contentDocument || (iframe.contentWindow && (iframe.contentWindow as any).document);
+          if (doc && !doc.__tmdb_cinesrc_styled) {
+            doc.__tmdb_cinesrc_styled = true;
+            const style = doc.createElement('style');
+            style.id = 'tmdb-cinesrc-hide-episodes';
+            style.textContent = `
+              #base-ui-_r_8_,
+              [id="base-ui-_r_8_"] {
+                display: none !important;
+                opacity: 0 !important;
+                pointer-events: none !important;
+                visibility: hidden !important;
+                width: 0 !important;
+                height: 0 !important;
+                max-width: 0 !important;
+                max-height: 0 !important;
+                overflow: hidden !important;
+                margin: 0 !important;
+                padding: 0 !important;
+              }
+            `;
+            (doc.head || doc.documentElement).appendChild(style);
+          }
+        }
+      } catch {}
+    };
+
     // Attempt immediately, and retry at 500ms, 1200ms, 2500ms, and 4000ms once media buffer begins
     sendUnmuteMessages();
+    styleCineSrcIframe();
     setTimeout(() => {
       sendUnmuteMessages();
       activateCenterPlayButton();
+      styleCineSrcIframe();
     }, 600);
-    setTimeout(sendUnmuteMessages, 1200);
-    setTimeout(sendUnmuteMessages, 2500);
-    setTimeout(sendUnmuteMessages, 4000);
+    setTimeout(() => { sendUnmuteMessages(); styleCineSrcIframe(); }, 1200);
+    setTimeout(() => { sendUnmuteMessages(); styleCineSrcIframe(); }, 2500);
+    setTimeout(() => { sendUnmuteMessages(); styleCineSrcIframe(); }, 4000);
   };
 
   const handleIframeError = () => {

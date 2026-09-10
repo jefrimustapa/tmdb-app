@@ -248,8 +248,6 @@ function isExplicit18PlusRating(cert?: string | null, countryCode?: string): boo
  * Check if a movie has explicit adult/sexual content by checking release descriptors & notes (Strategy 4),
  * or genre-specific combinations:
  * - "explicit 18+" + Romance
- * - "explicit 18+" + Drama
- * - "none" (uncertified) + Drama
  * - "none" (uncertified) + Romance
  * - "19 / 19+" + Romance
  * Uses in-memory cache to ensure fast subsequent lookups.
@@ -260,15 +258,14 @@ export async function checkMovieIsExplicitAdult(
   genreIds?: number[]
 ): Promise<boolean> {
   const isRomance = Array.isArray(genreIds) && genreIds.includes(ROMANCE_GENRE_ID);
-  const isDrama = Array.isArray(genreIds) && genreIds.includes(DRAMA_GENRE_ID);
 
-  // Optimization 1: When genres are known and title is neither Romance nor Drama,
-  // genre-specific adult rules (18+ / 19+ / none) never match.
-  if (Array.isArray(genreIds) && !isRomance && !isDrama) {
+  // Optimization 1: When genres are known and title is not Romance,
+  // genre-specific adult rules (18+ / 19+ / none + romance) never match.
+  if (Array.isArray(genreIds) && !isRomance) {
     return false;
   }
 
-  const cacheKey = `m_${movieId}_r${isRomance ? 1 : 0}_d${isDrama ? 1 : 0}`;
+  const cacheKey = `m_${movieId}_r${isRomance ? 1 : 0}`;
   if (explicitRatingCache.has(cacheKey)) {
     return explicitRatingCache.get(cacheKey)!;
   }
@@ -309,14 +306,11 @@ export async function checkMovieIsExplicitAdult(
 
     // Genre-specific filtering rules:
     // 1. rating: "explicit 18+" + genre: romance
-    // 2. rating: "explicit 18+" + genre: drama
-    // 3. rating: none + genre: drama
-    // 4. rating: none + genre: romance
-    // 5. rating: 19+ + genre: romance
+    // 2. rating: none + genre: romance
+    // 3. rating: 19+ + genre: romance
     const romanceMatch = isRomance && (hasExplicit18 || isUncertified || has19);
-    const dramaMatch = isDrama && (hasExplicit18 || isUncertified);
 
-    const result = hasExplicitDescriptor || romanceMatch || dramaMatch;
+    const result = hasExplicitDescriptor || romanceMatch;
     explicitRatingCache.set(cacheKey, result);
     dbService.setRatingCacheItem(cacheKey, result).catch(() => {});
     return result;
@@ -329,8 +323,6 @@ export async function checkMovieIsExplicitAdult(
  * Check if a TV series has explicit adult/sexual content by checking content descriptors (Strategy 4),
  * or genre-specific combinations:
  * - "explicit 18+" + Romance
- * - "explicit 18+" + Drama
- * - "none" (uncertified) + Drama
  * - "none" (uncertified) + Romance
  * - "19 / 19+" + Romance
  * Uses in-memory and IndexedDB persistent cache to ensure fast subsequent lookups.
@@ -341,15 +333,14 @@ export async function checkTVIsExplicitAdult(
   genreIds?: number[]
 ): Promise<boolean> {
   const isRomance = Array.isArray(genreIds) && genreIds.includes(ROMANCE_GENRE_ID);
-  const isDrama = Array.isArray(genreIds) && genreIds.includes(DRAMA_GENRE_ID);
 
-  // Optimization 1: When genres are known and title is neither Romance nor Drama,
-  // genre-specific adult rules (18+ / 19+ / none) never match.
-  if (Array.isArray(genreIds) && !isRomance && !isDrama) {
+  // Optimization 1: When genres are known and title is not Romance,
+  // genre-specific adult rules (18+ / 19+ / none + romance) never match.
+  if (Array.isArray(genreIds) && !isRomance) {
     return false;
   }
 
-  const cacheKey = `t_${tvId}_r${isRomance ? 1 : 0}_d${isDrama ? 1 : 0}`;
+  const cacheKey = `t_${tvId}_r${isRomance ? 1 : 0}`;
   if (explicitRatingCache.has(cacheKey)) {
     return explicitRatingCache.get(cacheKey)!;
   }
@@ -386,14 +377,11 @@ export async function checkTVIsExplicitAdult(
 
     // Genre-specific filtering rules:
     // 1. rating: "explicit 18+" + genre: romance
-    // 2. rating: "explicit 18+" + genre: drama
-    // 3. rating: none + genre: drama
-    // 4. rating: none + genre: romance
-    // 5. rating: 19+ + genre: romance
+    // 2. rating: none + genre: romance
+    // 3. rating: 19+ + genre: romance
     const romanceMatch = isRomance && (hasExplicit18 || isUncertified || has19);
-    const dramaMatch = isDrama && (hasExplicit18 || isUncertified);
 
-    const result = hasExplicitDescriptor || romanceMatch || dramaMatch;
+    const result = hasExplicitDescriptor || romanceMatch;
     explicitRatingCache.set(cacheKey, result);
     dbService.setRatingCacheItem(cacheKey, result).catch(() => {});
     return result;

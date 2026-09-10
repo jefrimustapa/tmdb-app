@@ -636,7 +636,7 @@ export const Settings: React.FC = () => {
                       ]
                     : priorityCategoryTab === 'asian'
                     ? [
-                        { index: 0, label: 'Asean #1 (Primary)', badgeClass: 'bg-amber-500/20 text-amber-300 border-amber-500/40', defaultId: 'cinesrc' },
+                        { index: 0, label: 'Asean #1 (Primary)', badgeClass: 'bg-amber-500/20 text-amber-300 border-amber-500/40', defaultId: 'vidlink' },
                         { index: 1, label: 'Asean #2 (Failover 1)', badgeClass: 'bg-hbo-purple/30 text-hbo-purple-light border-hbo-purple/40', defaultId: '111movies' },
                         { index: 2, label: 'Asean #3 (Failover 2)', badgeClass: 'bg-hbo-cyan/20 text-hbo-cyan border-hbo-cyan/40', defaultId: 'lari21-asian' }
                       ]
@@ -662,7 +662,7 @@ export const Settings: React.FC = () => {
                       : isAsianTab
                       ? (settings.topAsianProviders && settings.topAsianProviders.length >= 3
                           ? settings.topAsianProviders
-                          : ['cinesrc', '111movies', 'lari21-asian'])
+                          : ['vidlink', '111movies', 'lari21-asian'])
                       : isAnimeTab
                       ? (settings.topAnimeProviders && settings.topAnimeProviders.length >= 3
                           ? settings.topAnimeProviders

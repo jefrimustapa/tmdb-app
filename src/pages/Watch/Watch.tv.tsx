@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import { tmdbApi } from '../../services/tmdb';
 import type { TMDBMovieDetails, TMDBTVDetails, TMDBSeasonDetails } from '../../types/tmdb';
@@ -126,7 +126,7 @@ export const Watch: React.FC = () => {
             const defaultProvider = koreanFlag
               ? (s.topKoreanProviders?.[0] || 'kisskh-kdrama')
               : asianFlag
-              ? (s.topAsianProviders?.[0] || 'cinesrc')
+              ? (s.topAsianProviders?.[0] || 'vidlink')
               : animeFlag
               ? (s.topAnimeProviders?.[0] || 'megaplay-anime')
               : (s.topProviders?.[0] || s.preferredProvider || 'vidlink');
@@ -478,6 +478,22 @@ export const Watch: React.FC = () => {
     navigate(`/watch/tv/${tmdbId}?s=${prevEpisodeInfo.season}&e=${prevEpisodeInfo.episode}`, { replace: true });
   }, [prevEpisodeInfo, navigate, tmdbId]);
 
+  // Dim-fade the episode title only when it extends past the horizontal centre of the screen.
+  // Must live here (before any early return) to satisfy Rules of Hooks.
+  const episodeTitleRef = useRef<HTMLSpanElement>(null);
+  const [episodeTitleOverflows, setEpisodeTitleOverflows] = useState(false);
+  const checkEpisodeTitleOverflow = useCallback(() => {
+    if (!episodeTitleRef.current) return;
+    setEpisodeTitleOverflows(episodeTitleRef.current.getBoundingClientRect().right > window.innerWidth / 2);
+  }, []);
+  useEffect(() => {
+    checkEpisodeTitleOverflow();
+    const ro = new ResizeObserver(checkEpisodeTitleOverflow);
+    if (episodeTitleRef.current) ro.observe(episodeTitleRef.current);
+    window.addEventListener('resize', checkEpisodeTitleOverflow);
+    return () => { ro.disconnect(); window.removeEventListener('resize', checkEpisodeTitleOverflow); };
+  }, [checkEpisodeTitleOverflow, currentEpisode?.name]);
+
   if (isLoading || !details) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-hbo-dark">
@@ -489,7 +505,7 @@ export const Watch: React.FC = () => {
 
   const title = details.title || details.name;
   const releaseYear = (details.release_date || details.first_air_date || '').split('-')[0];
-  const episodeLabel = mediaType === 'tv' ? `S${seasonParam}E${episodeParam}` : null;
+  const episodeLabel = mediaType === 'tv' ? `S${seasonParam}:E${episodeParam}` : null;
 
   return (
     <div
@@ -500,7 +516,7 @@ export const Watch: React.FC = () => {
         {/* Overlay Top Header Nav: Row 1 (Back + Center-aligned Title, Provider Switcher) & Row 2 (Season/Episode info + Prev/Next buttons) */}
         <div
           data-watch-header="true"
-          className={`absolute top-0 left-0 right-0 z-40 flex flex-col gap-2 px-3 sm:px-6 pt-[max(0.75rem,env(safe-area-inset-top,1.75rem))] pb-5 bg-gradient-to-b from-black/95 via-black/60 to-transparent transition-all duration-300 pointer-events-auto ${
+          className={`absolute top-0 left-0 right-0 z-40 flex flex-col gap-2 px-3 sm:px-6 pt-[max(0.75rem,env(safe-area-inset-top,1.75rem))] pb-8 bg-gradient-to-b from-black via-black/90 to-transparent transition-all duration-300 pointer-events-auto ${
             headerVisible ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4 pointer-events-none'
           }`}
         >
@@ -562,22 +578,30 @@ export const Watch: React.FC = () => {
 
           {/* Row 2: Season & Episode Info (Left) + Episode Navigation (Prev & Next) (Right) */}
           {mediaType === 'tv' && (episodeLabel || prevEpisodeInfo || nextEpisodeInfo) && (
-            <div className="flex items-center justify-between gap-3 w-full pl-1 sm:pl-2">
-              {/* Left: Season & Episode Label */}
-              <div className="flex items-center gap-2 min-w-0">
+            <div className="flex items-center justify-between gap-3 w-full pl-0.5 sm:pl-1">
+              {/* Left: S1:E4 • Episode Title without box (with smooth gradient fade edge) */}
+              <div className="flex items-center gap-2 min-w-0 flex-1 max-w-[calc(100%-160px)] sm:max-w-xl">
                 {episodeLabel && (
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-md bg-hbo-purple/90 text-hbo-cyan border border-hbo-cyan/30 text-[11px] sm:text-xs font-black tracking-wider uppercase flex-shrink-0 shadow-sm">
+                  <span className="text-xs sm:text-sm font-semibold tracking-wider text-white/90 flex-shrink-0">
                     {episodeLabel}
                   </span>
                 )}
                 {currentEpisode?.name && (
-                  <span className="text-xs text-white/80 font-medium truncate max-w-[200px] sm:max-w-md">
-                    {currentEpisode.name}
-                  </span>
+                  <div
+                    className="overflow-hidden whitespace-nowrap min-w-0"
+                    style={episodeTitleOverflows ? {
+                      WebkitMaskImage: 'linear-gradient(to right, black 85%, transparent 100%)',
+                      maskImage: 'linear-gradient(to right, black 85%, transparent 100%)'
+                    } : undefined}
+                  >
+                    <span ref={episodeTitleRef} className="text-xs sm:text-sm text-white/75 font-medium">
+                      • {currentEpisode.name}
+                    </span>
+                  </div>
                 )}
               </div>
 
-              {/* Right: Prev & Next Episode Buttons */}
+              {/* Right: Prev & Next Episode Buttons (Unified Style) */}
               <div className="flex items-center gap-2 flex-shrink-0 ml-auto">
                 {prevEpisodeInfo && (
                   <button
@@ -593,13 +617,12 @@ export const Watch: React.FC = () => {
                     id="watch-prev-ep-btn"
                     data-watch-header-item="true"
                     tabIndex={0}
-                    title={`Play Previous: S${prevEpisodeInfo.season} E${prevEpisodeInfo.episode}`}
-                    aria-label={`Play Previous: S${prevEpisodeInfo.season} E${prevEpisodeInfo.episode}`}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/60 hover:bg-hbo-purple/80 text-white/90 hover:text-white border border-white/20 hover:border-hbo-cyan/30 text-xs font-bold transition hover:scale-105 tv-focus-target focus:ring-2 focus:ring-hbo-cyan focus:bg-hbo-purple"
+                    title={`Previous: S${prevEpisodeInfo.season} E${prevEpisodeInfo.episode}${prevEpisodeInfo.title ? ` - ${prevEpisodeInfo.title}` : ''}`}
+                    aria-label={`Previous Episode: S${prevEpisodeInfo.season} E${prevEpisodeInfo.episode}`}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/60 hover:bg-white/15 text-white/80 hover:text-white border border-white/15 text-xs font-semibold transition hover:scale-105 tv-focus-target focus:ring-2 focus:ring-hbo-cyan focus:bg-white/20"
                   >
                     <SkipBack className="w-3.5 h-3.5" />
-                    <span className="hidden sm:inline">Prev: S{prevEpisodeInfo.season} E{prevEpisodeInfo.episode}</span>
-                    <span className="sm:hidden">Prev</span>
+                    <span>Prev</span>
                   </button>
                 )}
 
@@ -617,13 +640,12 @@ export const Watch: React.FC = () => {
                     id="watch-next-ep-btn"
                     data-watch-header-item="true"
                     tabIndex={0}
-                    title={`Play Next: S${nextEpisodeInfo.season} E${nextEpisodeInfo.episode}`}
-                    aria-label={`Play Next: S${nextEpisodeInfo.season} E${nextEpisodeInfo.episode}`}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-hbo-purple/60 hover:bg-hbo-purple text-hbo-cyan border border-hbo-cyan/30 text-xs font-bold transition hover:scale-105 tv-focus-target focus:ring-2 focus:ring-hbo-cyan focus:bg-hbo-purple"
+                    title={`Next: S${nextEpisodeInfo.season} E${nextEpisodeInfo.episode}${nextEpisodeInfo.title ? ` - ${nextEpisodeInfo.title}` : ''}`}
+                    aria-label={`Next Episode: S${nextEpisodeInfo.season} E${nextEpisodeInfo.episode}`}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/60 hover:bg-white/15 text-white/80 hover:text-white border border-white/15 text-xs font-semibold transition hover:scale-105 tv-focus-target focus:ring-2 focus:ring-hbo-cyan focus:bg-white/20"
                   >
+                    <span>Next</span>
                     <SkipForward className="w-3.5 h-3.5" />
-                    <span className="hidden sm:inline">Next: S{nextEpisodeInfo.season} E{nextEpisodeInfo.episode}</span>
-                    <span className="sm:hidden">Next</span>
                   </button>
                 )}
               </div>

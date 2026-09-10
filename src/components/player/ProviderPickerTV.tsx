@@ -143,21 +143,18 @@ export const ProviderPickerTV: React.FC<ProviderPickerTVProps> = ({
         data-provider-trigger="true"
         data-watch-header-item="true"
         tabIndex={0}
-        className={`flex items-center gap-2 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl border backdrop-blur-md transition-all tv-focus-target ${
+        className={`flex items-center gap-2 px-3 py-1.5 rounded-full border transition-all tv-focus-target ${
           isOpen
             ? 'bg-hbo-purple/40 border-hbo-cyan text-white shadow-hbo-glow'
-            : 'bg-black/60 hover:bg-black/80 border-white/20 text-gray-200 hover:text-white'
+            : 'bg-black/60 hover:bg-black/80 border-white/15 text-gray-200 hover:text-white shadow-sm'
         }`}
         title="Switch Streaming Server"
       >
-        <Server className="w-4 h-4 text-hbo-cyan flex-shrink-0" />
+        <Server className="w-3.5 h-3.5 text-hbo-cyan flex-shrink-0" />
         <div className="text-left">
           <div className="flex items-center gap-1.5">
-            <span className="text-xs sm:text-sm font-bold text-white tracking-wide truncate max-w-[110px] sm:max-w-[160px]">
-              {compact ? shortServerName : selectedProvider.name}
-            </span>
-            <span className="text-[10px] font-extrabold px-1.5 py-0.5 rounded bg-hbo-purple text-hbo-cyan border border-hbo-cyan/30 uppercase tracking-wider flex-shrink-0">
-              {serverIndex}/{totalServers}
+            <span className="text-xs sm:text-sm font-semibold text-white tracking-wide truncate max-w-[120px] sm:max-w-[160px]">
+              {shortServerName}
             </span>
           </div>
           {isProbing && (
@@ -166,27 +163,31 @@ export const ProviderPickerTV: React.FC<ProviderPickerTVProps> = ({
             </p>
           )}
         </div>
-        <ChevronDown
-          className={`w-3.5 h-3.5 text-gray-400 transition-transform duration-200 ${isOpen ? 'rotate-180 text-hbo-cyan' : ''}`}
-        />
+        <ChevronDown className="w-3.5 h-3.5 text-gray-400" />
       </button>
 
       {isOpen && (
         <div
-          data-provider-dropdown-open="true"
-          className="absolute right-0 top-[calc(100%+8px)] w-80 sm:w-88 rounded-xl bg-hbo-card/98 border border-hbo-border shadow-2xl backdrop-blur-2xl z-50 flex flex-col overflow-hidden focus:outline-none animate-fade-in"
+          ref={dropdownRef}
+          className="absolute right-0 mt-2 w-72 sm:w-80 rounded-2xl bg-hbo-card/95 border border-white/20 shadow-2xl overflow-hidden z-50 animate-fade-in"
         >
-          {/* Fixed Non-Scrolling Header - Never overlaps items */}
-          <div className="px-3.5 py-2.5 text-[10px] font-bold text-gray-400 uppercase tracking-wider flex items-center justify-between border-b border-hbo-border/60 bg-hbo-dark/80 flex-shrink-0">
-            <span>Select Stream Server</span>
-            <ShieldCheck className="w-3.5 h-3.5 text-green-400" />
+          {/* Header */}
+          <div className="flex items-center justify-between px-4 py-2.5 border-b border-white/10 bg-hbo-card">
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="w-4 h-4 text-green-400 flex-shrink-0" />
+              <span className="text-xs font-black uppercase tracking-wider text-white">
+                Select Stream Server
+              </span>
+            </div>
           </div>
 
-          {/* Scrollable Server Items Container */}
-          <div className="p-2 space-y-1.5 overflow-y-auto max-h-[min(320px,calc(100vh-140px))] focus-scroll-container">
+          {/* List */}
+          <div className="max-h-80 overflow-y-auto p-2 space-y-1">
             {displayProviders.map((provider, idx) => {
               const isSelected = provider.id === currentProviderId;
               const isHighlighted = idx === highlightedIndex;
+              const cleanName = provider.name.replace(/\s*\([^)]*\)/g, '').trim();
+
               return (
                 <button
                   key={provider.id}
@@ -230,7 +231,7 @@ export const ProviderPickerTV: React.FC<ProviderPickerTVProps> = ({
                       handleSelect(provider);
                     }
                   }}
-                  className={`w-full flex items-center justify-between gap-3 px-3.5 py-2.5 sm:py-3 rounded-xl text-left transition-all tv-focus-target focus:outline-none ${
+                  className={`w-full flex items-center justify-between gap-3 px-3 py-2 sm:py-2.5 rounded-xl text-left transition-all tv-focus-target focus:outline-none ${
                     isHighlighted
                       ? 'bg-hbo-purple/40 border border-hbo-cyan/60 text-white font-bold'
                       : (isSelected
@@ -238,28 +239,24 @@ export const ProviderPickerTV: React.FC<ProviderPickerTVProps> = ({
                         : 'text-gray-300 hover:text-white hover:bg-hbo-hover border border-transparent')
                   }`}
                 >
-                  <div className="min-w-0 flex-1 pr-1">
-                    <div className="flex items-center gap-2">
-                      <p className={`text-xs sm:text-sm font-bold truncate ${isHighlighted || isSelected ? 'text-hbo-cyan' : 'text-white'}`}>
-                        {provider.name}
-                      </p>
-                      <span className={`text-[10px] px-2 py-0.5 rounded font-bold whitespace-nowrap flex-shrink-0 ${
-                        provider.badge === 'Anime'
-                          ? 'bg-gradient-to-r from-pink-500/30 to-purple-500/30 text-pink-300 border border-pink-500/40'
-                          : provider.badge === 'K-Drama'
-                          ? 'bg-gradient-to-r from-rose-500/30 to-pink-500/30 text-rose-300 border border-rose-500/40'
-                          : provider.badge === 'Asean'
-                          ? 'bg-gradient-to-r from-amber-500/30 to-red-500/30 text-amber-300 border border-amber-500/40'
-                          : 'bg-white/10 text-gray-300'
-                      }`}>
-                        {provider.badge}
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-gray-400 mt-0.5 leading-snug truncate">
-                      {provider.tagline}
+                  <div className="min-w-0 flex-1 flex items-center gap-2 pr-1">
+                    <p className={`text-xs sm:text-sm font-bold truncate ${isHighlighted || isSelected ? 'text-hbo-cyan' : 'text-white'}`}>
+                      {cleanName}
                     </p>
+                    <span className="text-white/40 text-xs select-none">•</span>
+                    <span className={`text-[10px] px-2 py-0.5 rounded font-bold whitespace-nowrap flex-shrink-0 ${
+                      provider.badge === 'Anime'
+                        ? 'bg-gradient-to-r from-pink-500/30 to-purple-500/30 text-pink-300 border border-pink-500/40'
+                        : provider.badge === 'K-Drama'
+                        ? 'bg-gradient-to-r from-rose-500/30 to-pink-500/30 text-rose-300 border border-rose-500/40'
+                        : provider.badge === 'Asean'
+                        ? 'bg-gradient-to-r from-amber-500/30 to-red-500/30 text-amber-300 border border-amber-500/40'
+                        : 'bg-white/10 text-gray-300'
+                    }`}>
+                      {provider.badge}
+                    </span>
                   </div>
-                  {isSelected && <Check className="w-3.5 h-3.5 text-hbo-cyan flex-shrink-0 ml-2" />}
+                  {isSelected && <Check className="w-4 h-4 text-hbo-cyan flex-shrink-0 ml-1.5" />}
                 </button>
               );
             })}
