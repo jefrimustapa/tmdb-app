@@ -86,7 +86,7 @@ export interface UserSettings {
   adBlockShield: boolean;
   filterAdult: boolean;
   filterUnreleased?: boolean;
-  maturityLevel: 'all' | 'pg13' | 'family';
+  maturityLevel: 'all' | 'mature' | 'teen' | 'older_kids' | 'kids' | 'pg13' | 'family';
   streamResolver: StreamResolverType; // Legacy single selection
   enabledResolvers: StreamResolverType[]; // Multi or single enabled engines (e.g. ['torbox', 'private_extractor', 'embed'])
   directStreamApiUrl?: string; // Custom or default Consumet API URL (e.g. https://tmdb-api-yfbu.onrender.com)

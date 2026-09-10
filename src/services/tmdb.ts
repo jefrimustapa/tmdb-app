@@ -82,12 +82,22 @@ async function tmdbFetch<T>(endpoint: string, params: Record<string, string | nu
     if (filterUnreleased && !params['primary_release_date.lte']) {
       url.searchParams.set('primary_release_date.lte', todayStr);
     }
-    if (maturityLevel === 'pg13') {
+    if (maturityLevel === 'mature') {
+      // 16+ / 17+: Up to R (excludes NC-17, explicit adult)
+      url.searchParams.set('certification_country', 'US');
+      url.searchParams.set('certification.lte', 'R');
+    } else if (maturityLevel === 'teen' || maturityLevel === 'pg13') {
+      // 13+: Up to PG-13 (excludes R, NC-17)
       url.searchParams.set('certification_country', 'US');
       url.searchParams.set('certification.lte', 'PG-13');
-    } else if (maturityLevel === 'family') {
+    } else if (maturityLevel === 'older_kids' || maturityLevel === 'family') {
+      // 7+: Up to PG (excludes PG-13, R)
       url.searchParams.set('certification_country', 'US');
       url.searchParams.set('certification.lte', 'PG');
+    } else if (maturityLevel === 'kids') {
+      // 0+: Strictly G / All Ages
+      url.searchParams.set('certification_country', 'US');
+      url.searchParams.set('certification.lte', 'G');
     }
     if (filterAdult) {
       const existingWithout = url.searchParams.get('without_keywords');
@@ -100,12 +110,22 @@ async function tmdbFetch<T>(endpoint: string, params: Record<string, string | nu
     if (filterUnreleased && !params['first_air_date.lte']) {
       url.searchParams.set('first_air_date.lte', todayStr);
     }
-    if (maturityLevel === 'pg13') {
+    if (maturityLevel === 'mature') {
+      // 16+: Up to TV-14 / mild TV-MA
+      url.searchParams.set('certification_country', 'US');
+      url.searchParams.set('certification.lte', 'TV-MA');
+    } else if (maturityLevel === 'teen' || maturityLevel === 'pg13') {
+      // 13+: Up to TV-14
       url.searchParams.set('certification_country', 'US');
       url.searchParams.set('certification.lte', 'TV-14');
-    } else if (maturityLevel === 'family') {
+    } else if (maturityLevel === 'older_kids' || maturityLevel === 'family') {
+      // 7+: Up to TV-PG
       url.searchParams.set('certification_country', 'US');
       url.searchParams.set('certification.lte', 'TV-PG');
+    } else if (maturityLevel === 'kids') {
+      // 0+: Strictly TV-Y / TV-G
+      url.searchParams.set('certification_country', 'US');
+      url.searchParams.set('certification.lte', 'TV-G');
     }
     if (filterAdult) {
       const existingWithout = url.searchParams.get('without_keywords');
