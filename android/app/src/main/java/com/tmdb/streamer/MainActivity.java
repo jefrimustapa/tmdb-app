@@ -148,6 +148,9 @@ public class MainActivity extends BridgeActivity {
             android.webkit.CookieManager cookieManager = android.webkit.CookieManager.getInstance();
             cookieManager.setAcceptCookie(true);
             cookieManager.setAcceptThirdPartyCookies(webView, true);
+            // Enable cross-frame access for DOM styling and bridge inspection
+            settings.setAllowFileAccessFromFileURLs(true);
+            settings.setAllowUniversalAccessFromFileURLs(true);
             // Set modern Chrome mobile user agent to prevent 403 bot-blocking by embed providers
             settings.setUserAgentString("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36");
 
@@ -917,6 +920,208 @@ public class MainActivity extends BridgeActivity {
                             } catch (Exception ignored) {}
                         }
 
+                        // CineSrc CSS Interceptor: Append hide rules directly to CineSrc stylesheets
+                        // This bypasses Same-Origin Policy completely and does NOT affect HTML or API tokens!
+                        if (lower.contains("cinesrc.st") && lower.contains(".css")) {
+                            try {
+                                URL url = new URL(rawUrl);
+                                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                                conn.setRequestMethod(request.getMethod());
+                                conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36");
+                                conn.setRequestProperty("Referer", "https://cinesrc.st/");
+                                int statusCode = conn.getResponseCode();
+                                InputStream in = statusCode >= 400 ? conn.getErrorStream() : conn.getInputStream();
+                                if (in != null && statusCode < 400) {
+                                    ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                                    byte[] buffer = new byte[8192];
+                                    int len;
+                                    while ((len = in.read(buffer)) != -1) {
+                                        baos.write(buffer, 0, len);
+                                    }
+                                    in.close();
+                                    String extraCss = "\n#base-ui-_r_8_, [id='base-ui-_r_8_'] { display: none !important; opacity: 0 !important; pointer-events: none !important; visibility: hidden !important; width: 0 !important; height: 0 !important; max-width: 0 !important; max-height: 0 !important; overflow: hidden !important; margin: 0 !important; padding: 0 !important; }\n";
+                                    baos.write(extraCss.getBytes(StandardCharsets.UTF_8));
+                                    Map<String, String> headers = new HashMap<>();
+                                    headers.put("Access-Control-Allow-Origin", "*");
+                                    return new WebResourceResponse(
+                                        "text/css",
+                                        "UTF-8",
+                                        200,
+                                        "OK",
+                                        headers,
+                                        new ByteArrayInputStream(baos.toByteArray())
+                                    );
+                                }
+                            } catch (Exception ignored) {}
+                        }
+
+                        // VidLink Auto-Unmute Injector (Option A)
+                        // Intercepts vidlink.pro HTML pages and injects a script that:
+                        // 1. Pre-sets mediaSettings localStorage to {volume:1, muted:false} before Vidstack reads it
+                        // 2. Polls every 500ms to click the mute button if the player initializes muted
+                        if (lower.contains("vidlink.pro") && !lower.contains(".js") && !lower.contains(".css")
+                                && !lower.contains(".png") && !lower.contains(".jpg") && !lower.contains(".svg")
+                                && !lower.contains(".woff") && !lower.contains(".ico") && !lower.contains(".json")
+                                && !lower.contains(".m3u8") && !lower.contains(".ts") && !lower.contains(".mp4")) {
+                            try {
+                                URL url = new URL(rawUrl);
+                                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                                conn.setRequestMethod(request.getMethod());
+                                conn.setConnectTimeout(12000);
+                                conn.setReadTimeout(15000);
+                                Map<String, String> reqHeaders = request.getRequestHeaders();
+                                if (reqHeaders != null) {
+                                    for (Map.Entry<String, String> entry : reqHeaders.entrySet()) {
+                                        String k = entry.getKey().toLowerCase();
+                                        if (!k.equals("host")) {
+                                            conn.setRequestProperty(entry.getKey(), entry.getValue());
+                                        }
+                                    }
+                                }
+                                conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36");
+                                String vidlinkCookie = android.webkit.CookieManager.getInstance().getCookie(rawUrl);
+                                if (vidlinkCookie != null && !vidlinkCookie.isEmpty()) {
+                                    conn.setRequestProperty("Cookie", vidlinkCookie);
+                                }
+
+                                int statusCode = conn.getResponseCode();
+                                String contentType = conn.getContentType();
+                                String mimeType = "text/html";
+                                String encoding = "UTF-8";
+                                if (contentType != null) {
+                                    String[] parts = contentType.split(";");
+                                    mimeType = parts[0].trim();
+                                    for (String part : parts) {
+                                        if (part.trim().toLowerCase().startsWith("charset=")) {
+                                            encoding = part.trim().substring(8).trim();
+                                        }
+                                    }
+                                }
+
+                                // Store cookies from response
+                                for (Map.Entry<String, java.util.List<String>> header : conn.getHeaderFields().entrySet()) {
+                                    if (header.getKey() != null && header.getKey().equalsIgnoreCase("set-cookie")) {
+                                        for (String cookieVal : header.getValue()) {
+                                            android.webkit.CookieManager.getInstance().setCookie(rawUrl, cookieVal);
+                                        }
+                                    }
+                                }
+
+                                InputStream in = statusCode >= 400 ? conn.getErrorStream() : conn.getInputStream();
+                                if (in != null && mimeType != null && mimeType.contains("html") && statusCode < 400) {
+                                    try {
+                                        BufferedReader reader = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8));
+                                        StringBuilder sb = new StringBuilder();
+                                        String l;
+                                        while ((l = reader.readLine()) != null) {
+                                            sb.append(l).append("\n");
+                                        }
+                                        String html = sb.toString();
+
+                                        // Auto-unmute injection script for VidLink (Vidstack player)
+                                        // Runs BEFORE Next.js hydration so localStorage is pre-set before player reads it
+                                        String vidlinkUnmuteScript = "<script>\n" +
+                                            "(function() {\n" +
+                                            "  // 1. Pre-set VidLink mediaSettings in localStorage BEFORE Vidstack reads it\n" +
+                                            "  try {\n" +
+                                            "    var ms = { volume: 1, muted: false, lang: 'English', captions: false };\n" +
+                                            "    localStorage.setItem('mediaSettings', JSON.stringify(ms));\n" +
+                                            "    console.log('[TMDB] VidLink mediaSettings pre-set to unmuted');\n" +
+                                            "  } catch(e) {}\n" +
+                                            "\n" +
+                                            "  // 2. Poll every 500ms to click mute button if player initializes muted\n" +
+                                            "  var vidlinkUnmuteTimer = setInterval(function() {\n" +
+                                            "    try {\n" +
+                                            "      // Re-enforce localStorage every poll cycle in case player resets it\n" +
+                                            "      var stored = localStorage.getItem('mediaSettings');\n" +
+                                            "      if (!stored) {\n" +
+                                            "        localStorage.setItem('mediaSettings', JSON.stringify({ volume: 1, muted: false, lang: 'English', captions: false }));\n" +
+                                            "      } else {\n" +
+                                            "        try {\n" +
+                                            "          var parsed = JSON.parse(stored);\n" +
+                                            "          if (parsed.muted !== false || parsed.volume !== 1) {\n" +
+                                            "            parsed.muted = false;\n" +
+                                            "            parsed.volume = 1;\n" +
+                                            "            localStorage.setItem('mediaSettings', JSON.stringify(parsed));\n" +
+                                            "          }\n" +
+                                            "        } catch(pe) {}\n" +
+                                            "      }\n" +
+                                            "\n" +
+                                            "      // Click the mute button if it is in muted state\n" +
+                                            "      var muteBtn = document.querySelector('button[data-media-mute-button][data-state=\"muted\"]');\n" +
+                                            "      if (muteBtn) {\n" +
+                                            "        muteBtn.click();\n" +
+                                            "        console.log('[TMDB] VidLink mute button clicked to unmute');\n" +
+                                            "      }\n" +
+                                            "\n" +
+                                            "      // Also directly set video element muted=false and volume=1 if accessible\n" +
+                                            "      var videos = document.querySelectorAll('video');\n" +
+                                            "      videos.forEach(function(v) {\n" +
+                                            "        if (v.muted) {\n" +
+                                            "          v.muted = false;\n" +
+                                            "          v.volume = 1.0;\n" +
+                                            "          console.log('[TMDB] VidLink video element unmuted directly');\n" +
+                                            "        }\n" +
+                                            "      });\n" +
+                                            "    } catch(e) {}\n" +
+                                            "  }, 500);\n" +
+                                            "\n" +
+                                            "  // 3. Stop aggressive polling after 30s (player should be initialized by then)\n" +
+                                            "  setTimeout(function() {\n" +
+                                            "    clearInterval(vidlinkUnmuteTimer);\n" +
+                                            "    // Start a lighter maintenance poll every 5s for unmute persistence\n" +
+                                            "    setInterval(function() {\n" +
+                                            "      try {\n" +
+                                            "        var muteBtn = document.querySelector('button[data-media-mute-button][data-state=\"muted\"]');\n" +
+                                            "        if (muteBtn) muteBtn.click();\n" +
+                                            "        var videos = document.querySelectorAll('video');\n" +
+                                            "        videos.forEach(function(v) { if (v.muted) { v.muted = false; v.volume = 1.0; } });\n" +
+                                            "      } catch(e) {}\n" +
+                                            "    }, 5000);\n" +
+                                            "  }, 30000);\n" +
+                                            "})();\n" +
+                                            "</script>\n";
+
+                                        // Inject as the very FIRST script in <head> so it runs before Next.js bundles
+                                        if (html.contains("<head>")) {
+                                            html = html.replace("<head>", "<head>\n" + vidlinkUnmuteScript);
+                                        } else if (html.contains("<HEAD>")) {
+                                            html = html.replace("<HEAD>", "<HEAD>\n" + vidlinkUnmuteScript);
+                                        } else {
+                                            // No <head> tag found — inject at top of body
+                                            html = vidlinkUnmuteScript + html;
+                                        }
+                                        in = new ByteArrayInputStream(html.getBytes(StandardCharsets.UTF_8));
+                                        Log.i("TMDB_APP", "[VidLink] Auto-unmute script injected for: " + rawUrl);
+                                    } catch (Exception e) {
+                                        Log.w("TMDB_APP", "[VidLink] Script injection failed: " + e.getMessage());
+                                    }
+                                }
+
+                                Map<String, String> responseHeaders = new HashMap<>();
+                                responseHeaders.put("Access-Control-Allow-Origin", "*");
+                                responseHeaders.put("Access-Control-Allow-Headers", "*");
+                                for (Map.Entry<String, java.util.List<String>> header : conn.getHeaderFields().entrySet()) {
+                                    if (header.getKey() != null) {
+                                        String hKey = header.getKey().toLowerCase();
+                                        if (!hKey.equals("content-security-policy") && !hKey.equals("x-frame-options")) {
+                                            responseHeaders.put(header.getKey(), TextUtils.join(", ", header.getValue()));
+                                        }
+                                    }
+                                }
+                                return new WebResourceResponse(
+                                    mimeType,
+                                    encoding,
+                                    statusCode,
+                                    conn.getResponseMessage() != null ? conn.getResponseMessage() : "OK",
+                                    responseHeaders,
+                                    in
+                                );
+                            } catch (Exception e) {
+                                Log.w("TMDB_APP", "[VidLink] Intercept error: " + e.getMessage());
+                            }
+                        }
+
                         // Stealth 200 OK Ad/Tracker Interceptor (returns 0-byte dummy JS/CSS so anti-adblock detection never triggers)
                         if (isAdOrTrackerUrl(lower)) {
                             String mimeType = lower.contains(".css") ? "text/css" : "application/javascript";
@@ -967,8 +1172,31 @@ public class MainActivity extends BridgeActivity {
                         "      });" +
                         "    } catch(e) {}" +
                         "  }" +
+                        "  function hideCineSrcEpisodeBtn() {" +
+                        "    try {" +
+                        "      document.querySelectorAll('iframe').forEach(function(frame) {" +
+                        "        try {" +
+                        "          var doc = frame.contentDocument || (frame.contentWindow && frame.contentWindow.document);" +
+                        "          if (doc && !doc.__tmdb_cinesrc_styled) {" +
+                        "            var loc = (frame.contentWindow && frame.contentWindow.location ? frame.contentWindow.location.href : '') || (frame.src || '');" +
+                        "            if (loc.indexOf('cinesrc') !== -1) {" +
+                        "              doc.__tmdb_cinesrc_styled = true;" +
+                        "              var st = doc.createElement('style');" +
+                        "              st.id = 'tmdb-hide-cinesrc-episodes';" +
+                        "              st.textContent = \"#base-ui-_r_8_, [id='base-ui-_r_8_'] { display: none !important; opacity: 0 !important; pointer-events: none !important; visibility: hidden !important; width: 0 !important; height: 0 !important; max-width: 0 !important; max-height: 0 !important; overflow: hidden !important; margin: 0 !important; padding: 0 !important; }\";" +
+                        "              (doc.head || doc.documentElement).appendChild(st);" +
+                        "            }" +
+                        "          }" +
+                        "        } catch(e) {}" +
+                        "      });" +
+                        "    } catch(e) {}" +
+                        "  }" +
                         "  monitorMedia();" +
-                        "  setInterval(monitorMedia, 1000);" +
+                        "  hideCineSrcEpisodeBtn();" +
+                        "  setInterval(function() {" +
+                        "    monitorMedia();" +
+                        "    hideCineSrcEpisodeBtn();" +
+                        "  }, 1000);" +
                         "})();";
                     view.evaluateJavascript(mediaMonitorScript, null);
                 }
