@@ -28,6 +28,13 @@ const AppContent: React.FC = () => {
   const location = useLocation();
   const [startupUpdateInfo, setStartupUpdateInfo] = React.useState<UpdateInfo | null>(null);
 
+  // Check and auto-restore persistent data from external storage if fresh install / re-installed
+  React.useEffect(() => {
+    dbService.checkAndAutoRestore().catch(err => {
+      console.warn('[PersistentStorage] Startup check failed:', err);
+    });
+  }, []);
+
   // Synchronize Performance Mode attribute on document root (data-perf-mode="true")
   React.useEffect(() => {
     const syncPerfMode = (perfMode?: boolean) => {

@@ -151,6 +151,7 @@ export const dbService = {
           });
         }
       }
+      this.schedulePersistentSync();
     } catch (err) {
       console.error('Failed to save watch progress:', err);
     }
@@ -217,6 +218,7 @@ export const dbService = {
 
   async deleteHistoryItem(id: number) {
     await db.history.delete(id);
+    this.schedulePersistentSync();
   },
 
   async removeFromHistory(tmdbId: number, mediaType: 'movie' | 'tv') {
@@ -230,6 +232,7 @@ export const dbService = {
           await db.history.delete(item.id);
         }
       }
+      this.schedulePersistentSync();
     } catch (err) {
       console.error('Failed to remove from history:', err);
     }
@@ -237,21 +240,25 @@ export const dbService = {
 
   async clearHistory() {
     await db.history.clear();
+    this.schedulePersistentSync();
   },
 
   // Likes
   async toggleLike(item: Omit<LikedItem, 'id' | 'addedAt'>): Promise<boolean> {
     const existing = await db.likes.where({ tmdbId: item.tmdbId, mediaType: item.mediaType }).first();
+    let liked = false;
     if (existing && existing.id) {
       await db.likes.delete(existing.id);
-      return false; // unliked
+      liked = false; // unliked
     } else {
       await db.likes.add({ 
         ...item, 
         addedAt: Date.now() 
       });
-      return true; // liked
+      liked = true; // liked
     }
+    this.schedulePersistentSync();
+    return liked;
   },
 
   async isLiked(tmdbId: number, mediaType: 'movie' | 'tv'): Promise<boolean> {
@@ -266,16 +273,19 @@ export const dbService = {
   // Watchlist
   async toggleWatchlist(item: Omit<WatchlistItem, 'id' | 'addedAt'>): Promise<boolean> {
     const existing = await db.watchlist.where({ tmdbId: item.tmdbId, mediaType: item.mediaType }).first();
+    let watchlisted = false;
     if (existing && existing.id) {
       await db.watchlist.delete(existing.id);
-      return false; // removed
+      watchlisted = false; // removed
     } else {
       await db.watchlist.add({ 
         ...item, 
         addedAt: Date.now() 
       });
-      return true; // added
+      watchlisted = true; // added
     }
+    this.schedulePersistentSync();
+    return watchlisted;
   },
 
   async isWatchlisted(tmdbId: number, mediaType: 'movie' | 'tv'): Promise<boolean> {
@@ -363,6 +373,7 @@ export const dbService = {
     };
     cachedSettings = updated;
     await db.settings.put(updated);
+    this.schedulePersistentSync();
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('tmdb_settings_changed', { detail: updated }));
     }
@@ -397,5 +408,263 @@ export const dbService = {
     } catch (err) {
       console.warn('Failed to clear rating cache from IndexedDB:', err);
     }
+  },
+
+  // ==========================================
+  // Persistent Storage & Backup / Restore
+  // ==========================================
+
+  /**
+   * Bundles all user data (history, watchlist, likes, settings) into a single JSON object.
+   */
+  async exportAllData(): Promise<string> {
+    const history = await db.history.toArray();
+    const watchlist = await db.watchlist.toArray();
+    const likes = await db.likes.toArray();
+    const settings = await this.getSettings();
+
+    const payload = {
+      version: 1,
+      exportedAt: Date.now(),
+      appName: 'TMDB Streamer',
+      data: {
+        history,
+        watchlist,
+        likes,
+        settings
+      }
+    };
+    return JSON.stringify(payload, null, 2);
+  },
+
+  /**
+   * Imports and restores all user data from a backup JSON string.
+   */
+  async importAllData(jsonString: string): Promise<{ success: boolean; count: { history: number; watchlist: number; likes: number; settings: boolean } }> {
+    try {
+      const parsed = JSON.parse(jsonString);
+      const data = parsed.data || parsed;
+      let historyCount = 0;
+      let watchlistCount = 0;
+      let likesCount = 0;
+      let settingsRestored = false;
+
+      // 1. Restore Settings
+      if (data.settings && typeof data.settings === 'object') {
+        const current = await this.getSettings();
+        const merged: UserSettings = {
+          ...current,
+          ...data.settings,
+          id: 'current_settings',
+          updatedAt: Date.now()
+        };
+        await db.settings.put(merged);
+        cachedSettings = merged;
+        settingsRestored = true;
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('tmdb_settings_changed', { detail: merged }));
+        }
+      }
+
+      // 2. Restore History
+      if (Array.isArray(data.history)) {
+        for (const item of data.history) {
+          if (item && item.tmdbId && item.mediaType) {
+            // Check if exists
+            let existing: WatchHistoryItem | undefined;
+            if (item.mediaType === 'tv' && typeof item.season === 'number' && typeof item.episode === 'number') {
+              existing = await db.history
+                .where('[tmdbId+mediaType]')
+                .equals([item.tmdbId, item.mediaType])
+                .filter(h => h.season === item.season && h.episode === item.episode)
+                .first();
+            } else {
+              existing = await db.history
+                .where('[tmdbId+mediaType]')
+                .equals([item.tmdbId, item.mediaType])
+                .first();
+            }
+
+            if (existing && existing.id) {
+              await db.history.update(existing.id, {
+                ...item,
+                id: existing.id,
+                updatedAt: Math.max(existing.updatedAt || 0, item.updatedAt || 0)
+              });
+            } else {
+              const { id, ...cleanItem } = item;
+              await db.history.add(cleanItem);
+            }
+            historyCount++;
+          }
+        }
+      }
+
+      // 3. Restore Watchlist
+      if (Array.isArray(data.watchlist)) {
+        for (const item of data.watchlist) {
+          if (item && item.tmdbId && item.mediaType) {
+            const existing = await db.watchlist.where({ tmdbId: item.tmdbId, mediaType: item.mediaType }).first();
+            if (!existing) {
+              const { id, ...cleanItem } = item;
+              await db.watchlist.add(cleanItem);
+              watchlistCount++;
+            }
+          }
+        }
+      }
+
+      // 4. Restore Likes
+      if (Array.isArray(data.likes)) {
+        for (const item of data.likes) {
+          if (item && item.tmdbId && item.mediaType) {
+            const existing = await db.likes.where({ tmdbId: item.tmdbId, mediaType: item.mediaType }).first();
+            if (!existing) {
+              const { id, ...cleanItem } = item;
+              await db.likes.add(cleanItem);
+              likesCount++;
+            }
+          }
+        }
+      }
+
+      console.log(`[PersistentStorage] Data import completed: ${historyCount} history, ${watchlistCount} watchlist, ${likesCount} likes, settings=${settingsRestored}`);
+      return {
+        success: true,
+        count: {
+          history: historyCount,
+          watchlist: watchlistCount,
+          likes: likesCount,
+          settings: settingsRestored
+        }
+      };
+    } catch (err) {
+      console.error('[PersistentStorage] Failed to import data:', err);
+      return {
+        success: false,
+        count: { history: 0, watchlist: 0, likes: 0, settings: false }
+      };
+    }
+  },
+
+  /**
+   * Syncs current database state to the persistent Android storage backup file.
+   * Debounced to avoid excessive disk writes during video progress ticks.
+   */
+  schedulePersistentSync() {
+    if (typeof window === 'undefined') return;
+    const bridge = (window as any).AndroidBridge;
+    if (!bridge || typeof bridge.savePersistentBackup !== 'function') return;
+
+    if (_syncTimeout) {
+      clearTimeout(_syncTimeout);
+    }
+    _syncTimeout = setTimeout(async () => {
+      try {
+        const json = await dbService.exportAllData();
+        const ok = bridge.savePersistentBackup(json);
+        if (ok) {
+          console.log('[PersistentStorage] Auto-sync to persistent storage successful');
+        }
+      } catch (err) {
+        console.warn('[PersistentStorage] Auto-sync error:', err);
+      }
+    }, 2000);
+  },
+
+  /**
+   * Checks if Android persistent backup exists and restores it if IndexedDB is empty or upon request.
+   */
+  async checkAndAutoRestore(): Promise<boolean> {
+    if (typeof window === 'undefined') return false;
+    const bridge = (window as any).AndroidBridge;
+    if (!bridge || typeof bridge.hasPersistentBackup !== 'function' || typeof bridge.readPersistentBackup !== 'function') {
+      return false;
+    }
+
+    try {
+      const hasBackup = bridge.hasPersistentBackup();
+      // If no persistent backup exists yet, initialize it with current local data
+      if (!hasBackup) {
+        const historyCount = await db.history.count();
+        const watchlistCount = await db.watchlist.count();
+        const likesCount = await db.likes.count();
+        if (historyCount > 0 || watchlistCount > 0 || likesCount > 0) {
+          console.log('[PersistentStorage] Creating initial backup from existing data...');
+          await this.backupToPersistentStorage();
+        }
+        return false;
+      }
+
+      // Check if IndexedDB is brand new or empty (e.g. after fresh install)
+      const historyCount = await db.history.count();
+      const watchlistCount = await db.watchlist.count();
+      const likesCount = await db.likes.count();
+
+      // If already has significant local data, don't overwrite blindly on boot, but do restore if fresh install
+      if (historyCount === 0 && watchlistCount === 0 && likesCount === 0) {
+        console.log('[PersistentStorage] Fresh install detected! Automatically restoring from persistent backup...');
+        const backupJson = bridge.readPersistentBackup();
+        if (backupJson) {
+          const res = await this.importAllData(backupJson);
+          return res.success;
+        }
+      }
+    } catch (err) {
+      console.warn('[PersistentStorage] Auto-restore check failed:', err);
+    }
+    return false;
+  },
+
+  /**
+   * Manually trigger persistent backup to Android storage.
+   */
+  async backupToPersistentStorage(): Promise<boolean> {
+    if (typeof window === 'undefined') return false;
+    const bridge = (window as any).AndroidBridge;
+    if (!bridge || typeof bridge.savePersistentBackup !== 'function') return false;
+    try {
+      const json = await this.exportAllData();
+      return bridge.savePersistentBackup(json);
+    } catch (err) {
+      console.error('[PersistentStorage] Manual backup failed:', err);
+      return false;
+    }
+  },
+
+  /**
+   * Manually restore from Android persistent storage backup.
+   */
+  async restoreFromPersistentStorage(): Promise<{ success: boolean; count?: any }> {
+    if (typeof window === 'undefined') return { success: false };
+    const bridge = (window as any).AndroidBridge;
+    if (!bridge || typeof bridge.readPersistentBackup !== 'function') return { success: false };
+    try {
+      const json = bridge.readPersistentBackup();
+      if (!json) return { success: false };
+      return await this.importAllData(json);
+    } catch (err) {
+      console.error('[PersistentStorage] Manual restore failed:', err);
+      return { success: false };
+    }
+  },
+
+  getPersistentBackupMeta(): { available: boolean; timestamp: number; location: string } {
+    if (typeof window === 'undefined') return { available: false, timestamp: 0, location: '' };
+    const bridge = (window as any).AndroidBridge;
+    if (!bridge || typeof bridge.hasPersistentBackup !== 'function') {
+      return { available: false, timestamp: 0, location: '' };
+    }
+    try {
+      const available = bridge.hasPersistentBackup();
+      const timestamp = typeof bridge.getPersistentBackupTimestamp === 'function' ? bridge.getPersistentBackupTimestamp() : 0;
+      const location = typeof bridge.getPersistentBackupLocation === 'function' ? bridge.getPersistentBackupLocation() : '';
+      return { available, timestamp, location };
+    } catch {
+      return { available: false, timestamp: 0, location: '' };
+    }
   }
 };
+
+let _syncTimeout: any = null;
+
