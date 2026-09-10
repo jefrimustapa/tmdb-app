@@ -8,14 +8,22 @@
     --hbo-card: #0e0e17;
   }
   
-  html, body {
+  html {
+    overflow-x: hidden;
+    overflow-y: auto;
+    width: 100%;
+    max-width: 100vw;
+  }
+
+  body {
     background-color: #050508;
     color: #ffffff;
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
     -webkit-font-smoothing: antialiased;
     -webkit-tap-highlight-color: transparent;
     user-select: none;
-    overflow-x: clip;
+    overflow-x: hidden;
+    overflow-y: visible;
     max-width: 100vw;
     width: 100%;
   }
@@ -230,10 +238,12 @@ aside .tv-focus-target:focus-visible .tv-nav-label,
 }
 
 /* 7. Dedicated compositing and fluid touch panning for horizontal content rails */
+.overflow-x-auto,
 [data-content-rail="true"] .overflow-x-auto {
-  touch-action: pan-x pan-y;
+  touch-action: pan-x pan-y !important;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior-x: contain;
+  overscroll-behavior-y: auto;
 }
 
 [data-perf-mode="true"] [data-content-rail="true"] .overflow-x-auto {
