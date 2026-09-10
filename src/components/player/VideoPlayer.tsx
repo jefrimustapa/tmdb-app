@@ -123,6 +123,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const autoCycleTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const playerContainerRef = useRef<HTMLDivElement>(null);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<Hls | null>(null);
   const controlsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -651,6 +652,43 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           if (current > 0) {
             lastPostMessageTimeRef.current = Date.now();
             recordProgress(current, dur);
+          }
+          return;
+        }
+
+        // 3c. CineSrc Native Player events & Auto-Resume Seek Bridge
+        if (typeof data.type === 'string' && data.type.startsWith('cinesrc:')) {
+          const subType = data.type.substring(8); // 'ready', 'timeupdate', 'play', 'pause', 'ended', 'seeked', etc.
+
+          // On ready: if user has a saved resume timestamp, send auto-seek command into CineSrc iframe
+          if (subType === 'ready') {
+            if (resumeTimestamp > 0 && !hasSeekedInitialRef.current) {
+              hasSeekedInitialRef.current = true;
+              try {
+                iframeRef.current?.contentWindow?.postMessage({
+                  type: 'cinesrc:command',
+                  command: 'seek',
+                  args: [resumeTimestamp]
+                }, '*');
+              } catch {}
+            }
+            return;
+          }
+
+          if (subType === 'ended') {
+            const endDur = durationRef.current || data.duration || (episodeRuntimeMinutes ? episodeRuntimeMinutes * 60 : 0);
+            if (endDur > 0) recordProgress(endDur, endDur, true);
+            return;
+          }
+
+          if (subType === 'timeupdate' || subType === 'seeked' || subType === 'play') {
+            const current = data.currentTime ?? 0;
+            const dur = data.duration ?? 0;
+            if (current > 0) {
+              lastPostMessageTimeRef.current = Date.now();
+              recordProgress(current, dur);
+            }
+            return;
           }
           return;
         }
@@ -1202,6 +1240,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       {/* STATE 4: Protected Video Embed (ONLY rendered if embed is enabled) */}
       {playerMode === 'embed' && enabledResolvers.includes('embed') && (
         <iframe
+          ref={iframeRef}
           key={`${streamUrl}-${iframeKey}-${adShieldEnabled}`}
           src={streamUrl}
           title={title}
