@@ -154,24 +154,23 @@ async function tmdbFetch<T>(endpoint: string, params: Record<string, string | nu
 
   const data = await res.json();
 
-  // Filter adult items and explicit sexual/adult ratings if filterAdult is active
-  if (filterAdult && data && Array.isArray(data.results) && data.results.length > 0) {
+  // Helper to filter adult/NSFW items from any TMDB item array (e.g. data.results, data.similar.results, data.recommendations.results)
+  const filterMediaItemList = async (items: any[], defaultMediaType?: 'movie' | 'tv'): Promise<any[]> => {
+    if (!Array.isArray(items) || items.length === 0) return items;
+
     // Fast filter by item.adult flag
-    data.results = data.results.filter((item: any) => !item.adult);
+    let filtered = items.filter((item: any) => !item?.adult);
 
-    // If Performance Optimization Mode is ON, skip Strategy 1, 4, and 5 (network sub-requests and overview scanning)
-    // Server-side keyword exclusion (Strategy 3) and item.adult are active for maximum speed and zero lag!
     const isPerfMode = settings.performanceMode === true;
-
     if (!isPerfMode) {
       // Strategy 5: Filter by title and overview heuristics (immediate synchronous check)
-      data.results = data.results.filter((item: any) => {
+      filtered = filtered.filter((item: any) => {
         if (!item) return false;
         const textToCheck = `${item.title || item.name || ''} ${item.overview || ''}`;
         return !containsExplicitAdultText(textToCheck);
       });
 
-      // Strategy 1 & 4: Deep filter by release dates / content ratings & descriptors across all countries
+      // Strategy 4 & genre rules: Deep filter by release dates / content ratings & descriptors across all countries
       const fetchReleaseDates = async (id: number) => {
         const relUrl = `${TMDB_BASE_URL}/movie/${id}/release_dates?api_key=${TMDB_API_KEY}`;
         const relRes = await fetch(relUrl, {
@@ -190,13 +189,14 @@ async function tmdbFetch<T>(endpoint: string, params: Record<string, string | nu
 
       const isMovieEndpoint = endpoint.includes('/movie') || endpoint.includes('mediaType=movie');
       const isTvEndpoint = endpoint.includes('/tv') || endpoint.includes('mediaType=tv');
+      const fallbackType = defaultMediaType || (isTvEndpoint ? 'tv' : isMovieEndpoint ? 'movie' : undefined);
 
-      const filteredResults = await Promise.all(
-        data.results.map(async (item: any) => {
+      const deepFiltered = await Promise.all(
+        filtered.map(async (item: any) => {
           if (!item || !item.id) return item;
-          const itemType = item.media_type || (item.title ? 'movie' : (item.name ? 'tv' : (isTvEndpoint ? 'tv' : 'movie')));
+          const itemType = item.media_type || (item.title ? 'movie' : (item.name ? 'tv' : fallbackType || 'movie'));
           const genreIds = Array.isArray(item.genre_ids) ? item.genre_ids : (Array.isArray(item.genres) ? item.genres.map((g: any) => g.id) : undefined);
-          
+
           if (itemType === 'movie') {
             const isAdult = await checkMovieIsExplicitAdult(item.id, fetchReleaseDates, genreIds);
             return isAdult ? null : item;
@@ -208,18 +208,50 @@ async function tmdbFetch<T>(endpoint: string, params: Record<string, string | nu
         })
       );
 
-      data.results = filteredResults.filter(Boolean);
+      filtered = deepFiltered.filter(Boolean);
+    }
+
+    return filtered;
+  };
+
+  // Filter adult items and explicit sexual/adult ratings if filterAdult is active
+  if (filterAdult && data) {
+    if (Array.isArray(data.results) && data.results.length > 0) {
+      data.results = await filterMediaItemList(data.results);
+    }
+    // Also filter nested similar / recommendations from append_to_response on details endpoints
+    if (data.similar && Array.isArray(data.similar.results) && data.similar.results.length > 0) {
+      data.similar.results = await filterMediaItemList(data.similar.results);
+    }
+    if (data.recommendations && Array.isArray(data.recommendations.results) && data.recommendations.results.length > 0) {
+      data.recommendations.results = await filterMediaItemList(data.recommendations.results);
     }
   }
 
   // Filter unreleased/future items if filterUnreleased is active (except explicit upcoming endpoints)
-  if (filterUnreleased && !endpoint.includes('/upcoming') && data && Array.isArray(data.results)) {
-    data.results = data.results.filter((item: any) => {
-      if (item.release_date && item.release_date > todayStr) return false;
-      if (item.first_air_date && item.first_air_date > todayStr) return false;
-      if (item.status === 'Planned' || item.status === 'In Production' || item.status === 'Post Production') return false;
-      return true;
-    });
+  if (filterUnreleased && !endpoint.includes('/upcoming') && data) {
+    if (Array.isArray(data.results)) {
+      data.results = data.results.filter((item: any) => {
+        if (item.release_date && item.release_date > todayStr) return false;
+        if (item.first_air_date && item.first_air_date > todayStr) return false;
+        if (item.status === 'Planned' || item.status === 'In Production' || item.status === 'Post Production') return false;
+        return true;
+      });
+    }
+    if (data.similar && Array.isArray(data.similar.results)) {
+      data.similar.results = data.similar.results.filter((item: any) => {
+        if (item.release_date && item.release_date > todayStr) return false;
+        if (item.first_air_date && item.first_air_date > todayStr) return false;
+        return true;
+      });
+    }
+    if (data.recommendations && Array.isArray(data.recommendations.results)) {
+      data.recommendations.results = data.recommendations.results.filter((item: any) => {
+        if (item.release_date && item.release_date > todayStr) return false;
+        if (item.first_air_date && item.first_air_date > todayStr) return false;
+        return true;
+      });
+    }
   }
 
   apiCache.set(cacheKey, { data, expiry: Date.now() + CACHE_TTL_MS });
