@@ -66,6 +66,7 @@ const MediaCardComponent: React.FC<MediaCardProps> = ({
   const menuRef = useRef<HTMLDivElement>(null);
   const menuBtnRef = useRef<HTMLButtonElement>(null);
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const touchStartPosRef = useRef<{ x: number; y: number } | null>(null);
   const cardRef = useRef<HTMLDivElement>(null);
 
   const isLandscape = variant === 'landscape';
@@ -259,21 +260,33 @@ const MediaCardComponent: React.FC<MediaCardProps> = ({
     if (onDelete) onDelete();
   };
 
-  const handleTouchStart = () => {
+  const handleTouchStart = (e: React.TouchEvent | React.MouseEvent) => {
+    if ('touches' in e && e.touches.length === 1) {
+      touchStartPosRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    }
     longPressTimerRef.current = setTimeout(() => {
       setMenuOpen(true);
     }, 600);
   };
 
   const handleTouchEnd = () => {
+    touchStartPosRef.current = null;
     if (longPressTimerRef.current) {
       clearTimeout(longPressTimerRef.current);
     }
   };
 
-  const handleTouchMove = () => {
-    if (longPressTimerRef.current) {
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (longPressTimerRef.current && touchStartPosRef.current && e.touches.length === 1) {
+      const deltaX = Math.abs(e.touches[0].clientX - touchStartPosRef.current.x);
+      const deltaY = Math.abs(e.touches[0].clientY - touchStartPosRef.current.y);
+      if (deltaX > 8 || deltaY > 8) {
+        clearTimeout(longPressTimerRef.current);
+        longPressTimerRef.current = null;
+      }
+    } else if (longPressTimerRef.current) {
       clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
     }
   };
 
