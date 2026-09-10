@@ -2,12 +2,13 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20260910-1037';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-improve-adult-f.20260910-1037';
+export const APP_BUILD_NUMBER = '20260910-1049';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-improve-adult-f.20260910-1049';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
 export const APP_BRANCH = 'feat-improve-adult-f';
-export const APP_CHANGELOG = `* perf(details): optimize details page load time by unblocking similar media deep filtering
+export const APP_CHANGELOG = `* perf(filter): optimize rating filter with genre short-circuit, IndexedDB persistence, and request batching
+* perf(details): optimize details page load time by unblocking similar media deep filtering
 * feat(filter): apply adult & rating filter to Home page and More Like This recommendations
 * feat(filter): add explicit 18+ and unrated filters for Romance and Drama
 * feat(filter): filter romance titles with 19+ certification or no certification
@@ -20,5 +21,4 @@ export const APP_CHANGELOG = `* perf(details): optimize details page load time b
 * fix(filter): perform deep adult & sexual rating filtering on catalog items
 * feat(filter): expand SafeSearch with worldwide explicit adult and sexual rating filters
 * fix(ui): prevent touch scroll hang and cancel long press on move (#67)
-* fix(player): fix restart from beginning for embed providers and improve KissKH progress tracking (#66)
-* feat(player): add Korean embed provider (KissKH) with isolated player & progress tracking (#65)`;
+* fix(player): fix restart from beginning for embed providers and improve KissKH progress tracking (#66)`;
