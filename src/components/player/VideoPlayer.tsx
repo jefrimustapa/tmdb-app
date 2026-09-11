@@ -12,6 +12,7 @@ import { tmdbImages, TMDB_FALLBACK_BACKDROP } from '../../services/tmdb';
 import { resolveAnimeMalId } from '../../services/animeMappingService';
 import { resolveLari21Stream } from '../../services/lariMappingService';
 import { resolveKisskhStream } from '../../services/kisskhMappingService';
+import { resolveDramacoolStream } from '../../services/dramacoolMappingService';
 
 interface VideoPlayerProps {
   mediaType: 'movie' | 'tv';
@@ -317,6 +318,39 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         }
       }
 
+      // 0c. FAST PATH: If selected provider is Dramacool (Korean), resolve directly without hardcoded timeout
+      if (providerId === 'dramacool-kdrama') {
+        try {
+          console.log('[Resolver] Fast-path Korean Provider (Dramacool)...');
+          setResolvingStatus('Resolving Dramacool Korean Stream...');
+          const dramaRes = await resolveDramacoolStream(title, releaseYear, season, episode, originalTitle);
+          if (!isMounted) return;
+          if (dramaRes && dramaRes.embedUrl) {
+            console.log('[Resolver] ✅ Playing via Dramacool Player:', dramaRes.embedUrl);
+            setResolvingStatus('Connected to Dramacool Player');
+            setResolvedDramacoolUrl(dramaRes.embedUrl);
+            setPlayerMode('embed');
+            setDirectStreamUrl(null);
+            setDirectStreamLabel('Dramacool Player');
+            setIsExtracting(false);
+            setExtractionFailed(false);
+            setIsLoading(false);
+            return;
+          }
+          console.warn('[Resolver] Dramacool resolution returned no stream');
+          setResolvingStatus('Stream unavailable on Dramacool');
+          setIsLoading(false);
+          setHasError(true);
+          return;
+        } catch (err) {
+          console.warn('[Resolver] Dramacool resolution error:', err);
+          setResolvingStatus('Stream unavailable on Dramacool');
+          setIsLoading(false);
+          setHasError(true);
+          return;
+        }
+      }
+
       // 1. Try TorBox if enabled
       if (enabledResolvers.includes('torbox') && torboxApiKey && torboxApiKey.trim()) {
         try {
@@ -408,11 +442,19 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
   const [resolvedLari21Url, setResolvedLari21Url] = useState<string | null>(null);
   const [resolvedKisskhUrl, setResolvedKisskhUrl] = useState<string | null>(null);
+  const [resolvedDramacoolUrl, setResolvedDramacoolUrl] = useState<string | null>(null);
 
   const provider = getProviderById(providerId);
   const baseStreamUrl = useMemo(() => {
+    // For Dramacool Korean provider
+    if (provider.id === 'dramacool-kdrama') {
+      if (resolvedDramacoolUrl) {
+        return resolvedDramacoolUrl;
+      }
+      return '';
+    }
     // For KissKH Korean provider
-    if (provider.id === 'kisskh-kdrama' || provider.id === 'kisskh' || provider.category === 'korean') {
+    if (provider.id === 'kisskh-kdrama' || provider.id === 'kisskh') {
       if (resolvedKisskhUrl) {
         return resolvedKisskhUrl;
       }
@@ -433,7 +475,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     return mediaType === 'movie'
       ? provider.getMovieUrl(tmdbId)
       : provider.getTVUrl(tmdbId, season, episode);
-  }, [provider, resolvedKisskhUrl, resolvedLari21Url, resolvedMalId, mediaType, tmdbId, season, episode]);
+  }, [provider, resolvedDramacoolUrl, resolvedKisskhUrl, resolvedLari21Url, resolvedMalId, mediaType, tmdbId, season, episode]);
 
   const streamUrl = useMemo(() => {
     if (!baseStreamUrl) return '';
