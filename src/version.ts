@@ -2,12 +2,13 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20260910-1633';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-persistent-stor.20260910-1633';
+export const APP_BUILD_NUMBER = '20260910-2352';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.perf-improve-lari-pe.20260910-2352';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
-export const APP_BRANCH = 'feat-persistent-stor';
-export const APP_CHANGELOG = `* feat(player): VidLink auto-unmute injection and episode title conditional fade (#71)
+export const APP_BRANCH = 'perf-improve-lari-pe';
+export const APP_CHANGELOG = `* feat(storage): make watch history, settings, watchlist and likes persistent across app uninstalls (#72)
+* feat(player): VidLink auto-unmute injection and episode title conditional fade (#71)
 * fix(scroll): resolve vertical scroll unresponsiveness on mobile rails and card touch (#70)
 * feat(player): improve CineSrc watch progress tracking and auto-resume (#69)
 * feat(filter): adult filtering, unified rating country priority, 5-tier maturity & optimizations (#68)
@@ -20,5 +21,4 @@ export const APP_CHANGELOG = `* feat(player): VidLink auto-unmute injection and 
 * fix(player): fix MegaPlay anime progress tracking, compact up next popup, and update trigger percent settings (#61)
 * feat(details,watch,stream): add Asian stream provider, optimize details UX, and fix watch progress reset (#60)
 * feat(stream): separate embedded server priority for anime vs other content
-* feat(watch): center title in row 1 and move episode info to row 2 with prev/next buttons (#59)
-* feat(filter): add Anime option to Movies, TV Series, and Search genre filters (#57)`;
+* feat(watch): center title in row 1 and move episode info to row 2 with prev/next buttons (#59)`;

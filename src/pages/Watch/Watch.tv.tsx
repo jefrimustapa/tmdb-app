@@ -7,7 +7,7 @@ import { ProviderPickerTV } from '../../components/player/ProviderPickerTV';
 import { TVVirtualCursor } from '../../components/player/TVVirtualCursor';
 import { dbService } from '../../services/db';
 import { isAnimeMedia } from '../../services/animeMappingService';
-import { isAseanMedia, isKoreanMedia } from '../../services/lk21MappingService';
+import { isAseanMedia, isKoreanMedia } from '../../services/lariMappingService';
 import { ArrowLeft, SkipForward, SkipBack } from 'lucide-react';
 
 import type { VirtualCursorStyle } from '../../types/db';

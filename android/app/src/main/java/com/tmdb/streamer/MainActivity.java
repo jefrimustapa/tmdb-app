@@ -258,8 +258,8 @@ public class MainActivity extends BridgeActivity {
                         URL url = new URL(targetUrl);
                         HttpURLConnection conn = (HttpURLConnection) url.openConnection();
                         conn.setRequestMethod("GET");
-                        conn.setConnectTimeout(8000);
-                        conn.setReadTimeout(10000);
+                        conn.setConnectTimeout(4000);
+                        conn.setReadTimeout(5000);
                         conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36");
                         conn.setRequestProperty("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8");
                         conn.setRequestProperty("Accept-Language", "en-US,en;q=0.9,id;q=0.8");
@@ -313,8 +313,8 @@ public class MainActivity extends BridgeActivity {
                         HttpURLConnection conn = (HttpURLConnection) url.openConnection();
                         conn.setRequestMethod("POST");
                         conn.setDoOutput(true);
-                        conn.setConnectTimeout(8000);
-                        conn.setReadTimeout(10000);
+                        conn.setConnectTimeout(4000);
+                        conn.setReadTimeout(5000);
                         conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36");
                         if (contentType != null && !contentType.isEmpty()) {
                             conn.setRequestProperty("Content-Type", contentType);
