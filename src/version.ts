@@ -2,12 +2,13 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20260911-1553';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.fix-kisskh-provider.20260911-1553';
+export const APP_BUILD_NUMBER = '20260911-1621';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.fix-vidsrc-su-in-app.20260911-1621';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
-export const APP_BRANCH = 'fix-kisskh-provider';
-export const APP_CHANGELOG = `* fix(filter): map romance genre to keywords in TV series discover (#75)
+export const APP_BRANCH = 'fix-vidsrc-su-in-app';
+export const APP_CHANGELOG = `* fix(player): add KissKH timeout failover and customizable resolver timeout setting (#76)
+* fix(filter): map romance genre to keywords in TV series discover (#75)
 * fix(watch): unhide top header on mouse hover in TV mode (#74)
 * perf(player): improve LARI21 performance, add progress status, and rename mapping service (#73)
 * feat(storage): make watch history, settings, watchlist and likes persistent across app uninstalls (#72)
@@ -20,5 +21,4 @@ export const APP_CHANGELOG = `* fix(filter): map romance genre to keywords in TV
 * feat(player): add Korean embed provider (KissKH) with isolated player & progress tracking (#65)
 * feat(card): modify title card badges, floating menu, and continue watch details button (#64)
 * feat: improve filters across Movies, Series, and Search (#63)
-* fix(home): exclude re-releases and sort new release movies by latest date on left (#62)
-* fix(player): fix MegaPlay anime progress tracking, compact up next popup, and update trigger percent settings (#61)`;
+* fix(home): exclude re-releases and sort new release movies by latest date on left (#62)`;

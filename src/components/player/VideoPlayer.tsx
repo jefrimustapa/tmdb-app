@@ -1363,7 +1363,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           allowFullScreen
           allow="autoplay *; encrypted-media *; picture-in-picture *; fullscreen *"
           sandbox={
-            (typeof (window as any).AndroidBridge !== 'undefined')
+            (typeof (window as any).AndroidBridge !== 'undefined' || provider.id === 'vidsrc-kdrama' || provider.id.startsWith('vidsrc'))
               ? undefined
               : (adShieldEnabled
                 ? 'allow-scripts allow-same-origin allow-forms allow-presentation allow-pointer-lock'
