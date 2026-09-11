@@ -19,30 +19,45 @@ function getNormalizedKey(title: string, year?: string | number, season = 1, epi
   return `${cleanTitle}_${year || 'all'}_s${season}_e${episode}`;
 }
 
-async function executeFetch(url: string, referer = 'https://kisskh.do/'): Promise<string> {
-  // 1. If running inside Android WebView with native AndroidBridge, use it to bypass CORS
-  if (typeof window !== 'undefined' && (window as any).AndroidBridge?.fetchHttp) {
-    try {
-      const nativeResult = (window as any).AndroidBridge.fetchHttp(url, referer, 'https://kisskh.do');
-      if (nativeResult && typeof nativeResult === 'string' && nativeResult.trim().length > 0) {
-        return nativeResult;
+async function executeFetch(url: string, referer = 'https://kisskh.do/', timeoutMs = 3500): Promise<string> {
+  const fetchPromise = (async () => {
+    // 1. If running inside Android WebView with native AndroidBridge, use it to bypass CORS
+    if (typeof window !== 'undefined' && (window as any).AndroidBridge?.fetchHttp) {
+      try {
+        const nativeResult = (window as any).AndroidBridge.fetchHttp(url, referer, 'https://kisskh.do');
+        if (nativeResult && typeof nativeResult === 'string' && nativeResult.trim().length > 0) {
+          return nativeResult;
+        }
+      } catch (e) {
+        console.warn('[KisskhResolver] AndroidBridge.fetchHttp failed, falling back to fetch:', e);
       }
-    } catch (e) {
-      console.warn('[KisskhResolver] AndroidBridge.fetchHttp failed, falling back to fetch:', e);
     }
-  }
 
-  // 2. Fallback to standard fetch
-  const res = await fetch(url, {
-    headers: {
-      Accept: 'application/json, text/plain, */*',
-      Referer: referer
+    // 2. Fallback to standard fetch with AbortController timeout
+    const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    const fetchTimer = controller ? setTimeout(() => controller.abort(), timeoutMs) : null;
+    try {
+      const res = await fetch(url, {
+        signal: controller ? controller.signal : undefined,
+        headers: {
+          Accept: 'application/json, text/plain, */*',
+          Referer: referer
+        }
+      });
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status} for ${url}`);
+      }
+      return await res.text();
+    } finally {
+      if (fetchTimer) clearTimeout(fetchTimer);
     }
-  });
-  if (!res.ok) {
-    throw new Error(`HTTP ${res.status} for ${url}`);
-  }
-  return await res.text();
+  })();
+
+  const timeoutPromise = new Promise<string>((_, reject) =>
+    setTimeout(() => reject(new Error(`Timeout after ${timeoutMs}ms for ${url}`)), timeoutMs + 200)
+  );
+
+  return Promise.race([fetchPromise, timeoutPromise]);
 }
 
 /**

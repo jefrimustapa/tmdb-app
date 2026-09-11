@@ -90,6 +90,8 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const [upNextTriggerPercent, setUpNextTriggerPercent] = useState(90);
   const [upNextTimeout, setUpNextTimeout] = useState(10);
   const [tickerIntervalSec, setTickerIntervalSec] = useState(5);
+  const [streamResolverTimeout, setStreamResolverTimeout] = useState(5);
+  const streamResolverTimeoutRef = useRef(5);
 
   const dismissedUpNextRef = useRef(false);
   const nextEpisodeTriggeredRef = useRef(false);
@@ -211,6 +213,10 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           setTickerIntervalSec(s.watchProgressTickerInterval);
           tickerIntervalRef.current = s.watchProgressTickerInterval;
         }
+        if (typeof s.streamResolverTimeout === 'number' && s.streamResolverTimeout >= 2 && s.streamResolverTimeout <= 30) {
+          setStreamResolverTimeout(s.streamResolverTimeout);
+          streamResolverTimeoutRef.current = s.streamResolverTimeout;
+        }
       }
     });
   }, []);
@@ -228,15 +234,17 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       setPlayerMode('loading');
       setResolvingStatus('Initializing stream resolver...');
 
-      // 0. FAST PATH: If selected provider is LARI21 (Asean), resolve directly with a strict 4.5s timeout
+      const activeTimeoutMs = (streamResolverTimeoutRef.current || streamResolverTimeout || 5) * 1000;
+
+      // 0. FAST PATH: If selected provider is LARI21 (Asean), resolve directly with customizable timeout
       if (providerId === 'lari21-asian' || providerId === 'lk21-asian') {
         try {
-          console.log('[Resolver] Fast-path Asian Provider (LARI21)...');
+          console.log(`[Resolver] Fast-path Asian Provider (LARI21) [timeout: ${activeTimeoutMs}ms]...`);
           setResolvingStatus('Resolving LARI21 Asian Stream...');
           const lari21Promise = resolveLari21Stream(title, releaseYear, originalTitle, (status) => {
             if (isMounted) setResolvingStatus(status);
           });
-          const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 4500));
+          const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), activeTimeoutMs));
           const lari21Res = await Promise.race([lari21Promise, timeoutPromise]);
           if (!isMounted) return;
           if (lari21Res && lari21Res.embedUrl) {
@@ -268,12 +276,14 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         }
       }
 
-      // 0b. FAST PATH: If selected provider is KissKH (Korean), resolve directly to isolated embed player
+      // 0b. FAST PATH: If selected provider is KissKH (Korean), resolve directly to isolated embed player with customizable timeout & failover
       if (providerId === 'kisskh-kdrama' || providerId === 'kisskh') {
         try {
-          console.log('[Resolver] Fast-path Korean Provider (KissKH)...');
+          console.log(`[Resolver] Fast-path Korean Provider (KissKH) [timeout: ${activeTimeoutMs}ms]...`);
           setResolvingStatus('Resolving KissKH Korean Stream...');
-          const kisskhRes = await resolveKisskhStream(title, releaseYear, season, episode, originalTitle);
+          const kisskhPromise = resolveKisskhStream(title, releaseYear, season, episode, originalTitle);
+          const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), activeTimeoutMs));
+          const kisskhRes = await Promise.race([kisskhPromise, timeoutPromise]);
           if (!isMounted) return;
           if (kisskhRes && kisskhRes.embedUrl) {
             console.log('[Resolver] ✅ Playing via KissKH Isolated Player:', kisskhRes.embedUrl);
@@ -287,8 +297,23 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             setIsLoading(false);
             return;
           }
+          console.warn('[Resolver] KissKH resolution returned no stream or timed out, auto-failover to next Korean provider...');
+          setResolvingStatus('Failing over to next Korean provider...');
+          // Fast failover to next provider in Korean priority list
+          const koreanFallbackId = (topKoreanProviders && topKoreanProviders.length > 0)
+            ? topKoreanProviders.find(p => p !== 'kisskh-kdrama' && p !== 'kisskh') || 'cinesrc'
+            : 'cinesrc';
+          const fallbackProvider = getProviderById(koreanFallbackId);
+          onProviderChange(fallbackProvider);
+          return;
         } catch (err) {
           console.warn('[Resolver] KissKH resolution error:', err);
+          const koreanFallbackId = (topKoreanProviders && topKoreanProviders.length > 0)
+            ? topKoreanProviders.find(p => p !== 'kisskh-kdrama' && p !== 'kisskh') || 'cinesrc'
+            : 'cinesrc';
+          const fallbackProvider = getProviderById(koreanFallbackId);
+          onProviderChange(fallbackProvider);
+          return;
         }
       }
 

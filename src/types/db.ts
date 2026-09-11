@@ -93,6 +93,7 @@ export interface UserSettings {
   torboxApiKey?: string; // TorBox API Key (for 4K HDR & 1080p cloud streams)
   directStreamMode?: boolean; // Legacy fallback flag
   streamHeaderTimeout: number; // in seconds, e.g. 3, 5, 8, or 0 for always visible
+  streamResolverTimeout?: number; // Provider stream resolution timeout in seconds (3-15s, default 5s)
   includeNightlyUpdates: boolean; // Option to check for and install Nightly pre-releases
   autoUpdateCheck?: boolean; // Automatically check for updates on application startup
   virtualCursorEnabled?: boolean; // TV Mode on-demand virtual cursor
