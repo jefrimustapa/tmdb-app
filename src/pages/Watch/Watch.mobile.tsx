@@ -6,7 +6,7 @@ import { VideoPlayer } from '../../components/player/VideoPlayer';
 import { ProviderPickerMobile } from '../../components/player/ProviderPickerMobile';
 import { dbService } from '../../services/db';
 import { isAnimeMedia } from '../../services/animeMappingService';
-import { isAseanMedia, isKoreanMedia } from '../../services/lk21MappingService';
+import { isAseanMedia, isKoreanMedia } from '../../services/lariMappingService';
 import { ArrowLeft, SkipForward, SkipBack } from 'lucide-react';
 
 export const Watch: React.FC = () => {
