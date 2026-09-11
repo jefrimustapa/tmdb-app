@@ -361,6 +361,14 @@ export const Search: React.FC = () => {
                 // TV Horror mapping: mystery (9648) or horror (27)
                 return item.genre_ids?.includes(9648) || item.genre_ids?.includes(27);
               }
+              if (u.id === 10749) {
+                // TV Romance mapping: check 10749, or drama/comedy/soap + romance keywords in title/overview
+                if (item.genre_ids?.includes(10749)) return true;
+                const text = `${item.name || ''} ${item.overview || ''}`.toLowerCase();
+                const hasRomanceText = /\b(romance|romantic|love|romcom|relationship|dating|crush|couple)\b/i.test(text);
+                const hasEligibleGenre = item.genre_ids?.some((g: number) => [18, 35, 10766, 10764, 16, 10765].includes(g));
+                return Boolean(hasRomanceText && hasEligibleGenre);
+              }
               return u.tvGenreId ? item.genre_ids?.includes(u.tvGenreId) : false;
             }
           }
