@@ -141,7 +141,7 @@ export const Home: React.FC = () => {
               Continue Watching
             </h2>
           </div>
-          <div className="flex items-center gap-3.5 overflow-x-auto no-scrollbar py-4 pl-4 sm:pl-8 pr-6 sm:pr-8 -my-2 snap-x snap-proximity scroll-pl-4 sm:scroll-pl-8">
+          <div className="flex items-center gap-3.5 overflow-x-auto no-scrollbar py-4 pl-4 sm:pl-8 pr-6 sm:pr-8 -my-2">
             {history.map((hist) => (
               <MediaCard
                 key={hist.id || `${hist.tmdbId}-${hist.mediaType}`}
