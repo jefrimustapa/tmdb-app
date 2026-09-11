@@ -264,6 +264,15 @@ export const STREAM_PROVIDERS: StreamProvider[] = [
     getMovieUrl: () => '',
     getTVUrl: () => '',
     getKoreanUrl: (resolvedUrl: string) => resolvedUrl
+  },
+  {
+    id: 'vidsrc-kdrama',
+    name: 'VidSrc (K-Drama)',
+    tagline: 'High-speed Korean & Asian drama streaming with multi-subtitles via VidSrc SU',
+    badge: 'K-Drama',
+    category: 'korean',
+    getMovieUrl: (tmdbId: number) => `https://vidsrc.su/embed/movie/${tmdbId}`,
+    getTVUrl: (tmdbId: number, s: number, e: number) => `https://vidsrc.su/embed/tv/${tmdbId}/${s}/${e}`
   }
 ];
 

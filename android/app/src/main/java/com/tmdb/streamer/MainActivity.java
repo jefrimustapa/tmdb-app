@@ -661,8 +661,8 @@ public class MainActivity extends BridgeActivity {
                             });
                         }
 
-                        // Asian Stream & TurboVIP Anti-Hotlinking and CSP Frame Shield
-                        if ((lower.contains("videonode.de") || lower.contains("playcdn.de") || lower.contains("turbovid") || lower.contains("turboviplay") || lower.contains("turbosplayer") || lower.contains("layaricon21.com") || lower.contains("abyssplayer.com") || lower.contains("embed4me.vip")) &&
+                        // Asian Stream, VidSrc & TurboVIP Anti-Hotlinking, CSP Frame Shield and X-Frame-Options removal
+                        if ((lower.contains("videonode.de") || lower.contains("playcdn.de") || lower.contains("turbovid") || lower.contains("turboviplay") || lower.contains("turbosplayer") || lower.contains("layaricon21.com") || lower.contains("abyssplayer.com") || lower.contains("embed4me.vip") || lower.contains("vidsrc.su") || lower.contains("vidsrc.stream") || lower.contains("vidsrc.net")) &&
                             !lower.contains("/cdn-cgi/")) {
                             try {
                                 URL url = new URL(rawUrl);
@@ -687,6 +687,9 @@ public class MainActivity extends BridgeActivity {
                                 } else if (lower.contains("playcdn.de")) {
                                     conn.setRequestProperty("Referer", "https://videonode.de/");
                                     conn.setRequestProperty("Origin", "https://videonode.de");
+                                } else if (lower.contains("vidsrc.su") || lower.contains("vidsrc.stream") || lower.contains("vidsrc.net")) {
+                                    conn.setRequestProperty("Referer", "https://vidsrc.su/");
+                                    conn.setRequestProperty("Origin", "https://vidsrc.su");
                                 } else {
                                     conn.setRequestProperty("Referer", "https://layaricon21.com/");
                                     conn.setRequestProperty("Origin", "https://layaricon21.com");
@@ -732,7 +735,55 @@ public class MainActivity extends BridgeActivity {
                                 }
 
                                 InputStream in = statusCode >= 400 ? conn.getErrorStream() : conn.getInputStream();
-                                if (lower.contains("turbovid") && mimeType != null && mimeType.contains("html") && statusCode < 400) {
+                                if (lower.contains("vidsrc.su") && mimeType != null && mimeType.contains("html") && statusCode < 400) {
+                                    try {
+                                        BufferedReader reader = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8));
+                                        StringBuilder sb = new StringBuilder();
+                                        String l;
+                                        while ((l = reader.readLine()) != null) {
+                                            sb.append(l).append("\n");
+                                        }
+                                        String html = sb.toString();
+                                        // Inject client-side anti-webview and desktop environment spoofing
+                                        String vidsrcSpoofScript = "<script>\n" +
+                                            "(function() {\n" +
+                                            "  try {\n" +
+                                            "    var desktopBrands = [\n" +
+                                            "      { brand: 'Google Chrome', version: '131' },\n" +
+                                            "      { brand: 'Chromium', version: '131' },\n" +
+                                            "      { brand: 'Not_A Brand', version: '24' }\n" +
+                                            "    ];\n" +
+                                            "    Object.defineProperty(navigator, 'userAgentData', {\n" +
+                                            "      get: function() { return { brands: desktopBrands, mobile: false, platform: 'Windows' }; },\n" +
+                                            "      configurable: true\n" +
+                                            "    });\n" +
+                                            "    Object.defineProperty(navigator, 'userAgent', {\n" +
+                                            "      get: function() { return 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'; },\n" +
+                                            "      configurable: true\n" +
+                                            "    });\n" +
+                                            "    Object.defineProperty(window, 'frameElement', { get: function() { return null; }, configurable: true });\n" +
+                                            "  } catch(e){}\n" +
+                                            "})();\n" +
+                                            "</script>\n";
+                                        html = html.replace("<head>", "<head>\n" + vidsrcSpoofScript);
+                                        in = new ByteArrayInputStream(html.getBytes(StandardCharsets.UTF_8));
+                                    } catch (Exception e) {}
+                                } else if (lower.contains("vidsrc.su") && (lower.endsWith(".js") || lower.contains("/assets/index-")) && statusCode < 400) {
+                                    try {
+                                        BufferedReader reader = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8));
+                                        StringBuilder sb = new StringBuilder();
+                                        String l;
+                                        while ((l = reader.readLine()) != null) {
+                                            sb.append(l).append("\n");
+                                        }
+                                        String js = sb.toString();
+                                        // Neutralize the in-app browser check by replacing the detection logic with 'return false;'
+                                        js = js.replace("return!!(null==r?void 0:r.some(e=>\"Android WebView\"===e.brand))", "return false");
+                                        js = js.replace("if(/; wv\\)/.test(t)||/\\(.*\\bwv\\b.*\\)/.test(t))return!0;", "/* bypassed */");
+                                        js = js.replace("if(/Version\\/\\d+\\.\\d+/.test(t)&&/Chrome\\/\\d/.test(t))return!0", "/* bypassed */");
+                                        in = new ByteArrayInputStream(js.getBytes(StandardCharsets.UTF_8));
+                                    } catch (Exception e) {}
+                                } else if (lower.contains("turbovid") && mimeType != null && mimeType.contains("html") && statusCode < 400) {
                                     try {
                                         BufferedReader reader = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8));
                                         StringBuilder sb = new StringBuilder();
