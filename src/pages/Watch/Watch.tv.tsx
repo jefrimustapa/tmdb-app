@@ -397,6 +397,35 @@ export const Watch: React.FC = () => {
   const lastMousePosRef = React.useRef({ x: -1, y: -1 });
 
   useEffect(() => {
+    const handleKeyOrTouch = () => {
+      resetHeaderTimer();
+    };
+
+    const handleMouseMove = (e: MouseEvent) => {
+      // If mouse is near the top (within 80px), always trigger reset/unhide immediately
+      if (e.clientY <= 80) {
+        resetHeaderTimer();
+        lastMousePosRef.current = { x: e.clientX, y: e.clientY };
+        return;
+      }
+
+      if (
+        lastMousePosRef.current.x === -1 ||
+        Math.abs(e.clientX - lastMousePosRef.current.x) > 3 ||
+        Math.abs(e.clientY - lastMousePosRef.current.y) > 3
+      ) {
+        lastMousePosRef.current = { x: e.clientX, y: e.clientY };
+        resetHeaderTimer();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyOrTouch, true);
+    window.addEventListener('touchstart', handleKeyOrTouch, true);
+    window.addEventListener('click', handleKeyOrTouch, true);
+    window.addEventListener('mousemove', handleMouseMove, true);
+    window.addEventListener('tmdb_screen_touched', handleKeyOrTouch);
+    window.addEventListener('tmdb_user_action', handleKeyOrTouch);
+
     resetHeaderTimer();
 
     return () => {
@@ -404,6 +433,12 @@ export const Watch: React.FC = () => {
         clearTimeout(hideTimerRef.current);
         hideTimerRef.current = null;
       }
+      window.removeEventListener('keydown', handleKeyOrTouch, true);
+      window.removeEventListener('touchstart', handleKeyOrTouch, true);
+      window.removeEventListener('click', handleKeyOrTouch, true);
+      window.removeEventListener('mousemove', handleMouseMove, true);
+      window.removeEventListener('tmdb_screen_touched', handleKeyOrTouch);
+      window.removeEventListener('tmdb_user_action', handleKeyOrTouch);
     };
   }, [resetHeaderTimer]);
 
@@ -510,12 +545,25 @@ export const Watch: React.FC = () => {
   return (
     <div
       className="relative w-screen h-screen min-h-screen bg-black overflow-hidden flex flex-col justify-start select-none"
+      onClick={resetHeaderTimer}
+      onTouchStart={resetHeaderTimer}
+      onMouseMove={resetHeaderTimer}
     >
       {/* Stream Player Area with Overlay Header */}
       <div className="relative w-full h-full flex-1 bg-black overflow-hidden group">
+        {/* Invisible Top-Edge Hover Zone: Wakes/Unhides header when mouse enters the top 80px */}
+        <div
+          className="absolute top-0 left-0 right-0 h-20 z-30 pointer-events-auto"
+          onMouseEnter={resetHeaderTimer}
+          onMouseMove={resetHeaderTimer}
+          aria-hidden="true"
+        />
+
         {/* Overlay Top Header Nav: Row 1 (Back + Center-aligned Title, Provider Switcher) & Row 2 (Season/Episode info + Prev/Next buttons) */}
         <div
           data-watch-header="true"
+          onMouseEnter={resetHeaderTimer}
+          onMouseMove={resetHeaderTimer}
           className={`absolute top-0 left-0 right-0 z-40 flex flex-col gap-2 px-3 sm:px-6 pt-[max(0.75rem,env(safe-area-inset-top,1.75rem))] pb-8 bg-gradient-to-b from-black via-black/90 to-transparent transition-all duration-300 pointer-events-auto ${
             headerVisible ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4 pointer-events-none'
           }`}
