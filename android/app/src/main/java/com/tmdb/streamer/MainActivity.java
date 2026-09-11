@@ -662,7 +662,7 @@ public class MainActivity extends BridgeActivity {
                         }
 
                         // Asian Stream, VidSrc & TurboVIP Anti-Hotlinking, CSP Frame Shield and X-Frame-Options removal
-                        if ((lower.contains("videonode.de") || lower.contains("playcdn.de") || lower.contains("turbovid") || lower.contains("turboviplay") || lower.contains("turbosplayer") || lower.contains("layaricon21.com") || lower.contains("abyssplayer.com") || lower.contains("embed4me.vip") || lower.contains("vidsrc.su") || lower.contains("vidsrc.stream") || lower.contains("vidsrc.net")) &&
+                        if ((lower.contains("videonode.de") || lower.contains("playcdn.de") || lower.contains("turbovid") || lower.contains("turboviplay") || lower.contains("turbosplayer") || lower.contains("layaricon21.com") || lower.contains("abyssplayer.com") || lower.contains("embed4me.vip") || lower.contains("vidsrc.su") || lower.contains("vidsrc.stream") || lower.contains("vidsrc.net") || lower.contains("vidmoly") || lower.contains("vidbasic.top") || lower.contains("kisskh.space") || lower.contains("dramacool.net.my")) &&
                             !lower.contains("/cdn-cgi/")) {
                             try {
                                 URL url = new URL(rawUrl);
@@ -690,6 +690,12 @@ public class MainActivity extends BridgeActivity {
                                 } else if (lower.contains("vidsrc.su") || lower.contains("vidsrc.stream") || lower.contains("vidsrc.net")) {
                                     conn.setRequestProperty("Referer", "https://vidsrc.su/");
                                     conn.setRequestProperty("Origin", "https://vidsrc.su");
+                                } else if (lower.contains("vidmoly")) {
+                                    conn.setRequestProperty("Referer", "https://kisskh.space/");
+                                    conn.setRequestProperty("Origin", "https://kisskh.space");
+                                } else if (lower.contains("kisskh.space") || lower.contains("vidbasic.top")) {
+                                    conn.setRequestProperty("Referer", "https://dramacool.net.my/");
+                                    conn.setRequestProperty("Origin", "https://dramacool.net.my");
                                 } else {
                                     conn.setRequestProperty("Referer", "https://layaricon21.com/");
                                     conn.setRequestProperty("Origin", "https://layaricon21.com");

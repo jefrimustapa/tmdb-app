@@ -273,6 +273,16 @@ export const STREAM_PROVIDERS: StreamProvider[] = [
     category: 'korean',
     getMovieUrl: (tmdbId: number) => `https://vidsrc.su/embed/movie/${tmdbId}`,
     getTVUrl: (tmdbId: number, s: number, e: number) => `https://vidsrc.su/embed/tv/${tmdbId}/${s}/${e}`
+  },
+  {
+    id: 'dramacool-kdrama',
+    name: 'Dramacool (K-Drama)',
+    tagline: 'Extensive Korean & Asian drama catalog with English subtitles via Dramacool MY',
+    badge: 'K-Drama',
+    category: 'korean',
+    getMovieUrl: () => '',
+    getTVUrl: () => '',
+    getKoreanUrl: (resolvedUrl: string) => resolvedUrl
   }
 ];
 
