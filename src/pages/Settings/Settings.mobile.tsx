@@ -519,13 +519,54 @@ export const Settings: React.FC = () => {
                         className={`py-2 px-1 rounded-xl border text-center transition-all flex flex-col items-center justify-center ${
                           isSelected
                             ? 'bg-hbo-purple/40 border-hbo-cyan text-white font-bold shadow-md ring-1 ring-hbo-cyan/50'
-                            : 'bg-hbo-dark/60 border-hbo-border text-gray-300 hover:bg-hbo-hover'
+                            : 'bg-hbo-dark/60 border-hbo-border text-gray-400 hover:text-gray-200'
                         }`}
                       >
                         <span className="text-xs font-bold text-white">{opt.label}</span>
-                        <span className={`text-[9px] ${isSelected ? 'text-hbo-cyan font-semibold' : 'text-gray-500'}`}>
-                          {opt.desc}
-                        </span>
+                        <span className={`text-[8px] ${isSelected ? 'text-hbo-cyan' : 'text-gray-500'}`}>{opt.desc}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Provider Stream Resolution Timeout */}
+              <div className="p-4 sm:p-5 space-y-3">
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <div className="flex items-center gap-2">
+                    <Clock className="w-4 h-4 text-hbo-cyan flex-shrink-0" />
+                    <h3 className="text-sm sm:text-base font-bold text-white">Stream Resolver Timeout</h3>
+                  </div>
+                  <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-hbo-dark border border-hbo-border text-hbo-cyan font-bold">
+                    {`${settings.streamResolverTimeout || 5}s`}
+                  </span>
+                </div>
+                <p className="text-xs text-gray-400">
+                  Maximum time allowed for fast-path providers (KissKH, LARI21) to connect before auto-failing over to the next priority provider.
+                </p>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
+                  {[
+                    { seconds: 3, label: '3 Seconds', desc: 'Aggressive' },
+                    { seconds: 5, label: '5s (Default)', desc: 'Balanced' },
+                    { seconds: 8, label: '8 Seconds', desc: 'Patient' },
+                    { seconds: 12, label: '12 Seconds', desc: 'Slow Network' }
+                  ].map((opt) => {
+                    const isSelected = (settings.streamResolverTimeout ?? 5) === opt.seconds;
+                    return (
+                      <button
+                        key={opt.seconds}
+                        onClick={() => handleUpdate({ streamResolverTimeout: opt.seconds })}
+                        className={`p-2.5 rounded-xl border text-left transition-all ${
+                          isSelected
+                            ? 'bg-hbo-cyan/20 border-hbo-cyan text-white shadow-hbo-glow'
+                            : 'bg-hbo-dark/60 border-hbo-border text-gray-400 hover:text-gray-200'
+                        }`}
+                      >
+                        <p className={`text-xs font-bold ${isSelected ? 'text-hbo-cyan' : 'text-white'}`}>
+                          {opt.label}
+                        </p>
+                        <p className="text-[10px] text-gray-500 mt-0.5">{opt.desc}</p>
                       </button>
                     );
                   })}

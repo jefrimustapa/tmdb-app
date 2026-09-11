@@ -626,6 +626,54 @@ export const Settings: React.FC = () => {
                 </div>
               </div>
 
+              {/* Row 4b: Provider Stream Resolution Timeout */}
+              <div
+                data-settings-row="true"
+                className="bg-hbo-card border border-hbo-border rounded-2xl p-4 shadow-lg space-y-2.5"
+              >
+                <div className="flex items-center justify-between mb-0.5">
+                  <div>
+                    <h4 className="text-xs font-bold text-gray-200 uppercase tracking-wider flex items-center gap-1.5">
+                      <Clock className="w-3.5 h-3.5 text-hbo-cyan flex-shrink-0" />
+                      <span>Stream Resolver Timeout</span>
+                    </h4>
+                    <p className="text-[11px] text-gray-400 mt-0.5">
+                      Max time allowed for fast-path providers (KissKH, LARI21) before auto-failing over to backup servers.
+                    </p>
+                  </div>
+                  <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-black/80 border border-hbo-border text-hbo-cyan font-bold flex-shrink-0">
+                    {`${settings.streamResolverTimeout || 5} Seconds`}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-4 gap-2.5">
+                  {[
+                    { seconds: 3, label: '3 Seconds', desc: 'Aggressive failover' },
+                    { seconds: 5, label: '5 Seconds (Default)', desc: 'Balanced' },
+                    { seconds: 8, label: '8 Seconds', desc: 'Patient connection' },
+                    { seconds: 12, label: '12 Seconds', desc: 'Slow network/Wi-Fi' }
+                  ].map((opt) => {
+                    const isSelected = (settings.streamResolverTimeout ?? 5) === opt.seconds;
+                    return (
+                      <button
+                        key={opt.seconds}
+                        onClick={() => handleUpdate({ streamResolverTimeout: opt.seconds })}
+                        className={`p-3 rounded-xl border text-left transition-all tv-focus-target min-h-[68px] flex flex-col justify-between ${
+                          isSelected
+                            ? 'bg-hbo-purple/40 border-hbo-cyan text-white shadow-lg ring-1 ring-hbo-cyan/50 font-bold'
+                            : 'bg-hbo-dark/60 border-hbo-border hover:bg-hbo-hover hover:border-white/20 text-gray-300'
+                        }`}
+                      >
+                        <p className={`text-xs font-bold ${isSelected ? 'text-hbo-cyan' : 'text-white'}`}>
+                          {opt.label}
+                        </p>
+                        <p className="text-[9px] text-gray-400 mt-0.5 leading-snug">{opt.desc}</p>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
               {/* Row 4: Stream Engine - TorBox Debrid */}
               {(() => {
                 const currentEnabled = settings.enabledResolvers && settings.enabledResolvers.length > 0
@@ -1109,7 +1157,7 @@ export const Settings: React.FC = () => {
                         }`}
                       >
                         <p className={`text-xs font-bold ${isSelected ? 'text-hbo-cyan' : 'text-white'}`}>
-                          {opt.label}
+                           {opt.label}
                         </p>
                         <p className="text-[9px] text-gray-400 mt-0.5 leading-snug">{opt.desc}</p>
                       </button>
