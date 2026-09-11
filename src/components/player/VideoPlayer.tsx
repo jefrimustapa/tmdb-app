@@ -10,7 +10,7 @@ import type { StreamResolverType } from '../../types/db';
 import { Logo } from '../common/Logo';
 import { tmdbImages, TMDB_FALLBACK_BACKDROP } from '../../services/tmdb';
 import { resolveAnimeMalId } from '../../services/animeMappingService';
-import { resolveLari21Stream } from '../../services/lk21MappingService';
+import { resolveLari21Stream } from '../../services/lariMappingService';
 import { resolveKisskhStream } from '../../services/kisskhMappingService';
 
 interface VideoPlayerProps {
@@ -72,6 +72,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const [playerMode, setPlayerMode] = useState<'loading' | 'embed' | 'direct' | 'error'>('loading');
   const [directStreamUrl, setDirectStreamUrl] = useState<string | null>(null);
   const [directStreamLabel, setDirectStreamLabel] = useState<string>('');
+  const [resolvingStatus, setResolvingStatus] = useState<string>('');
   const [isExtracting, setIsExtracting] = useState(false);
   const [extractionFailed, setExtractionFailed] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -225,15 +226,22 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     async function executeStreamResolution() {
       setIsExtracting(true);
       setPlayerMode('loading');
+      setResolvingStatus('Initializing stream resolver...');
 
-      // 0. FAST PATH: If selected provider is LARI21 (Asean), resolve directly without checking TorBox or Private Extractor
+      // 0. FAST PATH: If selected provider is LARI21 (Asean), resolve directly with a strict 4.5s timeout
       if (providerId === 'lari21-asian' || providerId === 'lk21-asian') {
         try {
           console.log('[Resolver] Fast-path Asian Provider (LARI21)...');
-          const lari21Res = await resolveLari21Stream(title, releaseYear, originalTitle);
+          setResolvingStatus('Resolving LARI21 Asian Stream...');
+          const lari21Promise = resolveLari21Stream(title, releaseYear, originalTitle, (status) => {
+            if (isMounted) setResolvingStatus(status);
+          });
+          const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 4500));
+          const lari21Res = await Promise.race([lari21Promise, timeoutPromise]);
           if (!isMounted) return;
           if (lari21Res && lari21Res.embedUrl) {
             console.log('[Resolver] ✅ Playing via LARI21 Embed Iframe:', lari21Res.embedUrl);
+            setResolvingStatus('Connected to LARI21 Embed');
             setResolvedLari21Url(lari21Res.embedUrl);
             setPlayerMode('embed');
             setDirectStreamUrl(null);
@@ -243,8 +251,20 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             setIsLoading(false);
             return;
           }
+          console.warn('[Resolver] LARI21 resolution returned no stream or timed out, auto-failover to next Asian provider...');
+          setResolvingStatus('Failing over to next Asian provider...');
+          // Fast failover to next provider in Asian priority list
+          const asianFallbackId = (topAsianProviders && topAsianProviders.length > 0)
+            ? topAsianProviders.find(p => p !== 'lari21-asian' && p !== 'lk21-asian') || 'vidlink'
+            : 'vidlink';
+          const fallbackProvider = getProviderById(asianFallbackId);
+          onProviderChange(fallbackProvider);
+          return;
         } catch (err) {
           console.warn('[Resolver] LARI21 resolution error:', err);
+          const fallbackProvider = getProviderById('vidlink');
+          onProviderChange(fallbackProvider);
+          return;
         }
       }
 
@@ -252,10 +272,12 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       if (providerId === 'kisskh-kdrama' || providerId === 'kisskh') {
         try {
           console.log('[Resolver] Fast-path Korean Provider (KissKH)...');
+          setResolvingStatus('Resolving KissKH Korean Stream...');
           const kisskhRes = await resolveKisskhStream(title, releaseYear, season, episode, originalTitle);
           if (!isMounted) return;
           if (kisskhRes && kisskhRes.embedUrl) {
             console.log('[Resolver] ✅ Playing via KissKH Isolated Player:', kisskhRes.embedUrl);
+            setResolvingStatus('Connected to KissKH Player');
             setResolvedKisskhUrl(kisskhRes.embedUrl);
             setPlayerMode('embed');
             setDirectStreamUrl(null);
@@ -274,10 +296,12 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       if (enabledResolvers.includes('torbox') && torboxApiKey && torboxApiKey.trim()) {
         try {
           console.log('[Resolver] Checking TorBox 4K Cloud...');
+          setResolvingStatus('Checking TorBox 4K Cloud Debrid...');
           const torboxRes = await fetchTorboxStream(tmdbId, undefined, mediaType, season, episode, torboxApiKey);
           if (!isMounted) return;
           if (torboxRes && torboxRes.sources && torboxRes.sources.length > 0) {
             console.log(`[Resolver] ✅ Playing via TorBox 4K:`, torboxRes.sources[0].url);
+            setResolvingStatus('Connected to TorBox 4K Cloud');
             setDirectStreamUrl(torboxRes.sources[0].url);
             setDirectStreamLabel('TorBox 4K Cloud');
             setPlayerMode('direct');
@@ -295,10 +319,12 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       if (enabledResolvers.includes('private_extractor')) {
         try {
           console.log('[Resolver] Checking Private Stream Extractor...');
+          setResolvingStatus('Querying Private Stream Extractor...');
           const directRes = await fetchDirectStream(tmdbId, title, mediaType, season, episode, directStreamApiUrl);
           if (!isMounted) return;
           if (directRes && directRes.sources && directRes.sources.length > 0) {
             console.log(`[Resolver] ✅ Playing via ${directRes.provider}:`, directRes.sources[0].url);
+            setResolvingStatus(`Connected via ${directRes.provider}`);
             setDirectStreamUrl(directRes.sources[0].url);
             setDirectStreamLabel(directRes.provider);
             setPlayerMode('direct');
@@ -317,6 +343,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       // 4. Fallback to Embed Resolver ONLY if explicitly enabled
       if (enabledResolvers.includes('embed')) {
         console.log('[Resolver] Active: Embed Resolver');
+        setResolvingStatus(`Loading embed player (${provider.name})...`);
         setPlayerMode('embed');
         setDirectStreamUrl(null);
         setDirectStreamLabel('Embed Mirror');
@@ -325,9 +352,6 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       } else {
         console.log('[Resolver] Direct stream not resolved and Embed Resolver is disabled.');
         setPlayerMode('error');
-        setDirectStreamUrl(null);
-        setExtractionFailed(true);
-        setIsExtracting(false);
       }
     };
 
@@ -1201,24 +1225,43 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     >
       {/* STATE 1: Resolving Stream Loading Screen */}
       {playerMode === 'loading' && (
-        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black">
-          <div className="w-12 h-12 border-4 border-hbo-purple-light border-t-hbo-cyan rounded-full animate-spin mb-4 shadow-hbo-glow" />
-          <p className="text-sm font-bold text-white tracking-wide">
-            Resolving Stream...
+        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/95 backdrop-blur-md px-6 text-center animate-fade-in">
+          <div className="relative mb-4">
+            <div className="w-14 h-14 border-4 border-hbo-purple/40 border-t-hbo-cyan rounded-full animate-spin shadow-hbo-glow" />
+            <div className="absolute inset-0 flex items-center justify-center">
+              <span className="w-2 h-2 rounded-full bg-hbo-cyan animate-ping" />
+            </div>
+          </div>
+          <p className="text-base font-black text-white tracking-tight flex items-center gap-2">
+            <span>Resolving Stream</span>
+            <span className="inline-flex px-2 py-0.5 rounded-md bg-hbo-cyan/20 border border-hbo-cyan/40 text-hbo-cyan text-[11px] font-bold">
+              {provider.name}
+            </span>
           </p>
-          <p className="text-xs text-gray-400 mt-1.5">
-            Checking: {enabledResolvers.map(r => r === 'torbox' ? 'TorBox 4K' : r === 'private_extractor' ? 'Private Extractor' : 'Embed Resolver').join(' → ')}
-          </p>
+          {resolvingStatus ? (
+            <p className="text-xs text-hbo-cyan/90 font-medium mt-2 max-w-sm animate-pulse tracking-wide">
+              {resolvingStatus}
+            </p>
+          ) : (
+            <p className="text-xs text-gray-400 mt-2">
+              Checking: {enabledResolvers.map(r => r === 'torbox' ? 'TorBox 4K' : r === 'private_extractor' ? 'Private Extractor' : 'Embed Resolver').join(' → ')}
+            </p>
+          )}
         </div>
       )}
 
       {/* STATE 2: Embed Provider Loading Spinner */}
       {playerMode === 'embed' && isLoading && (
-        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-black/90 backdrop-blur-md">
+        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-black/90 backdrop-blur-md px-6 text-center animate-fade-in">
           <div className="w-12 h-12 border-4 border-hbo-purple-light border-t-hbo-cyan rounded-full animate-spin mb-3 shadow-hbo-glow" />
           <p className="text-sm font-semibold text-gray-200">
             Loading stream via <span className="text-hbo-cyan font-bold">{provider.name}</span>...
           </p>
+          {resolvingStatus && (
+            <p className="text-xs text-hbo-cyan/80 font-medium mt-1.5 animate-pulse">
+              {resolvingStatus}
+            </p>
+          )}
           <p className="text-xs text-gray-500 mt-1">
             {adShieldEnabled ? 'Ad & Popup Shield is active' : 'Ad Shield disabled (Unrestricted mode)'}
           </p>
