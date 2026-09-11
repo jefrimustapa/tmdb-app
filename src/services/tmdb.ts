@@ -331,7 +331,7 @@ export const UNIFIED_GENRES: UnifiedGenre[] = [
   { id: 10402, name: 'Music', movieGenreId: 10402, tvGenreId: 10402 },
   { id: 9648, name: 'Mystery', movieGenreId: 9648, tvGenreId: 9648 },
   { id: 10764, name: 'Reality', movieGenreId: 10770, tvGenreId: 10764 },
-  { id: 10749, name: 'Romance', movieGenreId: 10749, tvGenreId: 10749 },
+  { id: 10749, name: 'Romance', movieGenreId: 10749, tvGenreId: 10749, isCustom: true },
   { id: 878, name: 'Sci-Fi', movieGenreId: 878, tvGenreId: 10765 },
   { id: 53, name: 'Thriller', movieGenreId: 53, tvGenreId: 9648 },
   { id: 10752, name: 'War', movieGenreId: 10752, tvGenreId: 10768 },
@@ -571,6 +571,7 @@ export const tmdbApi = {
       const inputIds = queryParams.with_genres.split(',').map((s: string) => s.trim()).filter(Boolean);
       const mappedTvIds = new Set<string>();
       let hasHorror = false;
+      let hasRomance = false;
       let isAnime = false;
 
       for (const idStr of inputIds) {
@@ -583,19 +584,35 @@ export const tmdbApi = {
           hasHorror = true;
           continue;
         }
+        if (idNum === 10749) {
+          hasRomance = true;
+          continue;
+        }
         const unified = UNIFIED_GENRES.find((g) => g.id === idNum || g.movieGenreId === idNum || g.tvGenreId === idNum);
         if (unified) {
-          mappedTvIds.add(String(unified.tvGenreId));
+          if (unified.id === 10749) {
+            hasRomance = true;
+          } else {
+            mappedTvIds.add(String(unified.tvGenreId));
+          }
         } else if (!isNaN(idNum)) {
           mappedTvIds.add(String(idNum));
         }
       }
 
+      const extraKeywords: string[] = [];
       if (hasHorror) {
-        const horrorKeywords = '315058|256183|295907|250593|12339';
+        extraKeywords.push('315058|256183|295907|250593|12339');
+      }
+      if (hasRomance) {
+        extraKeywords.push('9840|9799|282984');
+      }
+
+      if (extraKeywords.length > 0) {
+        const joinedExtra = extraKeywords.join(',');
         queryParams.with_keywords = queryParams.with_keywords
-          ? `${queryParams.with_keywords}|${horrorKeywords}`
-          : horrorKeywords;
+          ? `${queryParams.with_keywords},${joinedExtra}`
+          : joinedExtra;
       }
 
       if (isAnime) {
