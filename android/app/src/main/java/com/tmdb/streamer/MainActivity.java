@@ -219,6 +219,104 @@ public class MainActivity extends BridgeActivity {
                 }
 
                 @JavascriptInterface
+                public void openCastMenu() {
+                    openGoogleCast();
+                }
+
+                @JavascriptInterface
+                public void openGoogleCast() {
+                    runOnUiThread(() -> {
+                        try {
+                            Intent intent = new Intent(android.provider.Settings.ACTION_CAST_SETTINGS);
+                            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                            startActivity(intent);
+                        } catch (Exception e1) {
+                            try {
+                                Intent intent = new Intent("android.settings.WIFI_DISPLAY_SETTINGS");
+                                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                                startActivity(intent);
+                            } catch (Exception e2) {
+                                android.widget.Toast.makeText(MainActivity.this, "Please open Cast from Quick Settings", android.widget.Toast.LENGTH_SHORT).show();
+                            }
+                        }
+                    });
+                }
+
+                @JavascriptInterface
+                public void openScreenMirror() {
+                    runOnUiThread(() -> {
+                        // 1. Try Samsung Smart View directly
+                        try {
+                            Intent smartViewIntent = new Intent();
+                            smartViewIntent.setClassName("com.samsung.android.smartmirroring", "com.samsung.android.smartmirroring.CastingActivity");
+                            smartViewIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                            startActivity(smartViewIntent);
+                            return;
+                        } catch (Exception ignored) {}
+
+                        // 2. Try Samsung Smart View action
+                        try {
+                            Intent intent = new Intent("com.samsung.android.smartmirroring/com.samsung.android.smartmirroring.CastingActivity");
+                            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                            startActivity(intent);
+                            return;
+                        } catch (Exception ignored) {}
+
+                        // 3. Try standard WIFI_DISPLAY_SETTINGS
+                        try {
+                            Intent intent = new Intent("android.settings.WIFI_DISPLAY_SETTINGS");
+                            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                            startActivity(intent);
+                            return;
+                        } catch (Exception ignored) {}
+
+                        // 4. Fallback to Cast Settings
+                        try {
+                            Intent intent = new Intent(android.provider.Settings.ACTION_CAST_SETTINGS);
+                            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                            startActivity(intent);
+                        } catch (Exception e) {
+                            android.widget.Toast.makeText(MainActivity.this, "Please open Screen Mirror / Smart View from Quick Settings", android.widget.Toast.LENGTH_SHORT).show();
+                        }
+                    });
+                }
+
+                @JavascriptInterface
+                public void openSamsungSmartView() {
+                    openScreenMirror();
+                }
+
+                @JavascriptInterface
+                public void openGoogleHomeCast() {
+                    openGoogleCast();
+                }
+
+                @JavascriptInterface
+                public void castStreamUrl(String url, String title) {
+                    runOnUiThread(() -> {
+                        if (url == null || url.trim().isEmpty()) {
+                            android.widget.Toast.makeText(MainActivity.this, "No direct stream URL available to cast", android.widget.Toast.LENGTH_SHORT).show();
+                            return;
+                        }
+                        try {
+                            android.net.Uri uri = android.net.Uri.parse(url.trim());
+                            Intent intent = new Intent(Intent.ACTION_VIEW);
+                            String mimeType = url.contains(".m3u8") ? "application/x-mpegURL" : "video/*";
+                            intent.setDataAndType(uri, mimeType);
+                            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                            if (title != null && !title.isEmpty()) {
+                                intent.putExtra(Intent.EXTRA_TITLE, title);
+                            }
+                            Intent chooser = Intent.createChooser(intent, "Cast / Play with TV app (Screen-off supported)");
+                            chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                            startActivity(chooser);
+                        } catch (Exception e) {
+                            android.widget.Toast.makeText(MainActivity.this, "Unable to open cast app: " + e.getMessage(), android.widget.Toast.LENGTH_SHORT).show();
+                        }
+                    });
+                }
+
+                @JavascriptInterface
                 public void simulateTouchAt(float x, float y) {
                     runOnUiThread(() -> {
                         WebView wv = bridge.getWebView();
