@@ -77,6 +77,7 @@ export const Watch: React.FC = () => {
           if (s.streamHeaderTimeout !== undefined) {
             setHeaderTimeoutSeconds(s.streamHeaderTimeout);
           }
+
         }
       })
       .catch((err) => {
@@ -199,21 +200,30 @@ export const Watch: React.FC = () => {
     };
   }, []);
 
+  const lastInputTimeRef = React.useRef(0);
   const lastMousePosRef = React.useRef({ x: -1, y: -1 });
 
   useEffect(() => {
     const handleKeyOrTouch = () => {
-      resetHeaderTimer();
+      const now = Date.now();
+      if (now - lastInputTimeRef.current > 150) {
+        lastInputTimeRef.current = now;
+        resetHeaderTimer();
+      }
     };
 
     const handleMouseMove = (e: MouseEvent) => {
-      if (
-        lastMousePosRef.current.x === -1 ||
-        Math.abs(e.clientX - lastMousePosRef.current.x) > 3 ||
-        Math.abs(e.clientY - lastMousePosRef.current.y) > 3
-      ) {
-        lastMousePosRef.current = { x: e.clientX, y: e.clientY };
-        resetHeaderTimer();
+      const now = Date.now();
+      if (now - lastInputTimeRef.current > 150) {
+        if (
+          lastMousePosRef.current.x === -1 ||
+          Math.abs(e.clientX - lastMousePosRef.current.x) > 5 ||
+          Math.abs(e.clientY - lastMousePosRef.current.y) > 5
+        ) {
+          lastInputTimeRef.current = now;
+          lastMousePosRef.current = { x: e.clientX, y: e.clientY };
+          resetHeaderTimer();
+        }
       }
     };
 

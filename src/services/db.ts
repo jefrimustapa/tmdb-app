@@ -88,6 +88,7 @@ export const DEFAULT_SETTINGS: UserSettings = {
   virtualCursorSpeed: 'normal',
   virtualCursorStyle: 'hbo_max',
   performanceMode: getDefaultPerformanceMode(),
+  showPerformanceHud: false,
   updatedAt: Date.now()
 };
 

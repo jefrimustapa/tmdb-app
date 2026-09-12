@@ -988,6 +988,48 @@ export const Settings: React.FC = () => {
                   {(settings.performanceMode ?? false) ? 'Enabled' : 'Disabled'}
                 </button>
               </div>
+
+              {/* Performance HUD Toggle */}
+              <div className="p-4 sm:p-5 space-y-3">
+                <div className="flex items-center gap-2">
+                  <h3 className="text-sm sm:text-base font-bold text-white">Performance HUD</h3>
+                  <span className="px-2 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wider bg-hbo-cyan/10 text-hbo-cyan border border-hbo-cyan/20">
+                    Debug
+                  </span>
+                </div>
+                <p className="text-xs text-gray-400">
+                  Displays real-time CPU %, GPU usage, and RAM consumption.
+                </p>
+
+                <div className="grid grid-cols-3 gap-2 pt-1">
+                  {[
+                    { id: 'off', label: 'Disabled' },
+                    { id: 'watch_only', label: 'Watch Only' },
+                    { id: 'all_pages', label: 'All Pages' }
+                  ].map((opt) => {
+                    const currentVal = settings.showPerformanceHud === true 
+                      ? 'all_pages' 
+                      : (settings.showPerformanceHud === 'watch_only' || settings.showPerformanceHud === 'all_pages' 
+                          ? settings.showPerformanceHud 
+                          : 'off');
+                    const isSelected = currentVal === opt.id;
+
+                    return (
+                      <button
+                        key={opt.id}
+                        onClick={() => handleUpdate({ showPerformanceHud: opt.id as any })}
+                        className={`py-2 px-2.5 rounded-xl text-xs font-bold transition-all border text-center ${
+                          isSelected
+                            ? 'bg-hbo-cyan text-black font-extrabold border-hbo-cyan shadow-hbo-glow'
+                            : 'bg-white/5 border-white/10 text-gray-400 hover:text-white'
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
           </div>
         )}

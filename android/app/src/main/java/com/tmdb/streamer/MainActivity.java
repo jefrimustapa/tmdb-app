@@ -54,6 +54,8 @@ public class MainActivity extends BridgeActivity {
     private volatile boolean isSimulatingTouch = false;
     private volatile boolean isAdShieldActive = true;
     private OrientationEventListener orientationListener;
+    private static long sPrevAppCpuTime = 0;
+    private static long sPrevAppUptime = 0;
 
     private static final String[] AD_BLOCK_PATTERNS = new String[] {
         "propellerads", "adsterra", "monetag", "exoclick", "popcash", "popads",
@@ -142,6 +144,12 @@ public class MainActivity extends BridgeActivity {
                 // Disable offscreen pre-rasterization on TV to save GPU fill rate on Mali-450
                 settings.setOffscreenPreRaster(false);
             }
+            // Explicit hardware accelerated layer for composite video surface
+            webView.setLayerType(android.view.View.LAYER_TYPE_HARDWARE, null);
+            // Deprecated in newer API but honored on Android 7-9 (Mi Box running Marshmallow/Nougat/Oreo/Pie)
+            try {
+                settings.setRenderPriority(WebSettings.RenderPriority.HIGH);
+            } catch (Exception ignored) {}
             // Allow mixed content so HLS streams over http/https load smoothly
             settings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
             // Enable third-party cookies so Cloudflare / cf_clearance / session cookies persist across iframes
@@ -615,6 +623,92 @@ public class MainActivity extends BridgeActivity {
                         }
                     });
                 }
+                @JavascriptInterface
+                public String getPerformanceStats() {
+                    try {
+                        // Fast non-allocating memory inspection
+                        Runtime rt = Runtime.getRuntime();
+                        long totalMem = rt.totalMemory() / (1024 * 1024);
+                        long freeMem = rt.freeMemory() / (1024 * 1024);
+                        long usedMem = totalMem - freeMem;
+
+                        android.os.Debug.MemoryInfo memInfo = new android.os.Debug.MemoryInfo();
+                        android.os.Debug.getMemoryInfo(memInfo);
+                        int totalPssMb = memInfo.getTotalPss() / 1024;
+
+                        // Accurate Process CPU calculation from /proc/self/stat (permitted under Android SELinux)
+                        float cpuUsage = -1.0f;
+                        try {
+                            java.io.RandomAccessFile reader = new java.io.RandomAccessFile("/proc/self/stat", "r");
+                            String statLine = reader.readLine();
+                            reader.close();
+                            if (statLine != null) {
+                                String[] toks = statLine.split("\\s+");
+                                if (toks.length >= 15) {
+                                    // utime is index 13, stime is index 14
+                                    long utime = Long.parseLong(toks[13]);
+                                    long stime = Long.parseLong(toks[14]);
+                                    long appCpuTime = utime + stime;
+                                    long nowUptime = android.os.SystemClock.elapsedRealtime();
+
+                                    if (sPrevAppUptime > 0 && nowUptime > sPrevAppUptime) {
+                                        long timeDiffMs = nowUptime - sPrevAppUptime;
+                                        long cpuTicks = appCpuTime - sPrevAppCpuTime;
+                                        // 100 ticks per sec (10ms per tick)
+                                        float cpuTimeMs = cpuTicks * 10.0f;
+                                        int numCores = Math.max(1, Runtime.getRuntime().availableProcessors());
+                                        cpuUsage = Math.max(0.0f, Math.min(100.0f, (cpuTimeMs / (float)(timeDiffMs * numCores)) * 100.0f));
+                                    }
+                                    sPrevAppCpuTime = appCpuTime;
+                                    sPrevAppUptime = nowUptime;
+                                }
+                            }
+                        } catch (Exception ignored) {}
+
+                        // GPU Memory usage (Graphics PSS in MB)
+                        int gpuMemMb = 0;
+                        try {
+                            String graphicsPss = memInfo.getMemoryStat("summary.graphics");
+                            if (graphicsPss != null) {
+                                gpuMemMb = Integer.parseInt(graphicsPss) / 1024;
+                            }
+                        } catch (Exception ignored) {}
+
+                        // GPU Busy load % (checks common Android GPU vendor paths: Mali, Adreno, etc.)
+                        float gpuUsage = -1.0f;
+                        String[] gpuPaths = new String[] {
+                            "/sys/class/kgsl/kgsl-3d0/gpu_busy_percentage",
+                            "/sys/class/kgsl/kgsl-3d0/devfreq/gpu_load",
+                            "/sys/devices/platform/mali/utilization",
+                            "/sys/devices/platform/13040000.mali/utilization",
+                            "/sys/class/mpgpu/cur_freq"
+                        };
+                        for (String p : gpuPaths) {
+                            try {
+                                java.io.File gf = new java.io.File(p);
+                                if (gf.exists() && gf.canRead()) {
+                                    java.io.RandomAccessFile gr = new java.io.RandomAccessFile(gf, "r");
+                                    String line = gr.readLine();
+                                    gr.close();
+                                    if (line != null) {
+                                        float val = Float.parseFloat(line.trim().replace("%", ""));
+                                        if (val >= 0) {
+                                            gpuUsage = val;
+                                            break;
+                                        }
+                                    }
+                                }
+                            } catch (Exception ignored) {}
+                        }
+
+                        return String.format(java.util.Locale.US,
+                            "{\"pssMb\":%d,\"usedMb\":%d,\"totalMb\":%d,\"cpuPercent\":%.1f,\"gpuPercent\":%.1f,\"gpuMemMb\":%d}",
+                            totalPssMb, usedMem, totalMem, cpuUsage, gpuUsage, gpuMemMb
+                        );
+                    } catch (Exception e) {
+                        return "{\"error\":\"" + e.getMessage() + "\"}";
+                    }
+                }
             }, "AndroidBridge");
 
             // Handle alert, confirm, and multi-window popups
@@ -669,17 +763,20 @@ public class MainActivity extends BridgeActivity {
                         String rawUrl = request.getUrl().toString();
                         String lower = rawUrl.toLowerCase();
 
-                        // Sniff and capture direct HLS (.m3u8) and MP4 video stream feeds
-                        if ((lower.contains(".m3u8") || lower.contains(".mp4")) && 
-                            !lower.contains("localhost") && 
-                            !lower.startsWith("capacitor://")) {
-                            runOnUiThread(() -> {
-                                String jsDispatch = String.format(
-                                    "window.dispatchEvent(new CustomEvent('tmdb_direct_stream_found', { detail: { streamUrl: '%s' } }));",
-                                    rawUrl.replace("'", "\\'")
-                                );
-                                view.evaluateJavascript(jsDispatch, null);
-                            });
+                        // Sniffing direct stream feeds has been decommissioned in favor of strict stream engine architecture.
+                        // Skipping evaluateJavascript avoids high-frequency main thread interruption on HLS segment refreshes.
+
+                        // BLOCK KNOWN HEAVY TRACKER & AD SCRIPTS AT NATIVE LAYER
+                        // Embed providers inject aggressive analytics, popunders, and coin miners that choke TV CPUs.
+                        // Returning an empty 200 response immediately prevents parsing and execution overhead.
+                        if (lower.contains("googletagmanager.com") || lower.contains("google-analytics.com") ||
+                            lower.contains("histats.com") || lower.contains("popads.net") || lower.contains("syndication.exdynsrv.com") ||
+                            lower.contains("creative.mmo13.net") || lower.contains("clickadu.com") || lower.contains("trafficjunky.com") ||
+                            lower.contains("adsterra.com") || lower.contains("exoclick.com") || lower.contains("propellerads.com") ||
+                            lower.contains("yandex.ru") || lower.contains("mc.yandex") || lower.contains("scorecardresearch.com") ||
+                            lower.contains("coinhive.min.js") || lower.contains("crypto-loot.com") || lower.contains("adtrue.com") ||
+                            lower.contains("bet365") || lower.contains("1xbet") || lower.contains("vidoomy.com")) {
+                            return new WebResourceResponse("text/javascript", "UTF-8", new java.io.ByteArrayInputStream("".getBytes()));
                         }
 
                         // Asian Stream, VidSrc & TurboVIP Anti-Hotlinking, CSP Frame Shield and X-Frame-Options removal
@@ -1452,9 +1549,15 @@ public class MainActivity extends BridgeActivity {
                         "  }" +
                         "  monitorMedia();" +
                         "  hideCineSrcEpisodeBtn();" +
-                        "  setInterval(function() {" +
+                        "  var attempts = 0;" +
+                        "  var maxAttempts = 15;" +
+                        "  var timer = setInterval(function() {" +
+                        "    attempts++;" +
                         "    monitorMedia();" +
                         "    hideCineSrcEpisodeBtn();" +
+                        "    if (attempts >= maxAttempts) {" +
+                        "      clearInterval(timer);" +
+                        "    }" +
                         "  }, 1000);" +
                         "})();";
                     view.evaluateJavascript(mediaMonitorScript, null);
@@ -1795,10 +1898,19 @@ public class MainActivity extends BridgeActivity {
                             "  var isHeaderFocused = !!window.__tmdbHeaderFocused || (header && header.contains(document.activeElement));" +
                             "  var backBtn = document.getElementById('watch-back-btn') || (header ? header.querySelector('[data-watch-back=\"true\"], [data-watch-header-item=\"true\"]') : null);" +
                             "  if (!isHeaderFocused) {" +
+                            "    if (document.activeElement && typeof document.activeElement.blur === 'function') {" +
+                            "      try { document.activeElement.blur(); } catch(e) {}" +
+                            "    }" +
+                            "    window.focus();" +
+                            "    if (header) {" +
+                            "      header.classList.remove('invisible', 'pointer-events-none');" +
+                            "      header.classList.add('visible', 'pointer-events-auto');" +
+                            "    }" +
                             "    window.__tmdbHeaderFocused = true;" +
                             "    window.dispatchEvent(new CustomEvent('tmdb_show_header_focus_back'));" +
                             "    if (backBtn) { backBtn.focus(); }" +
-                            "    setTimeout(function() { if (backBtn) { backBtn.focus(); } }, 50);" +
+                            "    setTimeout(function() { if (backBtn) { backBtn.focus(); } }, 40);" +
+                            "    setTimeout(function() { if (backBtn) { backBtn.focus(); } }, 120);" +
                             "    return 'FOCUSED_HEADER';" +
                             "  } else {" +
                             "    window.__tmdbHeaderFocused = false;" +

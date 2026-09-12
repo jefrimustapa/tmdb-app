@@ -197,12 +197,20 @@ export const Watch: React.FC = () => {
       setHeaderVisible(true);
       (window as any).__tmdbHeaderFocused = true;
       resetHeaderTimer();
-      setTimeout(() => {
+      // Unfocus iframe and return keyboard focus to top-level window
+      if (document.activeElement && typeof (document.activeElement as HTMLElement).blur === 'function') {
+        (document.activeElement as HTMLElement).blur();
+      }
+      window.focus();
+      const tryFocus = () => {
         const backBtn = document.getElementById('watch-back-btn') || document.querySelector<HTMLElement>('[data-watch-back="true"]');
         if (backBtn) {
-          backBtn.focus();
+          backBtn.focus({ preventScroll: true });
         }
-      }, 30);
+      };
+      requestAnimationFrame(tryFocus);
+      setTimeout(tryFocus, 40);
+      setTimeout(tryFocus, 120);
     };
 
     const onResetHeaderTimer = () => {
@@ -331,6 +339,10 @@ export const Watch: React.FC = () => {
   const okPressCountRef = React.useRef(0);
   const okPressTimerRef = React.useRef<NodeJS.Timeout | null>(null);
 
+  const handleCloseCursor = React.useCallback(() => {
+    setCursorActive(false);
+  }, []);
+
   useEffect(() => {
     const handleGlobalOkPress = (e: KeyboardEvent) => {
       if (!cursorSettings.enabled) return;
@@ -355,10 +367,6 @@ export const Watch: React.FC = () => {
       }
     };
 
-    const handleCloseCursor = () => {
-      console.log('[TMDB Streamer] tmdb_close_cursor received');
-      setCursorActive(false);
-    };
     const handleToggleCursor = () => {
       console.log('[TMDB Streamer] tmdb_toggle_cursor received, enabled:', cursorSettings.enabled);
       if (cursorSettings.enabled) {
@@ -565,7 +573,7 @@ export const Watch: React.FC = () => {
           onMouseEnter={resetHeaderTimer}
           onMouseMove={resetHeaderTimer}
           className={`absolute top-0 left-0 right-0 z-40 flex flex-col gap-2 px-3 sm:px-6 pt-[max(0.75rem,env(safe-area-inset-top,1.75rem))] pb-8 bg-gradient-to-b from-black via-black/90 to-transparent transition-all duration-300 pointer-events-auto ${
-            headerVisible ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4 pointer-events-none'
+            headerVisible ? 'opacity-100 translate-y-0 visible' : 'opacity-0 -translate-y-4 invisible pointer-events-none'
           }`}
         >
           {/* Row 1: Back Button + Vertically Centered Title (Left) and Provider Switcher (Right) */}
@@ -739,10 +747,9 @@ export const Watch: React.FC = () => {
         {/* TV Virtual On-Demand Cursor */}
         <TVVirtualCursor
           active={cursorActive}
-          onClose={() => setCursorActive(false)}
+          onClose={handleCloseCursor}
           speed={cursorSettings.speed}
           timeoutSeconds={cursorSettings.timeout}
-          cursorStyle={cursorSettings.style}
         />
       </div>
     </div>
