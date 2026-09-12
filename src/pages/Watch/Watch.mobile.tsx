@@ -7,7 +7,7 @@ import { ProviderPickerMobile } from '../../components/player/ProviderPickerMobi
 import { dbService } from '../../services/db';
 import { isAnimeMedia } from '../../services/animeMappingService';
 import { isAseanMedia, isKoreanMedia } from '../../services/lariMappingService';
-import { ArrowLeft, SkipForward, SkipBack } from 'lucide-react';
+import { ArrowLeft, SkipForward, SkipBack, Cast, Tv, X } from 'lucide-react';
 
 export const Watch: React.FC = () => {
   const { type, id } = useParams<{ type: 'movie' | 'tv'; id: string }>();
@@ -338,6 +338,40 @@ export const Watch: React.FC = () => {
     return () => { ro.disconnect(); window.removeEventListener('resize', checkEpisodeTitleOverflow); };
   }, [checkEpisodeTitleOverflow, currentEpisode?.name]);
 
+  const [showCastMenu, setShowCastMenu] = useState(false);
+
+  const handleOpenCastMenu = useCallback(() => {
+    setShowCastMenu(true);
+  }, []);
+
+  const handleCloseCastMenu = useCallback(() => {
+    setShowCastMenu(false);
+  }, []);
+
+  const handleGoogleCast = useCallback(() => {
+    setShowCastMenu(false);
+    if (typeof (window as any).AndroidBridge?.openGoogleCast === 'function') {
+      (window as any).AndroidBridge.openGoogleCast();
+    } else if (typeof (window as any).AndroidBridge?.openCastMenu === 'function') {
+      (window as any).AndroidBridge.openCastMenu();
+    } else {
+      alert('Cast is only supported on Android devices.');
+    }
+  }, []);
+
+  const handleScreenMirror = useCallback(() => {
+    setShowCastMenu(false);
+    if (typeof (window as any).AndroidBridge?.openScreenMirror === 'function') {
+      (window as any).AndroidBridge.openScreenMirror();
+    } else if (typeof (window as any).AndroidBridge?.openSamsungSmartView === 'function') {
+      (window as any).AndroidBridge.openSamsungSmartView();
+    } else if (typeof (window as any).AndroidBridge?.openCastMenu === 'function') {
+      (window as any).AndroidBridge.openCastMenu();
+    } else {
+      alert('Please open Smart View / Screen Mirror from Quick Settings.');
+    }
+  }, []);
+
   if (isLoading || !details) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-hbo-dark">
@@ -381,8 +415,11 @@ export const Watch: React.FC = () => {
                 onKeyDown={(e) => {
                   if (e.key === 'ArrowRight') {
                     e.preventDefault();
+                    const castBtn = document.getElementById('watch-cast-btn');
                     const trigger = document.getElementById('watch-provider-trigger');
-                    if (trigger) {
+                    if (castBtn) {
+                      castBtn.focus();
+                    } else if (trigger) {
                       trigger.focus();
                     }
                   } else if (e.key === 'ArrowDown') {
@@ -415,8 +452,30 @@ export const Watch: React.FC = () => {
               </h1>
             </div>
 
-            {/* Right: Quick Provider Switcher Dropdown */}
+            {/* Right: Cast Button + Quick Provider Switcher Dropdown */}
             <div className="flex items-center gap-2 flex-shrink-0">
+              <button
+                type="button"
+                onClick={handleOpenCastMenu}
+                id="watch-cast-btn"
+                data-watch-header-item="true"
+                aria-label="Cast to TV"
+                title="Cast Watch Page to TV"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'ArrowRight') {
+                    e.preventDefault();
+                    document.getElementById('watch-provider-trigger')?.focus();
+                  } else if (e.key === 'ArrowLeft') {
+                    e.preventDefault();
+                    document.getElementById('watch-back-btn')?.focus();
+                  }
+                }}
+                className="p-2 rounded-full bg-black/60 hover:bg-black/90 text-white/90 hover:text-white border border-white/15 transition active:scale-95 hover:scale-105 flex-shrink-0 tv-focus-target focus:outline-none focus:border-hbo-cyan focus:ring-2 focus:ring-hbo-cyan shadow-sm cursor-pointer"
+              >
+                <Cast className="w-4 h-4 sm:w-5 sm:h-5 text-hbo-cyan/90 hover:text-hbo-cyan" />
+              </button>
+
               {enabledResolvers.includes('embed') ? (
                 <ProviderPickerMobile
                   currentProviderId={providerId}
@@ -545,6 +604,74 @@ export const Watch: React.FC = () => {
           />
         </div>
       </div>
+
+      {/* Cast Selection Modal */}
+      {showCastMenu && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fadeIn"
+          onClick={handleCloseCastMenu}
+        >
+          <div
+            className="w-full max-w-xs bg-zinc-900/95 border border-white/10 rounded-2xl p-4 shadow-2xl shadow-black/80 space-y-3 animate-scaleUp"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between pb-2 border-b border-white/10">
+              <span className="text-xs font-bold font-display uppercase tracking-wider text-zinc-400">
+                Cast Screen
+              </span>
+              <button
+                type="button"
+                onClick={handleCloseCastMenu}
+                className="p-1 -mr-1 rounded-full text-zinc-400 hover:text-white hover:bg-white/10 transition"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Clean 2 options */}
+            <div className="space-y-2">
+              {/* Option 1: Standard Google Cast Screen Mirror */}
+              <button
+                type="button"
+                onClick={handleGoogleCast}
+                className="w-full flex items-center gap-3 p-3 rounded-xl bg-white/5 hover:bg-white/10 active:bg-white/15 border border-white/10 hover:border-hbo-cyan/40 transition text-left group cursor-pointer"
+              >
+                <div className="p-2 rounded-lg bg-hbo-purple/20 text-hbo-cyan group-hover:scale-105 transition flex-shrink-0">
+                  <Cast className="w-4 h-4" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-xs font-semibold text-white group-hover:text-hbo-cyan transition truncate">
+                    Standard Google Cast Screen Mirror
+                  </div>
+                  <div className="text-[10px] text-zinc-400 truncate">
+                    Chromecast & Google TV
+                  </div>
+                </div>
+              </button>
+
+              {/* Option 2: screen mirror */}
+              <button
+                type="button"
+                onClick={handleScreenMirror}
+                className="w-full flex items-center gap-3 p-3 rounded-xl bg-white/5 hover:bg-white/10 active:bg-white/15 border border-white/10 hover:border-hbo-purple/40 transition text-left group cursor-pointer"
+              >
+                <div className="p-2 rounded-lg bg-purple-500/20 text-purple-300 group-hover:scale-105 transition flex-shrink-0">
+                  <Tv className="w-4 h-4" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-xs font-semibold text-white group-hover:text-purple-300 transition truncate">
+                    screen mirror
+                  </div>
+                  <div className="text-[10px] text-zinc-400 truncate">
+                    Smart View & Wireless Display
+                  </div>
+                </div>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
