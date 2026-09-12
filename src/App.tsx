@@ -21,6 +21,7 @@ import { useLocation } from 'react-router-dom';
 import { dbService } from './services/db';
 import { updateService, type UpdateInfo } from './services/updateService';
 import { UpdateModal } from './components/common/UpdateModal';
+import { PerformanceHud } from './components/common/PerformanceHud';
 
 const AppContent: React.FC = () => {
   const { isTV, isMobile } = useDevice();
@@ -37,7 +38,9 @@ const AppContent: React.FC = () => {
     });
   }, []);
 
-  // Synchronize Performance Mode attribute on document root (data-perf-mode="true")
+  const [hudMode, setHudMode] = React.useState<'off' | 'watch_only' | 'all_pages'>('off');
+
+  // Synchronize Performance Mode attribute on document root (data-perf-mode="true") and HUD visibility
   React.useEffect(() => {
     const syncPerfMode = (perfMode?: boolean) => {
       if (typeof document === 'undefined') return;
@@ -48,12 +51,27 @@ const AppContent: React.FC = () => {
       }
     };
 
-    dbService.getSettings().then(s => syncPerfMode(s.performanceMode));
+    dbService.getSettings().then(s => {
+      syncPerfMode(s.performanceMode);
+      if (s.showPerformanceHud !== undefined) {
+        if (s.showPerformanceHud === true) setHudMode('all_pages');
+        else if (s.showPerformanceHud === false) setHudMode('off');
+        else setHudMode(s.showPerformanceHud);
+      }
+    });
 
     const handleSettingsChanged = (e: Event) => {
       const customEvent = e as CustomEvent<any>;
-      if (customEvent.detail && typeof customEvent.detail.performanceMode === 'boolean') {
-        syncPerfMode(customEvent.detail.performanceMode);
+      if (customEvent.detail) {
+        if (typeof customEvent.detail.performanceMode === 'boolean') {
+          syncPerfMode(customEvent.detail.performanceMode);
+        }
+        if (customEvent.detail.showPerformanceHud !== undefined) {
+          const val = customEvent.detail.showPerformanceHud;
+          if (val === true) setHudMode('all_pages');
+          else if (val === false) setHudMode('off');
+          else setHudMode(val);
+        }
       }
     };
 
@@ -126,6 +144,13 @@ const AppContent: React.FC = () => {
       {showExitToast && (
         <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 px-4 py-2 bg-hbo-card/95 backdrop-blur-md border border-hbo-cyan/50 text-white rounded-full text-xs font-bold shadow-2xl shadow-hbo-purple/50 animate-bounce">
           Press back again to exit
+        </div>
+      )}
+
+      {/* Global Performance HUD Overlay (Configurable: Off / Watch Page Only / All Pages) */}
+      {(hudMode === 'all_pages' || (hudMode === 'watch_only' && isWatchPage)) && (
+        <div className="fixed top-2 left-1/2 -translate-x-1/2 z-[99999999] pointer-events-none">
+          <PerformanceHud />
         </div>
       )}
     </div>

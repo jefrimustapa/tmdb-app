@@ -1442,7 +1442,9 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           src={streamUrl}
           title={title}
           loading="eager"
-          className="w-full h-full border-0 transform-gpu will-change-transform"
+          tabIndex={-1}
+          className="w-full h-full border-0"
+          style={{ contain: 'strict' }}
           allowFullScreen
           allow="autoplay *; encrypted-media *; picture-in-picture *; fullscreen *"
           sandbox={
