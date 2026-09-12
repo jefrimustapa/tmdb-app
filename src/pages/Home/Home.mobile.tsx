@@ -141,7 +141,10 @@ export const Home: React.FC = () => {
               Continue Watching
             </h2>
           </div>
-          <div className="flex items-center gap-3.5 overflow-x-auto no-scrollbar py-4 pl-4 sm:pl-8 pr-6 sm:pr-8 -my-2">
+          <div
+            style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-x pan-y' }}
+            className="flex items-center gap-3.5 overflow-x-auto no-scrollbar py-4 pl-4 sm:pl-8 pr-6 sm:pr-8 -my-2 touch-pan-x touch-pan-y overscroll-x-contain"
+          >
             {history.map((hist) => (
               <MediaCard
                 key={hist.id || `${hist.tmdbId}-${hist.mediaType}`}

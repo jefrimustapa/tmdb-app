@@ -2,12 +2,13 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20260912-1225';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.perf-optimize-watch-.20260912-1225';
+export const APP_BUILD_NUMBER = '20260912-1252';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.fix-media-card-scrol.20260912-1252';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
-export const APP_BRANCH = 'perf-optimize-watch-';
-export const APP_CHANGELOG = `* feat(details): add deep link sharing and restyle action buttons with unified focus and selection (#81)
+export const APP_BRANCH = 'fix-media-card-scrol';
+export const APP_CHANGELOG = `* perf(watch): optimize watch page rendering, TV cursor navigation and remote back focus (#82)
+* feat(details): add deep link sharing and restyle action buttons with unified focus and selection (#81)
 * feat(player): improve Dramacool tracking, multi-server extraction, and slug matching (#80)
 * feat(provider): add Dramacool stream provider without hardcoded timeout (#79)
 * fix(ui): remove horizontal scroll snapping for title cards in mobile mode (#78)
@@ -20,5 +21,4 @@ export const APP_CHANGELOG = `* feat(details): add deep link sharing and restyle
 * feat(player): VidLink auto-unmute injection and episode title conditional fade (#71)
 * fix(scroll): resolve vertical scroll unresponsiveness on mobile rails and card touch (#70)
 * feat(player): improve CineSrc watch progress tracking and auto-resume (#69)
-* feat(filter): adult filtering, unified rating country priority, 5-tier maturity & optimizations (#68)
-* fix(ui): prevent touch scroll hang and cancel long press on move (#67)`;
+* feat(filter): adult filtering, unified rating country priority, 5-tier maturity & optimizations (#68)`;
