@@ -173,7 +173,13 @@ const MediaCardComponent: React.FC<MediaCardProps> = ({
     };
   }, [menuOpen]);
 
+  const isTouchMovedRef = useRef(false);
+
   const handleCardClick = () => {
+    if (isTouchMovedRef.current) {
+      isTouchMovedRef.current = false;
+      return;
+    }
     if (menuOpen) {
       setMenuOpen(false);
       return;
@@ -261,6 +267,7 @@ const MediaCardComponent: React.FC<MediaCardProps> = ({
   };
 
   const handleTouchStart = (e: React.TouchEvent | React.MouseEvent) => {
+    isTouchMovedRef.current = false;
     if ('touches' in e && e.touches.length === 1) {
       touchStartPosRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
     }
@@ -277,12 +284,15 @@ const MediaCardComponent: React.FC<MediaCardProps> = ({
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
-    if (longPressTimerRef.current && touchStartPosRef.current && e.touches.length === 1) {
+    if (touchStartPosRef.current && e.touches.length === 1) {
       const deltaX = Math.abs(e.touches[0].clientX - touchStartPosRef.current.x);
       const deltaY = Math.abs(e.touches[0].clientY - touchStartPosRef.current.y);
-      if (deltaX > 8 || deltaY > 8) {
-        clearTimeout(longPressTimerRef.current);
-        longPressTimerRef.current = null;
+      if (deltaX > 6 || deltaY > 6) {
+        isTouchMovedRef.current = true;
+        if (longPressTimerRef.current) {
+          clearTimeout(longPressTimerRef.current);
+          longPressTimerRef.current = null;
+        }
       }
     } else if (longPressTimerRef.current) {
       clearTimeout(longPressTimerRef.current);
@@ -323,7 +333,8 @@ const MediaCardComponent: React.FC<MediaCardProps> = ({
         onMouseDown={handleTouchStart}
         onMouseUp={handleTouchEnd}
         onClick={handleCardClick}
-        className={`group relative flex-shrink-0 rounded-xl overflow-hidden bg-hbo-card border border-hbo-border/40 tv-focus-target cursor-pointer focus:outline-none select-none ${
+        style={{ touchAction: 'pan-x pan-y' }}
+        className={`group relative flex-shrink-0 rounded-xl overflow-hidden bg-hbo-card border border-hbo-border/40 tv-focus-target cursor-pointer focus:outline-none select-none touch-pan-x touch-pan-y ${
           isLandscape
             ? 'w-[164px] sm:w-[172px] lg:w-[176px] max-w-[180px]'
             : 'w-[130px] sm:w-[140px] lg:w-[144px] max-w-[148px]'
@@ -337,8 +348,9 @@ const MediaCardComponent: React.FC<MediaCardProps> = ({
             alt={title}
             loading="lazy"
             decoding="async"
+            draggable={false}
             onError={(e) => tmdbImages.handleImgError(e, isLandscape)}
-            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 pointer-events-none select-none"
           />
 
           {/* Pure Play Icon on Bottom-Left Corner for Landscape Continue Watching Cards */}

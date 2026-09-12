@@ -146,6 +146,9 @@ public class MainActivity extends BridgeActivity {
             }
             // Explicit hardware accelerated layer for composite video surface
             webView.setLayerType(android.view.View.LAYER_TYPE_HARDWARE, null);
+            // Ensure nested scrolling and fluid overscroll for horizontal and vertical web touch gestures
+            androidx.core.view.ViewCompat.setNestedScrollingEnabled(webView, true);
+            webView.setOverScrollMode(android.view.View.OVER_SCROLL_IF_CONTENT_SCROLLS);
             // Deprecated in newer API but honored on Android 7-9 (Mi Box running Marshmallow/Nougat/Oreo/Pie)
             try {
                 settings.setRenderPriority(WebSettings.RenderPriority.HIGH);
@@ -193,6 +196,11 @@ public class MainActivity extends BridgeActivity {
                 @JavascriptInterface
                 public void setWatchPage(boolean active) {
                     isWatchPageActive = active;
+                    if (!active) {
+                        isVirtualCursorActive = false;
+                        isDropdownOpen = false;
+                        isSimulatingTouch = false;
+                    }
                     runOnUiThread(() -> {
                         if (isTV()) return;
                         if (active) {
