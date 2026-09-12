@@ -2,12 +2,13 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20260912-0119';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-improve-trackin.20260912-0119';
+export const APP_BUILD_NUMBER = '20260912-0152';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-details-share-d.20260912-0152';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
-export const APP_BRANCH = 'feat-improve-trackin';
-export const APP_CHANGELOG = `* feat(provider): add Dramacool stream provider without hardcoded timeout (#79)
+export const APP_BRANCH = 'feat-details-share-d';
+export const APP_CHANGELOG = `* feat(player): improve Dramacool tracking, multi-server extraction, and slug matching (#80)
+* feat(provider): add Dramacool stream provider without hardcoded timeout (#79)
 * fix(ui): remove horizontal scroll snapping for title cards in mobile mode (#78)
 * fix(player): bypass vidsrc in-app browser restrictions and add vidsrc-kdrama provider (#77)
 * fix(player): add KissKH timeout failover and customizable resolver timeout setting (#76)
@@ -20,5 +21,4 @@ export const APP_CHANGELOG = `* feat(provider): add Dramacool stream provider wi
 * feat(player): improve CineSrc watch progress tracking and auto-resume (#69)
 * feat(filter): adult filtering, unified rating country priority, 5-tier maturity & optimizations (#68)
 * fix(ui): prevent touch scroll hang and cancel long press on move (#67)
-* fix(player): fix restart from beginning for embed providers and improve KissKH progress tracking (#66)
-* feat(player): add Korean embed provider (KissKH) with isolated player & progress tracking (#65)`;
+* fix(player): fix restart from beginning for embed providers and improve KissKH progress tracking (#66)`;

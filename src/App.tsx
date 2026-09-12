@@ -15,6 +15,7 @@ import { SettingsTV, SettingsMobile } from './pages/Settings';
 import { useDevice } from './hooks/useDevice';
 import { useTVNavigation } from './hooks/useTVNavigation';
 import { useAndroidBackButton } from './hooks/useAndroidBackButton';
+import { useDeepLink } from './hooks/useDeepLink';
 
 import { useLocation } from 'react-router-dom';
 import { dbService } from './services/db';
@@ -25,6 +26,7 @@ const AppContent: React.FC = () => {
   const { isTV, isMobile } = useDevice();
   useTVNavigation(isTV);
   const { showExitToast } = useAndroidBackButton();
+  useDeepLink();
   const location = useLocation();
   const [startupUpdateInfo, setStartupUpdateInfo] = React.useState<UpdateInfo | null>(null);
 

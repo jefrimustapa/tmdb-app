@@ -33,6 +33,25 @@
                 <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
             </intent-filter>
 
+            <!-- Deep link intent filter: custom URI scheme tmdbstream:// -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="tmdbstream" />
+            </intent-filter>
+
+            <!-- Deep link intent filter: themoviedb.org web links (clickable in WhatsApp, Telegram, etc.) -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="www.themoviedb.org" android:pathPrefix="/movie" />
+                <data android:scheme="https" android:host="www.themoviedb.org" android:pathPrefix="/tv" />
+                <data android:scheme="https" android:host="themoviedb.org" android:pathPrefix="/movie" />
+                <data android:scheme="https" android:host="themoviedb.org" android:pathPrefix="/tv" />
+            </intent-filter>
+
         </activity>
 
         <provider
