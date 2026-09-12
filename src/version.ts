@@ -2,12 +2,13 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20260911-1732';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-add-dramacool-p.20260911-1732';
+export const APP_BUILD_NUMBER = '20260912-0119';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-improve-trackin.20260912-0119';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
-export const APP_BRANCH = 'feat-add-dramacool-p';
-export const APP_CHANGELOG = `* fix(ui): remove horizontal scroll snapping for title cards in mobile mode (#78)
+export const APP_BRANCH = 'feat-improve-trackin';
+export const APP_CHANGELOG = `* feat(provider): add Dramacool stream provider without hardcoded timeout (#79)
+* fix(ui): remove horizontal scroll snapping for title cards in mobile mode (#78)
 * fix(player): bypass vidsrc in-app browser restrictions and add vidsrc-kdrama provider (#77)
 * fix(player): add KissKH timeout failover and customizable resolver timeout setting (#76)
 * fix(filter): map romance genre to keywords in TV series discover (#75)
@@ -20,5 +21,4 @@ export const APP_CHANGELOG = `* fix(ui): remove horizontal scroll snapping for t
 * feat(filter): adult filtering, unified rating country priority, 5-tier maturity & optimizations (#68)
 * fix(ui): prevent touch scroll hang and cancel long press on move (#67)
 * fix(player): fix restart from beginning for embed providers and improve KissKH progress tracking (#66)
-* feat(player): add Korean embed provider (KissKH) with isolated player & progress tracking (#65)
-* feat(card): modify title card badges, floating menu, and continue watch details button (#64)`;
+* feat(player): add Korean embed provider (KissKH) with isolated player & progress tracking (#65)`;

@@ -3,14 +3,25 @@
  * Resolves TMDB media to active embed URL (vidmoly, vidbasic, etc.) for playback.
  */
 
+export interface DramacoolServer {
+  name: string;
+  url: string;
+}
+
+export interface DramacoolStreamResult {
+  embedUrl: string | null;
+  servers?: DramacoolServer[];
+}
+
 interface CachedDramacoolEntry {
   embedUrl: string | null;
+  servers?: DramacoolServer[];
   timestamp: number;
 }
 
 const MEMORY_CACHE = new Map<string, CachedDramacoolEntry>();
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
-const SESSION_CACHE_KEY_PREFIX = 'tmdb_dramacool_v2_';
+const SESSION_CACHE_KEY_PREFIX = 'tmdb_dramacool_v3_';
 
 function getNormalizedKey(title: string, year?: string | number, season = 1, episode = 1): string {
   const cleanTitle = title.trim().toLowerCase().replace(/[^\w\s]/g, '').replace(/\s+/g, '_');
@@ -70,10 +81,18 @@ async function findDramaSlug(title: string, year?: string | number, originalTitl
       const html = await executeFetch(searchUrl);
       if (!html) continue;
 
-      // Dramacool search results contain links like:
-      // <a href="https://dramacool.net.my/night-has-come-2023/" class="img">
-      // or <h3 class="title" ...>Title</h3>
-      const matches = Array.from(html.matchAll(/href="https:\/\/dramacool\.net\.my\/([a-zA-Z0-9\-]+)\/"/gi));
+      // If Dramacool returned "nothing found" or "no results", do not inspect sidebar links
+      if (/nothing found|no results|not be found/i.test(html)) {
+        continue;
+      }
+
+      // Isolate the actual search results block (<ul class="list-episode-item ...">)
+      // This prevents capturing links from "Latest Added Episodes" sidebar widget!
+      const listBlockMatch = html.match(/<ul[^>]*class=['"][^'"]*list-episode-item[^'"]*['"][\s\S]*?<\/ul>/i);
+      const searchContainerHtml = listBlockMatch ? listBlockMatch[0] : '';
+      if (!searchContainerHtml) continue;
+
+      const matches = Array.from(searchContainerHtml.matchAll(/href="https:\/\/dramacool\.net\.my\/([a-zA-Z0-9\-]+)\/"/gi));
       const candidates: string[] = [];
 
       for (const m of matches) {
@@ -91,20 +110,35 @@ async function findDramaSlug(title: string, year?: string | number, originalTitl
 
       if (candidates.length > 0) {
         const cleanQ = query.toLowerCase().replace(/[^\w]/g, '');
-        // Prioritize match containing year or closest slug
-        const found = candidates.find(slug => {
-          if (year && slug.includes(String(year))) {
+        const queryWords = query.toLowerCase().split(/\s+/).filter(w => w.length > 2);
+        
+        // 1. Try exact match with year
+        if (cleanQ.length >= 2) {
+          const matchWithYear = candidates.find(slug => {
+            if (year && slug.includes(String(year))) {
+              const cleanSlug = slug.replace(/[^\w]/g, '');
+              return cleanSlug.includes(cleanQ) || cleanQ.includes(cleanSlug);
+            }
+            return false;
+          });
+
+          if (matchWithYear) return matchWithYear;
+
+          // 2. Try match containing clean query
+          const matchClean = candidates.find(slug => {
             const cleanSlug = slug.replace(/[^\w]/g, '');
             return cleanSlug.includes(cleanQ) || cleanQ.includes(cleanSlug);
-          }
-          return false;
-        }) || candidates.find(slug => {
-          const cleanSlug = slug.replace(/[^\w]/g, '');
-          return cleanSlug.includes(cleanQ) || cleanQ.includes(cleanSlug);
-        }) || candidates[0];
+          });
 
-        if (found) {
-          return found;
+          if (matchClean) return matchClean;
+        }
+
+        // 3. Try matching all major query words in the slug
+        if (queryWords.length > 0) {
+          const matchAllWords = candidates.find(slug => {
+            return queryWords.every(w => slug.includes(w));
+          });
+          if (matchAllWords) return matchAllWords;
         }
       }
     } catch (err) {
@@ -124,13 +158,13 @@ export async function resolveDramacoolStream(
   season = 1,
   episode = 1,
   originalTitle?: string
-): Promise<{ embedUrl: string | null }> {
+): Promise<DramacoolStreamResult> {
   const cacheKey = getNormalizedKey(title, year, season, episode);
 
   // 1. Check in-memory cache
   const memoryHit = MEMORY_CACHE.get(cacheKey);
   if (memoryHit && memoryHit.embedUrl && (Date.now() - memoryHit.timestamp < CACHE_TTL_MS)) {
-    return { embedUrl: memoryHit.embedUrl };
+    return { embedUrl: memoryHit.embedUrl, servers: memoryHit.servers };
   }
 
   // 2. Check sessionStorage
@@ -141,7 +175,7 @@ export async function resolveDramacoolStream(
         const parsed: CachedDramacoolEntry = JSON.parse(stored);
         if (parsed && parsed.embedUrl && (Date.now() - parsed.timestamp < CACHE_TTL_MS)) {
           MEMORY_CACHE.set(cacheKey, parsed);
-          return { embedUrl: parsed.embedUrl };
+          return { embedUrl: parsed.embedUrl, servers: parsed.servers };
         }
       }
     } catch (_) {}
@@ -214,25 +248,46 @@ export async function resolveDramacoolStream(
     }
 
     let finalEmbedUrl = rawServerUrl;
+    const extractedServers: DramacoolServer[] = [];
 
     // If the server URL is an intermediate page like kisskh.space or similar player relay,
-    // fetch it to extract the underlying iframe (e.g. vidmoly.biz, vidbasic.top, etc.)
+    // fetch it to extract all available servers (Vidmoly, Streamtape, MixDrop, etc.)
     if (rawServerUrl.includes('kisskh.space') || rawServerUrl.includes('asianembed') || rawServerUrl.includes('vidbasic.top/embed')) {
       try {
         const relayHtml = await executeFetch(rawServerUrl, epUrl);
+        
+        // 1. Extract multiple server choices from relay list (e.g. Vidmoly, Streamtape, MixDrop)
+        const serverMatches = Array.from(relayHtml.matchAll(/<li[^>]+data-video=['"]([^'"]+)['"][^>]*>(.*?)<\/li>/gi));
+        for (const sm of serverMatches) {
+          let sUrl = sm[1].trim();
+          if (sUrl.startsWith('//')) sUrl = `https:${sUrl}`;
+          const sName = sm[2].replace(/<[^>]+>/g, '').trim() || 'Server';
+          if (!extractedServers.some(s => s.url === sUrl)) {
+            extractedServers.push({ name: sName, url: sUrl });
+          }
+        }
+
+        // 2. Extract active inner iframe
         const innerIframe = relayHtml.match(/<iframe[^>]+(?:id="embedvideo"[^>]*src|src)="([^"]+)"/i);
         if (innerIframe && innerIframe[1]) {
           let innerSrc = innerIframe[1].trim();
           if (innerSrc.startsWith('//')) innerSrc = `https:${innerSrc}`;
           finalEmbedUrl = innerSrc;
+        } else if (extractedServers.length > 0) {
+          finalEmbedUrl = extractedServers[0].url;
         }
       } catch (e) {
         console.warn('[DramacoolResolver] Could not resolve inner relay iframe, using relay URL directly:', e);
       }
     }
 
+    if (extractedServers.length === 0 && finalEmbedUrl) {
+      extractedServers.push({ name: 'Vidmoly', url: finalEmbedUrl });
+    }
+
     const entry: CachedDramacoolEntry = {
       embedUrl: finalEmbedUrl,
+      servers: extractedServers,
       timestamp: Date.now()
     };
     MEMORY_CACHE.set(cacheKey, entry);
@@ -242,9 +297,9 @@ export async function resolveDramacoolStream(
       } catch (_) {}
     }
 
-    return { embedUrl: finalEmbedUrl };
+    return { embedUrl: finalEmbedUrl, servers: extractedServers };
   } catch (err) {
     console.warn('[DramacoolResolver] Resolution error:', err);
-    return { embedUrl: null };
+    return { embedUrl: null, servers: [] };
   }
 }

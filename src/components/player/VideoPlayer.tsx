@@ -12,7 +12,7 @@ import { tmdbImages, TMDB_FALLBACK_BACKDROP } from '../../services/tmdb';
 import { resolveAnimeMalId } from '../../services/animeMappingService';
 import { resolveLari21Stream } from '../../services/lariMappingService';
 import { resolveKisskhStream } from '../../services/kisskhMappingService';
-import { resolveDramacoolStream } from '../../services/dramacoolMappingService';
+import { resolveDramacoolStream, type DramacoolServer } from '../../services/dramacoolMappingService';
 
 interface VideoPlayerProps {
   mediaType: 'movie' | 'tv';
@@ -326,27 +326,35 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           const dramaRes = await resolveDramacoolStream(title, releaseYear, season, episode, originalTitle);
           if (!isMounted) return;
           if (dramaRes && dramaRes.embedUrl) {
-            console.log('[Resolver] ✅ Playing via Dramacool Player:', dramaRes.embedUrl);
-            setResolvingStatus('Connected to Dramacool Player');
+            const activeServer = dramaRes.servers?.[0]?.name || 'Vidmoly';
+            console.log(`[Resolver] ✅ Playing via Dramacool (${activeServer}):`, dramaRes.embedUrl);
+            setResolvingStatus(`Connected to Dramacool (${activeServer})`);
+            setDramacoolServers(dramaRes.servers || [{ name: activeServer, url: dramaRes.embedUrl }]);
+            setActiveDramacoolServerIndex(0);
             setResolvedDramacoolUrl(dramaRes.embedUrl);
             setPlayerMode('embed');
             setDirectStreamUrl(null);
-            setDirectStreamLabel('Dramacool Player');
+            setDirectStreamLabel(`Dramacool (${activeServer})`);
             setIsExtracting(false);
             setExtractionFailed(false);
             setIsLoading(false);
             return;
           }
-          console.warn('[Resolver] Dramacool resolution returned no stream');
-          setResolvingStatus('Stream unavailable on Dramacool');
-          setIsLoading(false);
-          setHasError(true);
+          console.warn('[Resolver] Dramacool resolution returned no stream, auto-failover to next Korean provider...');
+          setResolvingStatus('Failing over to next Korean provider...');
+          const koreanFallbackId = (topKoreanProviders && topKoreanProviders.length > 0)
+            ? topKoreanProviders.find(p => p !== 'dramacool-kdrama') || 'kisskh-kdrama'
+            : 'kisskh-kdrama';
+          const fallbackProvider = getProviderById(koreanFallbackId);
+          onProviderChange(fallbackProvider);
           return;
         } catch (err) {
           console.warn('[Resolver] Dramacool resolution error:', err);
-          setResolvingStatus('Stream unavailable on Dramacool');
-          setIsLoading(false);
-          setHasError(true);
+          const koreanFallbackId = (topKoreanProviders && topKoreanProviders.length > 0)
+            ? topKoreanProviders.find(p => p !== 'dramacool-kdrama') || 'kisskh-kdrama'
+            : 'kisskh-kdrama';
+          const fallbackProvider = getProviderById(koreanFallbackId);
+          onProviderChange(fallbackProvider);
           return;
         }
       }
@@ -443,6 +451,8 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const [resolvedLari21Url, setResolvedLari21Url] = useState<string | null>(null);
   const [resolvedKisskhUrl, setResolvedKisskhUrl] = useState<string | null>(null);
   const [resolvedDramacoolUrl, setResolvedDramacoolUrl] = useState<string | null>(null);
+  const [dramacoolServers, setDramacoolServers] = useState<DramacoolServer[]>([]);
+  const [activeDramacoolServerIndex, setActiveDramacoolServerIndex] = useState<number>(0);
 
   const provider = getProviderById(providerId);
   const baseStreamUrl = useMemo(() => {
@@ -745,6 +755,22 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
         // 3b. KissKH Isolated Player playback events
         if (data.type === 'kisskh' || data.channel === 'kisskh') {
+          if (data.event === 'ended') {
+            const endDur = durationRef.current || data.duration || (episodeRuntimeMinutes ? episodeRuntimeMinutes * 60 : 0);
+            if (endDur > 0) recordProgress(endDur, endDur, true);
+            return;
+          }
+          const current = data.currentTime ?? data.time ?? data.seconds ?? 0;
+          const dur = data.duration ?? 0;
+          if (current > 0) {
+            lastPostMessageTimeRef.current = Date.now();
+            recordProgress(current, dur);
+          }
+          return;
+        }
+
+        // 3b2. Dramacool / Vidmoly playback events
+        if (data.type === 'dramacool' || data.channel === 'dramacool') {
           if (data.event === 'ended') {
             const endDur = durationRef.current || data.duration || (episodeRuntimeMinutes ? episodeRuntimeMinutes * 60 : 0);
             if (endDur > 0) recordProgress(endDur, endDur, true);
@@ -1182,6 +1208,21 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     if (autoCycleTimeoutRef.current) {
       clearTimeout(autoCycleTimeoutRef.current);
     }
+
+    // If active provider is Dramacool and has backup servers (e.g. Streamtape, MixDrop), try next server first
+    if (provider.id === 'dramacool-kdrama' && dramacoolServers.length > 1 && activeDramacoolServerIndex + 1 < dramacoolServers.length) {
+      const nextIdx = activeDramacoolServerIndex + 1;
+      const nextServer = dramacoolServers[nextIdx];
+      console.warn(`[Dramacool] Active server failed. Failing over to backup server ${nextServer.name}...`);
+      setActiveDramacoolServerIndex(nextIdx);
+      setResolvedDramacoolUrl(nextServer.url);
+      setDirectStreamLabel(`Dramacool (${nextServer.name})`);
+      setIsLoading(true);
+      setHasError(false);
+      setIframeKey((prev) => prev + 1);
+      return;
+    }
+
     setIsLoading(false);
     if (autoCycle && !allFailed) {
       cycleToNextProvider();
@@ -1464,6 +1505,23 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
               : `The selected server (${provider.name}) could not stream "${title}". Please try switching to another server.`}
           </p>
           <div className="flex flex-wrap items-center justify-center gap-3">
+            {provider.id === 'dramacool-kdrama' && dramacoolServers.length > 1 && (
+              <button
+                onClick={() => {
+                  const nextIdx = (activeDramacoolServerIndex + 1) % dramacoolServers.length;
+                  const nextServer = dramacoolServers[nextIdx];
+                  setActiveDramacoolServerIndex(nextIdx);
+                  setResolvedDramacoolUrl(nextServer.url);
+                  setDirectStreamLabel(`Dramacool (${nextServer.name})`);
+                  setHasError(false);
+                  setIsLoading(true);
+                  setIframeKey((prev) => prev + 1);
+                }}
+                className="px-4 py-2.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 text-xs sm:text-sm font-bold border border-amber-500/40 transition hover:scale-105 tv-focus-target"
+              >
+                Switch to {dramacoolServers[(activeDramacoolServerIndex + 1) % dramacoolServers.length]?.name || 'Backup Server'}
+              </button>
+            )}
             <button
               onClick={restartAutoCycle}
               className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-hbo-purple to-hbo-cyan text-white font-bold text-xs sm:text-sm shadow-hbo-glow hover:scale-105 transition tv-focus-target"

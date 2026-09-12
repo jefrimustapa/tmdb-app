@@ -662,7 +662,7 @@ public class MainActivity extends BridgeActivity {
                         }
 
                         // Asian Stream, VidSrc & TurboVIP Anti-Hotlinking, CSP Frame Shield and X-Frame-Options removal
-                        if ((lower.contains("videonode.de") || lower.contains("playcdn.de") || lower.contains("turbovid") || lower.contains("turboviplay") || lower.contains("turbosplayer") || lower.contains("layaricon21.com") || lower.contains("abyssplayer.com") || lower.contains("embed4me.vip") || lower.contains("vidsrc.su") || lower.contains("vidsrc.stream") || lower.contains("vidsrc.net") || lower.contains("vidmoly") || lower.contains("vidbasic.top") || lower.contains("kisskh.space") || lower.contains("dramacool.net.my")) &&
+                        if ((lower.contains("videonode.de") || lower.contains("playcdn.de") || lower.contains("turbovid") || lower.contains("turboviplay") || lower.contains("turbosplayer") || lower.contains("layaricon21.com") || lower.contains("abyssplayer.com") || lower.contains("embed4me.vip") || lower.contains("vidsrc.su") || lower.contains("vidsrc.stream") || lower.contains("vidsrc.net") || lower.contains("vidmoly") || lower.contains("streamtape.com") || lower.contains("mixdrop") || lower.contains("vidbasic.top") || lower.contains("kisskh.space") || lower.contains("dramacool.net.my")) &&
                             !lower.contains("/cdn-cgi/")) {
                             try {
                                 URL url = new URL(rawUrl);
@@ -690,7 +690,7 @@ public class MainActivity extends BridgeActivity {
                                 } else if (lower.contains("vidsrc.su") || lower.contains("vidsrc.stream") || lower.contains("vidsrc.net")) {
                                     conn.setRequestProperty("Referer", "https://vidsrc.su/");
                                     conn.setRequestProperty("Origin", "https://vidsrc.su");
-                                } else if (lower.contains("vidmoly")) {
+                                } else if (lower.contains("vidmoly") || lower.contains("streamtape.com") || lower.contains("mixdrop")) {
                                     conn.setRequestProperty("Referer", "https://kisskh.space/");
                                     conn.setRequestProperty("Origin", "https://kisskh.space");
                                 } else if (lower.contains("kisskh.space") || lower.contains("vidbasic.top")) {
@@ -817,6 +817,116 @@ public class MainActivity extends BridgeActivity {
                                             "});\n" +
                                             "</script>\n";
                                         html = html.replace("<head>", "<head>\n" + mockScript);
+                                        in = new ByteArrayInputStream(html.getBytes(StandardCharsets.UTF_8));
+                                    } catch (Exception e) {}
+                                } else if ((lower.contains("vidmoly") || lower.contains("streamtape.com") || lower.contains("mixdrop") || lower.contains("kisskh.space")) && mimeType != null && mimeType.contains("html") && statusCode < 400) {
+                                    try {
+                                        BufferedReader reader = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8));
+                                        StringBuilder sb = new StringBuilder();
+                                        String l;
+                                        while ((l = reader.readLine()) != null) {
+                                            sb.append(l).append("\n");
+                                        }
+                                        String html = sb.toString();
+                                        String dramacoolTrackerScript = "<script id=\"tmdb-dramacool-tracker\">\n" +
+                                            "// 1. Block popup redirects and unwanted new tabs\n" +
+                                            "window.open = function() { return null; };\n" +
+                                            "window.openNewTab = function() { return null; };\n" +
+                                            "// 2. Playback State Broadcaster\n" +
+                                            "(function setupDramacoolTracker() {\n" +
+                                            "  function sendMsg(evt, cur, dur) {\n" +
+                                            "    try {\n" +
+                                            "      var payload = { type: 'dramacool', channel: 'dramacool', event: evt, currentTime: cur, duration: dur };\n" +
+                                            "      if (window.parent && window.parent !== window) {\n" +
+                                            "        window.parent.postMessage(payload, '*');\n" +
+                                            "      }\n" +
+                                            "      if (window.AndroidBridge && typeof window.AndroidBridge.onNativePlaybackState === 'function') {\n" +
+                                            "        window.AndroidBridge.onNativePlaybackState(evt === 'timeupdate' || evt === 'play', cur, dur);\n" +
+                                            "      }\n" +
+                                            "    } catch(e) {}\n" +
+                                            "  }\n" +
+                                            "  function getInitialResumeTime() {\n" +
+                                            "    try {\n" +
+                                            "      var m = window.location.hash.match(/t=(\\d+)/) || window.location.search.match(/[?&]t=(\\d+)/);\n" +
+                                            "      if (m && m[1]) return parseFloat(m[1]);\n" +
+                                            "    } catch(e) {}\n" +
+                                            "    return 0;\n" +
+                                            "  }\n" +
+                                            "  var initialSeekDone = false;\n" +
+                                            "  var pollTimer = setInterval(function() {\n" +
+                                            "    // Hook JWPlayer\n" +
+                                            "    if (typeof jwplayer === 'function') {\n" +
+                                            "      try {\n" +
+                                            "        var p = jwplayer('vplayer') || (typeof jwplayer === 'function' ? jwplayer() : null);\n" +
+                                            "        if (p && typeof p.on === 'function') {\n" +
+                                            "          clearInterval(pollTimer);\n" +
+                                            "          p.on('play', function() {\n" +
+                                            "            sendMsg('play', p.getPosition() || 0, p.getDuration() || 0);\n" +
+                                            "            if (!initialSeekDone) {\n" +
+                                            "              var resume = getInitialResumeTime();\n" +
+                                            "              if (resume > 0) {\n" +
+                                            "                initialSeekDone = true;\n" +
+                                            "                p.seek(resume);\n" +
+                                            "              }\n" +
+                                            "            }\n" +
+                                            "          });\n" +
+                                            "          p.on('time', function(e) {\n" +
+                                            "            if (e.position > 0) {\n" +
+                                            "              sendMsg('timeupdate', e.position, e.duration || 0);\n" +
+                                            "            }\n" +
+                                            "          });\n" +
+                                            "          p.on('pause', function() {\n" +
+                                            "            sendMsg('pause', p.getPosition() || 0, p.getDuration() || 0);\n" +
+                                            "          });\n" +
+                                            "          p.on('complete', function() {\n" +
+                                            "            var dur = p.getDuration() || 0;\n" +
+                                            "            sendMsg('ended', dur, dur);\n" +
+                                            "          });\n" +
+                                            "          return;\n" +
+                                            "        }\n" +
+                                            "      } catch(e) {}\n" +
+                                            "    }\n" +
+                                            "    // Hook HTML5 <video> tag fallback\n" +
+                                            "    var v = document.querySelector('video');\n" +
+                                            "    if (v) {\n" +
+                                            "      clearInterval(pollTimer);\n" +
+                                            "      v.addEventListener('playing', function() {\n" +
+                                            "        sendMsg('play', v.currentTime || 0, v.duration || 0);\n" +
+                                            "        if (!initialSeekDone) {\n" +
+                                            "          var resume = getInitialResumeTime();\n" +
+                                            "          if (resume > 0) {\n" +
+                                            "            initialSeekDone = true;\n" +
+                                            "            v.currentTime = resume;\n" +
+                                            "          }\n" +
+                                            "        }\n" +
+                                            "      });\n" +
+                                            "      v.addEventListener('timeupdate', function() {\n" +
+                                            "        if (v.duration > 0 && v.currentTime > 0) {\n" +
+                                            "          sendMsg('timeupdate', v.currentTime, v.duration);\n" +
+                                            "        }\n" +
+                                            "      });\n" +
+                                            "      v.addEventListener('pause', function() {\n" +
+                                            "        sendMsg('pause', v.currentTime || 0, v.duration || 0);\n" +
+                                            "      });\n" +
+                                            "      v.addEventListener('ended', function() {\n" +
+                                            "        sendMsg('ended', v.duration || 0, v.duration || 0);\n" +
+                                            "      });\n" +
+                                            "    }\n" +
+                                            "  }, 200);\n" +
+                                            "})();\n" +
+                                            "</script>\n";
+                                        String cleanCss = "<style id=\"tmdb-vidmoly-clean\">\n" +
+                                            "html, body { width: 100vw !important; height: 100vh !important; margin: 0 !important; padding: 0 !important; overflow: hidden !important; background: #000 !important; }\n" +
+                                            "#vidmolyadblocktest, #lo_dlsm, #resume-overlay, .resume-container, .resume-progress-bar, .ad, .ads, [id*='banner'] { display: none !important; opacity: 0 !important; visibility: hidden !important; pointer-events: none !important; height: 0 !important; width: 0 !important; }\n" +
+                                            "#vplayer, .jwplayer, video { width: 100vw !important; height: 100vh !important; max-width: 100vw !important; max-height: 100vh !important; position: absolute !important; inset: 0 !important; }\n" +
+                                            "/* Center play / pause display notification icon on screen */\n" +
+                                            ".jwplayer .jw-display-controls, .jw-display-controls { display: flex !important; align-items: center !important; justify-content: center !important; width: 100% !important; height: 100% !important; position: absolute !important; inset: 0 !important; pointer-events: none !important; }\n" +
+                                            ".jwplayer .jw-display-icon-container, .jw-display-icon-container { position: absolute !important; top: 50% !important; left: 50% !important; transform: translate(-50%, -50%) !important; margin: 0 !important; pointer-events: auto !important; }\n" +
+                                            "</style>\n";
+                                        html = html.replace("<head>", "<head>\n" + cleanCss + dramacoolTrackerScript);
+                                        // Neutralize inline function that creates and displays the resume overlay
+                                        html = html.replace("overlay.style.display = 'block';", "overlay.style.display = 'none';");
+                                        html = html.replace("showResumeDialog(", "void(0);//");
                                         in = new ByteArrayInputStream(html.getBytes(StandardCharsets.UTF_8));
                                     } catch (Exception e) {}
                                 }
