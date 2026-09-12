@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
-import { Play, Heart, Bookmark, Star, ArrowLeft, Plus, Check, RotateCcw } from 'lucide-react';
+import { Play, Heart, Bookmark, Star, ArrowLeft, Plus, Check, RotateCcw, Share2 } from 'lucide-react';
 import type { TMDBMovieDetails, TMDBTVDetails, TMDBMediaItem } from '../../types/tmdb';
 import { tmdbApi, tmdbImages, extractContentRating, resolveGenresFromIds, isExplicitAdultCertification } from '../../services/tmdb';
 import { dbService } from '../../services/db';
@@ -200,6 +200,54 @@ export const Details: React.FC = () => {
       releaseDate: details.release_date || details.first_air_date
     });
     setIsWatchlist(status);
+  };
+
+  const [shareToast, setShareToast] = useState(false);
+
+  const handleShare = async () => {
+    if (!details) return;
+    const itemTitle = details.title || details.name || 'Untitled';
+    const webDeepLinkUrl = `https://www.themoviedb.org/${mediaType}/${tmdbId}`;
+    const shareText = `Check out ${itemTitle} on TMDB Streamer!`;
+
+    // 1. Try Android Native Bridge
+    if (typeof window !== 'undefined' && (window as any).AndroidBridge && typeof (window as any).AndroidBridge.shareDeepLink === 'function') {
+      try {
+        (window as any).AndroidBridge.shareDeepLink(itemTitle, shareText, webDeepLinkUrl);
+        return;
+      } catch (e) {
+        console.warn('[Share] AndroidBridge share failed:', e);
+      }
+    }
+
+    // 2. Try standard navigator.share (if supported)
+    if (typeof navigator !== 'undefined' && navigator.share) {
+      try {
+        await navigator.share({
+          title: itemTitle,
+          text: `${shareText}\n${webDeepLinkUrl}`,
+          url: webDeepLinkUrl
+        });
+        return;
+      } catch (e: any) {
+        if (e.name !== 'AbortError') {
+          console.warn('[Share] Web share failed:', e);
+        } else {
+          return;
+        }
+      }
+    }
+
+    // 3. Fallback: Copy direct link to clipboard
+    if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText) {
+      try {
+        await navigator.clipboard.writeText(webDeepLinkUrl);
+        setShareToast(true);
+        setTimeout(() => setShareToast(false), 2000);
+      } catch (err) {
+        console.warn('[Share] Clipboard copy failed:', err);
+      }
+    }
   };
 
   const handleBack = () => {
@@ -409,49 +457,80 @@ export const Details: React.FC = () => {
                     </Link>
                   </div>
 
-                  {/* Row 2: Secondary action buttons */}
-                  <div className="flex items-center justify-center sm:justify-start gap-3 w-full">
+                  {/* Row 2: Secondary action buttons (vertical icon + description with lower shaded background) */}
+                  <div className="grid grid-cols-3 sm:flex sm:flex-wrap items-stretch justify-center gap-2.5 sm:gap-3 w-full">
                     {isResumable && (
                       <button
                         type="button"
                         onClick={() => navigate(restartUrl)}
                         title="Restart from beginning"
                         aria-label="Restart from beginning"
-                        className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 rounded-full bg-white/10 hover:bg-white/20 text-white border border-white/20 backdrop-blur-md transition-all active:scale-95 text-xs font-semibold"
+                        className="tv-focus-target group relative flex flex-col items-center justify-between rounded-xl overflow-hidden border border-white/20 bg-white/[0.06] hover:bg-white/[0.12] text-white backdrop-blur-md transition-all duration-200 active:scale-95 shadow-md hover:border-white/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-hbo-cyan p-0"
                       >
-                        <RotateCcw className="w-4 h-4 text-gray-200 flex-shrink-0" />
-                        <span>Restart</span>
+                        <div className="flex items-center justify-center pt-3 pb-1.5 w-full">
+                          <RotateCcw className="w-5 h-5 text-gray-200 group-hover:text-white group-hover:scale-110 transition-transform" />
+                        </div>
+                        <div className="w-full bg-black/60 border-t border-white/10 py-1.5 px-1.5 text-center">
+                          <span className="text-[11px] font-medium text-gray-300 group-hover:text-white tracking-wide block truncate">Restart</span>
+                        </div>
                       </button>
                     )}
 
                     <button
                       type="button"
                       onClick={handleToggleWatchlist}
-                      className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 rounded-full backdrop-blur-md border transition-all active:scale-95 text-xs font-semibold ${
+                      className={`tv-focus-target group relative flex flex-col items-center justify-between rounded-xl overflow-hidden border backdrop-blur-md transition-all duration-200 active:scale-95 shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-hbo-cyan p-0 ${
                         isWatchlist
-                          ? 'bg-hbo-purple-light/30 border-hbo-purple-light text-hbo-cyan'
-                          : 'bg-white/10 hover:bg-white/20 border-white/20 text-white'
+                          ? 'border-hbo-cyan bg-hbo-purple/30 text-hbo-cyan shadow-hbo-glow'
+                          : 'border-white/20 bg-white/[0.06] hover:bg-white/[0.12] text-white hover:border-white/40'
                       }`}
                       title={isWatchlist ? 'In Watchlist' : 'Add to Watchlist'}
                       aria-label={isWatchlist ? 'In Watchlist' : 'Add to Watchlist'}
                     >
-                      <Bookmark className={`w-4 h-4 flex-shrink-0 ${isWatchlist ? 'fill-current' : ''}`} />
-                      <span>Watchlist</span>
+                      <div className="flex items-center justify-center pt-3 pb-1.5 w-full">
+                        <Bookmark className={`w-5 h-5 group-hover:scale-110 transition-transform ${isWatchlist ? 'fill-current text-hbo-cyan' : 'text-gray-200 group-hover:text-white'}`} />
+                      </div>
+                      <div className={`w-full py-1.5 px-1.5 text-center border-t ${isWatchlist ? 'bg-black/70 border-hbo-cyan/40' : 'bg-black/60 border-white/10'}`}>
+                        <span className={`text-[11px] tracking-wide block truncate ${isWatchlist ? 'text-hbo-cyan font-bold' : 'font-medium text-gray-300 group-hover:text-white'}`}>
+                          {isWatchlist ? 'Added' : 'Watchlist'}
+                        </span>
+                      </div>
                     </button>
 
                     <button
                       type="button"
                       onClick={handleToggleLike}
-                      className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 rounded-full backdrop-blur-md border transition-all active:scale-95 text-xs font-semibold ${
+                      className={`tv-focus-target group relative flex flex-col items-center justify-between rounded-xl overflow-hidden border backdrop-blur-md transition-all duration-200 active:scale-95 shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-hbo-cyan p-0 ${
                         isLiked
-                          ? 'bg-red-500/30 border-red-500 text-red-400'
-                          : 'bg-white/10 hover:bg-white/20 border-white/20 text-white'
+                          ? 'border-hbo-cyan bg-hbo-purple/30 text-hbo-cyan shadow-hbo-glow'
+                          : 'border-white/20 bg-white/[0.06] hover:bg-white/[0.12] text-white hover:border-white/40'
                       }`}
                       title={isLiked ? 'Liked' : 'Like'}
                       aria-label={isLiked ? 'Liked' : 'Like'}
                     >
-                      <Heart className={`w-4 h-4 flex-shrink-0 ${isLiked ? 'fill-current' : ''}`} />
-                      <span>{isLiked ? 'Liked' : 'Like'}</span>
+                      <div className="flex items-center justify-center pt-3 pb-1.5 w-full">
+                        <Heart className={`w-5 h-5 group-hover:scale-110 transition-transform ${isLiked ? 'fill-current text-hbo-cyan' : 'text-gray-200 group-hover:text-white'}`} />
+                      </div>
+                      <div className={`w-full py-1.5 px-1.5 text-center border-t ${isLiked ? 'bg-black/70 border-hbo-cyan/40' : 'bg-black/60 border-white/10'}`}>
+                        <span className={`text-[11px] tracking-wide block truncate ${isLiked ? 'text-hbo-cyan font-bold' : 'font-medium text-gray-300 group-hover:text-white'}`}>
+                          {isLiked ? 'Liked' : 'Like'}
+                        </span>
+                      </div>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleShare}
+                      className="tv-focus-target group relative flex flex-col items-center justify-between rounded-xl overflow-hidden border border-white/20 bg-white/[0.06] hover:bg-white/[0.12] text-white backdrop-blur-md transition-all duration-200 active:scale-95 shadow-md hover:border-hbo-cyan focus:outline-none focus-visible:ring-2 focus-visible:ring-hbo-cyan p-0"
+                      title="Share link"
+                      aria-label="Share"
+                    >
+                      <div className="flex items-center justify-center pt-3 pb-1.5 w-full">
+                        <Share2 className="w-5 h-5 text-hbo-cyan group-hover:scale-110 transition-transform" />
+                      </div>
+                      <div className="w-full bg-black/60 border-t border-white/10 py-1.5 px-1.5 text-center">
+                        <span className="text-[11px] font-medium text-gray-300 group-hover:text-white tracking-wide block truncate">Share</span>
+                      </div>
                     </button>
                   </div>
                 </div>
@@ -538,6 +617,13 @@ export const Details: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Share copied toast */}
+      {shareToast && (
+        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 px-4 py-2 bg-hbo-card/95 backdrop-blur-md border border-hbo-cyan/50 text-white rounded-full text-xs font-bold shadow-2xl shadow-hbo-purple/50 animate-bounce">
+          Deep link copied to clipboard!
+        </div>
+      )}
     </div>
   );
 };

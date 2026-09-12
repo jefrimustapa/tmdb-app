@@ -594,6 +594,27 @@ public class MainActivity extends BridgeActivity {
                     File backupFile = getPersistentBackupFile(false);
                     return backupFile != null ? backupFile.getAbsolutePath() : "";
                 }
+
+                @JavascriptInterface
+                public void shareDeepLink(String title, String text, String deepLinkUrl) {
+                    runOnUiThread(() -> {
+                        try {
+                            Intent shareIntent = new Intent(Intent.ACTION_SEND);
+                            shareIntent.setType("text/plain");
+                            shareIntent.putExtra(Intent.EXTRA_SUBJECT, title);
+                            String fullMessage = text;
+                            if (!TextUtils.isEmpty(deepLinkUrl)) {
+                                fullMessage = (TextUtils.isEmpty(text) ? "" : text + "\n") + deepLinkUrl;
+                            }
+                            shareIntent.putExtra(Intent.EXTRA_TEXT, fullMessage);
+                            Intent chooser = Intent.createChooser(shareIntent, "Share " + title);
+                            chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                            startActivity(chooser);
+                        } catch (Exception e) {
+                            Log.e("TMDB_APP", "Failed to share deep link: " + e.getMessage(), e);
+                        }
+                    });
+                }
             }, "AndroidBridge");
 
             // Handle alert, confirm, and multi-window popups
@@ -1439,6 +1460,9 @@ public class MainActivity extends BridgeActivity {
                     view.evaluateJavascript(mediaMonitorScript, null);
                 }
             });
+
+            // Handle cold-start deep link intent (if app was launched directly via tmdbstream://)
+            handleDeepLinkIntent(getIntent());
         }
     }
 
@@ -1898,6 +1922,52 @@ public class MainActivity extends BridgeActivity {
             Log.e("TMDB_APP", "[PersistentStorage] Error resolving backup file: " + e.getMessage(), e);
         }
         return null;
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        handleDeepLinkIntent(intent);
+    }
+
+    private void handleDeepLinkIntent(Intent intent) {
+        if (intent == null) return;
+        Uri data = intent.getData();
+        if (data != null) {
+            String scheme = data.getScheme();
+            String host = data.getHost();
+            boolean isTmdbStreamScheme = "tmdbstream".equalsIgnoreCase(scheme);
+            boolean isTmdbWebLink = "https".equalsIgnoreCase(scheme) && 
+                (host != null && (host.equalsIgnoreCase("themoviedb.org") || host.equalsIgnoreCase("www.themoviedb.org")));
+
+            if (isTmdbStreamScheme || isTmdbWebLink) {
+                String uriStr = data.toString();
+                Log.i("TMDB_APP", "[DeepLink] Received deep link: " + uriStr);
+                runOnUiThread(() -> {
+                    WebView wv = this.bridge != null ? this.bridge.getWebView() : null;
+                    if (wv != null) {
+                        dispatchDeepLinkToWeb(wv, uriStr);
+                    } else {
+                        // Retry briefly if webview is still initializing
+                        getWindow().getDecorView().postDelayed(() -> {
+                            WebView retryWv = bridge != null ? bridge.getWebView() : null;
+                            if (retryWv != null) {
+                                dispatchDeepLinkToWeb(retryWv, uriStr);
+                            }
+                        }, 500);
+                    }
+                });
+            }
+        }
+    }
+
+    private void dispatchDeepLinkToWeb(WebView wv, String uriStr) {
+        String jsDispatch = String.format(
+            "window.dispatchEvent(new CustomEvent('tmdb_deep_link', { detail: { url: '%s' } }));",
+            uriStr.replace("'", "\\'")
+        );
+        wv.evaluateJavascript(jsDispatch, null);
     }
 
     @Override
