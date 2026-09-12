@@ -102,5 +102,6 @@ export interface UserSettings {
   virtualCursorSpeed?: 'slow' | 'normal' | 'fast'; // Cursor movement speed
   virtualCursorStyle?: VirtualCursorStyle; // Cursor style/appearance (10 options)
   performanceMode?: boolean; // Lite graphics & fast 60fps rendering (Default: ON for TV, OFF for Mobile)
+  showPerformanceHud?: boolean | 'off' | 'watch_only' | 'all_pages'; // Performance HUD mode
   updatedAt: number;
 }

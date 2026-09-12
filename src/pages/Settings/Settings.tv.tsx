@@ -40,8 +40,6 @@ import {
   Save
 } from 'lucide-react';
 
-import { CURSOR_STYLES_LIST } from '../../components/player/TVVirtualCursor';
-
 type TVCategory = 'playback' | 'display' | 'controls' | 'content' | 'system';
 
 export const Settings: React.FC = () => {
@@ -1207,6 +1205,64 @@ export const Settings: React.FC = () => {
                   )}
                 </button>
               </div>
+
+              {/* Row 4: Performance HUD Mode Selection */}
+              <div
+                data-settings-row="true"
+                className="bg-hbo-card border border-hbo-border rounded-2xl p-4 shadow-lg space-y-3"
+              >
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div>
+                    <div className="flex items-center gap-2 mb-0.5">
+                      <span className="text-sm sm:text-base font-bold font-display text-white">Performance HUD</span>
+                      <span className="px-2 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wider bg-hbo-cyan/10 text-hbo-cyan border border-hbo-cyan/20">
+                        Debug Tool
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-gray-400">
+                      Display real-time CPU %, GPU usage, and RAM consumption.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Segmented D-pad accessible options */}
+                <div className="grid grid-cols-3 gap-2.5 pt-1">
+                  {[
+                    { id: 'off', label: 'Disabled', desc: 'HUD is completely hidden' },
+                    { id: 'watch_only', label: 'Watch Page Only', desc: 'Only visible while playing video' },
+                    { id: 'all_pages', label: 'All Pages', desc: 'Visible throughout entire app' }
+                  ].map((opt) => {
+                    const currentVal = settings.showPerformanceHud === true 
+                      ? 'all_pages' 
+                      : (settings.showPerformanceHud === 'watch_only' || settings.showPerformanceHud === 'all_pages' 
+                          ? settings.showPerformanceHud 
+                          : 'off');
+                    const isSelected = currentVal === opt.id;
+
+                    return (
+                      <button
+                        key={opt.id}
+                        onClick={() => handleUpdate({ showPerformanceHud: opt.id as any })}
+                        className={`p-3 rounded-xl border text-left transition-all tv-focus-target min-h-[64px] flex flex-col justify-between ${
+                          isSelected
+                            ? 'bg-hbo-cyan/20 border-hbo-cyan text-white shadow-hbo-glow ring-1 ring-hbo-cyan/50'
+                            : 'bg-hbo-dark/60 border-hbo-border text-gray-400 hover:text-gray-200 hover:border-white/20'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <p className={`text-xs font-bold ${isSelected ? 'text-hbo-cyan' : 'text-white'}`}>
+                            {opt.label}
+                          </p>
+                          {isSelected && (
+                            <Check className="w-3.5 h-3.5 text-hbo-cyan stroke-[2.5]" />
+                          )}
+                        </div>
+                        <p className="text-[9px] text-gray-400 mt-0.5 leading-snug">{opt.desc}</p>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
           )}
 
@@ -1296,42 +1352,6 @@ export const Settings: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Row 3: Cursor Reticle Style */}
-                  <div
-                    data-settings-row="true"
-                    className="bg-hbo-card border border-hbo-border rounded-2xl p-4 shadow-lg space-y-2.5"
-                  >
-                    <div>
-                      <h4 className="text-xs font-bold text-gray-200 uppercase tracking-wider flex items-center gap-1.5">
-                        <Sparkles className="w-3.5 h-3.5 text-hbo-cyan flex-shrink-0" />
-                        <span>Cursor Reticle Style</span>
-                      </h4>
-                      <p className="text-[11px] text-gray-400 mt-0.5">Visual look and accent colors of the TV mouse pointer.</p>
-                    </div>
-
-                    <div className="grid grid-cols-4 gap-2.5">
-                      {CURSOR_STYLES_LIST.slice(0, 4).map((style) => {
-                        const isSel = (settings.virtualCursorStyle || 'hbo_max') === style.id;
-                        return (
-                          <button
-                            key={style.id}
-                            onClick={() => handleUpdate({ virtualCursorStyle: style.id as any })}
-                            className={`p-3 rounded-xl border text-left text-xs font-bold transition-all tv-focus-target min-h-[60px] flex flex-col justify-between ${
-                              isSel
-                                ? 'bg-hbo-purple/40 border-hbo-cyan text-white shadow-md ring-1 ring-hbo-cyan/50'
-                                : 'bg-hbo-dark/60 border-hbo-border text-gray-400 hover:text-white'
-                            }`}
-                          >
-                            <div className="flex items-center justify-between w-full">
-                              <span className="text-xs font-bold text-white truncate">{style.name}</span>
-                              {isSel && <Check className="w-3 h-3 text-hbo-cyan flex-shrink-0" />}
-                            </div>
-                            <span className={`text-[9px] ${isSel ? 'text-hbo-cyan' : 'text-gray-400'}`}>{style.desc}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
                 </>
               )}
             </div>
