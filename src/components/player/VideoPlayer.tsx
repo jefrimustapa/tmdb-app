@@ -105,6 +105,35 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const nextEpisodeInfoRef = useRef(nextEpisodeInfo);
   const onNextEpisodeRef = useRef(onNextEpisode);
 
+  // Grab TV remote focus when Up Next appears
+  const grabUpNextFocus = useCallback(() => {
+    const tryFocus = () => {
+      if ((window as any).__tmdbHeaderFocused === true) return;
+      const upNextBtn = document.getElementById('up-next-play-btn');
+      if (upNextBtn) {
+        upNextBtn.focus();
+      }
+    };
+    setTimeout(tryFocus, 40);
+    setTimeout(tryFocus, 120);
+    setTimeout(tryFocus, 250);
+  }, []);
+
+  // Listen for dismiss event from remote Back key
+  useEffect(() => {
+    const handleDismissUpNext = () => {
+      if (showUpNextRef.current) {
+        setShowUpNext(false);
+        showUpNextRef.current = false;
+        dismissedUpNextRef.current = true;
+      }
+    };
+    window.addEventListener('tmdb_dismiss_up_next', handleDismissUpNext);
+    return () => {
+      window.removeEventListener('tmdb_dismiss_up_next', handleDismissUpNext);
+    };
+  }, []);
+
   useEffect(() => {
     nextEpisodeInfoRef.current = nextEpisodeInfo;
     onNextEpisodeRef.current = onNextEpisode;
@@ -573,12 +602,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       showUpNextRef.current = true;
       setShowUpNext(true);
       setCountdown(upNextTimeoutRef.current || 20);
-      setTimeout(() => {
-        const upNextBtn = document.getElementById('up-next-play-btn');
-        if (upNextBtn && (window as any).__tmdbHeaderFocused !== true) {
-          upNextBtn.focus();
-        }
-      }, 50);
+      grabUpNextFocus();
     }
 
     // Throttled save to IndexedDB (matches user configured ticker interval)
@@ -1548,7 +1572,10 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
       {/* Up Next Episode Overlay (Compact & Sleek) */}
       {showUpNext && nextEpisodeInfo && (
-        <div className="absolute bottom-4 right-4 sm:bottom-6 sm:right-6 z-40 w-72 sm:w-80 max-w-[calc(100vw-2rem)] bg-hbo-card/95 border border-hbo-cyan/40 rounded-2xl shadow-2xl p-3 backdrop-blur-xl animate-in fade-in slide-in-from-bottom-4 duration-300 transform-gpu">
+        <div
+          data-up-next-popup="true"
+          className="absolute bottom-4 right-4 sm:bottom-6 sm:right-6 z-40 w-72 sm:w-80 max-w-[calc(100vw-2rem)] bg-hbo-card/95 border border-hbo-cyan/40 rounded-2xl shadow-2xl p-3 backdrop-blur-xl animate-in fade-in slide-in-from-bottom-4 duration-300 transform-gpu"
+        >
           <div className="flex items-center justify-between gap-2 mb-2">
             <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-hbo-cyan flex items-center gap-1.5">
               <span className="w-1.5 h-1.5 rounded-full bg-hbo-cyan animate-pulse" />
@@ -1595,17 +1622,28 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             <div className="w-full h-1 bg-white/10 rounded-full overflow-hidden">
               <div
                 className="h-full bg-gradient-to-r from-hbo-purple-light to-hbo-cyan transition-all duration-1000 ease-linear"
-                style={{ width: `${Math.max(0, Math.min(100, (countdown / (upNextTimeoutRef.current || 10)) * 100))}%` }}
+                style={{ width: `${Math.max(0, Math.min(100, (countdown / (upNextTimeoutRef.current || 20)) * 100))}%` }}
               />
             </div>
             <div className="flex items-center justify-end gap-2 pt-0.5">
               <button
+                id="up-next-dismiss-btn"
                 type="button"
                 onClick={() => {
                   setShowUpNext(false);
                   dismissedUpNextRef.current = true;
                 }}
-                className="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-white text-[11px] font-semibold transition tv-focus-target"
+                onKeyDown={(e) => {
+                  if (e.key === 'ArrowRight') {
+                    e.preventDefault();
+                    document.getElementById('up-next-play-btn')?.focus();
+                  } else if (e.key === 'Escape') {
+                    e.preventDefault();
+                    setShowUpNext(false);
+                    dismissedUpNextRef.current = true;
+                  }
+                }}
+                className="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-white text-[11px] font-semibold transition tv-focus-target focus:ring-2 focus:ring-white focus:bg-white/30"
               >
                 Dismiss
               </button>
@@ -1616,7 +1654,17 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                   setShowUpNext(false);
                   onNextEpisode?.();
                 }}
-                className="px-3 py-1 rounded-lg bg-gradient-to-r from-hbo-purple to-hbo-cyan text-white text-[11px] font-bold shadow-hbo-glow hover:scale-105 transition flex items-center gap-1 tv-focus-target"
+                onKeyDown={(e) => {
+                  if (e.key === 'ArrowLeft') {
+                    e.preventDefault();
+                    document.getElementById('up-next-dismiss-btn')?.focus();
+                  } else if (e.key === 'Escape') {
+                    e.preventDefault();
+                    setShowUpNext(false);
+                    dismissedUpNextRef.current = true;
+                  }
+                }}
+                className="px-3 py-1 rounded-lg bg-gradient-to-r from-hbo-purple to-hbo-cyan text-white text-[11px] font-bold shadow-hbo-glow hover:scale-105 transition flex items-center gap-1 tv-focus-target focus:ring-2 focus:ring-white"
               >
                 <Play className="w-3 h-3 fill-current" />
                 Play Now

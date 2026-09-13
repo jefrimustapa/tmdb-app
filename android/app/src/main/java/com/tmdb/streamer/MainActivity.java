@@ -1929,6 +1929,11 @@ public class MainActivity extends BridgeActivity {
                         webView.evaluateJavascript(
                             "(function() {" +
                             "  if (window.__tmdbVirtualCursorActive) return false;" +
+                            "  var upNext = document.querySelector('[data-up-next-popup=\"true\"]');" +
+                            "  if (upNext) {" +
+                            "    var playBtn = document.getElementById('up-next-play-btn');" +
+                            "    if (playBtn) { playBtn.focus(); return true; }" +
+                            "  }" +
                             "  var header = document.querySelector('[data-watch-header=\"true\"]');" +
                             "  var isHeaderFocused = !!window.__tmdbHeaderFocused || (header && header.contains(document.activeElement));" +
                             "  if (!isHeaderFocused) return false;" +
@@ -1963,6 +1968,11 @@ public class MainActivity extends BridgeActivity {
                         webView.evaluateJavascript(
                             "(function() {" +
                             "  if (window.__tmdbVirtualCursorActive) return false;" +
+                            "  var upNext = document.querySelector('[data-up-next-popup=\"true\"]');" +
+                            "  if (upNext) {" +
+                            "    var dismissBtn = document.getElementById('up-next-dismiss-btn');" +
+                            "    if (dismissBtn) { dismissBtn.focus(); return true; }" +
+                            "  }" +
                             "  var header = document.querySelector('[data-watch-header=\"true\"]');" +
                             "  var isHeaderFocused = !!window.__tmdbHeaderFocused || (header && header.contains(document.activeElement));" +
                             "  if (!isHeaderFocused) return false;" +
@@ -2022,6 +2032,19 @@ public class MainActivity extends BridgeActivity {
                                 "    }" +
                                 "    return true;" +
                                 "  }" +
+                                "  var upNext = document.querySelector('[data-up-next-popup=\"true\"]');" +
+                                "  if (upNext) {" +
+                                "    var active = document.activeElement;" +
+                                "    if (active && upNext.contains(active) && typeof active.click === 'function') {" +
+                                "      active.click();" +
+                                "      return true;" +
+                                "    }" +
+                                "    var playBtn = document.getElementById('up-next-play-btn');" +
+                                "    if (playBtn && typeof playBtn.click === 'function') {" +
+                                "      playBtn.click();" +
+                                "      return true;" +
+                                "    }" +
+                                "  }" +
                                 "  var active = document.activeElement;" +
                                 "  var isInteractive = active && active !== document.body && active !== document.documentElement && (" +
                                 "    active.tagName === 'BUTTON' || active.tagName === 'A' || active.tagName === 'INPUT' ||" +
@@ -2077,6 +2100,11 @@ public class MainActivity extends BridgeActivity {
                             "    window.__tmdbVirtualCursorActive = false;" +
                             "    window.dispatchEvent(new CustomEvent('tmdb_close_cursor'));" +
                             "    return 'CLOSED_CURSOR';" +
+                            "  }" +
+                            "  var upNext = document.querySelector('[data-up-next-popup=\"true\"]');" +
+                            "  if (upNext) {" +
+                            "    window.dispatchEvent(new CustomEvent('tmdb_dismiss_up_next'));" +
+                            "    return 'DISMISSED_UP_NEXT';" +
                             "  }" +
                             "  var header = document.querySelector('[data-watch-header=\"true\"]');" +
                             "  var dropdown = header ? header.querySelector('[data-provider-dropdown-open=\"true\"]') : null;" +
