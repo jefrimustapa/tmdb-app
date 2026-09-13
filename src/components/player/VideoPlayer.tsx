@@ -13,6 +13,8 @@ import { resolveAnimeMalId } from '../../services/animeMappingService';
 import { resolveLari21Stream } from '../../services/lariMappingService';
 import { resolveKisskhStream } from '../../services/kisskhMappingService';
 import { resolveDramacoolStream, type DramacoolServer } from '../../services/dramacoolMappingService';
+import { SubtitleOverlay } from './SubtitleOverlay';
+import type { SubtitleCue } from '../../services/subtitleService';
 
 interface VideoPlayerProps {
   mediaType: 'movie' | 'tv';
@@ -37,6 +39,9 @@ interface VideoPlayerProps {
   isKorean?: boolean;
   releaseYear?: string | number;
   originalTitle?: string;
+  customSubtitleCues?: SubtitleCue[];
+  customSubtitleOffset?: number;
+  customSubtitleEnabled?: boolean;
 }
 
 export const VideoPlayer: React.FC<VideoPlayerProps> = ({
@@ -61,7 +66,10 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   isAsian = false,
   isKorean = false,
   releaseYear,
-  originalTitle
+  originalTitle,
+  customSubtitleCues = [],
+  customSubtitleOffset = 0,
+  customSubtitleEnabled = false
 }) => {
   const [iframeKey, setIframeKey] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
@@ -83,6 +91,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const [topAsianProviders, setTopAsianProviders] = useState<string[]>(['vidlink', '111movies', 'lari21-asian']);
   const [topKoreanProviders, setTopKoreanProviders] = useState<string[]>(['kisskh-kdrama', 'cinesrc', 'moviesapi']);
   const [enabledResolvers, setEnabledResolvers] = useState<StreamResolverType[]>(['embed']);
+  const [playbackCurrentTime, setPlaybackCurrentTime] = useState<number>(0);
 
   // Up Next state
   const [showUpNext, setShowUpNext] = useState(false);
@@ -574,6 +583,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     if (currentSec < 0) return;
 
     currentTimeRef.current = currentSec;
+    setPlaybackCurrentTime(currentSec);
     if (totalDurationSec > 0) {
       durationRef.current = totalDurationSec;
     }
@@ -1621,6 +1631,14 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           </div>
         </div>
       )}
+
+      {/* Custom Subtitle Service Overlay */}
+      <SubtitleOverlay
+        cues={customSubtitleCues}
+        currentTime={playbackCurrentTime}
+        offsetSeconds={customSubtitleOffset}
+        enabled={customSubtitleEnabled}
+      />
 
       {/* Up Next Episode Overlay (Compact & Sleek) */}
       {showUpNext && nextEpisodeInfo && (
