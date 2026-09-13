@@ -2,12 +2,13 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20260913-1339';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.fix-tv-cinesrc-play-.20260913-1339';
+export const APP_BUILD_NUMBER = '20260913-1400';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-tv-search-debou.20260913-1400';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
-export const APP_BRANCH = 'fix-tv-cinesrc-play-';
-export const APP_CHANGELOG = `* fix(tv): eliminate navigation delay between sidebar home and hero banner and optimize D-pad responsiveness (#92)
+export const APP_BRANCH = 'feat-tv-search-debou';
+export const APP_CHANGELOG = `* fix(tv): enable play/pause toggle with d-pad center/ok button for cinesrc provider (#93)
+* fix(tv): eliminate navigation delay between sidebar home and hero banner and optimize D-pad responsiveness (#92)
 * fix(tv): synchronize 2D spatial D-Pad navigation for watch page header (#91)
 * fix(tv): fix remote D-Pad navigation and focus for Up Next episode popup (#90)
 * feat(settings): update autoplay next episode threshold to 96-104% and countdown to 20-80s (#89)
@@ -20,5 +21,4 @@ export const APP_CHANGELOG = `* fix(tv): eliminate navigation delay between side
 * perf(watch): optimize watch page rendering, TV cursor navigation and remote back focus (#82)
 * feat(details): add deep link sharing and restyle action buttons with unified focus and selection (#81)
 * feat(player): improve Dramacool tracking, multi-server extraction, and slug matching (#80)
-* feat(provider): add Dramacool stream provider without hardcoded timeout (#79)
-* fix(ui): remove horizontal scroll snapping for title cards in mobile mode (#78)`;
+* feat(provider): add Dramacool stream provider without hardcoded timeout (#79)`;

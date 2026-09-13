@@ -37,8 +37,9 @@ export const Search: React.FC = () => {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
 
-  // Load genres and recent searches
+  // Scroll to top on page mount & load genres/recent searches
   useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' as ScrollBehavior });
     Promise.allSettled([tmdbApi.getMovieGenres(), tmdbApi.getTVGenres()]).then(([mRes, tvRes]) => {
       const gMap = new Map<number, TMDBGenre>();
       if (mRes.status === 'fulfilled' && mRes.value.genres) {
@@ -216,22 +217,23 @@ export const Search: React.FC = () => {
     return () => window.removeEventListener('scroll', handleScroll);
   }, [page, totalPages, query, isLoading, isLoadingMore, selectedType]);
 
-  const [debounceTimer, setDebounceTimer] = useState<ReturnType<typeof setTimeout> | null>(null);
-  const historyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const searchDebounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     return () => {
-      if (historyTimerRef.current) clearTimeout(historyTimerRef.current);
-      if (debounceTimer) clearTimeout(debounceTimer);
+      if (searchDebounceTimerRef.current) {
+        clearTimeout(searchDebounceTimerRef.current);
+      }
     };
-  }, [debounceTimer]);
+  }, []);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
     setQuery(val);
 
-    if (debounceTimer) clearTimeout(debounceTimer);
-    if (historyTimerRef.current) clearTimeout(historyTimerRef.current);
+    if (searchDebounceTimerRef.current) {
+      clearTimeout(searchDebounceTimerRef.current);
+    }
 
     const trimmed = val.trim();
     if (!trimmed) {
@@ -240,18 +242,19 @@ export const Search: React.FC = () => {
       return;
     }
 
-    const t = setTimeout(() => {
+    // Unified 1s (1000ms) debounce for BOTH live search & history
+    searchDebounceTimerRef.current = setTimeout(() => {
       setSearchParams({ q: trimmed });
       const updated = addRecentSearch(trimmed);
       setRecentSearches(updated);
     }, 1000);
-    setDebounceTimer(t);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
-      if (historyTimerRef.current) clearTimeout(historyTimerRef.current);
-      if (debounceTimer) clearTimeout(debounceTimer);
+      if (searchDebounceTimerRef.current) {
+        clearTimeout(searchDebounceTimerRef.current);
+      }
       const trimmed = query.trim();
       setSearchParams(trimmed ? { q: trimmed } : {});
       if (trimmed) {
@@ -262,8 +265,9 @@ export const Search: React.FC = () => {
   };
 
   const handleClear = () => {
-    if (debounceTimer) clearTimeout(debounceTimer);
-    if (historyTimerRef.current) clearTimeout(historyTimerRef.current);
+    if (searchDebounceTimerRef.current) {
+      clearTimeout(searchDebounceTimerRef.current);
+    }
     setQuery('');
     setResults([]);
     setSearchParams({});
@@ -271,8 +275,9 @@ export const Search: React.FC = () => {
   };
 
   const handleSelectRecent = (historyQuery: string) => {
-    if (debounceTimer) clearTimeout(debounceTimer);
-    if (historyTimerRef.current) clearTimeout(historyTimerRef.current);
+    if (searchDebounceTimerRef.current) {
+      clearTimeout(searchDebounceTimerRef.current);
+    }
     const trimmed = historyQuery.trim();
     setQuery(trimmed);
     setSearchParams({ q: trimmed });
@@ -452,14 +457,19 @@ export const Search: React.FC = () => {
             autoFocus
             className="w-full pl-14 pr-12 py-4 bg-hbo-card/90 border-2 border-hbo-border rounded-2xl text-base sm:text-lg text-white placeholder-gray-400 focus:outline-none focus:border-hbo-purple-light focus:shadow-hbo-glow transition-all tv-focus-target"
           />
-          <SearchIcon className="w-6 h-6 text-hbo-cyan absolute left-4 top-1/2 -translate-y-1/2" />
+          <div className="absolute left-4 top-0 bottom-0 flex items-center pointer-events-none">
+            <SearchIcon className="w-6 h-6 text-hbo-cyan" />
+          </div>
           {query && (
-            <button
-              onClick={handleClear}
-              className="p-2 rounded-full hover:bg-white/10 text-gray-400 hover:text-white absolute right-3 top-1/2 -translate-y-1/2 transition tv-focus-target"
-            >
-              <X className="w-5 h-5" />
-            </button>
+            <div className="absolute right-3 top-0 bottom-0 flex items-center">
+              <button
+                onClick={handleClear}
+                className="p-2 rounded-full hover:bg-white/10 text-gray-400 hover:text-white flex items-center justify-center transition tv-focus-target"
+                aria-label="Clear search"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
           )}
         </div>
 
