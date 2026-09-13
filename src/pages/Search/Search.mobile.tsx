@@ -37,8 +37,9 @@ export const Search: React.FC = () => {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
 
-  // Load genres and recent searches
+  // Scroll to top on page mount & load genres/recent searches
   useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' as ScrollBehavior });
     Promise.allSettled([tmdbApi.getMovieGenres(), tmdbApi.getTVGenres()]).then(([mRes, tvRes]) => {
       const gMap = new Map<number, TMDBGenre>();
       if (mRes.status === 'fulfilled' && mRes.value.genres) {
@@ -216,12 +217,12 @@ export const Search: React.FC = () => {
     return () => window.removeEventListener('scroll', handleScroll);
   }, [page, totalPages, query, isLoading, isLoadingMore, selectedType]);
 
-  const historyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const searchDebounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     return () => {
-      if (historyTimerRef.current) {
-        clearTimeout(historyTimerRef.current);
+      if (searchDebounceTimerRef.current) {
+        clearTimeout(searchDebounceTimerRef.current);
       }
     };
   }, []);
@@ -229,27 +230,33 @@ export const Search: React.FC = () => {
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
     setQuery(val);
-    setSearchParams(val ? { q: val } : {});
 
-    if (historyTimerRef.current) {
-      clearTimeout(historyTimerRef.current);
+    if (searchDebounceTimerRef.current) {
+      clearTimeout(searchDebounceTimerRef.current);
     }
 
     const trimmed = val.trim();
-    if (trimmed) {
-      historyTimerRef.current = setTimeout(() => {
-        const updated = addRecentSearch(trimmed);
-        setRecentSearches(updated);
-      }, 800);
+    if (!trimmed) {
+      setSearchParams({});
+      setResults([]);
+      return;
     }
+
+    // Unified 1s (1000ms) debounce for BOTH live search & history
+    searchDebounceTimerRef.current = setTimeout(() => {
+      setSearchParams({ q: trimmed });
+      const updated = addRecentSearch(trimmed);
+      setRecentSearches(updated);
+    }, 1000);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
-      if (historyTimerRef.current) {
-        clearTimeout(historyTimerRef.current);
+      if (searchDebounceTimerRef.current) {
+        clearTimeout(searchDebounceTimerRef.current);
       }
       const trimmed = query.trim();
+      setSearchParams(trimmed ? { q: trimmed } : {});
       if (trimmed) {
         const updated = addRecentSearch(trimmed);
         setRecentSearches(updated);
@@ -258,8 +265,8 @@ export const Search: React.FC = () => {
   };
 
   const handleClear = () => {
-    if (historyTimerRef.current) {
-      clearTimeout(historyTimerRef.current);
+    if (searchDebounceTimerRef.current) {
+      clearTimeout(searchDebounceTimerRef.current);
     }
     setQuery('');
     setResults([]);
@@ -268,8 +275,8 @@ export const Search: React.FC = () => {
   };
 
   const handleSelectRecent = (historyQuery: string) => {
-    if (historyTimerRef.current) {
-      clearTimeout(historyTimerRef.current);
+    if (searchDebounceTimerRef.current) {
+      clearTimeout(searchDebounceTimerRef.current);
     }
     const trimmed = historyQuery.trim();
     setQuery(trimmed);
@@ -437,9 +444,9 @@ export const Search: React.FC = () => {
   }, [results, selectedMediaType, selectedCountry, selectedGenres, selectedYear, selectedRating, sortBy]);
 
   return (
-    <div className="min-h-screen pt-24 pb-16 px-4 sm:px-8 max-w-7xl mx-auto">
+    <div className="min-h-screen pt-20 sm:pt-24 pb-16 px-4 sm:px-8 max-w-7xl mx-auto">
       {/* Search Header Input */}
-      <div className="relative max-w-3xl mx-auto mb-4">
+      <div className="relative max-w-3xl mx-auto mt-3 sm:mt-4 mb-3">
         <div className="relative">
           <input
             type="text"
@@ -448,15 +455,16 @@ export const Search: React.FC = () => {
             onKeyDown={handleKeyDown}
             placeholder="Search by movie, TV show, anime, or director..."
             autoFocus
-            className="w-full pl-14 pr-12 py-4 bg-hbo-card/90 border-2 border-hbo-border rounded-2xl text-base sm:text-lg text-white placeholder-gray-400 focus:outline-none focus:border-hbo-purple-light focus:shadow-hbo-glow transition-all tv-focus-target"
+            className="w-full pl-11 pr-10 py-2.5 sm:py-3 bg-hbo-card/90 border border-hbo-border focus:border-hbo-cyan rounded-xl text-sm sm:text-base text-white placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-hbo-cyan/50 transition-all tv-focus-target shadow-sm"
           />
-          <SearchIcon className="w-6 h-6 text-hbo-cyan absolute left-4 top-1/2 -translate-y-1/2" />
+          <SearchIcon className="w-5 h-5 text-hbo-cyan absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
           {query && (
             <button
               onClick={handleClear}
-              className="p-2 rounded-full hover:bg-white/10 text-gray-400 hover:text-white absolute right-3 top-1/2 -translate-y-1/2 transition"
+              className="p-1.5 rounded-full hover:bg-white/10 text-gray-400 hover:text-white absolute right-2.5 top-1/2 -translate-y-1/2 transition active:scale-95 cursor-pointer"
+              aria-label="Clear search"
             >
-              <X className="w-5 h-5" />
+              <X className="w-4 h-4" />
             </button>
           )}
         </div>
