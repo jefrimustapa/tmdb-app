@@ -20,7 +20,23 @@ interface HomeFeedCache {
   timestamp: number;
 }
 
-let homeFeedCache: HomeFeedCache | null = null;
+const HOME_CACHE_KEY = 'tmdb_home_feed_cache';
+
+const loadSavedCache = (): HomeFeedCache | null => {
+  try {
+    const raw = localStorage.getItem(HOME_CACHE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      // Cache valid for 30 minutes on cold starts
+      if (parsed && Array.isArray(parsed.trending) && parsed.trending.length > 0) {
+        return parsed;
+      }
+    }
+  } catch {}
+  return null;
+};
+
+let homeFeedCache: HomeFeedCache | null = loadSavedCache();
 
 export const Home: React.FC = () => {
   const [trending, setTrending] = useState<TMDBMediaItem[]>(() => homeFeedCache?.trending || []);
@@ -97,6 +113,9 @@ export const Home: React.FC = () => {
         };
 
         homeFeedCache = newCache;
+        try {
+          localStorage.setItem(HOME_CACHE_KEY, JSON.stringify(newCache));
+        } catch {}
 
         setPopularTV(newCache.popularTV);
         setSuggestions(newCache.suggestions);
@@ -117,6 +136,9 @@ export const Home: React.FC = () => {
     // Listen for settings or library changes to invalidate cache and refresh suggestions
     const handleSettingsChanged = () => {
       homeFeedCache = null;
+      try {
+        localStorage.removeItem(HOME_CACHE_KEY);
+      } catch {}
       loadHomeData(true);
     };
 
@@ -127,11 +149,30 @@ export const Home: React.FC = () => {
     };
   }, []);
 
+  // If cold boot and no trending cached yet, show Hero skeleton with immediate active Watch Now button
   if (isLoading && !trending.length) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-hbo-dark">
-        <div className="w-14 h-14 border-4 border-hbo-purple border-t-hbo-cyan rounded-full animate-spin shadow-hbo-glow mb-4" />
-        <h2 className="text-lg font-bold font-display text-white tracking-wider">PREPARING CINEMA...</h2>
+      <div className="min-h-screen pb-16 bg-hbo-dark">
+        <div data-hero-banner="true" className="relative w-full h-[65vh] sm:h-[75vh] min-h-[460px] max-h-[750px] overflow-hidden bg-[#050508] select-none">
+          <div className="absolute inset-0 bg-gradient-to-t from-hbo-dark via-hbo-dark/60 to-transparent z-10" />
+          <div className="relative z-20 h-full flex flex-col justify-end p-6 sm:p-12 lg:p-16 max-w-4xl">
+            <div className="h-6 w-32 bg-white/10 rounded-full mb-3 animate-pulse" />
+            <div className="h-10 sm:h-14 w-3/4 bg-white/10 rounded-xl mb-4 animate-pulse" />
+            <div className="h-4 w-full max-w-xl bg-white/10 rounded mb-2 animate-pulse" />
+            <div className="h-4 w-2/3 max-w-xl bg-white/10 rounded mb-5 animate-pulse" />
+            <div className="flex flex-col gap-2.5 w-fit">
+              <button
+                type="button"
+                data-hero-btn="play"
+                data-hero-index={0}
+                tabIndex={0}
+                className="flex items-center gap-2 px-5 sm:px-6 py-2.5 rounded-xl bg-gradient-to-r from-hbo-purple to-hbo-cyan text-white font-bold text-xs sm:text-sm shadow-hbo-glow tv-focus-target opacity-80"
+              >
+                <span>Loading Cinema...</span>
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
