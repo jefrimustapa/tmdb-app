@@ -114,6 +114,25 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ items }) => {
     return () => window.removeEventListener('tmdb_hero_slide_change', handleSlideChange);
   }, [totalItems]);
 
+  // When HeroBanner mounts with items, immediately lock initial focus to Watch Now button if activeElement is body or unassigned
+  useEffect(() => {
+    if (displayItems.length > 0 && window.location.pathname === '/') {
+      const lockFocus = () => {
+        const active = document.activeElement;
+        const isAlreadyFocused = active && active !== document.body && active !== document.documentElement;
+        if (!isAlreadyFocused) {
+          const playBtn = bannerRef.current?.querySelector<HTMLElement>('[data-hero-btn="play"]');
+          if (playBtn) {
+            playBtn.focus({ preventScroll: true });
+          }
+        }
+      };
+      lockFocus();
+      const t = setTimeout(lockFocus, 60);
+      return () => clearTimeout(t);
+    }
+  }, [displayItems.length]);
+
   const [isPerfMode, setIsPerfMode] = useState(() => 
     typeof document !== 'undefined' && document.documentElement.getAttribute('data-perf-mode') === 'true'
   );

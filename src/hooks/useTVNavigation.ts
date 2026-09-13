@@ -72,12 +72,14 @@ export function useTVNavigation(isEnabled = true) {
       }
     };
 
-    const timer1 = setTimeout(setInitialFocus, 100);
-    const timer2 = setTimeout(setInitialFocus, 400);
+    const timers: NodeJS.Timeout[] = [];
+    // Progressive polling: fast checks for instant cached data, and extended checks for cold API network loads
+    [40, 120, 250, 500, 850, 1300].forEach((delay) => {
+      timers.push(setTimeout(setInitialFocus, delay));
+    });
 
     return () => {
-      clearTimeout(timer1);
-      clearTimeout(timer2);
+      timers.forEach(t => clearTimeout(t));
     };
   }, [isEnabled, location.pathname]);
 
@@ -140,6 +142,212 @@ export function useTVNavigation(isEnabled = true) {
       }
       (window as any).__tmdbLastNavTime = now;
 
+      const currentFocused = (document.activeElement && document.activeElement !== document.body)
+        ? (document.activeElement as HTMLElement)
+        : null;
+
+      // =========================================================================
+      // ULTRA FAST-PATH: HERO BANNER, SIDEBAR & HORIZONTAL RAILS (0ms LATENCY)
+      // Execute before ANY querySelectorAll('.tv-focus-target') or .offsetParent
+      // to eliminate layout reflow / thrashing completely on low-power TV CPUs.
+      // =========================================================================
+
+      // Fast-path 1: Hero Billboard Navigation (Full-Width Sliding Rail)
+      const heroBtn = currentFocused ? currentFocused.closest('[data-hero-btn]') : null;
+      if (heroBtn) {
+        const btnType = heroBtn.getAttribute('data-hero-btn'); // 'play' | 'details'
+        const currentSlideIdx = parseInt(heroBtn.getAttribute('data-hero-index') || '0', 10);
+        const heroBanner = document.querySelector('[data-hero-banner="true"]');
+        const totalSlides = parseInt(heroBanner?.getAttribute('data-total-slides') || '1', 10);
+
+        if (e.key === 'ArrowRight') {
+          e.preventDefault();
+          if (currentSlideIdx + 1 < totalSlides) {
+            window.dispatchEvent(new CustomEvent('tmdb_hero_slide_change', {
+              detail: { index: currentSlideIdx + 1, btnType }
+            }));
+          }
+          return;
+        } else if (e.key === 'ArrowLeft') {
+          e.preventDefault();
+          if (currentSlideIdx > 0) {
+            window.dispatchEvent(new CustomEvent('tmdb_hero_slide_change', {
+              detail: { index: currentSlideIdx - 1, btnType }
+            }));
+          } else {
+            // At leftmost slide (Card 0): save memory anchor and move focus to navbar / sidebar
+            lastFocusedContentEl = currentFocused;
+            const navActive = document.querySelector<HTMLElement>('aside a[data-nav-path="/"]') ||
+                              document.querySelector<HTMLElement>('aside a[data-active-route="true"]') ||
+                              document.querySelector<HTMLElement>('aside .tv-focus-target, [data-tv-nav="true"]');
+            navActive?.focus({ preventScroll: true });
+          }
+          return;
+        } else if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          if (btnType === 'play') {
+            const detailsBtn = heroBanner?.querySelector<HTMLElement>(
+              `[data-hero-btn="details"].tv-focus-target`
+            ) || heroBanner?.querySelector<HTMLElement>(
+              `[data-hero-btn="details"][data-hero-index="${currentSlideIdx}"]`
+            );
+            if (detailsBtn) {
+              detailsBtn.focus({ preventScroll: true });
+            } else {
+              const firstCard = document.querySelector<HTMLElement>('[data-content-rail="true"] .tv-focus-target, main [role="button"].tv-focus-target');
+              if (firstCard) {
+                firstCard.focus();
+                firstCard.scrollIntoView({ behavior: getScrollBehavior(), block: 'center' });
+              }
+            }
+          } else {
+            // From details: move down to first card of next section (Continue watching / Trending now)
+            const firstCard = document.querySelector<HTMLElement>('[data-content-rail="true"] .tv-focus-target, main [role="button"].tv-focus-target');
+            if (firstCard) {
+              firstCard.focus();
+              firstCard.scrollIntoView({ behavior: getScrollBehavior(), block: 'center' });
+            }
+          }
+          return;
+        } else if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          if (btnType === 'details') {
+            const playBtn = heroBanner?.querySelector<HTMLElement>(
+              `[data-hero-btn="play"][data-hero-index="${currentSlideIdx}"]`
+            );
+            playBtn?.focus({ preventScroll: true });
+          }
+          return;
+        }
+      }
+
+      // Fast-path 2: Horizontal Content Rail Card-to-Card Navigation (Direct DOM Siblings - 0ms)
+      if (currentFocused && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
+        const currentRow = currentFocused.parentElement;
+        const isInsideRail = currentFocused.closest('[data-content-rail="true"]') !== null || 
+                            currentRow?.classList.contains('overflow-x-auto');
+
+        if (currentRow && isInsideRail) {
+          if (e.key === 'ArrowRight') {
+            const nextSibling = currentFocused.nextElementSibling as HTMLElement | null;
+            if (nextSibling) {
+              const targetToFocus = nextSibling.classList.contains('tv-focus-target')
+                ? nextSibling
+                : nextSibling.querySelector<HTMLElement>('.tv-focus-target');
+              if (targetToFocus) {
+                e.preventDefault();
+                targetToFocus.focus({ preventScroll: true });
+
+                const scrollContainer = currentRow.classList.contains('overflow-x-auto')
+                  ? currentRow
+                  : currentFocused.closest('[data-content-rail="true"]')?.querySelector<HTMLElement>('.overflow-x-auto');
+                if (scrollContainer) {
+                  const leftPeekOffset = 80;
+                  const targetOffset = targetToFocus.offsetLeft;
+                  scrollContainer.scrollTo({
+                    left: Math.max(0, targetOffset - leftPeekOffset),
+                    behavior: e.repeat ? 'auto' : getScrollBehavior()
+                  });
+                } else {
+                  targetToFocus.scrollIntoView({ behavior: e.repeat ? 'auto' : getScrollBehavior(), block: 'nearest', inline: 'nearest' });
+                }
+                return;
+              }
+            }
+            // End of row: boundary lock
+            e.preventDefault();
+            return;
+          } else if (e.key === 'ArrowLeft') {
+            const prevSibling = currentFocused.previousElementSibling as HTMLElement | null;
+            if (prevSibling) {
+              const targetToFocus = prevSibling.classList.contains('tv-focus-target')
+                ? prevSibling
+                : prevSibling.querySelector<HTMLElement>('.tv-focus-target');
+              if (targetToFocus) {
+                e.preventDefault();
+                targetToFocus.focus({ preventScroll: true });
+
+                const scrollContainer = currentRow.classList.contains('overflow-x-auto')
+                  ? currentRow
+                  : currentFocused.closest('[data-content-rail="true"]')?.querySelector<HTMLElement>('.overflow-x-auto');
+                if (scrollContainer) {
+                  if (prevSibling === currentRow.firstElementChild) {
+                    scrollContainer.scrollTo({ left: 0, behavior: e.repeat ? 'auto' : getScrollBehavior() });
+                  } else {
+                    const leftPeekOffset = 80;
+                    const targetOffset = targetToFocus.offsetLeft;
+                    scrollContainer.scrollTo({
+                      left: Math.max(0, targetOffset - leftPeekOffset),
+                      behavior: e.repeat ? 'auto' : getScrollBehavior()
+                    });
+                  }
+                } else {
+                  targetToFocus.scrollIntoView({ behavior: e.repeat ? 'auto' : getScrollBehavior(), block: 'nearest', inline: 'nearest' });
+                }
+                return;
+              }
+            }
+
+            // If at the leftmost card of the rail: return directly to sidebar nav (Memory anchor)
+            if (e.repeat) {
+              e.preventDefault();
+              return;
+            }
+
+            lastFocusedContentEl = currentFocused;
+            const currentPath = window.location.pathname;
+            const activeNav = document.querySelector<HTMLElement>('aside a[data-active-route="true"]') ||
+                              document.querySelector<HTMLElement>('aside a.active, nav a.active') ||
+                              document.querySelector<HTMLElement>(`aside a[data-nav-path="${currentPath}"]`) ||
+                              document.querySelector<HTMLElement>('aside .tv-focus-target');
+            if (activeNav) {
+              e.preventDefault();
+              activeNav.focus();
+              activeNav.scrollIntoView({ behavior: e.repeat ? 'auto' : getScrollBehavior(), block: 'nearest', inline: 'center' });
+              return;
+            }
+          }
+        }
+      }
+
+      // Fast-path 3: Sidebar / Navigation -> Content Canvas
+      if (currentFocused && e.key === 'ArrowRight') {
+        const isCurrentInNav = currentFocused.closest('aside') !== null || currentFocused.getAttribute('data-tv-nav') === 'true';
+        if (isCurrentInNav) {
+          // 1. HBO Max Memory Anchor: Always restore focus to the exact last-focused content element
+          if (lastFocusedContentEl && document.body.contains(lastFocusedContentEl) && lastFocusedContentEl.offsetParent !== null) {
+            e.preventDefault();
+            lastFocusedContentEl.focus({ preventScroll: true });
+            lastFocusedContentEl.scrollIntoView({ behavior: e.repeat ? 'auto' : getScrollBehavior(), block: 'nearest', inline: 'nearest' });
+            return;
+          }
+
+          // 2. Cold Start / Initial Boot: Fast-path directly to Hero "Watch Now" on Home page
+          if (window.location.pathname === '/') {
+            const heroPlayBtn = document.querySelector<HTMLElement>('main [data-hero-btn="play"].tv-focus-target') ||
+                                document.querySelector<HTMLElement>('main [data-hero-btn="play"]') ||
+                                document.querySelector<HTMLElement>('main [data-hero-watch-now="true"]');
+            if (heroPlayBtn && heroPlayBtn.offsetParent !== null) {
+              e.preventDefault();
+              heroPlayBtn.focus({ preventScroll: true });
+              return;
+            }
+          }
+
+          // 3. Settings page fast-path
+          if (window.location.pathname === '/settings') {
+            const activeCat = document.querySelector<HTMLElement>('[data-tv-category-active="true"]') ||
+                              document.querySelector<HTMLElement>('[data-tv-category-item="true"]');
+            if (activeCat && activeCat.offsetParent !== null) {
+              e.preventDefault();
+              activeCat.focus();
+              activeCat.scrollIntoView({ behavior: e.repeat ? 'auto' : getScrollBehavior(), block: 'nearest', inline: 'center' });
+              return;
+            }
+          }
+        }
+      }
+
       // In TV mode, all intended spatial focus items are explicitly tagged with .tv-focus-target
       const focusableSelectors = '.tv-focus-target';
 
@@ -154,9 +362,6 @@ export function useTVNavigation(isEnabled = true) {
 
       if (focusableElements.length === 0) return;
 
-      const currentFocused = (document.activeElement && document.activeElement !== document.body)
-        ? (document.activeElement as HTMLElement)
-        : null;
       let currentIndex = currentFocused ? focusableElements.indexOf(currentFocused) : -1;
 
       // If nothing is focused yet, focus the first item on any arrow key
@@ -318,74 +523,6 @@ export function useTVNavigation(isEnabled = true) {
         // Candidate filtering rules:
         let candidateElements = focusableElements.filter(el => el !== currentFocused);
 
-        // Dedicated Hero Billboard Navigation (Full-Width Sliding Rail)
-        const heroBtn = currentFocused.closest('[data-hero-btn]');
-        if (heroBtn) {
-          const btnType = heroBtn.getAttribute('data-hero-btn'); // 'play' | 'details'
-          const currentSlideIdx = parseInt(heroBtn.getAttribute('data-hero-index') || '0', 10);
-          const heroBanner = document.querySelector('[data-hero-banner="true"]');
-          const totalSlides = parseInt(heroBanner?.getAttribute('data-total-slides') || '1', 10);
-
-          if (e.key === 'ArrowRight') {
-            e.preventDefault();
-            if (currentSlideIdx + 1 < totalSlides) {
-              window.dispatchEvent(new CustomEvent('tmdb_hero_slide_change', {
-                detail: { index: currentSlideIdx + 1, btnType }
-              }));
-            }
-            return;
-          } else if (e.key === 'ArrowLeft') {
-            e.preventDefault();
-            if (currentSlideIdx > 0) {
-              window.dispatchEvent(new CustomEvent('tmdb_hero_slide_change', {
-                detail: { index: currentSlideIdx - 1, btnType }
-              }));
-            } else {
-              // At leftmost slide (Card 0): move focus to navbar / sidebar
-              const navActive = document.querySelector<HTMLElement>('aside .tv-focus-target, [data-tv-nav="true"]');
-              navActive?.focus({ preventScroll: true });
-            }
-            return;
-          } else if (e.key === 'ArrowDown') {
-            e.preventDefault();
-            if (btnType === 'play') {
-              const detailsBtn = heroBanner?.querySelector<HTMLElement>(
-                `[data-hero-btn="details"].tv-focus-target`
-              ) || heroBanner?.querySelector<HTMLElement>(
-                `[data-hero-btn="details"][data-hero-index="${currentSlideIdx}"]`
-              );
-              if (detailsBtn) {
-                detailsBtn.focus({ preventScroll: true });
-              } else {
-                const railCards = Array.from(document.querySelectorAll<HTMLElement>('[data-content-rail="true"] .tv-focus-target, main [role="button"].tv-focus-target'))
-                  .filter(el => el.offsetParent !== null && !el.hasAttribute('disabled'));
-                if (railCards.length > 0) {
-                  railCards[0].focus();
-                  railCards[0].scrollIntoView({ behavior: getScrollBehavior(), block: 'center' });
-                }
-              }
-            } else {
-              // From details: move down to first card of next section (Continue watching / Trending now)
-              const railCards = Array.from(document.querySelectorAll<HTMLElement>('[data-content-rail="true"] .tv-focus-target, main [role="button"].tv-focus-target'))
-                .filter(el => el.offsetParent !== null && !el.hasAttribute('disabled'));
-              if (railCards.length > 0) {
-                railCards[0].focus();
-                railCards[0].scrollIntoView({ behavior: getScrollBehavior(), block: 'center' });
-              }
-            }
-            return;
-          } else if (e.key === 'ArrowUp') {
-            e.preventDefault();
-            if (btnType === 'details') {
-              const playBtn = heroBanner?.querySelector<HTMLElement>(
-                `[data-hero-btn="play"][data-hero-index="${currentSlideIdx}"]`
-              );
-              playBtn?.focus({ preventScroll: true });
-            }
-            return;
-          }
-        }
-
         if (isCurrentInNav && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
           // Linear navigation inside Sidebar
           const allNav = Array.from(document.querySelectorAll<HTMLElement>('aside .tv-focus-target, [data-tv-nav="true"]'))
@@ -484,17 +621,100 @@ export function useTVNavigation(isEnabled = true) {
               return;
             }
           }
+          const currentRail = currentFocused.closest('[data-content-rail="true"]');
+          if (currentRail) {
+            const allRails = Array.from(document.querySelectorAll<HTMLElement>('[data-content-rail="true"]'))
+              .filter(r => r.offsetParent !== null);
+            const currentRailIdx = allRails.indexOf(currentRail as HTMLElement);
+
+            if (e.key === 'ArrowDown') {
+              if (currentRailIdx >= 0 && currentRailIdx < allRails.length - 1) {
+                const nextRail = allRails[currentRailIdx + 1];
+                const nextRailCards = Array.from(nextRail.querySelectorAll<HTMLElement>('.tv-focus-target'))
+                  .filter(el => el.offsetParent !== null && !el.hasAttribute('disabled'));
+                if (nextRailCards.length > 0) {
+                  let bestCard = nextRailCards[0];
+                  let minXDiff = Infinity;
+                  for (const card of nextRailCards) {
+                    const r = card.getBoundingClientRect();
+                    const xDiff = Math.abs((r.left + r.width / 2) - (currentRect.left + currentRect.width / 2));
+                    if (xDiff < minXDiff) {
+                      minXDiff = xDiff;
+                      bestCard = card;
+                    }
+                  }
+                  e.preventDefault();
+                  bestCard.focus();
+                  bestCard.scrollIntoView({ behavior: e.repeat ? 'auto' : getScrollBehavior(), block: 'center', inline: 'nearest' });
+                  return;
+                }
+              }
+              // Last rail: lock
+              e.preventDefault();
+              return;
+            } else if (e.key === 'ArrowUp') {
+              if (currentRailIdx > 0) {
+                const prevRail = allRails[currentRailIdx - 1];
+                const prevRailCards = Array.from(prevRail.querySelectorAll<HTMLElement>('.tv-focus-target'))
+                  .filter(el => el.offsetParent !== null && !el.hasAttribute('disabled'));
+                if (prevRailCards.length > 0) {
+                  let bestCard = prevRailCards[0];
+                  let minXDiff = Infinity;
+                  for (const card of prevRailCards) {
+                    const r = card.getBoundingClientRect();
+                    const xDiff = Math.abs((r.left + r.width / 2) - (currentRect.left + currentRect.width / 2));
+                    if (xDiff < minXDiff) {
+                      minXDiff = xDiff;
+                      bestCard = card;
+                    }
+                  }
+                  e.preventDefault();
+                  bestCard.focus();
+                  bestCard.scrollIntoView({ behavior: e.repeat ? 'auto' : getScrollBehavior(), block: 'center', inline: 'nearest' });
+                  return;
+                }
+              } else if (currentRailIdx === 0) {
+                // Moving up from top rail: jump to Hero Billboard (Details or Play)
+                const heroBanner = document.querySelector('[data-hero-banner="true"]');
+                if (heroBanner) {
+                  const detailsBtn = heroBanner.querySelector<HTMLElement>('[data-hero-btn="details"].tv-focus-target') ||
+                                     heroBanner.querySelector<HTMLElement>('[data-hero-btn="play"].tv-focus-target');
+                  if (detailsBtn) {
+                    e.preventDefault();
+                    detailsBtn.focus();
+                    window.scrollTo({ top: 0, left: 0, behavior: getScrollBehavior() });
+                    return;
+                  }
+                }
+              }
+              // Top boundary lock
+              e.preventDefault();
+              return;
+            }
+          }
 
           // In main content canvas, UP/DOWN stays strictly inside main content canvas
           candidateElements = pageElements;
         } else if (e.key === 'ArrowRight') {
           if (isCurrentInNav) {
-            // HBO Max Memory Anchor (Item 4): restore focus to exact last-focused card
+            // 1. HBO Max Memory Anchor: Always restore focus to the exact last-focused element (card or hero button)
             if (lastFocusedContentEl && document.body.contains(lastFocusedContentEl) && lastFocusedContentEl.offsetParent !== null) {
               e.preventDefault();
-              lastFocusedContentEl.focus();
+              lastFocusedContentEl.focus({ preventScroll: true });
               lastFocusedContentEl.scrollIntoView({ behavior: e.repeat ? 'auto' : getScrollBehavior(), block: 'nearest', inline: 'nearest' });
               return;
+            }
+
+            // 2. Cold Start / No Prior Focus: Fast-path to Hero "Watch Now" on Home page (0ms)
+            if (window.location.pathname === '/') {
+              const heroPlayBtn = document.querySelector<HTMLElement>('main [data-hero-btn="play"].tv-focus-target') ||
+                                  document.querySelector<HTMLElement>('main [data-hero-btn="play"]') ||
+                                  document.querySelector<HTMLElement>('main [data-hero-watch-now="true"]');
+              if (heroPlayBtn) {
+                e.preventDefault();
+                heroPlayBtn.focus({ preventScroll: true });
+                return;
+              }
             }
 
             // On Settings page: Right from sidebar moves focus directly to active Category Item

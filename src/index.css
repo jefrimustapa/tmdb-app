@@ -296,5 +296,14 @@ aside .tv-focus-target:focus-visible .tv-nav-label,
 }
 
 .animate-hero-buttons {
-  animation: heroFadeInUp 550ms cubic-bezier(0.16, 1, 0.3, 1) 180ms both;
+  animation: heroFadeInUp 400ms cubic-bezier(0.16, 1, 0.3, 1) 0ms forwards;
+}
+
+[data-perf-mode="true"] .animate-hero-buttons,
+[data-perf-mode="true"] .animate-hero-badge,
+[data-perf-mode="true"] .animate-hero-title,
+[data-perf-mode="true"] .animate-hero-overview {
+  animation: none !important;
+  opacity: 1 !important;
+  transform: none !important;
 }
