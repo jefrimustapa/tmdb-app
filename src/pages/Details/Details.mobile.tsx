@@ -457,80 +457,56 @@ export const Details: React.FC = () => {
                     </Link>
                   </div>
 
-                  {/* Row 2: Secondary action buttons (vertical icon + description with lower shaded background) */}
-                  <div className="grid grid-cols-3 sm:flex sm:flex-wrap items-stretch justify-center gap-2.5 sm:gap-3 w-full">
+                  {/* Row 2: Secondary circular action buttons */}
+                  <div className="flex items-center justify-center sm:justify-start gap-3.5 sm:gap-4 pt-1 w-full">
                     {isResumable && (
                       <button
                         type="button"
                         onClick={() => navigate(restartUrl)}
                         title="Restart from beginning"
                         aria-label="Restart from beginning"
-                        className="tv-focus-target group relative flex flex-col items-center justify-between rounded-xl overflow-hidden border border-white/20 bg-white/[0.06] hover:bg-white/[0.12] text-white backdrop-blur-md transition-all duration-200 active:scale-95 shadow-md hover:border-white/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-hbo-cyan p-0"
+                        className="tv-focus-target group relative w-11 h-11 sm:w-12 sm:h-12 rounded-full border border-white/20 bg-white/[0.08] hover:bg-white/[0.15] text-white/90 hover:text-white hover:border-white/40 backdrop-blur-md transition-all duration-200 active:scale-95 flex items-center justify-center flex-shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-hbo-cyan shadow-sm"
                       >
-                        <div className="flex items-center justify-center pt-3 pb-1.5 w-full">
-                          <RotateCcw className="w-5 h-5 text-gray-200 group-hover:text-white group-hover:scale-110 transition-transform" />
-                        </div>
-                        <div className="w-full bg-black/60 border-t border-white/10 py-1.5 px-1.5 text-center">
-                          <span className="text-[11px] font-medium text-gray-300 group-hover:text-white tracking-wide block truncate">Restart</span>
-                        </div>
+                        <RotateCcw className="w-5 h-5 text-gray-200 group-hover:text-white group-hover:scale-110 transition-transform" />
                       </button>
                     )}
 
                     <button
                       type="button"
                       onClick={handleToggleWatchlist}
-                      className={`tv-focus-target group relative flex flex-col items-center justify-between rounded-xl overflow-hidden border backdrop-blur-md transition-all duration-200 active:scale-95 shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-hbo-cyan p-0 ${
+                      className={`tv-focus-target group relative w-11 h-11 sm:w-12 sm:h-12 rounded-full border backdrop-blur-md transition-all duration-200 active:scale-95 flex items-center justify-center flex-shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-hbo-cyan shadow-sm ${
                         isWatchlist
-                          ? 'border-hbo-cyan bg-hbo-purple/30 text-hbo-cyan shadow-hbo-glow'
-                          : 'border-white/20 bg-white/[0.06] hover:bg-white/[0.12] text-white hover:border-white/40'
+                          ? 'border-hbo-cyan ring-2 ring-hbo-cyan bg-hbo-purple/40 text-hbo-cyan'
+                          : 'border-white/20 bg-white/[0.08] hover:bg-white/[0.15] text-white/90 hover:text-white hover:border-white/40'
                       }`}
                       title={isWatchlist ? 'In Watchlist' : 'Add to Watchlist'}
                       aria-label={isWatchlist ? 'In Watchlist' : 'Add to Watchlist'}
                     >
-                      <div className="flex items-center justify-center pt-3 pb-1.5 w-full">
-                        <Bookmark className={`w-5 h-5 group-hover:scale-110 transition-transform ${isWatchlist ? 'fill-current text-hbo-cyan' : 'text-gray-200 group-hover:text-white'}`} />
-                      </div>
-                      <div className={`w-full py-1.5 px-1.5 text-center border-t ${isWatchlist ? 'bg-black/70 border-hbo-cyan/40' : 'bg-black/60 border-white/10'}`}>
-                        <span className={`text-[11px] tracking-wide block truncate ${isWatchlist ? 'text-hbo-cyan font-bold' : 'font-medium text-gray-300 group-hover:text-white'}`}>
-                          {isWatchlist ? 'Added' : 'Watchlist'}
-                        </span>
-                      </div>
+                      <Bookmark className={`w-5 h-5 transition-transform group-hover:scale-110 ${isWatchlist ? 'fill-current text-hbo-cyan' : 'text-gray-200 group-hover:text-white'}`} />
                     </button>
 
                     <button
                       type="button"
                       onClick={handleToggleLike}
-                      className={`tv-focus-target group relative flex flex-col items-center justify-between rounded-xl overflow-hidden border backdrop-blur-md transition-all duration-200 active:scale-95 shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-hbo-cyan p-0 ${
+                      className={`tv-focus-target group relative w-11 h-11 sm:w-12 sm:h-12 rounded-full border backdrop-blur-md transition-all duration-200 active:scale-95 flex items-center justify-center flex-shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-hbo-cyan shadow-sm ${
                         isLiked
-                          ? 'border-hbo-cyan bg-hbo-purple/30 text-hbo-cyan shadow-hbo-glow'
-                          : 'border-white/20 bg-white/[0.06] hover:bg-white/[0.12] text-white hover:border-white/40'
+                          ? 'border-hbo-cyan ring-2 ring-hbo-cyan bg-hbo-purple/40 text-hbo-cyan'
+                          : 'border-white/20 bg-white/[0.08] hover:bg-white/[0.15] text-white/90 hover:text-white hover:border-white/40'
                       }`}
                       title={isLiked ? 'Liked' : 'Like'}
                       aria-label={isLiked ? 'Liked' : 'Like'}
                     >
-                      <div className="flex items-center justify-center pt-3 pb-1.5 w-full">
-                        <Heart className={`w-5 h-5 group-hover:scale-110 transition-transform ${isLiked ? 'fill-current text-hbo-cyan' : 'text-gray-200 group-hover:text-white'}`} />
-                      </div>
-                      <div className={`w-full py-1.5 px-1.5 text-center border-t ${isLiked ? 'bg-black/70 border-hbo-cyan/40' : 'bg-black/60 border-white/10'}`}>
-                        <span className={`text-[11px] tracking-wide block truncate ${isLiked ? 'text-hbo-cyan font-bold' : 'font-medium text-gray-300 group-hover:text-white'}`}>
-                          {isLiked ? 'Liked' : 'Like'}
-                        </span>
-                      </div>
+                      <Heart className={`w-5 h-5 transition-transform group-hover:scale-110 ${isLiked ? 'fill-current text-hbo-cyan' : 'text-gray-200 group-hover:text-white'}`} />
                     </button>
 
                     <button
                       type="button"
                       onClick={handleShare}
-                      className="tv-focus-target group relative flex flex-col items-center justify-between rounded-xl overflow-hidden border border-white/20 bg-white/[0.06] hover:bg-white/[0.12] text-white backdrop-blur-md transition-all duration-200 active:scale-95 shadow-md hover:border-hbo-cyan focus:outline-none focus-visible:ring-2 focus-visible:ring-hbo-cyan p-0"
+                      className="tv-focus-target group relative w-11 h-11 sm:w-12 sm:h-12 rounded-full border border-white/20 bg-white/[0.08] hover:bg-white/[0.15] text-white/90 hover:text-white hover:border-hbo-cyan backdrop-blur-md transition-all duration-200 active:scale-95 flex items-center justify-center flex-shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-hbo-cyan shadow-sm"
                       title="Share link"
                       aria-label="Share"
                     >
-                      <div className="flex items-center justify-center pt-3 pb-1.5 w-full">
-                        <Share2 className="w-5 h-5 text-hbo-cyan group-hover:scale-110 transition-transform" />
-                      </div>
-                      <div className="w-full bg-black/60 border-t border-white/10 py-1.5 px-1.5 text-center">
-                        <span className="text-[11px] font-medium text-gray-300 group-hover:text-white tracking-wide block truncate">Share</span>
-                      </div>
+                      <Share2 className="w-5 h-5 text-hbo-cyan group-hover:scale-110 transition-transform" />
                     </button>
                   </div>
                 </div>
