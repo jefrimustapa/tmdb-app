@@ -373,7 +373,7 @@ export const Details: React.FC = () => {
             </div>
 
             {/* Primary Action Buttons */}
-            <div className="flex items-center justify-center sm:justify-start gap-3 sm:gap-4 pt-2 flex-wrap p-1">
+            <div data-details-action-bar="true" className="flex items-center justify-center sm:justify-start gap-3 sm:gap-4 pt-2 flex-wrap p-1">
               {(() => {
                 const isResumable = watchProgress && (watchProgress.timestamp > 15 || watchProgress.progressPercent > 1) && watchProgress.progressPercent < 90;
                 const minsLeft = watchProgress && watchProgress.duration > watchProgress.timestamp
@@ -504,7 +504,7 @@ export const Details: React.FC = () => {
               </h3>
               <span className="text-xs text-gray-400">Select actor to see filmography</span>
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3.5 sm:gap-4.5 p-1">
+            <div data-cast-grid="true" className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3.5 sm:gap-4.5 p-1">
               {details.credits.cast.slice(0, 12).map((actor) => (
                 <Link
                   key={actor.id}
