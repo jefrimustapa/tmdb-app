@@ -221,6 +221,68 @@ export function useTVNavigation(isEnabled = true) {
         }
       }
 
+      // Fast-path 1.5: Details Page Action Buttons Row (Watch, Restart, Watchlist, Like)
+      const detailsActionBar = currentFocused ? currentFocused.closest('[data-details-action-bar="true"]') : null;
+      if (detailsActionBar && (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
+        const actionItems = Array.from(detailsActionBar.querySelectorAll<HTMLElement>('.tv-focus-target'))
+          .filter(el => el.offsetParent !== null && !el.hasAttribute('disabled'));
+        const actionIdx = actionItems.indexOf(currentFocused!);
+
+        if (e.key === 'ArrowLeft') {
+          if (actionIdx > 0) {
+            e.preventDefault();
+            actionItems[actionIdx - 1].focus();
+            return;
+          } else {
+            // At leftmost action button (Watch/Resume): Move to Sidebar nav or Back button
+            e.preventDefault();
+            lastFocusedContentEl = currentFocused;
+            const currentPath = window.location.pathname;
+            const activeNav = document.querySelector<HTMLElement>('aside a[data-active-route="true"]') ||
+                              document.querySelector<HTMLElement>(`aside a[data-nav-path="${currentPath.startsWith('/details/tv') ? '/tv' : '/movies'}"]`) ||
+                              document.querySelector<HTMLElement>('aside a[data-nav-path="/movies"]') ||
+                              document.querySelector<HTMLElement>('aside a.active') ||
+                              document.querySelector<HTMLElement>('[data-details-back="true"]') ||
+                              document.querySelector<HTMLElement>('aside .tv-focus-target');
+            if (activeNav) {
+              activeNav.focus();
+              activeNav.scrollIntoView({ behavior: e.repeat ? 'auto' : getScrollBehavior(), block: 'nearest', inline: 'center' });
+            }
+            return;
+          }
+        } else if (e.key === 'ArrowRight') {
+          if (actionIdx >= 0 && actionIdx < actionItems.length - 1) {
+            e.preventDefault();
+            actionItems[actionIdx + 1].focus();
+            return;
+          } else {
+            // Last button in action bar: hard boundary lock (do not jump to other sections)
+            e.preventDefault();
+            return;
+          }
+        } else if (e.key === 'ArrowUp') {
+          // Move UP from action buttons to Back button
+          const backBtn = document.querySelector<HTMLElement>('[data-details-back="true"]');
+          if (backBtn) {
+            e.preventDefault();
+            backBtn.focus();
+            window.scrollTo({ top: 0, left: 0, behavior: getScrollBehavior() });
+            return;
+          }
+        } else if (e.key === 'ArrowDown') {
+          // Move DOWN to Episode Grid, Cast & Crew, or More Like This
+          const nextTarget = document.querySelector<HTMLElement>('[data-episode-grid="true"] .tv-focus-target') ||
+                             document.querySelector<HTMLElement>('[data-cast-grid="true"] .tv-focus-target') ||
+                             document.querySelector<HTMLElement>('[data-content-rail="true"] .tv-focus-target');
+          if (nextTarget) {
+            e.preventDefault();
+            nextTarget.focus();
+            nextTarget.scrollIntoView({ behavior: getScrollBehavior(), block: 'center', inline: 'nearest' });
+            return;
+          }
+        }
+      }
+
       // Fast-path 2: Horizontal Content Rail Card-to-Card Navigation (Direct DOM Siblings - 0ms)
       if (currentFocused && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
         const currentRow = currentFocused.parentElement;
@@ -674,7 +736,55 @@ export function useTVNavigation(isEnabled = true) {
                   return;
                 }
               } else if (currentRailIdx === 0) {
-                // Moving up from top rail: jump to Hero Billboard (Details or Play)
+                // Moving up from top rail:
+                // 1. On Details page: move up to Cast & Crew, Episode Grid, or Action Buttons
+                if (window.location.pathname.startsWith('/details')) {
+                  const castGrid = document.querySelector('[data-cast-grid="true"]');
+                  if (castGrid) {
+                    const castCards = Array.from(castGrid.querySelectorAll<HTMLElement>('.tv-focus-target'))
+                      .filter(el => el.offsetParent !== null && !el.hasAttribute('disabled'));
+                    if (castCards.length > 0) {
+                      // Pick card with closest horizontal alignment in the bottom row of cast grid
+                      let bestCast = castCards[0];
+                      let minXDiff = Infinity;
+                      for (const card of castCards) {
+                        const r = card.getBoundingClientRect();
+                        const xDiff = Math.abs((r.left + r.width / 2) - (currentRect.left + currentRect.width / 2));
+                        if (xDiff < minXDiff) {
+                          minXDiff = xDiff;
+                          bestCast = card;
+                        }
+                      }
+                      e.preventDefault();
+                      bestCast.focus();
+                      bestCast.scrollIntoView({ behavior: e.repeat ? 'auto' : getScrollBehavior(), block: 'center', inline: 'nearest' });
+                      return;
+                    }
+                  }
+
+                  const epGrid = document.querySelector('[data-episode-grid="true"]');
+                  if (epGrid) {
+                    const epItems = Array.from(epGrid.querySelectorAll<HTMLElement>('.tv-focus-target'))
+                      .filter(el => el.offsetParent !== null && !el.hasAttribute('disabled'));
+                    if (epItems.length > 0) {
+                      e.preventDefault();
+                      epItems[0].focus();
+                      epItems[0].scrollIntoView({ behavior: e.repeat ? 'auto' : getScrollBehavior(), block: 'center', inline: 'nearest' });
+                      return;
+                    }
+                  }
+
+                  const actionBtn = document.querySelector<HTMLElement>('[data-details-primary="true"]') ||
+                                    document.querySelector<HTMLElement>('[data-details-action-bar="true"] .tv-focus-target');
+                  if (actionBtn) {
+                    e.preventDefault();
+                    actionBtn.focus();
+                    actionBtn.scrollIntoView({ behavior: e.repeat ? 'auto' : getScrollBehavior(), block: 'center', inline: 'nearest' });
+                    return;
+                  }
+                }
+
+                // 2. On Home page: jump to Hero Billboard (Details or Play)
                 const heroBanner = document.querySelector('[data-hero-banner="true"]');
                 if (heroBanner) {
                   const detailsBtn = heroBanner.querySelector<HTMLElement>('[data-hero-btn="details"].tv-focus-target') ||
@@ -1028,6 +1138,17 @@ export function useTVNavigation(isEnabled = true) {
                 }
                 nextElement = bestFilter;
               }
+            }
+          }
+
+          if (!nextElement && window.location.pathname.startsWith('/details')) {
+            const actionBtn = document.querySelector<HTMLElement>('[data-details-primary="true"]') ||
+                              document.querySelector<HTMLElement>('[data-details-action-bar="true"] .tv-focus-target');
+            const backBtn = document.querySelector<HTMLElement>('[data-details-back="true"]');
+            if (actionBtn && actionBtn.getBoundingClientRect().bottom <= currentRect.top + 20) {
+              nextElement = actionBtn;
+            } else if (backBtn) {
+              nextElement = backBtn;
             }
           }
         }
