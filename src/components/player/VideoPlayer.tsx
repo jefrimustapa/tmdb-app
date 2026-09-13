@@ -147,6 +147,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const currentTimeRef = useRef<number>(initialTimestamp || 0);
   const durationRef = useRef<number>(0);
   const hasSeekedInitialRef = useRef(false);
+  const isPlayingRef = useRef(true); // Default to true once media starts loading
 
   // Auto-Cycle Provider until first working stream state
   const [autoCycle, setAutoCycle] = useState(true);
@@ -707,6 +708,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     const handlePlaybackStateChanged = (e: any) => {
       const { isPlaying, currentTime, duration } = e.detail || {};
       if (isPlaying !== undefined) {
+        isPlayingRef.current = !!isPlaying;
         if (isPlaying) {
           setIsLoading(false);
           setHasError(false);
@@ -722,11 +724,53 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       }
     };
 
+    // Global toggle play/pause listener (triggered by TV remote D-Pad Center/OK or Media keys)
+    const handleTogglePlayPause = () => {
+      // 1. If HTML5 direct video is active
+      if (videoRef.current) {
+        if (videoRef.current.paused) {
+          videoRef.current.play().catch(() => {});
+          isPlayingRef.current = true;
+        } else {
+          videoRef.current.pause();
+          isPlayingRef.current = false;
+        }
+        return;
+      }
+
+      // 2. If CineSrc (or similar embed provider supporting postMessage) is active
+      const isCineSrc = provider.id === 'cinesrc' || (streamUrl && streamUrl.includes('cinesrc'));
+      if (isCineSrc && iframeRef.current?.contentWindow) {
+        const nextCommand = isPlayingRef.current ? 'pause' : 'play';
+        try {
+          iframeRef.current.contentWindow.postMessage({
+            type: 'cinesrc:command',
+            command: nextCommand,
+            args: []
+          }, '*');
+          // Optimistically flip state
+          isPlayingRef.current = !isPlayingRef.current;
+        } catch (e) {
+          console.warn('[VideoPlayer] Error sending cinesrc play/pause command:', e);
+        }
+        return;
+      }
+
+      // 3. Focus iframe so standard spacebar/keyboard controls work
+      if (iframeRef.current) {
+        try {
+          iframeRef.current.focus();
+        } catch {}
+      }
+    };
+
     window.addEventListener('tmdb_playback_state_changed', handlePlaybackStateChanged);
+    window.addEventListener('tmdb_toggle_play_pause', handleTogglePlayPause);
     return () => {
       window.removeEventListener('tmdb_playback_state_changed', handlePlaybackStateChanged);
+      window.removeEventListener('tmdb_toggle_play_pause', handleTogglePlayPause);
     };
-  }, [recordProgress]);
+  }, [recordProgress, provider.id, streamUrl]);
 
   const lastPostMessageTimeRef = useRef<number>(0);
 
@@ -835,12 +879,20 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           }
 
           if (subType === 'ended') {
+            isPlayingRef.current = false;
             const endDur = durationRef.current || data.duration || (episodeRuntimeMinutes ? episodeRuntimeMinutes * 60 : 0);
             if (endDur > 0) recordProgress(endDur, endDur, true);
             return;
           }
 
+          if (subType === 'play') {
+            isPlayingRef.current = true;
+          } else if (subType === 'pause') {
+            isPlayingRef.current = false;
+          }
+
           if (subType === 'timeupdate' || subType === 'seeked' || subType === 'play') {
+            if (subType === 'play') isPlayingRef.current = true;
             const current = data.currentTime ?? 0;
             const dur = data.duration ?? 0;
             if (current > 0) {
