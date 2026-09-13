@@ -2045,7 +2045,8 @@ public class MainActivity extends BridgeActivity {
                     return true;
                 }
 
-                if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER || keyCode == KeyEvent.KEYCODE_NUMPAD_ENTER) {
+                if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER || keyCode == KeyEvent.KEYCODE_NUMPAD_ENTER ||
+                    keyCode == KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE || keyCode == KeyEvent.KEYCODE_MEDIA_PLAY || keyCode == KeyEvent.KEYCODE_MEDIA_PAUSE) {
                     long now = SystemClock.uptimeMillis();
                     boolean isDoublePress = (now - lastOkPressTime < 650);
                     lastOkPressTime = now;
@@ -2092,6 +2093,7 @@ public class MainActivity extends BridgeActivity {
                                 "    if (%b) {" +
                                 "      window.dispatchEvent(new CustomEvent('tmdb_toggle_cursor'));" +
                                 "    } else {" +
+                                "      window.dispatchEvent(new CustomEvent('tmdb_toggle_play_pause'));" +
                                 "      if (typeof window.AndroidBridge !== 'undefined' && typeof window.AndroidBridge.simulateTouchAt === 'function') {" +
                                 "        window.AndroidBridge.simulateTouchAt(window.innerWidth / 2, window.innerHeight / 2);" +
                                 "      }" +
