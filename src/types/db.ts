@@ -80,8 +80,8 @@ export interface UserSettings {
   deviceMode: 'auto' | 'tv' | 'mobile' | 'tablet' | 'desktop';
   autoplayNext: boolean;
   upNextPopup?: boolean;
-  upNextTriggerPercent?: number; // e.g. 90, 92, 94, 96, 98, 100
-  upNextTimeout?: number; // e.g. 5, 10, 15, 20
+  upNextTriggerPercent?: number; // e.g. 96, 98, 100, 102, 104
+  upNextTimeout?: number; // e.g. 20, 40, 60, 80
   watchProgressTickerInterval?: number; // Progress ticker frequency in seconds (1-10s; default 5s for TV, 2s for Mobile)
   adBlockShield: boolean;
   filterAdult: boolean;
