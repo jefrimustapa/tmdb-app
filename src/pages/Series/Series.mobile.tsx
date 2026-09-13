@@ -256,7 +256,7 @@ export const Series: React.FC = () => {
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3.5 sm:gap-5 lg:gap-6 py-2 px-1">
+          <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-4 landscape:sm:grid-cols-6 landscape:md:grid-cols-6 lg:grid-cols-6 xl:grid-cols-6 gap-3.5 sm:gap-5 lg:gap-6 py-2 px-1">
             {series.map((item) => (
               <div key={item.id} className="flex justify-center">
                 <MediaCard item={item} type="tv" />
