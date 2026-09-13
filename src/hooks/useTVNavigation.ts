@@ -92,6 +92,11 @@ export function useTVNavigation(isEnabled = true) {
         // Handle Back/Escape keys on Watch page (regardless of whether focus is in header or iframe)
         if (e.key === 'Escape' || e.keyCode === 27 || e.keyCode === 4 || e.key === 'BrowserBack' || e.key === 'GoBack') {
           e.preventDefault();
+          const upNextPopup = document.querySelector('[data-up-next-popup="true"]');
+          if (upNextPopup) {
+            window.dispatchEvent(new CustomEvent('tmdb_dismiss_up_next'));
+            return;
+          }
           const openDropdown = header?.querySelector('[data-provider-dropdown-open="true"]');
           if (openDropdown) {
             window.dispatchEvent(new CustomEvent('tmdb_close_dropdowns'));
