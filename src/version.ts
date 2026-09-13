@@ -2,12 +2,13 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20260912-1441';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.fix-mobile-landscape.20260912-1441';
+export const APP_BUILD_NUMBER = '20260913-0311';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-mobile-details-.20260913-0311';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
-export const APP_BRANCH = 'fix-mobile-landscape';
-export const APP_CHANGELOG = `* feat(watch): add Google Cast and screen mirror options to mobile watch page (#84)
+export const APP_BRANCH = 'feat-mobile-details-';
+export const APP_CHANGELOG = `* fixed the settings menu (#85)
+* feat(watch): add Google Cast and screen mirror options to mobile watch page (#84)
 * fix(ui): resolve intermittent horizontal touch scroll freezing on media cards and rails (#83)
 * perf(watch): optimize watch page rendering, TV cursor navigation and remote back focus (#82)
 * feat(details): add deep link sharing and restyle action buttons with unified focus and selection (#81)
@@ -20,5 +21,4 @@ export const APP_CHANGELOG = `* feat(watch): add Google Cast and screen mirror o
 * fix(watch): unhide top header on mouse hover in TV mode (#74)
 * perf(player): improve LARI21 performance, add progress status, and rename mapping service (#73)
 * feat(storage): make watch history, settings, watchlist and likes persistent across app uninstalls (#72)
-* feat(player): VidLink auto-unmute injection and episode title conditional fade (#71)
-* fix(scroll): resolve vertical scroll unresponsiveness on mobile rails and card touch (#70)`;
+* feat(player): VidLink auto-unmute injection and episode title conditional fade (#71)`;
