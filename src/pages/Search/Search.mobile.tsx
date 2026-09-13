@@ -468,7 +468,7 @@ export const Search: React.FC = () => {
           {query && (
             <button
               onClick={handleClear}
-              className="p-1.5 rounded-full hover:bg-white/10 text-gray-400 hover:text-white absolute right-2.5 top-1/2 -translate-y-1/2 transition active:scale-95 cursor-pointer"
+              className="p-1.5 rounded-full hover:bg-white/10 text-gray-400 hover:text-white absolute right-2.5 top-1/2 -translate-y-1/2 cursor-pointer select-none"
               aria-label="Clear search"
             >
               <X className="w-4 h-4" />
@@ -553,7 +553,7 @@ export const Search: React.FC = () => {
       ) : results.length > 0 ? (
         <div className="space-y-6">
           {filteredAndSortedResults.length > 0 ? (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 sm:gap-6 lg:gap-7 py-4 px-1">
+            <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-4 landscape:sm:grid-cols-6 landscape:md:grid-cols-6 lg:grid-cols-6 xl:grid-cols-6 gap-3.5 sm:gap-5 lg:gap-6 py-4 px-1">
               {filteredAndSortedResults.map((item) => (
                 <div key={`${item.media_type || 'item'}-${item.id}`} className="flex justify-center">
                   <MediaCard item={item} />
