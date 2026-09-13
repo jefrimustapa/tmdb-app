@@ -231,21 +231,21 @@ export const Search: React.FC = () => {
     setQuery(val);
 
     if (debounceTimer) clearTimeout(debounceTimer);
-    const t = setTimeout(() => {
-      setSearchParams(val ? { q: val } : {});
-    }, 250);
-    setDebounceTimer(t);
+    if (historyTimerRef.current) clearTimeout(historyTimerRef.current);
 
-    if (historyTimerRef.current) {
-      clearTimeout(historyTimerRef.current);
-    }
     const trimmed = val.trim();
-    if (trimmed) {
-      historyTimerRef.current = setTimeout(() => {
-        const updated = addRecentSearch(trimmed);
-        setRecentSearches(updated);
-      }, 800);
+    if (!trimmed) {
+      setSearchParams({});
+      setResults([]);
+      return;
     }
+
+    const t = setTimeout(() => {
+      setSearchParams({ q: trimmed });
+      const updated = addRecentSearch(trimmed);
+      setRecentSearches(updated);
+    }, 1000);
+    setDebounceTimer(t);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
