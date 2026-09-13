@@ -1938,23 +1938,22 @@ public class MainActivity extends BridgeActivity {
                             "  var isHeaderFocused = !!window.__tmdbHeaderFocused || (header && header.contains(document.activeElement));" +
                             "  if (!isHeaderFocused) return false;" +
                             "  var backBtn = document.getElementById('watch-back-btn');" +
+                            "  var prevBtn = document.getElementById('watch-prev-ep-btn');" +
                             "  var nextBtn = document.getElementById('watch-next-ep-btn');" +
                             "  var trigger = document.getElementById('watch-provider-trigger');" +
                             "  var active = document.activeElement;" +
                             "  if (active === backBtn) {" +
-                            "    if (nextBtn) {" +
-                            "      nextBtn.focus();" +
-                            "    } else if (trigger) {" +
-                            "      trigger.focus();" +
-                            "    }" +
+                            "    if (trigger) { trigger.focus(); } else if (prevBtn) { prevBtn.focus(); } else if (nextBtn) { nextBtn.focus(); }" +
+                            "    window.dispatchEvent(new CustomEvent('tmdb_reset_header_timer'));" +
+                            "    return true;" +
+                            "  } else if (active === prevBtn) {" +
+                            "    if (nextBtn) { nextBtn.focus(); } else if (trigger) { trigger.focus(); }" +
                             "    window.dispatchEvent(new CustomEvent('tmdb_reset_header_timer'));" +
                             "    return true;" +
                             "  } else if (active === nextBtn) {" +
-                            "    if (trigger) {" +
-                            "      trigger.focus();" +
-                            "      window.dispatchEvent(new CustomEvent('tmdb_reset_header_timer'));" +
-                            "      return true;" +
-                            "    }" +
+                            "    if (trigger) { trigger.focus(); }" +
+                            "    window.dispatchEvent(new CustomEvent('tmdb_reset_header_timer'));" +
+                            "    return true;" +
                             "  }" +
                             "  return false;" +
                             "})();",
@@ -1977,23 +1976,54 @@ public class MainActivity extends BridgeActivity {
                             "  var isHeaderFocused = !!window.__tmdbHeaderFocused || (header && header.contains(document.activeElement));" +
                             "  if (!isHeaderFocused) return false;" +
                             "  var backBtn = document.getElementById('watch-back-btn');" +
+                            "  var prevBtn = document.getElementById('watch-prev-ep-btn');" +
                             "  var nextBtn = document.getElementById('watch-next-ep-btn');" +
                             "  var trigger = document.getElementById('watch-provider-trigger');" +
                             "  var active = document.activeElement;" +
                             "  if (active === trigger) {" +
-                            "    if (nextBtn) {" +
-                            "      nextBtn.focus();" +
-                            "    } else if (backBtn) {" +
-                            "      backBtn.focus();" +
-                            "    }" +
+                            "    if (backBtn) { backBtn.focus(); } else if (nextBtn) { nextBtn.focus(); } else if (prevBtn) { prevBtn.focus(); }" +
                             "    window.dispatchEvent(new CustomEvent('tmdb_reset_header_timer'));" +
                             "    return true;" +
                             "  } else if (active === nextBtn) {" +
-                            "    if (backBtn) {" +
-                            "      backBtn.focus();" +
-                            "      window.dispatchEvent(new CustomEvent('tmdb_reset_header_timer'));" +
-                            "      return true;" +
-                            "    }" +
+                            "    if (prevBtn) { prevBtn.focus(); } else if (backBtn) { backBtn.focus(); }" +
+                            "    window.dispatchEvent(new CustomEvent('tmdb_reset_header_timer'));" +
+                            "    return true;" +
+                            "  } else if (active === prevBtn) {" +
+                            "    if (backBtn) { backBtn.focus(); }" +
+                            "    window.dispatchEvent(new CustomEvent('tmdb_reset_header_timer'));" +
+                            "    return true;" +
+                            "  }" +
+                            "  return false;" +
+                            "})();",
+                            null
+                        );
+                        return true;
+                    }
+                    return super.dispatchKeyEvent(event);
+                } else if (keyCode == KeyEvent.KEYCODE_DPAD_UP) {
+                    if (webView != null) {
+                        webView.evaluateJavascript(
+                            "(function() {" +
+                            "  if (window.__tmdbVirtualCursorActive) return false;" +
+                            "  var header = document.querySelector('[data-watch-header=\"true\"]');" +
+                            "  var isHeaderFocused = !!window.__tmdbHeaderFocused || (header && header.contains(document.activeElement));" +
+                            "  if (!isHeaderFocused) return false;" +
+                            "  var backBtn = document.getElementById('watch-back-btn');" +
+                            "  var prevBtn = document.getElementById('watch-prev-ep-btn');" +
+                            "  var nextBtn = document.getElementById('watch-next-ep-btn');" +
+                            "  var trigger = document.getElementById('watch-provider-trigger');" +
+                            "  var active = document.activeElement;" +
+                            "  if (active === prevBtn) {" +
+                            "    if (backBtn) { backBtn.focus(); }" +
+                            "    window.dispatchEvent(new CustomEvent('tmdb_reset_header_timer'));" +
+                            "    return true;" +
+                            "  } else if (active === nextBtn) {" +
+                            "    if (trigger) { trigger.focus(); } else if (backBtn) { backBtn.focus(); }" +
+                            "    window.dispatchEvent(new CustomEvent('tmdb_reset_header_timer'));" +
+                            "    return true;" +
+                            "  } else if (active === backBtn || active === trigger) {" +
+                            "    window.dispatchEvent(new CustomEvent('tmdb_reset_header_timer'));" +
+                            "    return true;" +
                             "  }" +
                             "  return false;" +
                             "})();",
@@ -2082,6 +2112,18 @@ public class MainActivity extends BridgeActivity {
                             "  var header = document.querySelector('[data-watch-header=\"true\"]');" +
                             "  var isHeaderFocused = !!window.__tmdbHeaderFocused || (header && header.contains(document.activeElement));" +
                             "  if (isHeaderFocused) {" +
+                            "    var active = document.activeElement;" +
+                            "    var backBtn = document.getElementById('watch-back-btn');" +
+                            "    var prevBtn = document.getElementById('watch-prev-ep-btn');" +
+                            "    var nextBtn = document.getElementById('watch-next-ep-btn');" +
+                            "    var trigger = document.getElementById('watch-provider-trigger');" +
+                            "    if (active === backBtn) {" +
+                            "      if (prevBtn) { prevBtn.focus(); window.dispatchEvent(new CustomEvent('tmdb_reset_header_timer')); return true; }" +
+                            "      if (nextBtn) { nextBtn.focus(); window.dispatchEvent(new CustomEvent('tmdb_reset_header_timer')); return true; }" +
+                            "    } else if (active === trigger) {" +
+                            "      if (nextBtn) { nextBtn.focus(); window.dispatchEvent(new CustomEvent('tmdb_reset_header_timer')); return true; }" +
+                            "      if (prevBtn) { prevBtn.focus(); window.dispatchEvent(new CustomEvent('tmdb_reset_header_timer')); return true; }" +
+                            "    }" +
                             "    window.dispatchEvent(new CustomEvent('tmdb_hide_header_and_focus_player'));" +
                             "    return true;" +
                             "  }" +

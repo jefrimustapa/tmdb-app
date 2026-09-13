@@ -275,6 +275,8 @@ export const Watch: React.FC = () => {
         e.stopImmediatePropagation();
         if (currentActive === backBtn) {
           if (trigger) trigger.focus();
+          else if (prevBtn) prevBtn.focus();
+          else if (nextBtn) nextBtn.focus();
         } else if (currentActive === prevBtn) {
           if (nextBtn) nextBtn.focus();
           else if (trigger) trigger.focus();
@@ -287,9 +289,9 @@ export const Watch: React.FC = () => {
         e.stopPropagation();
         e.stopImmediatePropagation();
         if (currentActive === trigger) {
-          if (nextBtn) nextBtn.focus();
+          if (backBtn) backBtn.focus();
+          else if (nextBtn) nextBtn.focus();
           else if (prevBtn) prevBtn.focus();
-          else if (backBtn) backBtn.focus();
         } else if (currentActive === nextBtn) {
           if (prevBtn) prevBtn.focus();
           else if (backBtn) backBtn.focus();
@@ -315,19 +317,16 @@ export const Watch: React.FC = () => {
         }
         resetHeaderTimer();
       } else if (e.key === 'ArrowUp') {
-        if (currentActive === prevBtn || currentActive === nextBtn) {
-          e.preventDefault();
-          e.stopPropagation();
-          e.stopImmediatePropagation();
-          if (currentActive === prevBtn && backBtn) {
-            backBtn.focus();
-          } else if (currentActive === nextBtn && trigger) {
-            trigger.focus();
-          } else if (backBtn) {
-            backBtn.focus();
-          }
-          resetHeaderTimer();
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        if (currentActive === prevBtn) {
+          if (backBtn) backBtn.focus();
+        } else if (currentActive === nextBtn) {
+          if (trigger) trigger.focus();
+          else if (backBtn) backBtn.focus();
         }
+        resetHeaderTimer();
       }
     };
 
