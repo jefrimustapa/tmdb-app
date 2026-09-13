@@ -58,7 +58,7 @@ export const Navbar: React.FC = () => {
           <Logo size={isMobile ? 'sm' : 'md'} />
 
           {/* Desktop/TV Navigation Links */}
-          <nav className="hidden md:flex items-center gap-1">
+          <nav className="hidden md:flex items-center gap-1 rounded-xl p-1">
             {navLinks.map((link) => {
               const isActive = location.pathname === link.path;
               return (
