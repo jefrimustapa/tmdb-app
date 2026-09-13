@@ -2,12 +2,13 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20260913-1134';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-autoplay-next-e.20260913-1134';
+export const APP_BUILD_NUMBER = '20260913-1148';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.fix-tv-upnext-popup-.20260913-1148';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
-export const APP_BRANCH = 'feat-autoplay-next-e';
-export const APP_CHANGELOG = `* fix(cinesrc): refine landscape settings and server menus and hide fullscreen button (#88)
+export const APP_BRANCH = 'fix-tv-upnext-popup-';
+export const APP_CHANGELOG = `* feat(settings): update autoplay next episode threshold to 96-104% and countdown to 20-80s (#89)
+* fix(cinesrc): refine landscape settings and server menus and hide fullscreen button (#88)
 * feat(search): compact mobile search box, scroll to top on mount, and 1s unified debounce (#87)
 * feat(details): circular 2nd row action buttons with unified cyan ring on mobile (#86)
 * fixed the settings menu (#85)
@@ -20,5 +21,4 @@ export const APP_CHANGELOG = `* fix(cinesrc): refine landscape settings and serv
 * fix(ui): remove horizontal scroll snapping for title cards in mobile mode (#78)
 * fix(player): bypass vidsrc in-app browser restrictions and add vidsrc-kdrama provider (#77)
 * fix(player): add KissKH timeout failover and customizable resolver timeout setting (#76)
-* fix(filter): map romance genre to keywords in TV series discover (#75)
-* fix(watch): unhide top header on mouse hover in TV mode (#74)`;
+* fix(filter): map romance genre to keywords in TV series discover (#75)`;
