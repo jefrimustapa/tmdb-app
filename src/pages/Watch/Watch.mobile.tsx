@@ -4,10 +4,12 @@ import { tmdbApi } from '../../services/tmdb';
 import type { TMDBMovieDetails, TMDBTVDetails, TMDBSeasonDetails } from '../../types/tmdb';
 import { VideoPlayer } from '../../components/player/VideoPlayer';
 import { ProviderPickerMobile } from '../../components/player/ProviderPickerMobile';
+import { SubtitlePickerModal } from '../../components/player/SubtitlePickerModal';
+import { searchSubtitles, fetchAndParseSubtitle, type SubtitleTrack, type SubtitleCue } from '../../services/subtitleService';
 import { dbService } from '../../services/db';
 import { isAnimeMedia } from '../../services/animeMappingService';
 import { isAseanMedia, isKoreanMedia } from '../../services/lariMappingService';
-import { ArrowLeft, SkipForward, SkipBack, Cast, Tv, X } from 'lucide-react';
+import { ArrowLeft, SkipForward, SkipBack, Cast, Tv, X, Subtitles } from 'lucide-react';
 
 export const Watch: React.FC = () => {
   const { type, id } = useParams<{ type: 'movie' | 'tv'; id: string }>();
@@ -98,6 +100,60 @@ export const Watch: React.FC = () => {
   const [headerTimeoutSeconds, setHeaderTimeoutSeconds] = useState(5);
   const [isPortrait, setIsPortrait] = useState(() => window.innerHeight > window.innerWidth);
   const hideTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Custom Subtitle State
+  const [isSubtitleModalOpen, setIsSubtitleModalOpen] = useState(false);
+  const [subtitleTracks, setSubtitleTracks] = useState<SubtitleTrack[]>([]);
+  const [activeSubtitleTrackId, setActiveSubtitleTrackId] = useState<string | null>(null);
+  const [customSubtitleCues, setCustomSubtitleCues] = useState<SubtitleCue[]>([]);
+  const [customSubtitleOffset, setCustomSubtitleOffset] = useState<number>(0);
+  const [isSubtitlesLoading, setIsSubtitlesLoading] = useState(false);
+
+  // Load available subtitles whenever media/episode changes
+  useEffect(() => {
+    if (!tmdbId) return;
+    let isMounted = true;
+    setIsSubtitlesLoading(true);
+    setSubtitleTracks([]);
+    setActiveSubtitleTrackId(null);
+    setCustomSubtitleCues([]);
+
+    searchSubtitles(tmdbId, mediaType, seasonParam, episodeParam)
+      .then((tracks) => {
+        if (!isMounted) return;
+        setSubtitleTracks(tracks);
+      })
+      .catch((err) => {
+        console.warn('[Watch.mobile] Failed to search subtitles:', err);
+      })
+      .finally(() => {
+        if (isMounted) setIsSubtitlesLoading(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [tmdbId, mediaType, seasonParam, episodeParam]);
+
+  // Handle selecting or disabling subtitle track
+  const handleSelectSubtitleTrack = useCallback(async (track: SubtitleTrack | null) => {
+    if (!track) {
+      setActiveSubtitleTrackId(null);
+      setCustomSubtitleCues([]);
+      return;
+    }
+
+    setActiveSubtitleTrackId(track.id);
+    setIsSubtitlesLoading(true);
+    try {
+      const cues = await fetchAndParseSubtitle(track.url);
+      setCustomSubtitleCues(cues);
+    } catch (err) {
+      console.error('[Watch.mobile] Failed to load subtitle cues:', err);
+    } finally {
+      setIsSubtitlesLoading(false);
+    }
+  }, []);
 
   // Dynamically track portrait vs landscape across orientation changes and window resizes
   useEffect(() => {
@@ -452,7 +508,7 @@ export const Watch: React.FC = () => {
               </h1>
             </div>
 
-            {/* Right: Cast Button + Quick Provider Switcher Dropdown */}
+            {/* Right: Cast Button + CC Subtitle Button + Quick Provider Switcher Dropdown */}
             <div className="flex items-center gap-2 flex-shrink-0">
               <button
                 type="button"
@@ -465,7 +521,7 @@ export const Watch: React.FC = () => {
                 onKeyDown={(e) => {
                   if (e.key === 'ArrowRight') {
                     e.preventDefault();
-                    document.getElementById('watch-provider-trigger')?.focus();
+                    document.getElementById('watch-subtitles-btn')?.focus();
                   } else if (e.key === 'ArrowLeft') {
                     e.preventDefault();
                     document.getElementById('watch-back-btn')?.focus();
@@ -474,6 +530,32 @@ export const Watch: React.FC = () => {
                 className="p-2 rounded-full bg-black/60 hover:bg-black/90 text-white/90 hover:text-white border border-white/15 transition active:scale-95 hover:scale-105 flex-shrink-0 tv-focus-target focus:outline-none focus:border-hbo-cyan focus:ring-2 focus:ring-hbo-cyan shadow-sm cursor-pointer"
               >
                 <Cast className="w-4 h-4 sm:w-5 sm:h-5 text-hbo-cyan/90 hover:text-hbo-cyan" />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsSubtitleModalOpen(true)}
+                id="watch-subtitles-btn"
+                data-watch-header-item="true"
+                aria-label="Subtitles"
+                title="Subtitles & Closed Captions"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'ArrowRight') {
+                    e.preventDefault();
+                    document.getElementById('watch-provider-trigger')?.focus();
+                  } else if (e.key === 'ArrowLeft') {
+                    e.preventDefault();
+                    document.getElementById('watch-cast-btn')?.focus();
+                  }
+                }}
+                className={`p-2 rounded-full border transition active:scale-95 hover:scale-105 flex-shrink-0 tv-focus-target focus:outline-none focus:border-hbo-cyan focus:ring-2 focus:ring-hbo-cyan shadow-sm cursor-pointer ${
+                  activeSubtitleTrackId
+                    ? 'bg-hbo-cyan/20 border-hbo-cyan text-hbo-cyan shadow-hbo-glow'
+                    : 'bg-black/60 hover:bg-black/90 text-white/90 hover:text-white border-white/15'
+                }`}
+              >
+                <Subtitles className={`w-4 h-4 sm:w-5 sm:h-5 ${activeSubtitleTrackId ? 'text-hbo-cyan' : 'text-white/90 hover:text-white'}`} />
               </button>
 
               {enabledResolvers.includes('embed') ? (
@@ -601,9 +683,24 @@ export const Watch: React.FC = () => {
             }}
             nextEpisodeInfo={nextEpisodeInfo}
             onNextEpisode={handleNextEpisode}
+            customSubtitleCues={customSubtitleCues}
+            customSubtitleOffset={customSubtitleOffset}
+            customSubtitleEnabled={Boolean(activeSubtitleTrackId && customSubtitleCues.length > 0)}
           />
         </div>
       </div>
+
+      {/* Custom Subtitle Picker & Sync Modal */}
+      <SubtitlePickerModal
+        isOpen={isSubtitleModalOpen}
+        onClose={() => setIsSubtitleModalOpen(false)}
+        tracks={subtitleTracks}
+        activeTrackId={activeSubtitleTrackId}
+        onSelectTrack={handleSelectSubtitleTrack}
+        syncOffset={customSubtitleOffset}
+        onAdjustSync={(newOffset) => setCustomSubtitleOffset(newOffset)}
+        isLoading={isSubtitlesLoading}
+      />
 
       {/* Cast Selection Modal */}
       {showCastMenu && (

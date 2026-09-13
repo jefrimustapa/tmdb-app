@@ -4,11 +4,13 @@ import { tmdbApi } from '../../services/tmdb';
 import type { TMDBMovieDetails, TMDBTVDetails, TMDBSeasonDetails } from '../../types/tmdb';
 import { VideoPlayer } from '../../components/player/VideoPlayer';
 import { ProviderPickerTV } from '../../components/player/ProviderPickerTV';
+import { SubtitlePickerModal } from '../../components/player/SubtitlePickerModal';
 import { TVVirtualCursor } from '../../components/player/TVVirtualCursor';
+import { searchSubtitles, fetchAndParseSubtitle, type SubtitleTrack, type SubtitleCue } from '../../services/subtitleService';
 import { dbService } from '../../services/db';
 import { isAnimeMedia } from '../../services/animeMappingService';
 import { isAseanMedia, isKoreanMedia } from '../../services/lariMappingService';
-import { ArrowLeft, SkipForward, SkipBack } from 'lucide-react';
+import { ArrowLeft, SkipForward, SkipBack, Subtitles } from 'lucide-react';
 
 import type { VirtualCursorStyle } from '../../types/db';
 
@@ -56,6 +58,60 @@ export const Watch: React.FC = () => {
   const [headerVisible, setHeaderVisible] = useState(true);
   const [headerTimeoutSeconds, setHeaderTimeoutSeconds] = useState(5);
   const headerTimeoutRef = React.useRef(5);
+
+  // Custom Subtitle State
+  const [isSubtitleModalOpen, setIsSubtitleModalOpen] = useState(false);
+  const [subtitleTracks, setSubtitleTracks] = useState<SubtitleTrack[]>([]);
+  const [activeSubtitleTrackId, setActiveSubtitleTrackId] = useState<string | null>(null);
+  const [customSubtitleCues, setCustomSubtitleCues] = useState<SubtitleCue[]>([]);
+  const [customSubtitleOffset, setCustomSubtitleOffset] = useState<number>(0);
+  const [isSubtitlesLoading, setIsSubtitlesLoading] = useState(false);
+
+  // Load available subtitles whenever media/episode changes
+  useEffect(() => {
+    if (!tmdbId) return;
+    let isMounted = true;
+    setIsSubtitlesLoading(true);
+    setSubtitleTracks([]);
+    setActiveSubtitleTrackId(null);
+    setCustomSubtitleCues([]);
+
+    searchSubtitles(tmdbId, mediaType, seasonParam, episodeParam)
+      .then((tracks) => {
+        if (!isMounted) return;
+        setSubtitleTracks(tracks);
+      })
+      .catch((err) => {
+        console.warn('[Watch.tv] Failed to search subtitles:', err);
+      })
+      .finally(() => {
+        if (isMounted) setIsSubtitlesLoading(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [tmdbId, mediaType, seasonParam, episodeParam]);
+
+  // Handle selecting or disabling subtitle track
+  const handleSelectSubtitleTrack = useCallback(async (track: SubtitleTrack | null) => {
+    if (!track) {
+      setActiveSubtitleTrackId(null);
+      setCustomSubtitleCues([]);
+      return;
+    }
+
+    setActiveSubtitleTrackId(track.id);
+    setIsSubtitlesLoading(true);
+    try {
+      const cues = await fetchAndParseSubtitle(track.url);
+      setCustomSubtitleCues(cues);
+    } catch (err) {
+      console.error('[Watch.tv] Failed to load subtitle cues:', err);
+    } finally {
+      setIsSubtitlesLoading(false);
+    }
+  }, []);
   const [isPortrait, setIsPortrait] = useState(() => window.innerHeight > window.innerWidth);
   const hideTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -259,12 +315,14 @@ export const Watch: React.FC = () => {
       const backBtn = document.getElementById('watch-back-btn');
       const prevBtn = document.getElementById('watch-prev-ep-btn');
       const nextBtn = document.getElementById('watch-next-ep-btn');
+      const subBtn = document.getElementById('watch-subtitles-btn');
       const trigger = document.getElementById('watch-provider-trigger');
 
       const currentActive = document.activeElement;
       const isHeaderActive = currentActive === backBtn || 
                              currentActive === prevBtn || 
                              currentActive === nextBtn || 
+                             currentActive === subBtn ||
                              currentActive === trigger;
 
       if (!isHeaderActive) return;
@@ -274,14 +332,20 @@ export const Watch: React.FC = () => {
         e.stopPropagation();
         e.stopImmediatePropagation();
         if (currentActive === backBtn) {
-          if (trigger) trigger.focus();
+          if (subBtn) subBtn.focus();
+          else if (trigger) trigger.focus();
           else if (prevBtn) prevBtn.focus();
+          else if (nextBtn) nextBtn.focus();
+        } else if (currentActive === subBtn) {
+          if (trigger) trigger.focus();
           else if (nextBtn) nextBtn.focus();
         } else if (currentActive === prevBtn) {
           if (nextBtn) nextBtn.focus();
+          else if (subBtn) subBtn.focus();
           else if (trigger) trigger.focus();
         } else if (currentActive === nextBtn) {
-          if (trigger) trigger.focus();
+          if (subBtn) subBtn.focus();
+          else if (trigger) trigger.focus();
         }
         resetHeaderTimer();
       } else if (e.key === 'ArrowLeft') {
@@ -289,9 +353,13 @@ export const Watch: React.FC = () => {
         e.stopPropagation();
         e.stopImmediatePropagation();
         if (currentActive === trigger) {
-          if (backBtn) backBtn.focus();
+          if (subBtn) subBtn.focus();
+          else if (backBtn) backBtn.focus();
           else if (nextBtn) nextBtn.focus();
           else if (prevBtn) prevBtn.focus();
+        } else if (currentActive === subBtn) {
+          if (backBtn) backBtn.focus();
+          else if (nextBtn) nextBtn.focus();
         } else if (currentActive === nextBtn) {
           if (prevBtn) prevBtn.focus();
           else if (backBtn) backBtn.focus();
@@ -307,7 +375,7 @@ export const Watch: React.FC = () => {
           if (prevBtn) prevBtn.focus();
           else if (nextBtn) nextBtn.focus();
           else window.dispatchEvent(new CustomEvent('tmdb_hide_header_and_focus_player'));
-        } else if (currentActive === trigger) {
+        } else if (currentActive === subBtn || currentActive === trigger) {
           if (nextBtn) nextBtn.focus();
           else if (prevBtn) prevBtn.focus();
           else window.dispatchEvent(new CustomEvent('tmdb_hide_header_and_focus_player'));
@@ -597,8 +665,25 @@ export const Watch: React.FC = () => {
               </h1>
             </div>
 
-            {/* Right: Quick Provider Switcher Dropdown */}
+            {/* Right: Subtitles Button + Quick Provider Switcher Dropdown */}
             <div className="flex items-center gap-2 flex-shrink-0">
+              <button
+                type="button"
+                onClick={() => setIsSubtitleModalOpen(true)}
+                id="watch-subtitles-btn"
+                data-watch-header-item="true"
+                aria-label="Subtitles"
+                title="Subtitles & Closed Captions"
+                tabIndex={0}
+                className={`p-2.5 rounded-full border backdrop-blur-md transition hover:scale-110 flex-shrink-0 tv-focus-target focus:outline-none focus:border-hbo-cyan focus:ring-2 focus:ring-hbo-cyan cursor-pointer ${
+                  activeSubtitleTrackId
+                    ? 'bg-hbo-cyan/20 border-hbo-cyan text-hbo-cyan shadow-hbo-glow'
+                    : 'bg-black/70 hover:bg-black text-white border-white/20'
+                }`}
+              >
+                <Subtitles className={`w-5 h-5 ${activeSubtitleTrackId ? 'text-hbo-cyan' : 'text-white'}`} />
+              </button>
+
               {enabledResolvers.includes('embed') ? (
                 <ProviderPickerTV
                   currentProviderId={providerId}
@@ -740,8 +825,23 @@ export const Watch: React.FC = () => {
             }}
             nextEpisodeInfo={nextEpisodeInfo}
             onNextEpisode={handleNextEpisode}
+            customSubtitleCues={customSubtitleCues}
+            customSubtitleOffset={customSubtitleOffset}
+            customSubtitleEnabled={Boolean(activeSubtitleTrackId && customSubtitleCues.length > 0)}
           />
         </div>
+
+        {/* Custom Subtitle Picker & Sync Modal */}
+        <SubtitlePickerModal
+          isOpen={isSubtitleModalOpen}
+          onClose={() => setIsSubtitleModalOpen(false)}
+          tracks={subtitleTracks}
+          activeTrackId={activeSubtitleTrackId}
+          onSelectTrack={handleSelectSubtitleTrack}
+          syncOffset={customSubtitleOffset}
+          onAdjustSync={(newOffset) => setCustomSubtitleOffset(newOffset)}
+          isLoading={isSubtitlesLoading}
+        />
 
         {/* TV Virtual On-Demand Cursor */}
         <TVVirtualCursor
