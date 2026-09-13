@@ -67,7 +67,7 @@ export const EpisodeGrid: React.FC<EpisodeGridProps> = ({
   }, [tvDetails.id, selectedSeason]);
 
   return (
-    <div className="mt-8 bg-hbo-card/80 border border-hbo-border/70 rounded-2xl p-4 sm:p-6 lg:p-7 shadow-xl">
+    <div data-episode-grid="true" className="mt-8 bg-hbo-card/80 border border-hbo-border/70 rounded-2xl p-4 sm:p-6 lg:p-7 shadow-xl">
       {/* Season Selector Tabs */}
       <div className="flex items-center justify-between gap-4 mb-6 flex-wrap">
         <h3 className="text-lg sm:text-xl font-bold font-display text-white flex items-center gap-2">
