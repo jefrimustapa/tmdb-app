@@ -549,24 +549,30 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     }
 
     const effectiveDuration = totalDurationSec > 0 ? totalDurationSec : durationRef.current;
-    const progressPercent = effectiveDuration > 0
-      ? Math.min(100, Math.round((currentSec / effectiveDuration) * 100))
+    const unclampedProgressPercent = effectiveDuration > 0
+      ? Math.round((currentSec / effectiveDuration) * 100)
       : 0;
+    const progressPercent = Math.min(100, Math.max(0, unclampedProgressPercent));
     const now = Date.now();
 
-    // Check for Up Next trigger on TV Series (>= configured % or within last 75 seconds) when Auto-Play is enabled
-    const targetPercent = upNextTriggerPercentRef.current || 90;
+    // Check for Up Next trigger on TV Series when Auto-Play is enabled
+    // Triggers when reaching configured % (96%-104%) or when video has ended (force === true)
+    const targetPercent = upNextTriggerPercentRef.current || 96;
+    const isAtOrPastTarget = unclampedProgressPercent >= targetPercent;
+    const isNearEnd = totalDurationSec > 120 && (totalDurationSec - currentSec <= 75) && targetPercent <= 100;
+    const isEnded = force && effectiveDuration > 0 && currentSec >= (effectiveDuration * 0.95);
+
     if (
       autoplayNextEnabledRef.current &&
       mediaType === 'tv' &&
       nextEpisodeInfoRef.current &&
       !showUpNextRef.current &&
       !dismissedUpNextRef.current &&
-      (progressPercent >= targetPercent || (totalDurationSec > 120 && totalDurationSec - currentSec <= 75))
+      (isAtOrPastTarget || isNearEnd || isEnded)
     ) {
       showUpNextRef.current = true;
       setShowUpNext(true);
-      setCountdown(upNextTimeoutRef.current || 10);
+      setCountdown(upNextTimeoutRef.current || 20);
       setTimeout(() => {
         const upNextBtn = document.getElementById('up-next-play-btn');
         if (upNextBtn && (window as any).__tmdbHeaderFocused !== true) {
@@ -1412,7 +1418,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             }
             if (mediaType === 'tv' && nextEpisodeInfo) {
               setShowUpNext(true);
-              setCountdown(10);
+              setCountdown(upNextTimeoutRef.current || 20);
               setTimeout(() => {
                 const upNextBtn = document.getElementById('up-next-play-btn');
                 if (upNextBtn && (window as any).__tmdbHeaderFocused !== true) {

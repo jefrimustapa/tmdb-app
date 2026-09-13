@@ -2,12 +2,14 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20260913-0338';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-improve-search-.20260913-0338';
+export const APP_BUILD_NUMBER = '20260913-1134';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-autoplay-next-e.20260913-1134';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
-export const APP_BRANCH = 'feat-improve-search-';
-export const APP_CHANGELOG = `* feat(details): circular 2nd row action buttons with unified cyan ring on mobile (#86)
+export const APP_BRANCH = 'feat-autoplay-next-e';
+export const APP_CHANGELOG = `* fix(cinesrc): refine landscape settings and server menus and hide fullscreen button (#88)
+* feat(search): compact mobile search box, scroll to top on mount, and 1s unified debounce (#87)
+* feat(details): circular 2nd row action buttons with unified cyan ring on mobile (#86)
 * fixed the settings menu (#85)
 * feat(watch): add Google Cast and screen mirror options to mobile watch page (#84)
 * fix(ui): resolve intermittent horizontal touch scroll freezing on media cards and rails (#83)
@@ -19,6 +21,4 @@ export const APP_CHANGELOG = `* feat(details): circular 2nd row action buttons w
 * fix(player): bypass vidsrc in-app browser restrictions and add vidsrc-kdrama provider (#77)
 * fix(player): add KissKH timeout failover and customizable resolver timeout setting (#76)
 * fix(filter): map romance genre to keywords in TV series discover (#75)
-* fix(watch): unhide top header on mouse hover in TV mode (#74)
-* perf(player): improve LARI21 performance, add progress status, and rename mapping service (#73)
-* feat(storage): make watch history, settings, watchlist and likes persistent across app uninstalls (#72)`;
+* fix(watch): unhide top header on mouse hover in TV mode (#74)`;

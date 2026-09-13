@@ -405,19 +405,18 @@ export const Settings: React.FC = () => {
                           <span>Trigger Timing (% of Episode)</span>
                         </span>
                         <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-hbo-dark border border-hbo-border text-hbo-cyan font-bold">
-                          {settings.upNextTriggerPercent || 90}% Progress
+                          {settings.upNextTriggerPercent || 96}% Progress
                         </span>
                       </div>
-                      <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5">
+                      <div className="grid grid-cols-5 gap-1.5">
                         {[
-                          { percent: 90, label: '90%', desc: 'Default' },
-                          { percent: 92, label: '92%', desc: 'Late' },
-                          { percent: 94, label: '94%', desc: 'Near End' },
                           { percent: 96, label: '96%', desc: 'Credits' },
-                          { percent: 98, label: '98%', desc: 'Final' },
-                          { percent: 100, label: '100%', desc: 'Finish' },
+                          { percent: 98, label: '98%', desc: 'Late' },
+                          { percent: 100, label: '100%', desc: 'End' },
+                          { percent: 102, label: '102%', desc: 'Outro' },
+                          { percent: 104, label: '104%', desc: 'Max' },
                         ].map((opt) => {
-                          const isSelected = (settings.upNextTriggerPercent || 90) === opt.percent;
+                          const isSelected = (settings.upNextTriggerPercent || 96) === opt.percent;
                           return (
                             <button
                               key={opt.percent}
@@ -447,17 +446,17 @@ export const Settings: React.FC = () => {
                           <span>Countdown Duration</span>
                         </span>
                         <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-hbo-dark border border-hbo-border text-hbo-cyan font-bold">
-                          {settings.upNextTimeout || 10} Seconds
+                          {settings.upNextTimeout || 20} Seconds
                         </span>
                       </div>
                       <div className="grid grid-cols-4 gap-1.5">
                         {[
-                          { seconds: 5, label: '5s', desc: 'Fast' },
-                          { seconds: 10, label: '10s', desc: 'Default' },
-                          { seconds: 15, label: '15s', desc: 'Relaxed' },
-                          { seconds: 20, label: '20s', desc: 'Extended' },
+                          { seconds: 20, label: '20s', desc: 'Standard' },
+                          { seconds: 40, label: '40s', desc: 'Medium' },
+                          { seconds: 60, label: '60s', desc: 'Relaxed' },
+                          { seconds: 80, label: '80s', desc: 'Extended' },
                         ].map((opt) => {
-                          const isSelected = (settings.upNextTimeout || 10) === opt.seconds;
+                          const isSelected = (settings.upNextTimeout || 20) === opt.seconds;
                           return (
                             <button
                               key={opt.seconds}
