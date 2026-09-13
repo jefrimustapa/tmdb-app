@@ -2,12 +2,13 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20260913-1439';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.fix-tv-details-navig.20260913-1439';
+export const APP_BUILD_NUMBER = '20260913-1447';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-fuzzy-search-im.20260913-1447';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
-export const APP_BRANCH = 'fix-tv-details-navig';
-export const APP_CHANGELOG = `* feat(tv): align search debounce with mobile and fix clear button vertical centering (#94)
+export const APP_BRANCH = 'feat-fuzzy-search-im';
+export const APP_CHANGELOG = `* fix(tv): fix vertical and horizontal navigation on details page (#95)
+* feat(tv): align search debounce with mobile and fix clear button vertical centering (#94)
 * fix(tv): enable play/pause toggle with d-pad center/ok button for cinesrc provider (#93)
 * fix(tv): eliminate navigation delay between sidebar home and hero banner and optimize D-pad responsiveness (#92)
 * fix(tv): synchronize 2D spatial D-Pad navigation for watch page header (#91)
@@ -20,5 +21,4 @@ export const APP_CHANGELOG = `* feat(tv): align search debounce with mobile and 
 * feat(watch): add Google Cast and screen mirror options to mobile watch page (#84)
 * fix(ui): resolve intermittent horizontal touch scroll freezing on media cards and rails (#83)
 * perf(watch): optimize watch page rendering, TV cursor navigation and remote back focus (#82)
-* feat(details): add deep link sharing and restyle action buttons with unified focus and selection (#81)
-* feat(player): improve Dramacool tracking, multi-server extraction, and slug matching (#80)`;
+* feat(details): add deep link sharing and restyle action buttons with unified focus and selection (#81)`;
