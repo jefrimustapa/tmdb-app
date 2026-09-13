@@ -140,25 +140,32 @@ export const Search: React.FC = () => {
           return [...prev, ...newItems];
         });
       } else {
-        // targetType === 'title'
-        const multiRes = await tmdbApi.searchMulti(trimmed, pageNum);
-        const rawResults = multiRes.results || [];
-        const titleResults: TMDBMediaItem[] = [];
+        // targetType === 'title': Search movies and TV shows in parallel to prevent 'person' entities from crowding out titles
+        const [movieRes, tvRes] = await Promise.allSettled([
+          tmdbApi.searchMovies(trimmed, pageNum),
+          tmdbApi.searchTV(trimmed, pageNum)
+        ]);
 
-        for (const item of rawResults) {
-          if (item.media_type === 'movie' || item.media_type === 'tv') {
-            titleResults.push({
-              ...item,
-              media_type: item.media_type || (item.title ? 'movie' : 'tv')
-            });
-          }
+        const titleItems: TMDBMediaItem[] = [];
+        let maxPages = 1;
+
+        if (movieRes.status === 'fulfilled' && movieRes.value?.results) {
+          titleItems.push(...movieRes.value.results.map((m) => ({ ...m, media_type: 'movie' as const })));
+          maxPages = Math.max(maxPages, movieRes.value.total_pages || 1);
+        }
+        if (tvRes.status === 'fulfilled' && tvRes.value?.results) {
+          titleItems.push(...tvRes.value.results.map((t) => ({ ...t, media_type: 'tv' as const })));
+          maxPages = Math.max(maxPages, tvRes.value.total_pages || 1);
         }
 
-        setTotalPages(multiRes.total_pages || 1);
+        const sorted = titleItems.sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
+        const unique = Array.from(new Map(sorted.map((item) => [item.id, item])).values());
+
+        setTotalPages(maxPages);
         setResults((prev) => {
-          if (!append) return titleResults;
+          if (!append) return unique;
           const existingIds = new Set(prev.map((i) => i.id));
-          const newItems = titleResults.filter((i) => !existingIds.has(i.id));
+          const newItems = unique.filter((i) => !existingIds.has(i.id));
           return [...prev, ...newItems];
         });
       }
