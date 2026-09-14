@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Subtitles, Check, X, Clock, Plus, Minus, RotateCcw, AlertCircle, Loader2 } from 'lucide-react';
 import { SubtitleTrack } from '../../services/subtitleService';
 
@@ -24,6 +24,96 @@ export const SubtitlePickerModal: React.FC<SubtitlePickerModalProps> = ({
   isLoading = false
 }) => {
   const [filterLang, setFilterLang] = useState<'all' | 'ms' | 'en'>('all');
+  const modalRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!isOpen) {
+      try {
+        (window as any).AndroidBridge?.setModalOpen(false);
+      } catch (e) {}
+      return;
+    }
+
+    try {
+      (window as any).AndroidBridge?.setModalOpen(true);
+    } catch (e) {}
+
+    // Spatial D-Pad navigation inside the modal for Android TV
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' || e.key === 'Back' || e.keyCode === 27) {
+        e.preventDefault();
+        e.stopPropagation();
+        onClose();
+        return;
+      }
+
+      if (!modalRef.current) return;
+      const focusables = Array.from(
+        modalRef.current.querySelectorAll<HTMLElement>('button:not([disabled]), .tv-focus-target')
+      ).filter((el) => el.offsetParent !== null);
+
+      if (focusables.length === 0) return;
+
+      const currentIndex = focusables.indexOf(document.activeElement as HTMLElement);
+
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        e.stopPropagation();
+        const nextIndex = currentIndex < focusables.length - 1 ? currentIndex + 1 : 0;
+        focusables[nextIndex].focus();
+        focusables[nextIndex].scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        e.stopPropagation();
+        const prevIndex = currentIndex > 0 ? currentIndex - 1 : focusables.length - 1;
+        focusables[prevIndex].focus();
+        focusables[prevIndex].scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      } else if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+        // Allow left/right to move through tabs or sync controls smoothly
+        if (currentIndex !== -1) {
+          const delta = e.key === 'ArrowRight' ? 1 : -1;
+          const targetIndex = currentIndex + delta;
+          if (targetIndex >= 0 && targetIndex < focusables.length) {
+            e.preventDefault();
+            e.stopPropagation();
+            focusables[targetIndex].focus();
+            focusables[targetIndex].scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+          }
+        }
+      }
+    };
+
+    const handleCloseDialogEvent = () => {
+      onClose();
+    };
+
+    window.addEventListener('keydown', handleKeyDown, true);
+    window.addEventListener('tmdb_close_dialog', handleCloseDialogEvent);
+
+    // Auto-focus the active track or first focusable button inside modal on TV
+    const timer = setTimeout(() => {
+      if (!modalRef.current) return;
+      const activeBtn = modalRef.current.querySelector<HTMLElement>('[data-selected-track="true"]');
+      if (activeBtn) {
+        activeBtn.focus();
+        activeBtn.scrollIntoView({ block: 'nearest' });
+        return;
+      }
+      const firstFocusable = modalRef.current.querySelector<HTMLElement>('.tv-focus-target, button');
+      if (firstFocusable) {
+        firstFocusable.focus();
+      }
+    }, 100);
+
+    return () => {
+      clearTimeout(timer);
+      try {
+        (window as any).AndroidBridge?.setModalOpen(false);
+      } catch (e) {}
+      window.removeEventListener('keydown', handleKeyDown, true);
+      window.removeEventListener('tmdb_close_dialog', handleCloseDialogEvent);
+    };
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
@@ -35,6 +125,7 @@ export const SubtitlePickerModal: React.FC<SubtitlePickerModalProps> = ({
 
   return (
     <div
+      ref={modalRef}
       role="dialog"
       aria-modal="true"
       aria-label="Subtitles & Audio Settings"
@@ -63,7 +154,8 @@ export const SubtitlePickerModal: React.FC<SubtitlePickerModalProps> = ({
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="p-1.5 rounded-full bg-white/5 hover:bg-white/15 text-gray-300 hover:text-white transition cursor-pointer"
+            data-close-dialog="true"
+            className="p-1.5 rounded-full bg-white/5 hover:bg-white/15 text-gray-300 hover:text-white transition cursor-pointer tv-focus-target focus:outline-none focus:ring-2 focus:ring-hbo-cyan"
           >
             <X className="w-5 h-5" />
           </button>
@@ -117,7 +209,7 @@ export const SubtitlePickerModal: React.FC<SubtitlePickerModalProps> = ({
           <button
             type="button"
             onClick={() => setFilterLang('all')}
-            className={`px-3 py-1.5 rounded-lg font-semibold transition ${
+            className={`px-3 py-1.5 rounded-lg font-semibold transition tv-focus-target focus:outline-none focus:ring-2 focus:ring-hbo-cyan ${
               filterLang === 'all'
                 ? 'bg-hbo-cyan/20 text-hbo-cyan border border-hbo-cyan/40'
                 : 'bg-white/5 text-gray-400 hover:text-white'
@@ -128,7 +220,7 @@ export const SubtitlePickerModal: React.FC<SubtitlePickerModalProps> = ({
           <button
             type="button"
             onClick={() => setFilterLang('ms')}
-            className={`px-3 py-1.5 rounded-lg font-semibold transition ${
+            className={`px-3 py-1.5 rounded-lg font-semibold transition tv-focus-target focus:outline-none focus:ring-2 focus:ring-hbo-cyan ${
               filterLang === 'ms'
                 ? 'bg-hbo-cyan/20 text-hbo-cyan border border-hbo-cyan/40'
                 : 'bg-white/5 text-gray-400 hover:text-white'
@@ -139,7 +231,7 @@ export const SubtitlePickerModal: React.FC<SubtitlePickerModalProps> = ({
           <button
             type="button"
             onClick={() => setFilterLang('en')}
-            className={`px-3 py-1.5 rounded-lg font-semibold transition ${
+            className={`px-3 py-1.5 rounded-lg font-semibold transition tv-focus-target focus:outline-none focus:ring-2 focus:ring-hbo-cyan ${
               filterLang === 'en'
                 ? 'bg-hbo-cyan/20 text-hbo-cyan border border-hbo-cyan/40'
                 : 'bg-white/5 text-gray-400 hover:text-white'
@@ -154,11 +246,12 @@ export const SubtitlePickerModal: React.FC<SubtitlePickerModalProps> = ({
           {/* Option: Off / Disable */}
           <button
             type="button"
+            data-selected-track={activeTrackId === null ? 'true' : undefined}
             onClick={() => {
               onSelectTrack(null);
               onClose();
             }}
-            className={`w-full flex items-center justify-between p-3 rounded-xl text-left border transition cursor-pointer ${
+            className={`w-full flex items-center justify-between p-3 rounded-xl text-left border transition cursor-pointer tv-focus-target focus:outline-none focus:border-hbo-cyan focus:ring-2 focus:ring-hbo-cyan ${
               activeTrackId === null
                 ? 'bg-hbo-purple/25 border-hbo-cyan/50 text-white shadow-hbo-glow'
                 : 'bg-white/5 hover:bg-white/10 border-white/5 text-gray-300'
@@ -198,11 +291,12 @@ export const SubtitlePickerModal: React.FC<SubtitlePickerModalProps> = ({
                 <button
                   key={track.id}
                   type="button"
+                  data-selected-track={isSelected ? 'true' : undefined}
                   onClick={() => {
                     onSelectTrack(track);
                     onClose();
                   }}
-                  className={`w-full flex items-center justify-between p-3 rounded-xl text-left border transition cursor-pointer group ${
+                  className={`w-full flex items-center justify-between p-3 rounded-xl text-left border transition cursor-pointer group tv-focus-target focus:outline-none focus:border-hbo-cyan focus:ring-2 focus:ring-hbo-cyan ${
                     isSelected
                       ? 'bg-hbo-purple/25 border-hbo-cyan/50 text-white shadow-hbo-glow'
                       : 'bg-white/5 hover:bg-white/10 border-white/5 text-gray-300'

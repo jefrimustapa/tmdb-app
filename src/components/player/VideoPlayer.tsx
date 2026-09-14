@@ -157,6 +157,14 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const durationRef = useRef<number>(0);
   const hasSeekedInitialRef = useRef(false);
   const isPlayingRef = useRef(true); // Default to true once media starts loading
+  const lastStateUpdateTimeRef = useRef<number>(0);
+  const customSubtitleEnabledRef = useRef(customSubtitleEnabled);
+  const customSubtitleCuesRef = useRef(customSubtitleCues);
+
+  useEffect(() => {
+    customSubtitleEnabledRef.current = customSubtitleEnabled;
+    customSubtitleCuesRef.current = customSubtitleCues;
+  }, [customSubtitleEnabled, customSubtitleCues]);
 
   // Auto-Cycle Provider until first working stream state
   const [autoCycle, setAutoCycle] = useState(true);
@@ -583,7 +591,18 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     if (currentSec < 0) return;
 
     currentTimeRef.current = currentSec;
-    setPlaybackCurrentTime(currentSec);
+    const now = Date.now();
+
+    // PERFORMANCE OPTIMIZATION:
+    // Only trigger React state re-renders (setPlaybackCurrentTime) when custom subtitles are active (throttled to 250ms/4Hz),
+    // or at 1Hz otherwise. This eliminates 4-10 React re-renders per second that cause playback micro-stuttering on TV.
+    const isCustomSubActive = customSubtitleEnabledRef.current && (customSubtitleCuesRef.current?.length || 0) > 0;
+    const minStateUpdateInterval = isCustomSubActive ? 250 : 1000;
+    if (force || now - lastStateUpdateTimeRef.current >= minStateUpdateInterval) {
+      lastStateUpdateTimeRef.current = now;
+      setPlaybackCurrentTime(currentSec);
+    }
+
     if (totalDurationSec > 0) {
       durationRef.current = totalDurationSec;
     }
@@ -593,7 +612,6 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       ? Math.round((currentSec / effectiveDuration) * 100)
       : 0;
     const progressPercent = Math.min(100, Math.max(0, unclampedProgressPercent));
-    const now = Date.now();
 
     // Check for Up Next trigger on TV Series when Auto-Play is enabled
     // Triggers when reaching configured % (96%-104%) or when video has ended (force === true)
@@ -748,25 +766,30 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         return;
       }
 
-      // 2. If CineSrc (or similar embed provider supporting postMessage) is active
-      const isCineSrc = provider.id === 'cinesrc' || (streamUrl && streamUrl.includes('cinesrc'));
-      if (isCineSrc && iframeRef.current?.contentWindow) {
-        const nextCommand = isPlayingRef.current ? 'pause' : 'play';
+      // 2. Iframe embed (Broadcast standardized commands to iframe)
+      if (iframeRef.current?.contentWindow) {
         try {
-          iframeRef.current.contentWindow.postMessage({
-            type: 'cinesrc:command',
-            command: nextCommand,
-            args: []
-          }, '*');
+          const nextCommand = isPlayingRef.current ? 'pause' : 'play';
+          const isCineSrc = provider.id === 'cinesrc' || (streamUrl && streamUrl.includes('cinesrc'));
+          if (isCineSrc) {
+            iframeRef.current.contentWindow.postMessage({
+              type: 'cinesrc:command',
+              command: nextCommand,
+              args: []
+            }, '*');
+          }
+          // Send single explicit command
+          iframeRef.current.contentWindow.postMessage({ type: nextCommand, action: nextCommand, command: nextCommand }, '*');
+          iframeRef.current.contentWindow.postMessage({ event: 'command', func: nextCommand === 'play' ? 'playVideo' : 'pauseVideo', args: '' }, '*');
+
           // Optimistically flip state
           isPlayingRef.current = !isPlayingRef.current;
         } catch (e) {
-          console.warn('[VideoPlayer] Error sending cinesrc play/pause command:', e);
+          console.warn('[VideoPlayer] Error sending toggle play/pause command:', e);
         }
-        return;
       }
 
-      // 3. Focus iframe so standard spacebar/keyboard controls work
+      // 3. Focus iframe so physical spacebar/keyboard controls work
       if (iframeRef.current) {
         try {
           iframeRef.current.focus();
@@ -774,11 +797,44 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       }
     };
 
+    const handlePausePlayer = () => {
+      // 1. Direct HTML5 video
+      if (videoRef.current && !videoRef.current.paused) {
+        videoRef.current.pause();
+        isPlayingRef.current = false;
+        return;
+      }
+
+      // 2. Iframe embed (Broadcast standardized pause command)
+      if (iframeRef.current?.contentWindow) {
+        try {
+          const isCineSrc = provider.id === 'cinesrc' || (streamUrl && streamUrl.includes('cinesrc'));
+          if (isCineSrc) {
+            iframeRef.current.contentWindow.postMessage({
+              type: 'cinesrc:command',
+              command: 'pause',
+              args: []
+            }, '*');
+          }
+          iframeRef.current.contentWindow.postMessage({ type: 'pause', action: 'pause', command: 'pause' }, '*');
+          iframeRef.current.contentWindow.postMessage({ event: 'command', func: 'pauseVideo', args: '' }, '*');
+          iframeRef.current.contentWindow.postMessage({ method: 'pause' }, '*');
+          iframeRef.current.contentWindow.postMessage(JSON.stringify({ event: 'command', func: 'pauseVideo' }), '*');
+          iframeRef.current.contentWindow.postMessage('pause', '*');
+          isPlayingRef.current = false;
+        } catch (e) {
+          console.warn('[VideoPlayer] Error sending pause command to iframe:', e);
+        }
+      }
+    };
+
     window.addEventListener('tmdb_playback_state_changed', handlePlaybackStateChanged);
     window.addEventListener('tmdb_toggle_play_pause', handleTogglePlayPause);
+    window.addEventListener('tmdb_pause_player', handlePausePlayer);
     return () => {
       window.removeEventListener('tmdb_playback_state_changed', handlePlaybackStateChanged);
       window.removeEventListener('tmdb_toggle_play_pause', handleTogglePlayPause);
+      window.removeEventListener('tmdb_pause_player', handlePausePlayer);
     };
   }, [recordProgress, provider.id, streamUrl]);
 
@@ -1536,7 +1592,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           loading="eager"
           tabIndex={-1}
           className="w-full h-full border-0"
-          style={{ contain: 'strict' }}
+
           allowFullScreen
           allow="autoplay *; encrypted-media *; picture-in-picture *; fullscreen *"
           sandbox={
