@@ -1976,12 +1976,12 @@ public class MainActivity extends BridgeActivity {
                 return true; // Completely consumed, do NOT exit page!
             }
 
-            // If a modal dialog is open, handle Back key and let DPAD keys fall through to WebView
+            // If a modal dialog is open, handle Back key and dispatch DPAD navigation directly to window!
             if (isModalOpen) {
+                WebView webView = bridge.getWebView();
                 if (keyCode == KeyEvent.KEYCODE_BACK) {
                     Log.i("TMDB_APP", "[Native Key] Back key consumed by open modal dialog");
                     isModalOpen = false;
-                    WebView webView = bridge.getWebView();
                     if (webView != null) {
                         webView.evaluateJavascript(
                             "(function() {" +
@@ -1994,8 +1994,48 @@ public class MainActivity extends BridgeActivity {
                     }
                     return true;
                 }
-                // Do NOT intercept D-Pad keys when modal is open; let WebView process them directly!
-                return super.dispatchKeyEvent(event);
+
+                if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
+                    if (webView != null) {
+                        webView.evaluateJavascript("window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', code: 'ArrowDown', bubbles: true }));", null);
+                    }
+                    return true;
+                }
+                if (keyCode == KeyEvent.KEYCODE_DPAD_UP) {
+                    if (webView != null) {
+                        webView.evaluateJavascript("window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', code: 'ArrowUp', bubbles: true }));", null);
+                    }
+                    return true;
+                }
+                if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT) {
+                    if (webView != null) {
+                        webView.evaluateJavascript("window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', code: 'ArrowLeft', bubbles: true }));", null);
+                    }
+                    return true;
+                }
+                if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) {
+                    if (webView != null) {
+                        webView.evaluateJavascript("window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', code: 'ArrowRight', bubbles: true }));", null);
+                    }
+                    return true;
+                }
+                if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER || keyCode == KeyEvent.KEYCODE_NUMPAD_ENTER) {
+                    if (webView != null) {
+                        webView.evaluateJavascript(
+                            "(function() {" +
+                            "  var el = document.activeElement;" +
+                            "  if (el && typeof el.click === 'function') {" +
+                            "    el.click();" +
+                            "  } else {" +
+                            "    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', bubbles: true }));" +
+                            "  }" +
+                            "})();",
+                            null
+                        );
+                    }
+                    return true;
+                }
+                return true;
             }
 
             if (isTV() && isWatchPageActive) {
@@ -2116,13 +2156,9 @@ public class MainActivity extends BridgeActivity {
                             "})();",
                             null
                         );
-                        // If modal is open, NEVER consume D-Pad Right! Let WebView process it!
-                        if (isModalOpen) {
-                            return super.dispatchKeyEvent(event);
-                        }
                         return true;
                     }
-                    return super.dispatchKeyEvent(event);
+                    return true;
                 } else if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT) {
                     if (webView != null) {
                         webView.evaluateJavascript(
@@ -2167,13 +2203,9 @@ public class MainActivity extends BridgeActivity {
                             "})();",
                             null
                         );
-                        // If modal is open, NEVER consume D-Pad Left! Let WebView process it!
-                        if (isModalOpen) {
-                            return super.dispatchKeyEvent(event);
-                        }
                         return true;
                     }
-                    return super.dispatchKeyEvent(event);
+                    return true;
                 } else if (keyCode == KeyEvent.KEYCODE_DPAD_UP) {
                     if (webView != null) {
                         webView.evaluateJavascript(
@@ -2205,13 +2237,9 @@ public class MainActivity extends BridgeActivity {
                             "})();",
                             null
                         );
-                        // If modal is open, NEVER consume D-Pad Up! Let WebView process it!
-                        if (isModalOpen) {
-                            return super.dispatchKeyEvent(event);
-                        }
                         return true;
                     }
-                    return super.dispatchKeyEvent(event);
+                    return true;
                 }
 
                 // Allow repeated presses for media scrub keys on remote so user can scrub the timeline
@@ -2312,13 +2340,9 @@ public class MainActivity extends BridgeActivity {
                             "})();",
                             null
                         );
-                        // If modal is open, NEVER consume D-Pad Down! Let WebView process it!
-                        if (isModalOpen) {
-                            return super.dispatchKeyEvent(event);
-                        }
                         return true;
                     }
-                    return super.dispatchKeyEvent(event);
+                    return true;
                 } else if (keyCode == KeyEvent.KEYCODE_BACK) {
                     if (webView != null) {
                         webView.evaluateJavascript(

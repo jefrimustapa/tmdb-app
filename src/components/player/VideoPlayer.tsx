@@ -1387,6 +1387,11 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     const styleCineSrcIframe = () => {
       try {
         const iframe = playerContainerRef.current?.querySelector('iframe');
+        if (iframe) {
+          iframe.setAttribute('tabindex', '-1');
+          iframe.setAttribute('focusable', 'false');
+          try { iframe.blur(); } catch {}
+        }
         if (iframe && (iframe.src.includes('cinesrc') || provider.id === 'cinesrc')) {
           const doc = iframe.contentDocument || (iframe.contentWindow && (iframe.contentWindow as any).document);
           if (doc && !doc.__tmdb_cinesrc_styled) {
