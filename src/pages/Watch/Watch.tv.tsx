@@ -10,7 +10,7 @@ import { dbService } from '../../services/db';
 import { getProviderById } from '../../services/streamProviders';
 import { isAnimeMedia } from '../../services/animeMappingService';
 import { isAseanMedia, isKoreanMedia } from '../../services/lariMappingService';
-import { ArrowLeft, SkipForward, SkipBack, Settings } from 'lucide-react';
+import { ArrowLeft, SkipForward, SkipBack, Settings, FastForward, Rewind } from 'lucide-react';
 
 import type { VirtualCursorStyle } from '../../types/db';
 
@@ -169,12 +169,9 @@ export const Watch: React.FC = () => {
       if (document.activeElement && (document.activeElement.tagName === 'BUTTON' || (document.activeElement as HTMLElement).dataset?.watchHeaderItem === 'true')) {
         (document.activeElement as HTMLElement).blur();
       }
-      const iframe = document.querySelector<HTMLIFrameElement>('iframe');
-      if (iframe) {
-        try {
-          iframe.focus();
-        } catch {}
-      }
+      try {
+        window.focus();
+      } catch {}
     }, delayMs);
   }, []);
 
@@ -311,10 +308,7 @@ export const Watch: React.FC = () => {
       if (document.activeElement && typeof (document.activeElement as HTMLElement).blur === 'function') {
         (document.activeElement as HTMLElement).blur();
       }
-      const iframe = document.querySelector<HTMLIFrameElement>('iframe');
-      if (iframe) {
-        try { iframe.focus(); } catch {}
-      }
+      try { window.focus(); } catch {}
     };
 
     window.addEventListener('tmdb_exit_watch', onExitWatch);
@@ -340,6 +334,8 @@ export const Watch: React.FC = () => {
       if (document.querySelector('[role="dialog"]') || document.querySelector('[data-provider-dropdown-open="true"]')) {
         return;
       }
+      if (isSettingsModalOpen || document.querySelector('[role="dialog"]')) return;
+
       const backBtn = document.getElementById('watch-back-btn');
       const prevBtn = document.getElementById('watch-prev-ep-btn');
       const nextBtn = document.getElementById('watch-next-ep-btn');
@@ -485,6 +481,100 @@ export const Watch: React.FC = () => {
       } catch {}
     };
   }, []);
+
+  // Smart Accumulator Seek State & Logic (Option A)
+  const [seekOsd, setSeekOsd] = useState<{
+    visible: boolean;
+    delta: number;
+    direction: 'forward' | 'rewind';
+  }>({
+    visible: false,
+    delta: 0,
+    direction: 'forward'
+  });
+
+  const accumulatedDeltaRef = useRef(0);
+  const seekDebounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const seekOsdHideTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const handleSeekRequest = useCallback((stepSeconds: number) => {
+    // Clear pending timers
+    if (seekDebounceTimerRef.current) {
+      clearTimeout(seekDebounceTimerRef.current);
+      seekDebounceTimerRef.current = null;
+    }
+    if (seekOsdHideTimerRef.current) {
+      clearTimeout(seekOsdHideTimerRef.current);
+      seekOsdHideTimerRef.current = null;
+    }
+
+    // Accumulate delta
+    accumulatedDeltaRef.current += stepSeconds;
+    const currentAccumulated = accumulatedDeltaRef.current;
+    const direction: 'forward' | 'rewind' = currentAccumulated >= 0 ? 'forward' : 'rewind';
+
+    // Update OSD pill immediately
+    setSeekOsd({
+      visible: true,
+      delta: Math.abs(currentAccumulated),
+      direction
+    });
+
+    // 650ms debounce: fire seek only after user pauses remote tapping
+    seekDebounceTimerRef.current = setTimeout(() => {
+      const finalDelta = accumulatedDeltaRef.current;
+      accumulatedDeltaRef.current = 0;
+
+      if (finalDelta !== 0) {
+        console.log('[Watch.tv] Dispatching tmdb_execute_seek with delta:', finalDelta);
+        window.dispatchEvent(new CustomEvent('tmdb_execute_seek', {
+          detail: { delta: finalDelta }
+        }));
+      }
+
+      // Keep OSD visible for 1s after execution before fading out
+      seekOsdHideTimerRef.current = setTimeout(() => {
+        setSeekOsd((prev) => ({ ...prev, visible: false }));
+      }, 1000);
+    }, 650);
+  }, []);
+
+  // Listen to native Android bridge 'tmdb_dpad_seek' & keyboard ArrowLeft/ArrowRight (fallback)
+  useEffect(() => {
+    const handleNativeDpadSeek = (e: CustomEvent) => {
+      const delta = e.detail?.delta || 10;
+      handleSeekRequest(delta);
+    };
+
+    const handleKeyDownSeek = (e: KeyboardEvent) => {
+      if (cursorActive) return;
+      if (headerVisible) return;
+      if (isSettingsModalOpen || document.querySelector('[role="dialog"]')) return;
+      const header = document.querySelector('[data-watch-header="true"]');
+      const isHeaderFocused = !!(window as any).__tmdbHeaderFocused || (header && header.contains(document.activeElement));
+      if (isHeaderFocused) return;
+
+      if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        e.stopPropagation();
+        handleSeekRequest(10);
+      } else if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        e.stopPropagation();
+        handleSeekRequest(-10);
+      }
+    };
+
+    window.addEventListener('tmdb_dpad_seek', handleNativeDpadSeek as EventListener);
+    window.addEventListener('keydown', handleKeyDownSeek, true);
+
+    return () => {
+      window.removeEventListener('tmdb_dpad_seek', handleNativeDpadSeek as EventListener);
+      window.removeEventListener('keydown', handleKeyDownSeek, true);
+      if (seekDebounceTimerRef.current) clearTimeout(seekDebounceTimerRef.current);
+      if (seekOsdHideTimerRef.current) clearTimeout(seekOsdHideTimerRef.current);
+    };
+  }, [cursorActive, headerVisible, handleSeekRequest]);
 
   const lastMousePosRef = React.useRef({ x: -1, y: -1 });
 
@@ -789,7 +879,12 @@ export const Watch: React.FC = () => {
         </div>
 
         {/* Video Player (Full Viewport with dynamic bottom safe area offset in portrait) */}
-        <div className={`absolute top-0 left-0 right-0 w-full z-10 ${isPortrait ? 'bottom-20' : 'bottom-0'}`}>
+        <div
+          className={`absolute top-0 left-0 right-0 w-full z-10 ${isPortrait ? 'bottom-20' : 'bottom-0'} ${
+            isSettingsModalOpen ? 'pointer-events-none' : ''
+          }`}
+          inert={isSettingsModalOpen || undefined}
+        >
           <VideoPlayer
             key={`${mediaType}-${tmdbId}-${seasonParam}-${episodeParam}`}
             mediaType={mediaType}
@@ -856,6 +951,27 @@ export const Watch: React.FC = () => {
           speed={cursorSettings.speed}
           timeoutSeconds={cursorSettings.timeout}
         />
+
+        {/* Smart Fast-Forward / Rewind OSD Pill (Option A) */}
+        {seekOsd.visible && (
+          <div className="absolute inset-0 pointer-events-none z-50 flex items-center justify-center transition-all duration-300">
+            <div className="flex items-center gap-3 px-6 py-3.5 rounded-2xl bg-black/85 backdrop-blur-md border border-cyan-500/40 text-white shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+              {seekOsd.direction === 'forward' ? (
+                <FastForward className="w-8 h-8 text-cyan-400 animate-pulse" />
+              ) : (
+                <Rewind className="w-8 h-8 text-cyan-400 animate-pulse" />
+              )}
+              <div className="flex flex-col items-center">
+                <span className="text-xl font-black font-display tracking-wider text-white">
+                  {seekOsd.direction === 'forward' ? `+${seekOsd.delta}s` : `-${seekOsd.delta}s`}
+                </span>
+                <span className="text-[10px] font-semibold tracking-widest text-cyan-400/90 uppercase">
+                  {seekOsd.direction === 'forward' ? 'Fast Forward' : 'Rewind'}
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

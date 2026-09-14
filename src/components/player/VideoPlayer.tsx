@@ -828,13 +828,89 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       }
     };
 
+    // Seek command executor (handles both direct HTML5 video and all iframe embed schemas)
+    const executeSeek = (targetTime: number, delta: number) => {
+      console.log(`[VideoPlayer] executeSeek -> targetTime: ${targetTime}s, delta: ${delta}s`);
+
+      // 1. Direct HTML5 video
+      if (videoRef.current) {
+        try {
+          const maxDuration = durationRef.current || videoRef.current.duration || 0;
+          const clamped = Math.max(0, maxDuration > 0 ? Math.min(maxDuration - 1, targetTime) : targetTime);
+          videoRef.current.currentTime = clamped;
+          currentTimeRef.current = clamped;
+          setPlaybackCurrentTime(clamped);
+          if (maxDuration > 0) {
+            recordProgress(clamped, maxDuration, true);
+          }
+        } catch (e) {
+          console.warn('[VideoPlayer] Error seeking direct video:', e);
+        }
+        return;
+      }
+
+      // 2. Iframe embeds (Broadcast to all player adapters)
+      if (iframeRef.current?.contentWindow) {
+        try {
+          currentTimeRef.current = targetTime;
+          setPlaybackCurrentTime(targetTime);
+          if (durationRef.current > 0) {
+            recordProgress(targetTime, durationRef.current, true);
+          }
+
+          const win = iframeRef.current.contentWindow;
+          // Standard postMessage schemas (VidLink, PlayerJS, Plyr, CineSrc, KissKH, MegaCloud)
+          win.postMessage({ type: 'seek', time: targetTime, delta }, '*');
+          win.postMessage({ action: 'seek', time: targetTime }, '*');
+          win.postMessage({ action: 'seekDelta', delta }, '*');
+          win.postMessage({ type: 'SEEK', data: { time: targetTime } }, '*');
+          win.postMessage({ event: 'seek', time: targetTime }, '*');
+          win.postMessage({ event: 'command', func: 'seekTo', args: [targetTime, true] }, '*');
+          win.postMessage({ channel: 'kisskh', type: 'seek', time: targetTime }, '*');
+          win.postMessage({ channel: 'kisskh', event: 'seek', time: targetTime }, '*');
+          win.postMessage({ channel: 'megacloud', event: 'seek', time: targetTime }, '*');
+          win.postMessage({ channel: 'megaplay', event: 'seek', time: targetTime }, '*');
+          win.postMessage(JSON.stringify({ type: 'seek', time: targetTime, delta }), '*');
+          win.postMessage(JSON.stringify({ action: 'seek', time: targetTime }), '*');
+          win.postMessage(JSON.stringify({ action: 'seekDelta', delta }), '*');
+          win.postMessage(JSON.stringify({ event: 'command', func: 'seekTo', args: [targetTime, true] }), '*');
+          win.postMessage(JSON.stringify({ channel: 'kisskh', type: 'seek', time: targetTime }), '*');
+          win.postMessage(JSON.stringify({ channel: 'megacloud', event: 'seek', time: targetTime }), '*');
+
+          // CineSrc specific custom command
+          const isCineSrc = provider.id === 'cinesrc' || (streamUrl && streamUrl.includes('cinesrc'));
+          if (isCineSrc) {
+            win.postMessage({
+              type: 'cinesrc:command',
+              command: 'seek',
+              args: [targetTime]
+            }, '*');
+          }
+        } catch (e) {
+          console.warn('[VideoPlayer] Error broadcasting seek command to iframe:', e);
+        }
+      }
+    };
+
+    const handleExecuteSeek = (e: any) => {
+      const detail = e.detail || {};
+      const delta = typeof detail.delta === 'number' ? detail.delta : 0;
+      let targetTime = typeof detail.targetTime === 'number' ? detail.targetTime : null;
+      if (targetTime === null) {
+        targetTime = Math.max(0, (currentTimeRef.current || 0) + delta);
+      }
+      executeSeek(targetTime, delta);
+    };
+
     window.addEventListener('tmdb_playback_state_changed', handlePlaybackStateChanged);
     window.addEventListener('tmdb_toggle_play_pause', handleTogglePlayPause);
     window.addEventListener('tmdb_pause_player', handlePausePlayer);
+    window.addEventListener('tmdb_execute_seek', handleExecuteSeek);
     return () => {
       window.removeEventListener('tmdb_playback_state_changed', handlePlaybackStateChanged);
       window.removeEventListener('tmdb_toggle_play_pause', handleTogglePlayPause);
       window.removeEventListener('tmdb_pause_player', handlePausePlayer);
+      window.removeEventListener('tmdb_execute_seek', handleExecuteSeek);
     };
   }, [recordProgress, provider.id, streamUrl]);
 
@@ -1311,6 +1387,11 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     const styleCineSrcIframe = () => {
       try {
         const iframe = playerContainerRef.current?.querySelector('iframe');
+        if (iframe) {
+          iframe.setAttribute('tabindex', '-1');
+          iframe.setAttribute('focusable', 'false');
+          try { iframe.blur(); } catch {}
+        }
         if (iframe && (iframe.src.includes('cinesrc') || provider.id === 'cinesrc')) {
           const doc = iframe.contentDocument || (iframe.contentWindow && (iframe.contentWindow as any).document);
           if (doc && !doc.__tmdb_cinesrc_styled) {

@@ -208,6 +208,7 @@ public class MainActivity extends BridgeActivity {
                     if (!active) {
                         isVirtualCursorActive = false;
                         isDropdownOpen = false;
+                        isModalOpen = false;
                         isSimulatingTouch = false;
                     }
                     runOnUiThread(() -> {
@@ -226,6 +227,7 @@ public class MainActivity extends BridgeActivity {
                         }
                     });
                 }
+
 
                 @JavascriptInterface
                 public void openCastMenu() {
@@ -1590,6 +1592,7 @@ public class MainActivity extends BridgeActivity {
                         // Intercepts vidlink.pro HTML pages and injects a script that:
                         // 1. Pre-sets mediaSettings localStorage to {volume:1, muted:false} before Vidstack reads it
                         // 2. Polls every 500ms to click the mute button if the player initializes muted
+                        // NOTE: Do NOT intercept cinesrc.st HTML because CineSrc uses PoW (Proof of Work) tokens that fail when intercepted!
                         if (lower.contains("vidlink.pro") && !lower.contains(".js") && !lower.contains(".css")
                                 && !lower.contains(".png") && !lower.contains(".jpg") && !lower.contains(".svg")
                                 && !lower.contains(".woff") && !lower.contains(".ico") && !lower.contains(".json")
@@ -1730,6 +1733,22 @@ public class MainActivity extends BridgeActivity {
                                             "        toggleVidLinkPlay('play');\n" +
                                             "      } else if (action === 'toggle' || d.key === ' ' || d.code === 'Space') {\n" +
                                             "        toggleVidLinkPlay();\n" +
+                                            "      } else if (action === 'seek' || action === 'SEEK') {\n" +
+                                            "        var target = typeof d.time === 'number' ? d.time : (d.data && typeof d.data.time === 'number' ? d.data.time : null);\n" +
+                                            "        if (target !== null && target >= 0) {\n" +
+                                            "          document.querySelectorAll('video').forEach(function(v) { try { v.currentTime = target; } catch(err) {} });\n" +
+                                            "        }\n" +
+                                            "      } else if (action === 'seekDelta') {\n" +
+                                            "        var delta = typeof d.delta === 'number' ? d.delta : 0;\n" +
+                                            "        if (delta !== 0) {\n" +
+                                            "          document.querySelectorAll('video').forEach(function(v) {\n" +
+                                            "            try {\n" +
+                                            "              var n = Math.max(0, (v.currentTime || 0) + delta);\n" +
+                                            "              if (v.duration && n > v.duration) n = v.duration;\n" +
+                                            "              v.currentTime = n;\n" +
+                                            "            } catch(err) {}\n" +
+                                            "          });\n" +
+                                            "        }\n" +
                                             "      }\n" +
                                             "    } catch(err) {}\n" +
                                             "  });\n" +
@@ -1957,12 +1976,12 @@ public class MainActivity extends BridgeActivity {
                 return true; // Completely consumed, do NOT exit page!
             }
 
-            // If a modal dialog is open, handle Back key and let DPAD keys fall through to WebView
+            // If a modal dialog is open, handle Back key and dispatch DPAD navigation directly to window!
             if (isModalOpen) {
+                WebView webView = bridge.getWebView();
                 if (keyCode == KeyEvent.KEYCODE_BACK) {
                     Log.i("TMDB_APP", "[Native Key] Back key consumed by open modal dialog");
                     isModalOpen = false;
-                    WebView webView = bridge.getWebView();
                     if (webView != null) {
                         webView.evaluateJavascript(
                             "(function() {" +
@@ -1975,8 +1994,48 @@ public class MainActivity extends BridgeActivity {
                     }
                     return true;
                 }
-                // Do NOT intercept D-Pad keys when modal is open; let WebView process them directly!
-                return super.dispatchKeyEvent(event);
+
+                if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
+                    if (webView != null) {
+                        webView.evaluateJavascript("window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', code: 'ArrowDown', bubbles: true }));", null);
+                    }
+                    return true;
+                }
+                if (keyCode == KeyEvent.KEYCODE_DPAD_UP) {
+                    if (webView != null) {
+                        webView.evaluateJavascript("window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', code: 'ArrowUp', bubbles: true }));", null);
+                    }
+                    return true;
+                }
+                if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT) {
+                    if (webView != null) {
+                        webView.evaluateJavascript("window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', code: 'ArrowLeft', bubbles: true }));", null);
+                    }
+                    return true;
+                }
+                if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) {
+                    if (webView != null) {
+                        webView.evaluateJavascript("window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', code: 'ArrowRight', bubbles: true }));", null);
+                    }
+                    return true;
+                }
+                if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER || keyCode == KeyEvent.KEYCODE_NUMPAD_ENTER) {
+                    if (webView != null) {
+                        webView.evaluateJavascript(
+                            "(function() {" +
+                            "  var el = document.activeElement;" +
+                            "  if (el && typeof el.click === 'function') {" +
+                            "    el.click();" +
+                            "  } else {" +
+                            "    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', bubbles: true }));" +
+                            "  }" +
+                            "})();",
+                            null
+                        );
+                    }
+                    return true;
+                }
+                return true;
             }
 
             if (isTV() && isWatchPageActive) {
@@ -2066,7 +2125,10 @@ public class MainActivity extends BridgeActivity {
                             "  }" +
                             "  var header = document.querySelector('[data-watch-header=\"true\"]');" +
                             "  var isHeaderFocused = !!window.__tmdbHeaderFocused || (header && header.contains(document.activeElement));" +
-                            "  if (!isHeaderFocused) return false;" +
+                            "  if (!isHeaderFocused) {" +
+                            "    window.dispatchEvent(new CustomEvent('tmdb_dpad_seek', { detail: { delta: 10, direction: 'forward' } }));" +
+                            "    return true;" +
+                            "  }" +
                             "  var backBtn = document.getElementById('watch-back-btn');" +
                             "  var subBtn = document.getElementById('watch-settings-btn');" +
                             "  var trigger = document.getElementById('watch-provider-trigger');" +
@@ -2096,7 +2158,7 @@ public class MainActivity extends BridgeActivity {
                         );
                         return true;
                     }
-                    return super.dispatchKeyEvent(event);
+                    return true;
                 } else if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT) {
                     if (webView != null) {
                         webView.evaluateJavascript(
@@ -2110,7 +2172,10 @@ public class MainActivity extends BridgeActivity {
                             "  }" +
                             "  var header = document.querySelector('[data-watch-header=\"true\"]');" +
                             "  var isHeaderFocused = !!window.__tmdbHeaderFocused || (header && header.contains(document.activeElement));" +
-                            "  if (!isHeaderFocused) return false;" +
+                            "  if (!isHeaderFocused) {" +
+                            "    window.dispatchEvent(new CustomEvent('tmdb_dpad_seek', { detail: { delta: -10, direction: 'rewind' } }));" +
+                            "    return true;" +
+                            "  }" +
                             "  var backBtn = document.getElementById('watch-back-btn');" +
                             "  var subBtn = document.getElementById('watch-settings-btn');" +
                             "  var trigger = document.getElementById('watch-provider-trigger');" +
@@ -2140,7 +2205,7 @@ public class MainActivity extends BridgeActivity {
                         );
                         return true;
                     }
-                    return super.dispatchKeyEvent(event);
+                    return true;
                 } else if (keyCode == KeyEvent.KEYCODE_DPAD_UP) {
                     if (webView != null) {
                         webView.evaluateJavascript(
@@ -2174,7 +2239,7 @@ public class MainActivity extends BridgeActivity {
                         );
                         return true;
                     }
-                    return super.dispatchKeyEvent(event);
+                    return true;
                 }
 
                 // Allow repeated presses for media scrub keys on remote so user can scrub the timeline
@@ -2277,7 +2342,7 @@ public class MainActivity extends BridgeActivity {
                         );
                         return true;
                     }
-                    return super.dispatchKeyEvent(event);
+                    return true;
                 } else if (keyCode == KeyEvent.KEYCODE_BACK) {
                     if (webView != null) {
                         webView.evaluateJavascript(
