@@ -63,65 +63,72 @@ export const Home: React.FC = () => {
         }
       });
 
-      // 2. If we already have fresh cached data (< 5 minutes old) and not forced, no need to re-fetch
-      const isCacheFresh = homeFeedCache && (Date.now() - homeFeedCache.timestamp < 5 * 60 * 1000);
+      // 2. Stale-While-Revalidate: If we have cached data (< 10 minutes old) and not forced, skip network
+      const isCacheFresh = homeFeedCache && (Date.now() - homeFeedCache.timestamp < 10 * 60 * 1000);
       if (isCacheFresh && !forceRefresh) {
         if (isLoading) setIsLoading(false);
         return;
       }
 
-      // If no cache at all, show the loading spinner during initial cold load
+      // If no cache at all, show the loading skeleton during initial cold load
       if (!homeFeedCache) {
         setIsLoading(true);
       }
 
       try {
-        // Stage 1: Load Hero Billboard & Top 2 rails first for instant cold start
-        const [trendRes, popMRes, histRes] = await Promise.all([
+        // Fire ALL primary rails concurrently in a single parallel batch (Zero Stage 1 -> Stage 2 waterfall)
+        const [trendRes, popMRes, popTVRes, newMRes, newTVRes] = await Promise.all([
           tmdbApi.getTrending('all', 'day'),
           tmdbApi.getPopularMovies(1),
-          dbService.getHistory(10)
-        ]);
-
-        if (!isMounted) return;
-
-        setTrending(trendRes.results || []);
-        setPopularMovies(popMRes.results || []);
-        setHistory(histRes || []);
-        setIsLoading(false);
-
-        // Stage 2: Load secondary lower rails & personalized suggestions in background
-        const [popTVRes, suggRes, newMRes, newTVRes] = await Promise.all([
           tmdbApi.getPopularTV(1),
-          getPersonalizedSuggestions(),
           tmdbApi.getNowPlayingMovies(1),
           tmdbApi.getOnTheAirTV(1)
         ]);
 
         if (!isMounted) return;
 
-        const newCache: HomeFeedCache = {
-          trending: trendRes.results || [],
-          popularMovies: popMRes.results || [],
-          popularTV: popTVRes.results || [],
-          suggestions: suggRes.items || [],
-          suggestionSubtitle: suggRes.subtitle,
-          newReleaseMovies: newMRes.results || [],
-          newReleaseTV: newTVRes.results || [],
-          history: histRes || [],
-          timestamp: Date.now()
-        };
+        const trendItems = trendRes.results || [];
+        const popMItems = popMRes.results || [];
+        const popTVItems = popTVRes.results || [];
+        const newMItems = newMRes.results || [];
+        const newTVItems = newTVRes.results || [];
 
-        homeFeedCache = newCache;
-        try {
-          localStorage.setItem(HOME_CACHE_KEY, JSON.stringify(newCache));
-        } catch {}
+        // Preload first hero billboard backdrop immediately so it renders without delay
+        if (trendItems.length > 0 && trendItems[0]?.backdrop_path) {
+          const img = new Image();
+          img.src = `https://image.tmdb.org/t/p/w780${trendItems[0].backdrop_path}`;
+        }
 
-        setPopularTV(newCache.popularTV);
-        setSuggestions(newCache.suggestions);
-        setSuggestionSubtitle(newCache.suggestionSubtitle);
-        setNewReleaseMovies(newCache.newReleaseMovies);
-        setNewReleaseTV(newCache.newReleaseTV);
+        setTrending(trendItems);
+        setPopularMovies(popMItems);
+        setPopularTV(popTVItems);
+        setNewReleaseMovies(newMItems);
+        setNewReleaseTV(newTVItems);
+        setIsLoading(false);
+
+        // Fetch personalized suggestions asynchronously in background without blocking rail display
+        getPersonalizedSuggestions(forceRefresh).then((suggRes) => {
+          if (!isMounted) return;
+          setSuggestions(suggRes.items || []);
+          setSuggestionSubtitle(suggRes.subtitle);
+
+          const updatedCache: HomeFeedCache = {
+            trending: trendItems,
+            popularMovies: popMItems,
+            popularTV: popTVItems,
+            suggestions: suggRes.items || [],
+            suggestionSubtitle: suggRes.subtitle,
+            newReleaseMovies: newMItems,
+            newReleaseTV: newTVItems,
+            history: homeFeedCache?.history || [],
+            timestamp: Date.now()
+          };
+          homeFeedCache = updatedCache;
+          try {
+            localStorage.setItem(HOME_CACHE_KEY, JSON.stringify(updatedCache));
+          } catch {}
+        }).catch(() => {});
+
       } catch (err) {
         console.error('Failed to load home feed:', err);
       } finally {
@@ -138,6 +145,7 @@ export const Home: React.FC = () => {
       homeFeedCache = null;
       try {
         localStorage.removeItem(HOME_CACHE_KEY);
+        localStorage.removeItem('tmdb_suggestions_cache');
       } catch {}
       loadHomeData(true);
     };
