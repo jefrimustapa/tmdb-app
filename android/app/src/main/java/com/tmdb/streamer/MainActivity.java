@@ -50,6 +50,7 @@ public class MainActivity extends BridgeActivity {
     private boolean isCurrentlyFullscreen = false;
     private boolean isWatchPageActive = false;
     private volatile boolean isDropdownOpen = false;
+    private volatile boolean isModalOpen = false;
     private volatile boolean isVirtualCursorActive = false;
     private volatile boolean isSimulatingTouch = false;
     private volatile boolean isAdShieldActive = true;
@@ -144,12 +145,16 @@ public class MainActivity extends BridgeActivity {
             settings.setDomStorageEnabled(true);
             settings.setDatabaseEnabled(true);
             settings.setCacheMode(WebSettings.LOAD_DEFAULT);
-            if (isTV() && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                // Disable offscreen pre-rasterization on TV to save GPU fill rate on Mali-450
-                settings.setOffscreenPreRaster(false);
-            }
-            // Explicit hardware accelerated layer for composite video surface
-            webView.setLayerType(android.view.View.LAYER_TYPE_HARDWARE, null);
+            // Enable explicit window-level hardware acceleration for direct hardware video overlays
+            getWindow().setFlags(
+                WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED,
+                WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED
+            );
+
+            // Allow Chromium to allocate native zero-copy SurfaceView / Overlay planes for video playback
+            // (Setting LAYER_TYPE_HARDWARE directly on the WebView forces GPU texture blitting and high CPU overhead)
+            webView.setLayerType(android.view.View.LAYER_TYPE_NONE, null);
+
             // Ensure nested scrolling and fluid overscroll for horizontal and vertical web touch gestures
             androidx.core.view.ViewCompat.setNestedScrollingEnabled(webView, true);
             webView.setOverScrollMode(android.view.View.OVER_SCROLL_IF_CONTENT_SCROLLS);
@@ -515,6 +520,42 @@ public class MainActivity extends BridgeActivity {
                 public void setDropdownOpen(boolean open) {
                     isDropdownOpen = open;
                     Log.i("TMDB_APP", "[AndroidBridge] setDropdownOpen: " + open);
+                }
+
+                @JavascriptInterface
+                public void setModalOpen(boolean open) {
+                    isModalOpen = open;
+                    Log.i("TMDB_APP", "[AndroidBridge] setModalOpen: " + open);
+                    if (open) {
+                        pauseAllMedia();
+                    }
+                }
+
+                @JavascriptInterface
+                public void pauseAllMedia() {
+                    runOnUiThread(() -> {
+                        try {
+                            WebView wv = bridge != null ? bridge.getWebView() : null;
+                            if (wv != null) {
+                                wv.evaluateJavascript(
+                                    "(function() {" +
+                                    "  try {" +
+                                    "    document.querySelectorAll('video, audio').forEach(function(v) { try { v.pause(); } catch(e) {} });" +
+                                    "    document.querySelectorAll('iframe').forEach(function(f) {" +
+                                    "      try {" +
+                                    "        f.contentWindow.postMessage({ type: 'pause', action: 'pause', command: 'pause' }, '*');" +
+                                    "        f.contentWindow.postMessage('pause', '*');" +
+                                    "      } catch(e) {}" +
+                                    "    });" +
+                                    "  } catch(e) {}" +
+                                    "})();",
+                                    null
+                                );
+                            }
+                        } catch (Exception e) {
+                            Log.w("TMDB_APP", "[AndroidBridge] pauseAllMedia failed: " + e.getMessage());
+                        }
+                    });
                 }
 
                 @JavascriptInterface
@@ -1141,6 +1182,28 @@ public class MainActivity extends BridgeActivity {
                                             "      });\n" +
                                             "    }\n" +
                                             "  }, 200);\n" +
+                                            "  window.addEventListener('message', function(e) {\n" +
+                                            "    try {\n" +
+                                            "      var d = typeof e.data === 'string' ? JSON.parse(e.data) : e.data;\n" +
+                                            "      if (!d) return;\n" +
+                                            "      var action = d.action || d.type || d.command || d;\n" +
+                                            "      var vid = document.querySelector('video');\n" +
+                                            "      var jwp = typeof jwplayer === 'function' ? (jwplayer('vplayer') || jwplayer()) : null;\n" +
+                                            "      if (action === 'pause') {\n" +
+                                            "        if (jwp && typeof jwp.pause === 'function') jwp.pause();\n" +
+                                            "        if (vid && !vid.paused) vid.pause();\n" +
+                                            "      } else if (action === 'play') {\n" +
+                                            "        if (jwp && typeof jwp.play === 'function') jwp.play();\n" +
+                                            "        if (vid && vid.paused) vid.play();\n" +
+                                            "      } else if (action === 'toggle' || d.key === ' ' || d.code === 'Space') {\n" +
+                                            "        if (jwp && typeof jwp.getState === 'function') {\n" +
+                                            "          if (jwp.getState() === 'playing') jwp.pause(); else jwp.play();\n" +
+                                            "        } else if (vid) {\n" +
+                                            "          if (vid.paused) vid.play(); else vid.pause();\n" +
+                                            "        }\n" +
+                                            "      }\n" +
+                                            "    } catch(err) {}\n" +
+                                            "  });\n" +
                                             "})();\n" +
                                             "</script>\n";
                                         String cleanCss = "<style id=\"tmdb-vidmoly-clean\">\n" +
@@ -1308,9 +1371,23 @@ public class MainActivity extends BridgeActivity {
                                             "  window.addEventListener('message', function(e) {\n" +
                                             "    try {\n" +
                                             "      var d = typeof e.data === 'string' ? JSON.parse(e.data) : e.data;\n" +
-                                            "      if (d && (d.type === 'seek' || d.type === 'SEEK' || d.event === 'seek') && (d.time !== undefined && d.time !== null)) {\n" +
+                                            "      if (!d) return;\n" +
+                                            "      var action = d.action || d.type || d.command || d;\n" +
+                                            "      var vid = attachedVideo || document.querySelector('video');\n" +
+                                            "      if (action === 'pause') {\n" +
+                                            "        if (vid && !vid.paused) vid.pause();\n" +
+                                            "        var pauseBtn = document.querySelector('button.play[data-state=\"playing\"], button[aria-label=\"Pause\"], .jwplayer .jw-icon-playback[aria-label=\"Pause\"]');\n" +
+                                            "        if (pauseBtn) pauseBtn.click();\n" +
+                                            "        console.log('[TMDB] KissKH paused via postMessage');\n" +
+                                            "      } else if (action === 'play') {\n" +
+                                            "        if (vid && vid.paused) vid.play();\n" +
+                                            "        var playBtn = document.querySelector('button.play[data-state=\"paused\"], button[aria-label=\"Play\"], .jwplayer .jw-icon-playback[aria-label=\"Play\"]');\n" +
+                                            "        if (playBtn) playBtn.click();\n" +
+                                            "        console.log('[TMDB] KissKH resumed via postMessage');\n" +
+                                            "      } else if (action === 'toggle' || d.key === ' ' || d.code === 'Space') {\n" +
+                                            "        if (vid) { if (vid.paused) vid.play(); else vid.pause(); }\n" +
+                                            "      } else if ((d.type === 'seek' || d.type === 'SEEK' || d.event === 'seek') && (d.time !== undefined && d.time !== null)) {\n" +
                                             "        var target = parseFloat(d.time);\n" +
-                                            "        var vid = attachedVideo || document.querySelector('video');\n" +
                                             "        if (vid && !isNaN(target) && target >= 0) {\n" +
                                             "          initialSeekDone = true;\n" +
                                             "          vid.currentTime = target;\n" +
@@ -1584,55 +1661,78 @@ public class MainActivity extends BridgeActivity {
                                             "  } catch(e) {}\n" +
                                             "\n" +
                                             "  // 2. Poll every 500ms to click mute button if player initializes muted\n" +
+                                            "  var vidlinkUnmuteAttempts = 0;\n" +
                                             "  var vidlinkUnmuteTimer = setInterval(function() {\n" +
+                                            "    vidlinkUnmuteAttempts++;\n" +
+                                            "    var isUnmuted = false;\n" +
                                             "    try {\n" +
-                                            "      // Re-enforce localStorage every poll cycle in case player resets it\n" +
-                                            "      var stored = localStorage.getItem('mediaSettings');\n" +
-                                            "      if (!stored) {\n" +
-                                            "        localStorage.setItem('mediaSettings', JSON.stringify({ volume: 1, muted: false, lang: 'English', captions: false }));\n" +
-                                            "      } else {\n" +
-                                            "        try {\n" +
-                                            "          var parsed = JSON.parse(stored);\n" +
-                                            "          if (parsed.muted !== false || parsed.volume !== 1) {\n" +
-                                            "            parsed.muted = false;\n" +
-                                            "            parsed.volume = 1;\n" +
-                                            "            localStorage.setItem('mediaSettings', JSON.stringify(parsed));\n" +
-                                            "          }\n" +
-                                            "        } catch(pe) {}\n" +
-                                            "      }\n" +
-                                            "\n" +
-                                            "      // Click the mute button if it is in muted state\n" +
                                             "      var muteBtn = document.querySelector('button[data-media-mute-button][data-state=\"muted\"]');\n" +
                                             "      if (muteBtn) {\n" +
                                             "        muteBtn.click();\n" +
-                                            "        console.log('[TMDB] VidLink mute button clicked to unmute');\n" +
                                             "      }\n" +
-                                            "\n" +
-                                            "      // Also directly set video element muted=false and volume=1 if accessible\n" +
                                             "      var videos = document.querySelectorAll('video');\n" +
                                             "      videos.forEach(function(v) {\n" +
                                             "        if (v.muted) {\n" +
                                             "          v.muted = false;\n" +
                                             "          v.volume = 1.0;\n" +
-                                            "          console.log('[TMDB] VidLink video element unmuted directly');\n" +
+                                            "        }\n" +
+                                            "        if (!v.muted && v.currentTime > 0) {\n" +
+                                            "          isUnmuted = true;\n" +
                                             "        }\n" +
                                             "      });\n" +
                                             "    } catch(e) {}\n" +
+                                            "    // Once video is actively playing and unmuted, clear interval to save 100% CPU\n" +
+                                            "    if (isUnmuted || vidlinkUnmuteAttempts >= 20) {\n" +
+                                            "      clearInterval(vidlinkUnmuteTimer);\n" +
+                                            "    }\n" +
                                             "  }, 500);\n" +
                                             "\n" +
-                                            "  // 3. Stop aggressive polling after 30s (player should be initialized by then)\n" +
-                                            "  setTimeout(function() {\n" +
-                                            "    clearInterval(vidlinkUnmuteTimer);\n" +
-                                            "    // Start a lighter maintenance poll every 5s for unmute persistence\n" +
-                                            "    setInterval(function() {\n" +
-                                            "      try {\n" +
-                                            "        var muteBtn = document.querySelector('button[data-media-mute-button][data-state=\"muted\"]');\n" +
-                                            "        if (muteBtn) muteBtn.click();\n" +
-                                            "        var videos = document.querySelectorAll('video');\n" +
-                                            "        videos.forEach(function(v) { if (v.muted) { v.muted = false; v.volume = 1.0; } });\n" +
-                                            "      } catch(e) {}\n" +
-                                            "    }, 5000);\n" +
-                                            "  }, 30000);\n" +
+                                            "  // 4. Listen for postMessage play/pause/toggle commands from parent app\n" +
+                                            "  var lastToggleTime = 0;\n" +
+                                            "  function toggleVidLinkPlay(forceState) {\n" +
+                                            "    var now = Date.now();\n" +
+                                            "    if (now - lastToggleTime < 250) return;\n" +
+                                            "    lastToggleTime = now;\n" +
+                                            "    try {\n" +
+                                            "      var vids = document.querySelectorAll('video');\n" +
+                                            "      var playBtn = document.querySelector('button[data-media-play-button]');\n" +
+                                            "      if (forceState === 'pause') {\n" +
+                                            "        vids.forEach(function(v) { try { v.pause(); } catch(err) {} });\n" +
+                                            "        if (playBtn && playBtn.getAttribute('data-state') === 'playing') {\n" +
+                                            "          playBtn.click();\n" +
+                                            "        }\n" +
+                                            "        console.log('[TMDB] VidLink paused via postMessage');\n" +
+                                            "      } else if (forceState === 'play') {\n" +
+                                            "        vids.forEach(function(v) { try { v.play(); } catch(err) {} });\n" +
+                                            "        if (playBtn && playBtn.getAttribute('data-state') === 'paused') {\n" +
+                                            "          playBtn.click();\n" +
+                                            "        }\n" +
+                                            "        console.log('[TMDB] VidLink resumed via postMessage');\n" +
+                                            "      } else {\n" +
+                                            "        // Toggle based on button state or video playback state\n" +
+                                            "        if (playBtn) {\n" +
+                                            "          playBtn.click();\n" +
+                                            "        } else if (vids.length > 0) {\n" +
+                                            "          if (vids[0].paused) { vids[0].play(); } else { vids[0].pause(); }\n" +
+                                            "        }\n" +
+                                            "        console.log('[TMDB] VidLink toggled via postMessage');\n" +
+                                            "      }\n" +
+                                            "    } catch(err) {}\n" +
+                                            "  }\n" +
+                                            "  window.addEventListener('message', function(e) {\n" +
+                                            "    try {\n" +
+                                            "      var d = typeof e.data === 'string' ? JSON.parse(e.data) : e.data;\n" +
+                                            "      if (!d) return;\n" +
+                                            "      var action = d.action || d.type || d.command || d;\n" +
+                                            "      if (action === 'pause') {\n" +
+                                            "        toggleVidLinkPlay('pause');\n" +
+                                            "      } else if (action === 'play') {\n" +
+                                            "        toggleVidLinkPlay('play');\n" +
+                                            "      } else if (action === 'toggle' || d.key === ' ' || d.code === 'Space') {\n" +
+                                            "        toggleVidLinkPlay();\n" +
+                                            "      }\n" +
+                                            "    } catch(err) {}\n" +
+                                            "  });\n" +
                                             "})();\n" +
                                             "</script>\n";
 
@@ -1857,6 +1957,28 @@ public class MainActivity extends BridgeActivity {
                 return true; // Completely consumed, do NOT exit page!
             }
 
+            // If a modal dialog is open, handle Back key and let DPAD keys fall through to WebView
+            if (isModalOpen) {
+                if (keyCode == KeyEvent.KEYCODE_BACK) {
+                    Log.i("TMDB_APP", "[Native Key] Back key consumed by open modal dialog");
+                    isModalOpen = false;
+                    WebView webView = bridge.getWebView();
+                    if (webView != null) {
+                        webView.evaluateJavascript(
+                            "(function() {" +
+                            "  window.dispatchEvent(new CustomEvent('tmdb_close_dialog'));" +
+                            "  var subBtn = document.getElementById('watch-settings-btn');" +
+                            "  if (subBtn) { subBtn.focus(); }" +
+                            "})();",
+                            null
+                        );
+                    }
+                    return true;
+                }
+                // Do NOT intercept D-Pad keys when modal is open; let WebView process them directly!
+                return super.dispatchKeyEvent(event);
+            }
+
             if (isTV() && isWatchPageActive) {
                 WebView webView = bridge.getWebView();
 
@@ -1936,6 +2058,7 @@ public class MainActivity extends BridgeActivity {
                         webView.evaluateJavascript(
                             "(function() {" +
                             "  if (window.__tmdbVirtualCursorActive) return false;" +
+                            "  if (document.querySelector('[role=\"dialog\"]')) return false;" +
                             "  var upNext = document.querySelector('[data-up-next-popup=\"true\"]');" +
                             "  if (upNext) {" +
                             "    var playBtn = document.getElementById('up-next-play-btn');" +
@@ -1945,20 +2068,25 @@ public class MainActivity extends BridgeActivity {
                             "  var isHeaderFocused = !!window.__tmdbHeaderFocused || (header && header.contains(document.activeElement));" +
                             "  if (!isHeaderFocused) return false;" +
                             "  var backBtn = document.getElementById('watch-back-btn');" +
+                            "  var subBtn = document.getElementById('watch-settings-btn');" +
+                            "  var trigger = document.getElementById('watch-provider-trigger');" +
                             "  var prevBtn = document.getElementById('watch-prev-ep-btn');" +
                             "  var nextBtn = document.getElementById('watch-next-ep-btn');" +
-                            "  var trigger = document.getElementById('watch-provider-trigger');" +
                             "  var active = document.activeElement;" +
                             "  if (active === backBtn) {" +
-                            "    if (trigger) { trigger.focus(); } else if (prevBtn) { prevBtn.focus(); } else if (nextBtn) { nextBtn.focus(); }" +
+                            "    if (subBtn) { subBtn.focus(); } else if (trigger) { trigger.focus(); } else if (prevBtn) { prevBtn.focus(); } else if (nextBtn) { nextBtn.focus(); }" +
+                            "    window.dispatchEvent(new CustomEvent('tmdb_reset_header_timer'));" +
+                            "    return true;" +
+                            "  } else if (active === subBtn) {" +
+                            "    if (trigger) { trigger.focus(); } else if (nextBtn) { nextBtn.focus(); }" +
                             "    window.dispatchEvent(new CustomEvent('tmdb_reset_header_timer'));" +
                             "    return true;" +
                             "  } else if (active === prevBtn) {" +
-                            "    if (nextBtn) { nextBtn.focus(); } else if (trigger) { trigger.focus(); }" +
+                            "    if (nextBtn) { nextBtn.focus(); } else if (subBtn) { subBtn.focus(); } else if (trigger) { trigger.focus(); }" +
                             "    window.dispatchEvent(new CustomEvent('tmdb_reset_header_timer'));" +
                             "    return true;" +
                             "  } else if (active === nextBtn) {" +
-                            "    if (trigger) { trigger.focus(); }" +
+                            "    if (subBtn) { subBtn.focus(); } else if (trigger) { trigger.focus(); }" +
                             "    window.dispatchEvent(new CustomEvent('tmdb_reset_header_timer'));" +
                             "    return true;" +
                             "  }" +
@@ -1974,6 +2102,7 @@ public class MainActivity extends BridgeActivity {
                         webView.evaluateJavascript(
                             "(function() {" +
                             "  if (window.__tmdbVirtualCursorActive) return false;" +
+                            "  if (document.querySelector('[role=\"dialog\"]')) return false;" +
                             "  var upNext = document.querySelector('[data-up-next-popup=\"true\"]');" +
                             "  if (upNext) {" +
                             "    var dismissBtn = document.getElementById('up-next-dismiss-btn');" +
@@ -1983,12 +2112,17 @@ public class MainActivity extends BridgeActivity {
                             "  var isHeaderFocused = !!window.__tmdbHeaderFocused || (header && header.contains(document.activeElement));" +
                             "  if (!isHeaderFocused) return false;" +
                             "  var backBtn = document.getElementById('watch-back-btn');" +
+                            "  var subBtn = document.getElementById('watch-settings-btn');" +
+                            "  var trigger = document.getElementById('watch-provider-trigger');" +
                             "  var prevBtn = document.getElementById('watch-prev-ep-btn');" +
                             "  var nextBtn = document.getElementById('watch-next-ep-btn');" +
-                            "  var trigger = document.getElementById('watch-provider-trigger');" +
                             "  var active = document.activeElement;" +
                             "  if (active === trigger) {" +
-                            "    if (backBtn) { backBtn.focus(); } else if (nextBtn) { nextBtn.focus(); } else if (prevBtn) { prevBtn.focus(); }" +
+                            "    if (subBtn) { subBtn.focus(); } else if (backBtn) { backBtn.focus(); } else if (nextBtn) { nextBtn.focus(); } else if (prevBtn) { prevBtn.focus(); }" +
+                            "    window.dispatchEvent(new CustomEvent('tmdb_reset_header_timer'));" +
+                            "    return true;" +
+                            "  } else if (active === subBtn) {" +
+                            "    if (backBtn) { backBtn.focus(); } else if (nextBtn) { nextBtn.focus(); }" +
                             "    window.dispatchEvent(new CustomEvent('tmdb_reset_header_timer'));" +
                             "    return true;" +
                             "  } else if (active === nextBtn) {" +
@@ -2012,23 +2146,25 @@ public class MainActivity extends BridgeActivity {
                         webView.evaluateJavascript(
                             "(function() {" +
                             "  if (window.__tmdbVirtualCursorActive) return false;" +
+                            "  if (document.querySelector('[role=\"dialog\"]')) return false;" +
                             "  var header = document.querySelector('[data-watch-header=\"true\"]');" +
                             "  var isHeaderFocused = !!window.__tmdbHeaderFocused || (header && header.contains(document.activeElement));" +
                             "  if (!isHeaderFocused) return false;" +
                             "  var backBtn = document.getElementById('watch-back-btn');" +
+                            "  var subBtn = document.getElementById('watch-settings-btn');" +
+                            "  var trigger = document.getElementById('watch-provider-trigger');" +
                             "  var prevBtn = document.getElementById('watch-prev-ep-btn');" +
                             "  var nextBtn = document.getElementById('watch-next-ep-btn');" +
-                            "  var trigger = document.getElementById('watch-provider-trigger');" +
                             "  var active = document.activeElement;" +
                             "  if (active === prevBtn) {" +
                             "    if (backBtn) { backBtn.focus(); }" +
                             "    window.dispatchEvent(new CustomEvent('tmdb_reset_header_timer'));" +
                             "    return true;" +
                             "  } else if (active === nextBtn) {" +
-                            "    if (trigger) { trigger.focus(); } else if (backBtn) { backBtn.focus(); }" +
+                            "    if (subBtn) { subBtn.focus(); } else if (trigger) { trigger.focus(); } else if (backBtn) { backBtn.focus(); }" +
                             "    window.dispatchEvent(new CustomEvent('tmdb_reset_header_timer'));" +
                             "    return true;" +
-                            "  } else if (active === backBtn || active === trigger) {" +
+                            "  } else if (active === backBtn || active === subBtn || active === trigger) {" +
                             "    window.dispatchEvent(new CustomEvent('tmdb_reset_header_timer'));" +
                             "    return true;" +
                             "  }" +
@@ -2101,9 +2237,6 @@ public class MainActivity extends BridgeActivity {
                                 "      window.dispatchEvent(new CustomEvent('tmdb_toggle_cursor'));" +
                                 "    } else {" +
                                 "      window.dispatchEvent(new CustomEvent('tmdb_toggle_play_pause'));" +
-                                "      if (typeof window.AndroidBridge !== 'undefined' && typeof window.AndroidBridge.simulateTouchAt === 'function') {" +
-                                "        window.AndroidBridge.simulateTouchAt(window.innerWidth / 2, window.innerHeight / 2);" +
-                                "      }" +
                                 "    }" +
                                 "  }" +
                                 "  return false;" +
@@ -2118,18 +2251,20 @@ public class MainActivity extends BridgeActivity {
                         webView.evaluateJavascript(
                             "(function() {" +
                             "  if (window.__tmdbVirtualCursorActive) return false;" +
+                            "  if (document.querySelector('[role=\"dialog\"]')) return false;" +
                             "  var header = document.querySelector('[data-watch-header=\"true\"]');" +
                             "  var isHeaderFocused = !!window.__tmdbHeaderFocused || (header && header.contains(document.activeElement));" +
                             "  if (isHeaderFocused) {" +
                             "    var active = document.activeElement;" +
                             "    var backBtn = document.getElementById('watch-back-btn');" +
+                            "    var subBtn = document.getElementById('watch-settings-btn');" +
                             "    var prevBtn = document.getElementById('watch-prev-ep-btn');" +
                             "    var nextBtn = document.getElementById('watch-next-ep-btn');" +
                             "    var trigger = document.getElementById('watch-provider-trigger');" +
                             "    if (active === backBtn) {" +
                             "      if (prevBtn) { prevBtn.focus(); window.dispatchEvent(new CustomEvent('tmdb_reset_header_timer')); return true; }" +
                             "      if (nextBtn) { nextBtn.focus(); window.dispatchEvent(new CustomEvent('tmdb_reset_header_timer')); return true; }" +
-                            "    } else if (active === trigger) {" +
+                            "    } else if (active === subBtn || active === trigger) {" +
                             "      if (nextBtn) { nextBtn.focus(); window.dispatchEvent(new CustomEvent('tmdb_reset_header_timer')); return true; }" +
                             "      if (prevBtn) { prevBtn.focus(); window.dispatchEvent(new CustomEvent('tmdb_reset_header_timer')); return true; }" +
                             "    }" +
@@ -2151,6 +2286,15 @@ public class MainActivity extends BridgeActivity {
                             "    window.__tmdbVirtualCursorActive = false;" +
                             "    window.dispatchEvent(new CustomEvent('tmdb_close_cursor'));" +
                             "    return 'CLOSED_CURSOR';" +
+                            "  }" +
+                            "  var dialog = document.querySelector('[role=\"dialog\"]');" +
+                            "  if (dialog) {" +
+                            "    window.dispatchEvent(new CustomEvent('tmdb_close_dialog'));" +
+                            "    var closeBtn = dialog.querySelector('button[aria-label=\"Close\"], [data-close-dialog=\"true\"]');" +
+                            "    if (closeBtn && typeof closeBtn.click === 'function') { closeBtn.click(); }" +
+                            "    var subBtn = document.getElementById('watch-settings-btn');" +
+                            "    if (subBtn) { subBtn.focus(); }" +
+                            "    return 'CLOSED_DIALOG';" +
                             "  }" +
                             "  var upNext = document.querySelector('[data-up-next-popup=\"true\"]');" +
                             "  if (upNext) {" +

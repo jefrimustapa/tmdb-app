@@ -315,12 +315,16 @@ export const TVVirtualCursor: React.FC<TVVirtualCursorProps> = ({
             <line x1="16" y1="26" x2="16" y2="31" stroke="#00E5FF" strokeWidth="2.5" strokeLinecap="round" />
             <line x1="1" y1="16" x2="6" y2="16" stroke="#00E5FF" strokeWidth="2.5" strokeLinecap="round" />
             <line x1="26" y1="16" x2="31" y2="16" stroke="#00E5FF" strokeWidth="2.5" strokeLinecap="round" />
-            {/* Center Pointer Core Hotspot */}
-            <circle cx="16" cy="16" r="3" fill="#FFFFFF" stroke="#000000" strokeWidth="0.8" />
+            {/* Center Pointer Core Hotspot: subtle color shift on click */}
+            <circle
+              cx="16"
+              cy="16"
+              r="3"
+              fill={isClicking ? '#00E5FF' : '#FFFFFF'}
+              stroke={isClicking ? '#00E5FF' : '#000000'}
+              strokeWidth="0.8"
+            />
           </svg>
-          {isClicking && (
-            <div className="absolute inset-0 rounded-full border-2 border-[#00E5FF] bg-[#00E5FF]/40 animate-ping" />
-          )}
         </div>
       </div>
     </div>

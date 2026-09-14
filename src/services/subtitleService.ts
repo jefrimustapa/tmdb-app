@@ -244,53 +244,137 @@ function parseTimestamp(timeStr: string): number {
 }
 
 /**
+ * Decodes common HTML entities found in subtitle tracks
+ */
+function decodeHtmlEntities(text: string): string {
+  if (!text.includes('&')) return text;
+  return text
+    .replace(/&amp;/g, '&')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;|&apos;|&#x27;/gi, "'")
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&#8220;|&#8221;|&ldquo;|&rdquo;/g, '"')
+    .replace(/&#8216;|&#8217;|&lsquo;|&rsquo;/g, "'")
+    .replace(/&ndash;/g, '–')
+    .replace(/&mdash;/g, '—')
+    .replace(/&#(\d+);/g, (_, dec) => {
+      try {
+        return String.fromCharCode(parseInt(dec, 10));
+      } catch {
+        return '';
+      }
+    });
+}
+
+/**
  * Parses raw SRT / WebVTT text into timed subtitle cues.
+ * Built with resilient line-by-line scanning to gracefully handle:
+ * - UTF-8 Byte Order Marks (BOM)
+ * - Single-newline cue separators (malformed SRTs)
+ * - WebVTT headers (WEBVTT, NOTE, STYLE, REGION)
+ * - Non-standard timestamp formats (H:MM:SS, MM:SS, commas/dots)
+ * - Trailing WebVTT cue positioning flags (align:middle position:50%)
+ * - Unescaped HTML entities and SSA/ASS tag overrides
  */
 export function parseSubtitleText(content: string): SubtitleCue[] {
   if (!content) return [];
 
-  // Normalize line breaks
-  const normalized = content.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-  const blocks = normalized.split(/\n\s*\n/);
+  // 1. Strip UTF-8 BOM if present
+  let cleanContent = content.charCodeAt(0) === 0xfeff ? content.slice(1) : content;
+
+  // 2. Normalize CRLF and CR to standard LF
+  cleanContent = cleanContent.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+
+  const lines = cleanContent.split('\n');
   const cues: SubtitleCue[] = [];
 
-  const timeRegex = /((?:\d{1,2}:)?\d{2}:\d{2}[,.]\d{2,3})\s*-->\s*((?:\d{1,2}:)?\d{2}:\d{2}[,.]\d{2,3})/;
+  // Matches flexible timestamps like "00:01:23,450 --> 00:01:25,700" or "01:23.450 --> 01:25.700"
+  // and ignores trailing WebVTT positioning tokens (e.g. "align:start size:50%")
+  const timestampRegex = /^\s*((?:\d{1,2}:)?\d{1,2}:\d{2}[,.]\d{1,3})\s*-->\s*((?:\d{1,2}:)?\d{1,2}:\d{2}[,.]\d{1,3})/;
 
-  for (const block of blocks) {
-    const lines = block.trim().split('\n');
-    let timeIndex = -1;
+  let currentStart = -1;
+  let currentEnd = -1;
+  let currentTextLines: string[] = [];
 
-    for (let i = 0; i < lines.length; i++) {
-      if (timeRegex.test(lines[i])) {
-        timeIndex = i;
-        break;
+  const flushCue = () => {
+    if (currentStart >= 0 && currentEnd > currentStart && currentTextLines.length > 0) {
+      const rawText = currentTextLines.join('\n');
+
+      // Sanitize: strip HTML tags (<i>, <b>, <font>, <v ...>), SSA tags ({\an8}), and decode entities
+      const sanitized = decodeHtmlEntities(
+        rawText
+          .replace(/<[^>]+>/g, '')
+          .replace(/\{[^}]+\}/g, '')
+      ).trim();
+
+      if (sanitized) {
+        cues.push({
+          start: currentStart,
+          end: currentEnd,
+          text: sanitized
+        });
       }
     }
+    currentStart = -1;
+    currentEnd = -1;
+    currentTextLines = [];
+  };
 
-    if (timeIndex === -1) continue;
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const trimmed = line.trim();
 
-    const timeMatch = lines[timeIndex].match(timeRegex);
-    if (!timeMatch) continue;
+    // Check if this line is a timestamp indicator
+    const match = trimmed.match(timestampRegex);
+    if (match) {
+      // If we already had an active cue collecting text, save it before starting this new one
+      flushCue();
 
-    const start = parseTimestamp(timeMatch[1]);
-    const end = parseTimestamp(timeMatch[2]);
-    if (isNaN(start) || isNaN(end) || end <= start) continue;
+      const startSec = parseTimestamp(match[1]);
+      const endSec = parseTimestamp(match[2]);
 
-    // Remaining lines contain the subtitle text
-    const textLines = lines.slice(timeIndex + 1);
-    const cleanedText = textLines
-      .join('\n')
-      // Strip HTML formatting tags like <i>, <b>, <font color="...">, <c.color>
-      .replace(/<[^>]+>/g, '')
-      // Strip SSA/ASS style override codes like {\an8}
-      .replace(/\{[^}]+\}/g, '')
-      .trim();
+      if (!isNaN(startSec) && !isNaN(endSec)) {
+        currentStart = startSec;
+        // Auto-correct zero or negative duration to minimum 2 seconds
+        currentEnd = endSec > startSec ? endSec : startSec + 2.0;
+      }
+      continue;
+    }
 
-    if (cleanedText) {
-      cues.push({ start, end, text: cleanedText });
+    // Skip WebVTT header lines or block metadata
+    if (
+      trimmed === 'WEBVTT' ||
+      trimmed.startsWith('NOTE') ||
+      trimmed.startsWith('STYLE') ||
+      trimmed.startsWith('REGION')
+    ) {
+      continue;
+    }
+
+    // Skip standalone numerical cue index lines (e.g. "1", "24", "1500")
+    if (/^\d+$/.test(trimmed) && currentStart < 0) {
+      continue;
+    }
+
+    // Blank line indicates cue termination
+    if (!trimmed) {
+      if (currentStart >= 0) {
+        flushCue();
+      }
+      continue;
+    }
+
+    // Otherwise, if we are inside a valid cue window, collect the text line
+    if (currentStart >= 0) {
+      currentTextLines.push(line);
     }
   }
 
-  // Sort chronologically by start time
+  // Flush final trailing cue
+  flushCue();
+
+  // Sort cues chronologically by start timestamp
   return cues.sort((a, b) => a.start - b.start);
 }
