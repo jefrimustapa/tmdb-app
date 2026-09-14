@@ -109,7 +109,6 @@ export const WatchSettingsModal: React.FC<WatchSettingsModalProps> = ({
       if (!modalRef.current) return;
 
       const currentEl = document.activeElement as HTMLElement | null;
-      if (!currentEl) return;
 
       // Group focusables into logical rows so vertical navigation jumps rows directly!
       const closeBtn = modalRef.current.querySelector<HTMLElement>('[data-close-dialog="true"]');
@@ -128,12 +127,14 @@ export const WatchSettingsModal: React.FC<WatchSettingsModalProps> = ({
       let currentRowIdx = -1;
       let currentColIdx = -1;
 
-      for (let r = 0; r < rows.length; r++) {
-        const c = rows[r].indexOf(currentEl);
-        if (c !== -1) {
-          currentRowIdx = r;
-          currentColIdx = c;
-          break;
+      if (currentEl) {
+        for (let r = 0; r < rows.length; r++) {
+          const c = rows[r].indexOf(currentEl);
+          if (c !== -1) {
+            currentRowIdx = r;
+            currentColIdx = c;
+            break;
+          }
         }
       }
 
@@ -149,10 +150,18 @@ export const WatchSettingsModal: React.FC<WatchSettingsModalProps> = ({
         }
 
         if (currentRowIdx === -1) {
-          // Focus first available item
-          const first = (rows[0] && rows[0][0]) || closeBtn;
-          first?.focus();
-          return;
+          // If current element is outside modal, focus active tab or first element
+          const activeTabEl = tabs.find((t) => t.getAttribute('aria-selected') === 'true') || (rows[0] && rows[0][0]) || closeBtn;
+          if (activeTabEl && activeTabEl !== currentEl) {
+            activeTabEl.focus();
+            return;
+          }
+          // If already on active tab or couldn't match, move to row 1 (content)
+          if (rows.length > 1 && rows[1].length > 0) {
+            rows[1][0].focus();
+            rows[1][0].scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+            return;
+          }
         }
 
         if (currentRowIdx < rows.length - 1) {
@@ -170,6 +179,12 @@ export const WatchSettingsModal: React.FC<WatchSettingsModalProps> = ({
         e.preventDefault();
         e.stopPropagation();
 
+        if (currentRowIdx === -1) {
+          const activeTabEl = tabs.find((t) => t.getAttribute('aria-selected') === 'true') || (rows[0] && rows[0][0]) || closeBtn;
+          activeTabEl?.focus();
+          return;
+        }
+
         if (currentRowIdx > 0) {
           const prevRow = rows[currentRowIdx - 1];
           const targetCol = Math.min(currentColIdx >= 0 ? currentColIdx : 0, prevRow.length - 1);
@@ -185,6 +200,12 @@ export const WatchSettingsModal: React.FC<WatchSettingsModalProps> = ({
 
       if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
         const delta = e.key === 'ArrowRight' ? 1 : -1;
+
+        if (currentRowIdx === -1) {
+          const activeTabEl = tabs.find((t) => t.getAttribute('aria-selected') === 'true') || (rows[0] && rows[0][0]) || closeBtn;
+          activeTabEl?.focus();
+          return;
+        }
 
         // If on tab buttons, switch active tab with left/right
         const tabSub = document.getElementById('settings-tab-subtitles');
@@ -225,25 +246,54 @@ export const WatchSettingsModal: React.FC<WatchSettingsModalProps> = ({
     window.addEventListener('keydown', handleKeyDown, true);
     window.addEventListener('tmdb_close_dialog', handleCloseDialog);
 
-    const timer = setTimeout(() => {
-      if (modalRef.current) {
-        const selected = modalRef.current.querySelector<HTMLElement>(
+    // Reliable focus pull into modal from iframe / background
+    const focusActiveModalElement = () => {
+      // Forcefully release focus from any embed iframe
+      try {
+        window.focus();
+        document.querySelectorAll('iframe').forEach((f) => {
+          try {
+            f.blur();
+            if (f.contentWindow) f.contentWindow.blur();
+          } catch (e) {}
+        });
+      } catch (e) {}
+
+      const modalEl = modalRef.current || document.querySelector<HTMLElement>('[role="dialog"]');
+      if (modalEl) {
+        const current = document.activeElement as HTMLElement | null;
+        if (current && !modalEl.contains(current)) {
+          current.blur();
+        }
+        // If already inside modal and not on modal root, keep current focus
+        if (current && modalEl.contains(current) && current !== modalEl) {
+          return;
+        }
+        const selected = modalEl.querySelector<HTMLElement>(
           '[data-selected-item="true"], [data-selected-track="true"], button[role="tab"][aria-selected="true"]'
         );
         if (selected) {
           selected.focus();
           selected.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
         } else {
-          const firstFocusable = modalRef.current.querySelector<HTMLElement>('button:not([disabled])');
+          const firstFocusable = modalEl.querySelector<HTMLElement>('button:not([disabled])');
           if (firstFocusable) firstFocusable.focus();
         }
       }
-    }, 60);
+    };
+
+    // Pull focus on multiple animation frames to ensure DOM is ready and iframe cannot steal it back
+    focusActiveModalElement();
+    const t1 = setTimeout(focusActiveModalElement, 50);
+    const t2 = setTimeout(focusActiveModalElement, 150);
+    const t3 = setTimeout(focusActiveModalElement, 300);
 
     return () => {
       window.removeEventListener('keydown', handleKeyDown, true);
       window.removeEventListener('tmdb_close_dialog', handleCloseDialog);
-      clearTimeout(timer);
+      clearTimeout(t1);
+      clearTimeout(t2);
+      clearTimeout(t3);
       try {
         (window as any).AndroidBridge?.setModalOpen?.(false);
       } catch (e) {}
@@ -307,6 +357,7 @@ export const WatchSettingsModal: React.FC<WatchSettingsModalProps> = ({
           </div>
           <button
             type="button"
+            tabIndex={0}
             onClick={onClose}
             aria-label="Close"
             data-close-dialog="true"
@@ -321,6 +372,7 @@ export const WatchSettingsModal: React.FC<WatchSettingsModalProps> = ({
           <button
             type="button"
             role="tab"
+            tabIndex={0}
             id="settings-tab-subtitles"
             aria-selected={activeTab === 'subtitles'}
             onClick={() => setActiveTab('subtitles')}
@@ -340,6 +392,7 @@ export const WatchSettingsModal: React.FC<WatchSettingsModalProps> = ({
           <button
             type="button"
             role="tab"
+            tabIndex={0}
             id="settings-tab-server"
             aria-selected={activeTab === 'server'}
             onClick={() => setActiveTab('server')}
@@ -373,6 +426,7 @@ export const WatchSettingsModal: React.FC<WatchSettingsModalProps> = ({
                 <div className="flex items-center gap-1.5">
                   <button
                     type="button"
+                    tabIndex={0}
                     onClick={() => onAdjustSync(Math.round((syncOffset - 0.5) * 10) / 10)}
                     data-sync-btn="true"
                     title="Delay subtitle by 0.5s"
@@ -384,6 +438,7 @@ export const WatchSettingsModal: React.FC<WatchSettingsModalProps> = ({
                   {syncOffset !== 0 && (
                     <button
                       type="button"
+                      tabIndex={0}
                       onClick={() => onAdjustSync(0)}
                       data-sync-btn="true"
                       title="Reset subtitle offset to 0"
@@ -394,6 +449,7 @@ export const WatchSettingsModal: React.FC<WatchSettingsModalProps> = ({
                   )}
                   <button
                     type="button"
+                    tabIndex={0}
                     onClick={() => onAdjustSync(Math.round((syncOffset + 0.5) * 10) / 10)}
                     data-sync-btn="true"
                     title="Advance subtitle by 0.5s"
@@ -410,6 +466,7 @@ export const WatchSettingsModal: React.FC<WatchSettingsModalProps> = ({
             <div className="flex items-center gap-2 px-5 py-2.5 border-b border-white/10 bg-black/20 text-xs flex-shrink-0">
               <button
                 type="button"
+                tabIndex={0}
                 onClick={() => setFilterLang('all')} data-lang-btn="true"
                 className={`px-3 py-1.5 rounded-lg font-semibold transition tv-focus-target focus:outline-none focus:ring-2 focus:ring-hbo-cyan cursor-pointer ${
                   filterLang === 'all'
@@ -421,6 +478,7 @@ export const WatchSettingsModal: React.FC<WatchSettingsModalProps> = ({
               </button>
               <button
                 type="button"
+                tabIndex={0}
                 onClick={() => setFilterLang('ms')} data-lang-btn="true"
                 className={`px-3 py-1.5 rounded-lg font-semibold transition tv-focus-target focus:outline-none focus:ring-2 focus:ring-hbo-cyan cursor-pointer ${
                   filterLang === 'ms'
@@ -432,6 +490,7 @@ export const WatchSettingsModal: React.FC<WatchSettingsModalProps> = ({
               </button>
               <button
                 type="button"
+                tabIndex={0}
                 onClick={() => setFilterLang('en')} data-lang-btn="true"
                 className={`px-3 py-1.5 rounded-lg font-semibold transition tv-focus-target focus:outline-none focus:ring-2 focus:ring-hbo-cyan cursor-pointer ${
                   filterLang === 'en'
@@ -448,6 +507,7 @@ export const WatchSettingsModal: React.FC<WatchSettingsModalProps> = ({
               {/* Option: Off / Disable */}
               <button
                 type="button"
+                tabIndex={0}
                 data-selected-item={activeTrackId === null ? 'true' : undefined}
                 data-selected-track={activeTrackId === null ? 'true' : undefined}
                 data-list-item="true"
@@ -514,6 +574,7 @@ export const WatchSettingsModal: React.FC<WatchSettingsModalProps> = ({
                   <button
                     key={track.id}
                     type="button"
+                    tabIndex={0}
                     data-selected-item={isSelected ? 'true' : undefined}
                     data-selected-track={isSelected ? 'true' : undefined}
                     data-list-item="true"
@@ -571,6 +632,7 @@ export const WatchSettingsModal: React.FC<WatchSettingsModalProps> = ({
                 <button
                   key={p.id}
                   type="button"
+                  tabIndex={0}
                   data-selected-item={isSelected ? 'true' : undefined}
                   data-list-item="true"
                   onClick={() => {

@@ -208,6 +208,7 @@ public class MainActivity extends BridgeActivity {
                     if (!active) {
                         isVirtualCursorActive = false;
                         isDropdownOpen = false;
+                        isModalOpen = false;
                         isSimulatingTouch = false;
                     }
                     runOnUiThread(() -> {
@@ -226,6 +227,7 @@ public class MainActivity extends BridgeActivity {
                         }
                     });
                 }
+
 
                 @JavascriptInterface
                 public void openCastMenu() {
@@ -1590,6 +1592,7 @@ public class MainActivity extends BridgeActivity {
                         // Intercepts vidlink.pro HTML pages and injects a script that:
                         // 1. Pre-sets mediaSettings localStorage to {volume:1, muted:false} before Vidstack reads it
                         // 2. Polls every 500ms to click the mute button if the player initializes muted
+                        // NOTE: Do NOT intercept cinesrc.st HTML because CineSrc uses PoW (Proof of Work) tokens that fail when intercepted!
                         if (lower.contains("vidlink.pro") && !lower.contains(".js") && !lower.contains(".css")
                                 && !lower.contains(".png") && !lower.contains(".jpg") && !lower.contains(".svg")
                                 && !lower.contains(".woff") && !lower.contains(".ico") && !lower.contains(".json")
@@ -1730,6 +1733,22 @@ public class MainActivity extends BridgeActivity {
                                             "        toggleVidLinkPlay('play');\n" +
                                             "      } else if (action === 'toggle' || d.key === ' ' || d.code === 'Space') {\n" +
                                             "        toggleVidLinkPlay();\n" +
+                                            "      } else if (action === 'seek' || action === 'SEEK') {\n" +
+                                            "        var target = typeof d.time === 'number' ? d.time : (d.data && typeof d.data.time === 'number' ? d.data.time : null);\n" +
+                                            "        if (target !== null && target >= 0) {\n" +
+                                            "          document.querySelectorAll('video').forEach(function(v) { try { v.currentTime = target; } catch(err) {} });\n" +
+                                            "        }\n" +
+                                            "      } else if (action === 'seekDelta') {\n" +
+                                            "        var delta = typeof d.delta === 'number' ? d.delta : 0;\n" +
+                                            "        if (delta !== 0) {\n" +
+                                            "          document.querySelectorAll('video').forEach(function(v) {\n" +
+                                            "            try {\n" +
+                                            "              var n = Math.max(0, (v.currentTime || 0) + delta);\n" +
+                                            "              if (v.duration && n > v.duration) n = v.duration;\n" +
+                                            "              v.currentTime = n;\n" +
+                                            "            } catch(err) {}\n" +
+                                            "          });\n" +
+                                            "        }\n" +
                                             "      }\n" +
                                             "    } catch(err) {}\n" +
                                             "  });\n" +
@@ -2066,7 +2085,10 @@ public class MainActivity extends BridgeActivity {
                             "  }" +
                             "  var header = document.querySelector('[data-watch-header=\"true\"]');" +
                             "  var isHeaderFocused = !!window.__tmdbHeaderFocused || (header && header.contains(document.activeElement));" +
-                            "  if (!isHeaderFocused) return false;" +
+                            "  if (!isHeaderFocused) {" +
+                            "    window.dispatchEvent(new CustomEvent('tmdb_dpad_seek', { detail: { delta: 10, direction: 'forward' } }));" +
+                            "    return true;" +
+                            "  }" +
                             "  var backBtn = document.getElementById('watch-back-btn');" +
                             "  var subBtn = document.getElementById('watch-settings-btn');" +
                             "  var trigger = document.getElementById('watch-provider-trigger');" +
@@ -2094,6 +2116,10 @@ public class MainActivity extends BridgeActivity {
                             "})();",
                             null
                         );
+                        // If modal is open, NEVER consume D-Pad Right! Let WebView process it!
+                        if (isModalOpen) {
+                            return super.dispatchKeyEvent(event);
+                        }
                         return true;
                     }
                     return super.dispatchKeyEvent(event);
@@ -2110,7 +2136,10 @@ public class MainActivity extends BridgeActivity {
                             "  }" +
                             "  var header = document.querySelector('[data-watch-header=\"true\"]');" +
                             "  var isHeaderFocused = !!window.__tmdbHeaderFocused || (header && header.contains(document.activeElement));" +
-                            "  if (!isHeaderFocused) return false;" +
+                            "  if (!isHeaderFocused) {" +
+                            "    window.dispatchEvent(new CustomEvent('tmdb_dpad_seek', { detail: { delta: -10, direction: 'rewind' } }));" +
+                            "    return true;" +
+                            "  }" +
                             "  var backBtn = document.getElementById('watch-back-btn');" +
                             "  var subBtn = document.getElementById('watch-settings-btn');" +
                             "  var trigger = document.getElementById('watch-provider-trigger');" +
@@ -2138,6 +2167,10 @@ public class MainActivity extends BridgeActivity {
                             "})();",
                             null
                         );
+                        // If modal is open, NEVER consume D-Pad Left! Let WebView process it!
+                        if (isModalOpen) {
+                            return super.dispatchKeyEvent(event);
+                        }
                         return true;
                     }
                     return super.dispatchKeyEvent(event);
@@ -2172,6 +2205,10 @@ public class MainActivity extends BridgeActivity {
                             "})();",
                             null
                         );
+                        // If modal is open, NEVER consume D-Pad Up! Let WebView process it!
+                        if (isModalOpen) {
+                            return super.dispatchKeyEvent(event);
+                        }
                         return true;
                     }
                     return super.dispatchKeyEvent(event);
@@ -2275,6 +2312,10 @@ public class MainActivity extends BridgeActivity {
                             "})();",
                             null
                         );
+                        // If modal is open, NEVER consume D-Pad Down! Let WebView process it!
+                        if (isModalOpen) {
+                            return super.dispatchKeyEvent(event);
+                        }
                         return true;
                     }
                     return super.dispatchKeyEvent(event);
