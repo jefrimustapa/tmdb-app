@@ -258,10 +258,22 @@ async function tmdbFetch<T>(endpoint: string, params: Record<string, string | nu
     return filtered;
   };
 
+  // Check if endpoint is a curated home rail or fast-path requested
+  const isHomeRailEndpoint = 
+    endpoint.startsWith('/trending/') || 
+    endpoint === '/movie/popular' || 
+    endpoint === '/tv/popular' || 
+    endpoint === '/movie/now_playing' || 
+    endpoint === '/tv/on_the_air';
+
   // Filter adult items and explicit sexual/adult ratings if filterAdult is active
   if (filterAdult && data) {
     if (Array.isArray(data.results) && data.results.length > 0) {
-      data.results = await filterMediaItemList(data.results);
+      if (isHomeRailEndpoint) {
+        data.results = fastFilterMediaItemList(data.results);
+      } else {
+        data.results = await filterMediaItemList(data.results);
+      }
     }
     // Fast-filter nested similar / recommendations from append_to_response on details endpoints
     // so details pages load instantaneously without blocking on 40 sub-requests
