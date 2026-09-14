@@ -2,12 +2,13 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20260914-0247';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.fix-unsupported-malf.20260914-0247';
+export const APP_BUILD_NUMBER = '20260914-0545';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.perf-improve-tv-home.20260914-0545';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
-export const APP_BRANCH = 'fix-unsupported-malf';
-export const APP_CHANGELOG = `* feat: implement custom subtitle service with OpenSubtitles v3 and bright67 engine (#99)
+export const APP_BRANCH = 'perf-improve-tv-home';
+export const APP_CHANGELOG = `* fix: handle unsupported and malformed subtitles, optimize video playback CPU usage, and refine virtual cursor click (#100)
+* feat: implement custom subtitle service with OpenSubtitles v3 and bright67 engine (#99)
 * feat(tablet): set 4 cols portrait and 6 cols landscape on movies, series, myspace, and search; remove search clear button scale animation (#98)
 * refactor: scope CineSrc landscape menu CSS to phones and round navbar container in perf mode (#97)
 * feat(search): replace searchMulti with parallel searchMovies and searchTV to improve title fuzzy matching (#96)
@@ -20,5 +21,4 @@ export const APP_CHANGELOG = `* feat: implement custom subtitle service with Ope
 * feat(settings): update autoplay next episode threshold to 96-104% and countdown to 20-80s (#89)
 * fix(cinesrc): refine landscape settings and server menus and hide fullscreen button (#88)
 * feat(search): compact mobile search box, scroll to top on mount, and 1s unified debounce (#87)
-* feat(details): circular 2nd row action buttons with unified cyan ring on mobile (#86)
-* fixed the settings menu (#85)`;
+* feat(details): circular 2nd row action buttons with unified cyan ring on mobile (#86)`;
