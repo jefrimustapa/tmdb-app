@@ -149,12 +149,12 @@ export const Settings: React.FC = () => {
   const [showEasterEgg, setShowEasterEgg] = useState(false);
   const easterEggScrollRef = useRef<HTMLDivElement>(null);
   const [priorityCategoryTab, setPriorityCategoryTab] = useState<'general' | 'anime' | 'asian' | 'korean'>('general');
-  const [openDropdownSlot, setOpenDropdownSlot] = useState<number | null>(null);
+  const [pickerModalSlot, setPickerModalSlot] = useState<number | null>(null);
   const clickCountRef = useRef(0);
   const clickTimerRef = useRef<NodeJS.Timeout | null>(null);
   const { detectedPlatform, activeLayout } = useDevice();
 
-  const isAnyDropdownOpen = openDropdownSlot !== null;
+  const isPickerModalOpen = pickerModalSlot !== null;
 
   // Reset scroll position of child panel when activeCategory changes
   useEffect(() => {
@@ -165,16 +165,16 @@ export const Settings: React.FC = () => {
 
   useEffect(() => {
     try {
-      (window as any).AndroidBridge?.setDropdownOpen?.(isAnyDropdownOpen);
+      (window as any).AndroidBridge?.setDropdownOpen?.(isPickerModalOpen);
     } catch {}
 
-    if (openDropdownSlot !== null) {
+    if (pickerModalSlot !== null) {
       setTimeout(() => {
-        const activeEl = document.querySelector<HTMLElement>('[data-priority-dropdown-container="true"] [data-provider-selected="true"]') ||
-                         document.querySelector<HTMLElement>('[data-priority-dropdown-container="true"] .tv-focus-target');
-        if (activeEl) {
-          activeEl.focus();
-          activeEl.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        const selectedEl = document.querySelector<HTMLElement>('[data-server-modal-item][data-provider-selected="true"]') ||
+                           document.querySelector<HTMLElement>('[data-server-modal-item]');
+        if (selectedEl) {
+          selectedEl.focus();
+          selectedEl.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
         }
       }, 50);
     }
@@ -184,13 +184,13 @@ export const Settings: React.FC = () => {
         (window as any).AndroidBridge?.setDropdownOpen?.(false);
       } catch {}
     };
-  }, [openDropdownSlot, isAnyDropdownOpen]);
+  }, [pickerModalSlot, isPickerModalOpen]);
 
-  // Handle remote Back button, Escape, and Left/Right arrow dismissal for priority dropdowns
+  // Handle remote Back button, tmdb_close_dropdowns, and Escape dismissal for picker modal
   useEffect(() => {
     const handleCloseFromEvent = () => {
-      const slot = openDropdownSlot;
-      setOpenDropdownSlot(null);
+      const slot = pickerModalSlot;
+      setPickerModalSlot(null);
       if (slot !== null) {
         setTimeout(() => {
           document.getElementById(`priority-server-btn-${slot}`)?.focus();
@@ -200,72 +200,35 @@ export const Settings: React.FC = () => {
 
     window.addEventListener('tmdb_close_dropdowns', handleCloseFromEvent);
 
-    if (!isAnyDropdownOpen) {
+    if (!isPickerModalOpen) {
       return () => {
         window.removeEventListener('tmdb_close_dropdowns', handleCloseFromEvent);
       };
     }
 
-    const handleKeyDown = (e: KeyboardEvent) => {
+    const handleModalKeyDown = (e: KeyboardEvent) => {
       if (
         e.key === 'Escape' ||
         e.key === 'BrowserBack' ||
         e.key === 'Back' ||
+        e.key === 'GoBack' ||
         e.keyCode === 27 ||
         e.keyCode === 4 ||
         e.keyCode === 10009
       ) {
         e.preventDefault();
-        e.stopPropagation();
-        const slot = openDropdownSlot;
-        setOpenDropdownSlot(null);
-        if (slot !== null) {
-          setTimeout(() => {
-            document.getElementById(`priority-server-btn-${slot}`)?.focus();
-          }, 50);
-        }
-        return;
-      }
-
-      if (e.key === 'ArrowRight' && openDropdownSlot !== null && openDropdownSlot < 2) {
-        e.preventDefault();
-        e.stopPropagation();
-        const nextSlot = openDropdownSlot + 1;
-        setOpenDropdownSlot(null);
-        setTimeout(() => {
-          document.getElementById(`priority-server-btn-${nextSlot}`)?.focus();
-        }, 50);
-        return;
-      }
-
-      if (e.key === 'ArrowLeft' && openDropdownSlot !== null && openDropdownSlot > 0) {
-        e.preventDefault();
-        e.stopPropagation();
-        const prevSlot = openDropdownSlot - 1;
-        setOpenDropdownSlot(null);
-        setTimeout(() => {
-          document.getElementById(`priority-server-btn-${prevSlot}`)?.focus();
-        }, 50);
+        e.stopImmediatePropagation();
+        handleCloseFromEvent();
         return;
       }
     };
 
-    const handleDocumentClick = (e: MouseEvent) => {
-      const target = e.target as HTMLElement;
-      if (!target.closest('[data-priority-dropdown-container="true"]')) {
-        setOpenDropdownSlot(null);
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown, { capture: true });
-    document.addEventListener('mousedown', handleDocumentClick);
-
+    window.addEventListener('keydown', handleModalKeyDown, { capture: true });
     return () => {
       window.removeEventListener('tmdb_close_dropdowns', handleCloseFromEvent);
-      window.removeEventListener('keydown', handleKeyDown, { capture: true });
-      document.removeEventListener('mousedown', handleDocumentClick);
+      window.removeEventListener('keydown', handleModalKeyDown, { capture: true });
     };
-  }, [openDropdownSlot, isAnyDropdownOpen]);
+  }, [isPickerModalOpen, pickerModalSlot]);
 
   const handleBuildNumberClick = () => {
     clickCountRef.current += 1;
@@ -321,6 +284,438 @@ export const Settings: React.FC = () => {
       window.removeEventListener('keydown', handleEasterEggBack, { capture: true });
     };
   }, [showEasterEgg]);
+
+  useEffect(() => {
+    const handleCaptureSpatialNav = (e: KeyboardEvent) => {
+      // Don't interfere if picker modal, easter egg, or update modal is open
+      if (isPickerModalOpen || showEasterEgg || showUpdateModal) return;
+
+      const isDown = e.key === 'ArrowDown' || e.keyCode === 40 || e.keyCode === 20;
+      const isUp = e.key === 'ArrowUp' || e.keyCode === 38 || e.keyCode === 19;
+      const isLeft = e.key === 'ArrowLeft' || e.keyCode === 37 || e.keyCode === 21;
+      const isRight = e.key === 'ArrowRight' || e.keyCode === 39 || e.keyCode === 22;
+
+      if (!isDown && !isUp && !isLeft && !isRight) return;
+
+      const active = document.activeElement as HTMLElement | null;
+      if (!active) return;
+
+      // ==========================================
+      // 1. PLAYBACK & STREAM PANEL NAV
+      // ==========================================
+      if (activeCategory === 'playback') {
+        // From Category Rail: ArrowRight -> Jump into Playback Toggle
+        if (active.id === 'tv-settings-cat-playback' && isRight) {
+          e.preventDefault();
+          e.stopImmediatePropagation();
+          const target = document.getElementById('playback-toggle-autoplay');
+          target?.focus();
+          target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+          return;
+        }
+
+        // From Auto-Play Toggle:
+        if (active.id === 'playback-toggle-autoplay') {
+          if (isLeft) {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            document.getElementById('tv-settings-cat-playback')?.focus();
+            return;
+          }
+          if (isDown) {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            if (settings?.autoplayNext !== false) {
+              const target = document.querySelector<HTMLElement>('[data-playback-trigger-selected="true"]') ||
+                             document.getElementById('playback-btn-trigger-0');
+              target?.focus();
+              target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+            } else {
+              const target = document.querySelector<HTMLElement>('[data-playback-ticker-selected="true"]') ||
+                             document.getElementById('playback-btn-ticker-0');
+              target?.focus();
+              target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+            }
+            return;
+          }
+        }
+
+        // From Trigger % (Row 2):
+        if (active.getAttribute('data-playback-trigger-selected') !== null) {
+          if (isUp) {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            document.getElementById('playback-toggle-autoplay')?.focus();
+            return;
+          }
+          if (isDown) {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            const target = document.querySelector<HTMLElement>('[data-playback-timeout-selected="true"]') ||
+                           document.getElementById('playback-btn-timeout-0');
+            target?.focus();
+            target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+            return;
+          }
+          if (isLeft && active.id === 'playback-btn-trigger-0') {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            document.getElementById('tv-settings-cat-playback')?.focus();
+            return;
+          }
+        }
+
+        // From Countdown Timeout (Row 3):
+        if (active.getAttribute('data-playback-timeout-selected') !== null) {
+          if (isUp) {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            const target = document.querySelector<HTMLElement>('[data-playback-trigger-selected="true"]') ||
+                           document.getElementById('playback-btn-trigger-0');
+            target?.focus();
+            target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+            return;
+          }
+          if (isDown) {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            const target = document.querySelector<HTMLElement>('[data-playback-ticker-selected="true"]') ||
+                           document.getElementById('playback-btn-ticker-0');
+            target?.focus();
+            target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+            return;
+          }
+          if (isLeft && active.id === 'playback-btn-timeout-0') {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            document.getElementById('tv-settings-cat-playback')?.focus();
+            return;
+          }
+        }
+
+        // From Ticker Interval (Row 4):
+        if (active.getAttribute('data-playback-ticker-selected') !== null) {
+          if (isUp) {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            if (settings?.autoplayNext !== false) {
+              const target = document.querySelector<HTMLElement>('[data-playback-timeout-selected="true"]') ||
+                             document.getElementById('playback-btn-timeout-0');
+              target?.focus();
+              target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+            } else {
+              document.getElementById('playback-toggle-autoplay')?.focus();
+            }
+            return;
+          }
+          if (isDown) {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            const target = document.querySelector<HTMLElement>('[data-playback-resolver-timeout-selected="true"]') ||
+                           document.getElementById('playback-btn-resolver-timeout-0');
+            target?.focus();
+            target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+            return;
+          }
+          if (isLeft && active.id === 'playback-btn-ticker-0') {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            document.getElementById('tv-settings-cat-playback')?.focus();
+            return;
+          }
+        }
+
+        // From Stream Resolver Timeout (Row 4b):
+        if (active.getAttribute('data-playback-resolver-timeout-selected') !== null) {
+          if (isUp) {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            const target = document.querySelector<HTMLElement>('[data-playback-ticker-selected="true"]') ||
+                           document.getElementById('playback-btn-ticker-0');
+            target?.focus();
+            target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+            return;
+          }
+          if (isDown) {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            document.getElementById('playback-engine-torbox')?.focus();
+            return;
+          }
+          if (isLeft && active.id === 'playback-btn-resolver-timeout-0') {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            document.getElementById('tv-settings-cat-playback')?.focus();
+            return;
+          }
+        }
+
+        // From Torbox Button:
+        if (active.id === 'playback-engine-torbox') {
+          if (isLeft) {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            document.getElementById('tv-settings-cat-playback')?.focus();
+            return;
+          }
+          if (isUp) {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            const target = document.querySelector<HTMLElement>('[data-playback-resolver-timeout-selected="true"]') ||
+                           document.getElementById('playback-btn-resolver-timeout-0');
+            target?.focus();
+            target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+            return;
+          }
+          if (isDown) {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            const apikeyInput = document.getElementById('playback-input-torbox-apikey');
+            const target = apikeyInput || document.getElementById('playback-engine-extractor') || document.getElementById('playback-engine-embed');
+            target?.focus();
+            target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+            return;
+          }
+        }
+
+        // From Torbox API Key Input:
+        if (active.id === 'playback-input-torbox-apikey') {
+          if (isLeft) {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            document.getElementById('tv-settings-cat-playback')?.focus();
+            return;
+          }
+          if (isUp) {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            document.getElementById('playback-engine-torbox')?.focus();
+            return;
+          }
+          if (isDown) {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            const target = document.getElementById('playback-engine-extractor') || document.getElementById('playback-engine-embed');
+            target?.focus();
+            target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+            return;
+          }
+        }
+
+        // From Private Extractor Engine:
+        if (active.id === 'playback-engine-extractor') {
+          if (isLeft) {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            document.getElementById('tv-settings-cat-playback')?.focus();
+            return;
+          }
+          if (isUp) {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            const apikeyInput = document.getElementById('playback-input-torbox-apikey');
+            const target = apikeyInput || document.getElementById('playback-engine-torbox');
+            target?.focus();
+            target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+            return;
+          }
+          if (isDown) {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            const target = document.getElementById('playback-engine-embed');
+            target?.focus();
+            target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+            return;
+          }
+        }
+
+        // From Embed Resolver Engine:
+        if (active.id === 'playback-engine-embed') {
+          if (isLeft) {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            document.getElementById('tv-settings-cat-playback')?.focus();
+            return;
+          }
+          if (isUp) {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            const target = document.getElementById('playback-engine-extractor') ||
+                           document.getElementById('playback-input-torbox-apikey') ||
+                           document.getElementById('playback-engine-torbox');
+            target?.focus();
+            target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+            return;
+          }
+          if (isDown) {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            // Go to active priority category tab
+            const target = document.querySelector<HTMLElement>('[data-priority-tab-active="true"]') ||
+                           document.getElementById('playback-tab-sub-general');
+            target?.focus();
+            target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+            return;
+          }
+        }
+
+        // From Subtabs (General, Anime, Asean, Korean):
+        if (active.id && active.id.startsWith('playback-tab-sub-')) {
+          if (isLeft && active.id === 'playback-tab-sub-general') {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            document.getElementById('tv-settings-cat-playback')?.focus();
+            return;
+          }
+          if (isUp) {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            const target = document.getElementById('playback-engine-embed') ||
+                           document.getElementById('playback-engine-extractor') ||
+                           document.getElementById('playback-engine-torbox');
+            target?.focus();
+            target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+            return;
+          }
+          if (isDown) {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            const target = document.getElementById('priority-server-btn-0');
+            target?.focus();
+            target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+            return;
+          }
+        }
+
+        // From Priority Server Buttons (Slot 0, 1, 2):
+        if (active.id && active.id.startsWith('priority-server-btn-')) {
+          if (isDown) {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            const target = document.getElementById('playback-toggle-adshield');
+            target?.focus();
+            target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+            return;
+          }
+          if (isLeft && active.id === 'priority-server-btn-0') {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            document.getElementById('tv-settings-cat-playback')?.focus();
+            return;
+          }
+          if (isUp) {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            const target = document.querySelector<HTMLElement>('[data-priority-tab-active="true"]') ||
+                           document.getElementById('playback-tab-sub-general');
+            target?.focus();
+            target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+            return;
+          }
+        }
+
+        // From AdShield Toggle:
+        if (active.id === 'playback-toggle-adshield') {
+          if (isLeft) {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            document.getElementById('tv-settings-cat-playback')?.focus();
+            return;
+          }
+          if (isUp) {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            const target = document.getElementById('priority-server-btn-0');
+            target?.focus();
+            target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+            return;
+          }
+        }
+      }
+
+      // ==========================================
+      // 2. CONTENT CONTROLS PANEL NAV
+      // ==========================================
+      if (activeCategory === 'content') {
+        // From Category Rail: ArrowRight -> Jump into selected maturity
+        if (active.id === 'tv-settings-cat-content' && isRight) {
+          e.preventDefault();
+          e.stopImmediatePropagation();
+          const target = document.querySelector<HTMLElement>('[data-content-maturity-selected="true"]') ||
+                         document.getElementById('content-maturity-all');
+          target?.focus();
+          target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+          return;
+        }
+
+        // From Maturity Buttons:
+        if (active.getAttribute('data-content-maturity-selected') !== null) {
+          if (isDown) {
+            const id = active.id;
+            // Lower row items: teen, older_kids, kids
+            if (id === 'content-maturity-teen' || id === 'content-maturity-older_kids' || id === 'content-maturity-kids') {
+              e.preventDefault();
+              e.stopImmediatePropagation();
+              document.getElementById('content-toggle-filterAdult')?.focus();
+              return;
+            }
+          }
+          if (isLeft && (active.id === 'content-maturity-all' || active.id === 'content-maturity-older_kids')) {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            document.getElementById('tv-settings-cat-content')?.focus();
+            return;
+          }
+        }
+
+        // From Filter Adult Toggle:
+        if (active.id === 'content-toggle-filterAdult') {
+          if (isLeft) {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            document.getElementById('tv-settings-cat-content')?.focus();
+            return;
+          }
+          if (isUp) {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            const target = document.querySelector<HTMLElement>('[data-content-maturity-selected="true"]') ||
+                           document.getElementById('content-maturity-all');
+            target?.focus();
+            target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+            return;
+          }
+          if (isDown) {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            document.getElementById('content-toggle-filterUnreleased')?.focus();
+            return;
+          }
+        }
+
+        // From Filter Unreleased Toggle:
+        if (active.id === 'content-toggle-filterUnreleased') {
+          if (isLeft) {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            document.getElementById('tv-settings-cat-content')?.focus();
+            return;
+          }
+          if (isUp) {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            document.getElementById('content-toggle-filterAdult')?.focus();
+            return;
+          }
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleCaptureSpatialNav, { capture: true });
+    return () => {
+      window.removeEventListener('keydown', handleCaptureSpatialNav, { capture: true });
+    };
+  }, [activeCategory, isPickerModalOpen, showEasterEgg, showUpdateModal, settings]);
 
   useEffect(() => {
     dbService.getSettings().then(setSettings);
@@ -391,6 +786,23 @@ export const Settings: React.FC = () => {
                 data-tv-category-active={isSelected ? 'true' : 'false'}
                 onClick={() => setActiveCategory(cat.id)}
                 onFocus={() => setActiveCategory(cat.id)}
+                onKeyDown={(e) => {
+                  if (e.key === 'ArrowRight') {
+                    if (cat.id === 'playback') {
+                      e.preventDefault();
+                      const target = document.getElementById('playback-toggle-autoplay') ||
+                                     document.querySelector<HTMLElement>('[data-settings-panel="true"] .tv-focus-target');
+                      target?.focus();
+                      target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                    } else if (cat.id === 'content') {
+                      e.preventDefault();
+                      const target = document.querySelector<HTMLElement>('[data-content-maturity-selected="true"]') ||
+                                     document.getElementById('content-maturity-all');
+                      target?.focus();
+                      target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                    }
+                  }
+                }}
                 className={`w-full p-3.5 rounded-2xl border text-left transition-all tv-focus-target flex items-center justify-between gap-3 min-h-[66px] ${
                   isSelected
                     ? 'bg-gradient-to-r from-hbo-purple/60 via-hbo-purple/30 to-hbo-cyan/20 border-hbo-cyan shadow-hbo-glow text-white ring-2 ring-hbo-cyan/60'
@@ -446,7 +858,27 @@ export const Settings: React.FC = () => {
                 </div>
 
                 <button
+                  id="playback-toggle-autoplay"
                   onClick={() => handleUpdate({ autoplayNext: settings.autoplayNext === false ? true : false })}
+                  onKeyDown={(e) => {
+                    if (e.key === 'ArrowLeft') {
+                      e.preventDefault();
+                      document.getElementById('tv-settings-cat-playback')?.focus();
+                    } else if (e.key === 'ArrowDown') {
+                      e.preventDefault();
+                      if (settings.autoplayNext !== false) {
+                        const selectedTrigger = document.querySelector<HTMLElement>('[data-playback-trigger-selected="true"]') ||
+                                                document.getElementById('playback-btn-trigger-0');
+                        selectedTrigger?.focus();
+                        selectedTrigger?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                      } else {
+                        const selectedTicker = document.querySelector<HTMLElement>('[data-playback-ticker-selected="true"]') ||
+                                               document.getElementById('playback-btn-ticker-0');
+                        selectedTicker?.focus();
+                        selectedTicker?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                      }
+                    }
+                  }}
                   className={`px-4 py-2 rounded-xl text-xs font-bold transition-all tv-focus-target flex items-center gap-1.5 flex-shrink-0 border ${
                     settings.autoplayNext !== false
                       ? 'bg-emerald-500/20 border-emerald-400 text-emerald-400 shadow-md'
@@ -496,13 +928,30 @@ export const Settings: React.FC = () => {
                         { percent: 100, label: '100%', desc: 'End' },
                         { percent: 102, label: '102%', desc: 'Outro' },
                         { percent: 104, label: '104%', desc: 'Max' },
-                      ].map((opt) => {
+                      ].map((opt, idx) => {
                         const isSelected = (settings.upNextTriggerPercent || 96) === opt.percent;
                         return (
                           <button
                             key={opt.percent}
+                            id={`playback-btn-trigger-${idx}`}
+                            data-playback-trigger-selected={isSelected ? 'true' : 'false'}
                             type="button"
                             onClick={() => handleUpdate({ upNextTriggerPercent: opt.percent })}
+                            onKeyDown={(e) => {
+                              if (e.key === 'ArrowLeft' && idx === 0) {
+                                e.preventDefault();
+                                document.getElementById('tv-settings-cat-playback')?.focus();
+                              } else if (e.key === 'ArrowUp') {
+                                e.preventDefault();
+                                document.getElementById('playback-toggle-autoplay')?.focus();
+                              } else if (e.key === 'ArrowDown') {
+                                e.preventDefault();
+                                const target = document.querySelector<HTMLElement>('[data-playback-timeout-selected="true"]') ||
+                                               document.getElementById('playback-btn-timeout-0');
+                                target?.focus();
+                                target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                              }
+                            }}
                             className={`py-2.5 px-1.5 rounded-xl border text-center transition-all tv-focus-target flex flex-col items-center justify-center gap-0.5 ${
                               isSelected
                                 ? 'bg-hbo-purple/40 border-hbo-cyan text-white font-bold shadow-lg ring-1 ring-hbo-cyan/50'
@@ -545,12 +994,32 @@ export const Settings: React.FC = () => {
                         { seconds: 40, label: '40s', desc: 'Medium' },
                         { seconds: 60, label: '60s', desc: 'Relaxed' },
                         { seconds: 80, label: '80s', desc: 'Extended' },
-                      ].map((opt) => {
+                      ].map((opt, idx) => {
                         const isSelected = (settings.upNextTimeout || 20) === opt.seconds;
                         return (
                           <button
                             key={opt.seconds}
+                            id={`playback-btn-timeout-${idx}`}
+                            data-playback-timeout-selected={isSelected ? 'true' : 'false'}
                             onClick={() => handleUpdate({ upNextTimeout: opt.seconds })}
+                            onKeyDown={(e) => {
+                              if (e.key === 'ArrowLeft' && idx === 0) {
+                                e.preventDefault();
+                                document.getElementById('tv-settings-cat-playback')?.focus();
+                              } else if (e.key === 'ArrowUp') {
+                                e.preventDefault();
+                                const target = document.querySelector<HTMLElement>('[data-playback-trigger-selected="true"]') ||
+                                               document.getElementById('playback-btn-trigger-0');
+                                target?.focus();
+                                target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                              } else if (e.key === 'ArrowDown') {
+                                e.preventDefault();
+                                const target = document.querySelector<HTMLElement>('[data-playback-ticker-selected="true"]') ||
+                                               document.getElementById('playback-btn-ticker-0');
+                                target?.focus();
+                                target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                              }
+                            }}
                             className={`p-2.5 rounded-xl border text-left transition-all tv-focus-target flex flex-col justify-between ${
                               isSelected
                                 ? 'bg-hbo-purple/40 border-hbo-purple-light text-white shadow-md ring-1 ring-hbo-purple-light/50'
@@ -599,14 +1068,38 @@ export const Settings: React.FC = () => {
                     { seconds: 3, label: '3s', desc: 'Frequent' },
                     { seconds: 5, label: '5s', desc: 'TV Default' },
                     { seconds: 10, label: '10s', desc: 'Eco Mode' },
-                  ].map((opt) => {
+                  ].map((opt, idx) => {
                     const currentVal = settings.watchProgressTickerInterval || 5;
                     const isSelected = currentVal === opt.seconds;
                     return (
                       <button
                         key={opt.seconds}
+                        id={`playback-btn-ticker-${idx}`}
+                        data-playback-ticker-selected={isSelected ? 'true' : 'false'}
                         type="button"
                         onClick={() => handleUpdate({ watchProgressTickerInterval: opt.seconds })}
+                        onKeyDown={(e) => {
+                          if (e.key === 'ArrowLeft' && idx === 0) {
+                            e.preventDefault();
+                            document.getElementById('tv-settings-cat-playback')?.focus();
+                          } else if (e.key === 'ArrowUp') {
+                            e.preventDefault();
+                            if (settings.autoplayNext !== false) {
+                              const target = document.querySelector<HTMLElement>('[data-playback-timeout-selected="true"]') ||
+                                             document.getElementById('playback-btn-timeout-0');
+                              target?.focus();
+                              target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                            } else {
+                              document.getElementById('playback-toggle-autoplay')?.focus();
+                            }
+                          } else if (e.key === 'ArrowDown') {
+                            e.preventDefault();
+                            const target = document.querySelector<HTMLElement>('[data-playback-resolver-timeout-selected="true"]') ||
+                                           document.getElementById('playback-btn-resolver-timeout-0');
+                            target?.focus();
+                            target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                          }
+                        }}
                         className={`py-2.5 px-1.5 rounded-xl border text-center transition-all tv-focus-target flex flex-col items-center justify-center gap-0.5 ${
                           isSelected
                             ? 'bg-hbo-purple/40 border-hbo-cyan text-white font-bold shadow-lg ring-1 ring-hbo-cyan/50'
@@ -649,12 +1142,31 @@ export const Settings: React.FC = () => {
                     { seconds: 5, label: '5 Seconds (Default)', desc: 'Balanced' },
                     { seconds: 8, label: '8 Seconds', desc: 'Patient connection' },
                     { seconds: 12, label: '12 Seconds', desc: 'Slow network/Wi-Fi' }
-                  ].map((opt) => {
+                  ].map((opt, idx) => {
                     const isSelected = (settings.streamResolverTimeout ?? 5) === opt.seconds;
                     return (
                       <button
                         key={opt.seconds}
+                        id={`playback-btn-resolver-timeout-${idx}`}
+                        data-playback-resolver-timeout-selected={isSelected ? 'true' : 'false'}
                         onClick={() => handleUpdate({ streamResolverTimeout: opt.seconds })}
+                        onKeyDown={(e) => {
+                          if (e.key === 'ArrowLeft' && idx === 0) {
+                            e.preventDefault();
+                            document.getElementById('tv-settings-cat-playback')?.focus();
+                          } else if (e.key === 'ArrowUp') {
+                            e.preventDefault();
+                            const target = document.querySelector<HTMLElement>('[data-playback-ticker-selected="true"]') ||
+                                           document.getElementById('playback-btn-ticker-0');
+                            target?.focus();
+                            target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                          } else if (e.key === 'ArrowDown') {
+                            e.preventDefault();
+                            const nextTarget = document.getElementById('playback-engine-torbox');
+                            nextTarget?.focus();
+                            nextTarget?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                          }
+                        }}
                         className={`p-3 rounded-xl border text-left transition-all tv-focus-target min-h-[68px] flex flex-col justify-between ${
                           isSelected
                             ? 'bg-hbo-purple/40 border-hbo-cyan text-white shadow-lg ring-1 ring-hbo-cyan/50 font-bold'
@@ -684,6 +1196,7 @@ export const Settings: React.FC = () => {
                     className="bg-hbo-card border border-hbo-border rounded-2xl p-4 shadow-lg"
                   >
                     <button
+                      id="playback-engine-torbox"
                       onClick={() => {
                         let updated: ('embed' | 'private_extractor' | 'torbox')[];
                         if (isTorboxEnabled) {
@@ -696,6 +1209,18 @@ export const Settings: React.FC = () => {
                           enabledResolvers: updated,
                           streamResolver: updated[0] || 'embed'
                         });
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'ArrowLeft') {
+                          e.preventDefault();
+                          document.getElementById('tv-settings-cat-playback')?.focus();
+                        } else if (e.key === 'ArrowUp') {
+                          e.preventDefault();
+                          const target = document.querySelector<HTMLElement>('[data-playback-resolver-timeout-selected="true"]') ||
+                                         document.getElementById('playback-btn-resolver-timeout-0');
+                          target?.focus();
+                          target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                        }
                       }}
                       className={`w-full p-3.5 rounded-xl border text-left transition-all tv-focus-target flex flex-col justify-between ${
                         isTorboxEnabled
@@ -737,6 +1262,7 @@ export const Settings: React.FC = () => {
                     <span>TorBox Debrid API Key</span>
                   </p>
                   <input
+                    id="playback-input-torbox-apikey"
                     type="password"
                     placeholder="Paste your TorBox API Key here..."
                     value={settings.torboxApiKey || ''}
@@ -759,6 +1285,7 @@ export const Settings: React.FC = () => {
                     className="bg-hbo-card border border-hbo-border rounded-2xl p-4 shadow-lg"
                   >
                     <button
+                      id="playback-engine-extractor"
                       onClick={() => {
                         let updated: ('embed' | 'private_extractor' | 'torbox')[];
                         if (isExtractorEnabled) {
@@ -814,6 +1341,7 @@ export const Settings: React.FC = () => {
                     className="bg-hbo-card border border-hbo-border rounded-2xl p-4 shadow-lg"
                   >
                     <button
+                      id="playback-engine-embed"
                       onClick={() => {
                         let updated: ('embed' | 'private_extractor' | 'torbox')[];
                         if (isEmbedEnabled) {
@@ -880,9 +1408,10 @@ export const Settings: React.FC = () => {
                 <div className="flex items-center gap-2 p-1 bg-black/40 border border-white/10 rounded-xl w-fit">
                   <button
                     type="button"
+                    id="playback-tab-sub-general"
+                    data-priority-tab-active={priorityCategoryTab === 'general' ? 'true' : 'false'}
                     onClick={() => {
                       setPriorityCategoryTab('general');
-                      setOpenDropdownSlot(null);
                     }}
                     className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all tv-focus-target ${
                       priorityCategoryTab === 'general'
@@ -890,13 +1419,14 @@ export const Settings: React.FC = () => {
                         : 'text-gray-400 hover:text-white'
                     }`}
                   >
-                    Movies & Series
+                    General
                   </button>
                   <button
                     type="button"
+                    id="playback-tab-sub-anime"
+                    data-priority-tab-active={priorityCategoryTab === 'anime' ? 'true' : 'false'}
                     onClick={() => {
                       setPriorityCategoryTab('anime');
-                      setOpenDropdownSlot(null);
                     }}
                     className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all tv-focus-target ${
                       priorityCategoryTab === 'anime'
@@ -908,9 +1438,10 @@ export const Settings: React.FC = () => {
                   </button>
                   <button
                     type="button"
+                    id="playback-tab-sub-asian"
+                    data-priority-tab-active={priorityCategoryTab === 'asian' ? 'true' : 'false'}
                     onClick={() => {
                       setPriorityCategoryTab('asian');
-                      setOpenDropdownSlot(null);
                     }}
                     className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all tv-focus-target ${
                       priorityCategoryTab === 'asian'
@@ -922,9 +1453,10 @@ export const Settings: React.FC = () => {
                   </button>
                   <button
                     type="button"
+                    id="playback-tab-sub-korean"
+                    data-priority-tab-active={priorityCategoryTab === 'korean' ? 'true' : 'false'}
                     onClick={() => {
                       setPriorityCategoryTab('korean');
-                      setOpenDropdownSlot(null);
                     }}
                     className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all tv-focus-target ${
                       priorityCategoryTab === 'korean'
@@ -993,77 +1525,16 @@ export const Settings: React.FC = () => {
                           </span>
                         </div>
 
-                        <div className="relative" data-priority-dropdown-container="true">
+                        <div>
                           <button
                             type="button"
                             id={`priority-server-btn-${index}`}
-                            onClick={() => setOpenDropdownSlot(openDropdownSlot === index ? null : index)}
+                            onClick={() => setPickerModalSlot(index)}
                             className="w-full flex items-center justify-between bg-hbo-card/90 border border-hbo-border text-white text-xs font-bold rounded-xl px-2.5 py-2 hover:bg-hbo-hover hover:border-hbo-cyan focus:outline-none focus:border-hbo-cyan focus:ring-2 focus:ring-hbo-cyan transition-all tv-focus-target"
                           >
                             <span className="truncate pr-1 text-xs">{selectedProviderObj.name}</span>
-                            <ChevronDown className={`w-3 h-3 text-gray-400 flex-shrink-0 transition-transform ${openDropdownSlot === index ? 'rotate-180 text-hbo-cyan' : ''}`} />
+                            <ChevronDown className="w-3 h-3 text-gray-400 flex-shrink-0" />
                           </button>
-
-                          {openDropdownSlot === index && (
-                            <div
-                              className="absolute left-0 right-0 w-full top-[calc(100%+4px)] z-50 bg-hbo-card/98 border border-hbo-border rounded-xl shadow-2xl p-2 max-h-[min(260px,calc(100vh-140px))] overflow-y-auto space-y-1.5 focus-scroll-container backdrop-blur-2xl animate-fade-in"
-                            >
-                              {STREAM_PROVIDERS.map((provider) => {
-                                const isSelected = selectedId === provider.id;
-                                return (
-                                  <button
-                                    key={provider.id}
-                                    data-provider-selected={isSelected ? 'true' : 'false'}
-                                    onClick={() => {
-                                      const updated = [...currentTop] as [string, string, string];
-                                      updated[index] = provider.id;
-                                      if (isKoreanTab) {
-                                        handleUpdate({
-                                          topKoreanProviders: updated
-                                        });
-                                      } else if (isAsianTab) {
-                                        handleUpdate({
-                                          topAsianProviders: updated
-                                        });
-                                      } else if (isAnimeTab) {
-                                        handleUpdate({
-                                          topAnimeProviders: updated
-                                        });
-                                      } else {
-                                        handleUpdate({
-                                          topProviders: updated,
-                                          preferredProvider: updated[0]
-                                        });
-                                      }
-                                      setOpenDropdownSlot(null);
-                                      setTimeout(() => {
-                                        document.getElementById(`priority-server-btn-${index}`)?.focus();
-                                      }, 50);
-                                    }}
-                                    className={`w-full flex items-center justify-between gap-3 px-3 py-2 rounded-xl text-left text-xs transition-all tv-focus-target ${
-                                      isSelected
-                                        ? 'bg-hbo-purple/40 border border-hbo-cyan/60 text-white font-bold'
-                                        : 'text-gray-300 hover:bg-hbo-hover hover:text-white border border-transparent'
-                                    }`}
-                                  >
-                                    <div className="min-w-0 flex-1">
-                                      <div className="flex items-center justify-between gap-1.5">
-                                        <span className="font-bold text-white block text-xs truncate">{provider.name}</span>
-                                        {isSelected && <Check className="w-3 h-3 text-hbo-cyan flex-shrink-0" />}
-                                      </div>
-                                      <span className="text-[9px] text-gray-400 block leading-normal mt-0.5 truncate">{provider.tagline}</span>
-                                      {provider.badge === 'Anime' && (
-                                        <span className="text-[9px] text-pink-400 font-semibold block mt-0.5">Anime Specialist</span>
-                                      )}
-                                      {provider.badge === 'Asian' && (
-                                        <span className="text-[9px] text-amber-400 font-semibold block mt-0.5">Asian Specialist</span>
-                                      )}
-                                    </div>
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          )}
                         </div>
                       </div>
                     );
@@ -1087,6 +1558,7 @@ export const Settings: React.FC = () => {
                 </div>
 
                 <button
+                  id="playback-toggle-adshield"
                   onClick={() => handleUpdate({ adBlockShield: !settings.adBlockShield })}
                   className={`px-4 py-2 rounded-xl text-xs font-bold transition-all tv-focus-target flex items-center gap-1.5 flex-shrink-0 border ${
                     settings.adBlockShield
@@ -1383,13 +1855,26 @@ export const Settings: React.FC = () => {
                     { id: 'teen', label: 'Teens (13+)', desc: 'Up to PG-13 / 12A / TV-14 (Excludes R)' },
                     { id: 'older_kids', label: 'Older Kids (7+)', desc: 'Up to PG / TV-PG (Gentle scares, fantasy)' },
                     { id: 'kids', label: 'Little Kids (All Ages)', desc: 'Strictly G / U / TV-Y / TV-G (Preschool & family)' },
-                  ].map((lvl) => {
+                  ].map((lvl, idx) => {
                     const currentMaturity = settings.maturityLevel === 'pg13' ? 'teen' : settings.maturityLevel === 'family' ? 'older_kids' : (settings.maturityLevel || 'all');
                     const isSelected = currentMaturity === lvl.id;
                     return (
                       <button
                         key={lvl.id}
+                        id={`content-maturity-${lvl.id}`}
+                        data-content-maturity-selected={isSelected ? 'true' : 'false'}
                         onClick={() => handleUpdate({ maturityLevel: lvl.id as any })}
+                        onKeyDown={(e) => {
+                          if (e.key === 'ArrowLeft' && (idx === 0 || idx === 3)) {
+                            e.preventDefault();
+                            document.getElementById('tv-settings-cat-content')?.focus();
+                          } else if (e.key === 'ArrowDown') {
+                            if (idx >= 2) {
+                              e.preventDefault();
+                              document.getElementById('content-toggle-filterAdult')?.focus();
+                            }
+                          }
+                        }}
                         className={`p-3 rounded-xl border text-left transition-all tv-focus-target min-h-[68px] flex flex-col justify-between ${
                           isSelected
                             ? 'bg-hbo-cyan/20 border-hbo-cyan text-white shadow-hbo-glow ring-1 ring-hbo-cyan/50'
@@ -1425,7 +1910,23 @@ export const Settings: React.FC = () => {
                 </div>
 
                 <button
+                  id="content-toggle-filterAdult"
                   onClick={() => handleUpdate({ filterAdult: settings.filterAdult === false ? true : false })}
+                  onKeyDown={(e) => {
+                    if (e.key === 'ArrowLeft') {
+                      e.preventDefault();
+                      document.getElementById('tv-settings-cat-content')?.focus();
+                    } else if (e.key === 'ArrowUp') {
+                      e.preventDefault();
+                      const target = document.querySelector<HTMLElement>('[data-content-maturity-selected="true"]') ||
+                                     document.getElementById('content-maturity-all');
+                      target?.focus();
+                      target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                    } else if (e.key === 'ArrowDown') {
+                      e.preventDefault();
+                      document.getElementById('content-toggle-filterUnreleased')?.focus();
+                    }
+                  }}
                   className={`px-4 py-2 rounded-xl text-xs font-bold transition-all tv-focus-target flex items-center gap-1.5 flex-shrink-0 border ${
                     settings.filterAdult !== false
                       ? 'bg-emerald-500/20 border-emerald-400 text-emerald-400 shadow-md'
@@ -1462,7 +1963,17 @@ export const Settings: React.FC = () => {
                 </div>
 
                 <button
+                  id="content-toggle-filterUnreleased"
                   onClick={() => handleUpdate({ filterUnreleased: settings.filterUnreleased === false ? true : false })}
+                  onKeyDown={(e) => {
+                    if (e.key === 'ArrowLeft') {
+                      e.preventDefault();
+                      document.getElementById('tv-settings-cat-content')?.focus();
+                    } else if (e.key === 'ArrowUp') {
+                      e.preventDefault();
+                      document.getElementById('content-toggle-filterAdult')?.focus();
+                    }
+                  }}
                   className={`px-4 py-2 rounded-xl text-xs font-bold transition-all tv-focus-target flex items-center gap-1.5 flex-shrink-0 border ${
                     settings.filterUnreleased !== false
                       ? 'bg-emerald-500/20 border-emerald-400 text-emerald-400 shadow-md'
@@ -1825,6 +2336,166 @@ export const Settings: React.FC = () => {
           updateInfo={updateInfo}
           onClose={() => setShowUpdateModal(false)}
         />
+      )}
+
+      {/* Android TV Priority Server Picker Modal Dialog */}
+      {pickerModalSlot !== null && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-[9999] flex items-center justify-center p-6 bg-black/85 backdrop-blur-xl animate-fade-in"
+          onClick={() => {
+            const slot = pickerModalSlot;
+            setPickerModalSlot(null);
+            setTimeout(() => {
+              document.getElementById(`priority-server-btn-${slot}`)?.focus();
+            }, 50);
+          }}
+        >
+          <div
+            className="relative w-full max-w-xl bg-hbo-card/98 border border-hbo-border rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh] animate-scale-in"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="p-4 border-b border-hbo-border/70 bg-black/60 flex items-center justify-between gap-4">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="p-2 rounded-xl bg-hbo-purple/20 border border-hbo-purple/40 text-hbo-cyan">
+                  <Server className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm sm:text-base font-bold text-white">
+                    Select Server (Slot #{pickerModalSlot + 1})
+                  </h3>
+                  <p className="text-[11px] text-gray-400">
+                    Category: <span className="font-semibold text-hbo-cyan capitalize">{priorityCategoryTab}</span> • {STREAM_PROVIDERS.length} available
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  const slot = pickerModalSlot;
+                  setPickerModalSlot(null);
+                  setTimeout(() => {
+                    document.getElementById(`priority-server-btn-${slot}`)?.focus();
+                  }, 50);
+                }}
+                className="p-1.5 rounded-full bg-white/10 hover:bg-white/20 text-gray-400 hover:text-white transition-all tv-focus-target"
+                aria-label="Close"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Modal Server List */}
+            <div className="flex-1 overflow-y-auto p-3 space-y-2 focus-scroll-container">
+              {(() => {
+                const isKoreanTab = priorityCategoryTab === 'korean';
+                const isAsianTab = priorityCategoryTab === 'asian';
+                const isAnimeTab = priorityCategoryTab === 'anime';
+                const currentTop = isKoreanTab
+                  ? (settings.topKoreanProviders && settings.topKoreanProviders.length >= 3
+                      ? settings.topKoreanProviders
+                      : ['kisskh-kdrama', 'cinesrc', 'moviesapi'])
+                  : isAsianTab
+                  ? (settings.topAsianProviders && settings.topAsianProviders.length >= 3
+                      ? settings.topAsianProviders
+                      : ['vidlink', '111movies', 'lari21-asian'])
+                  : isAnimeTab
+                  ? (settings.topAnimeProviders && settings.topAnimeProviders.length >= 3
+                      ? settings.topAnimeProviders
+                      : ['megaplay-anime', 'cinesrc', 'moviesapi'])
+                  : (settings.topProviders && settings.topProviders.length >= 3
+                      ? settings.topProviders
+                      : ['vidlink', 'moviesapi', 'cinesrc']);
+                const currentSelectedId = currentTop[pickerModalSlot] || STREAM_PROVIDERS[0].id;
+
+                return STREAM_PROVIDERS.map((provider, itemIdx) => {
+                  const isSelected = currentSelectedId === provider.id;
+                  return (
+                    <button
+                      key={provider.id}
+                      type="button"
+                      data-server-modal-item="true"
+                      data-provider-selected={isSelected ? 'true' : 'false'}
+                      onKeyDown={(e) => {
+                        if (e.key === 'ArrowDown') {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          const allButtons = Array.from(document.querySelectorAll<HTMLElement>('[data-server-modal-item="true"]'));
+                          if (itemIdx < allButtons.length - 1) {
+                            allButtons[itemIdx + 1].focus();
+                            allButtons[itemIdx + 1].scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                          }
+                        } else if (e.key === 'ArrowUp') {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          const allButtons = Array.from(document.querySelectorAll<HTMLElement>('[data-server-modal-item="true"]'));
+                          if (itemIdx > 0) {
+                            allButtons[itemIdx - 1].focus();
+                            allButtons[itemIdx - 1].scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                          }
+                        }
+                      }}
+                      onClick={() => {
+                        const updated = [...currentTop] as [string, string, string];
+                        updated[pickerModalSlot] = provider.id;
+                        if (isKoreanTab) {
+                          handleUpdate({ topKoreanProviders: updated });
+                        } else if (isAsianTab) {
+                          handleUpdate({ topAsianProviders: updated });
+                        } else if (isAnimeTab) {
+                          handleUpdate({ topAnimeProviders: updated });
+                        } else {
+                          handleUpdate({ topProviders: updated, preferredProvider: updated[0] });
+                        }
+                        const slot = pickerModalSlot;
+                        setPickerModalSlot(null);
+                        setTimeout(() => {
+                          document.getElementById(`priority-server-btn-${slot}`)?.focus();
+                        }, 50);
+                      }}
+                      className={`w-full flex items-center justify-between gap-3 p-3 rounded-xl text-left transition-all tv-focus-target border ${
+                        isSelected
+                          ? 'bg-hbo-purple/40 border-hbo-cyan text-white shadow-hbo-glow ring-1 ring-hbo-cyan/50'
+                          : 'bg-black/30 border-white/5 text-gray-300 hover:bg-hbo-hover hover:border-white/20'
+                      }`}
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center justify-between gap-2 mb-0.5">
+                          <span className="font-bold text-xs sm:text-sm text-white truncate">{provider.name}</span>
+                          {isSelected && (
+                            <div className="flex items-center gap-1 text-[11px] font-bold text-hbo-cyan">
+                              <Check className="w-3.5 h-3.5 stroke-[2.5]" />
+                              <span>Current</span>
+                            </div>
+                          )}
+                        </div>
+                        <p className="text-[11px] text-gray-400 line-clamp-1">{provider.tagline}</p>
+                        <div className="flex items-center gap-2 mt-1">
+                          {provider.badge === 'Anime' && (
+                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-pink-500/20 text-pink-300 border border-pink-500/30 font-semibold">Anime Specialist</span>
+                          )}
+                          {provider.badge === 'Asian' && (
+                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 font-semibold">Asian Specialist</span>
+                          )}
+                          {provider.badge === 'TorBox' && (
+                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-semibold">TorBox Debrid</span>
+                          )}
+                        </div>
+                      </div>
+                    </button>
+                  );
+                });
+              })()}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-3 border-t border-hbo-border/70 bg-black/60 flex items-center justify-between text-[11px] text-gray-400">
+              <span>Press <strong className="text-white">OK/Select</strong> to choose • <strong className="text-white">Back</strong> to cancel</span>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
