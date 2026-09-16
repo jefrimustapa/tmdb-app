@@ -11,6 +11,7 @@ import { Logo } from '../common/Logo';
 import { tmdbImages, TMDB_FALLBACK_BACKDROP } from '../../services/tmdb';
 import { resolveAnimeMalId } from '../../services/animeMappingService';
 import { resolveLari21Stream } from '../../services/lariMappingService';
+import { resolvePencuriStream, clearPencuriCache } from '../../services/pencuriMappingService';
 import { resolveKisskhStream } from '../../services/kisskhMappingService';
 import { resolveDramacoolStream, type DramacoolServer } from '../../services/dramacoolMappingService';
 import { SubtitleOverlay } from './SubtitleOverlay';
@@ -102,6 +103,8 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const [tickerIntervalSec, setTickerIntervalSec] = useState(5);
   const [streamResolverTimeout, setStreamResolverTimeout] = useState(5);
   const streamResolverTimeoutRef = useRef(5);
+  const [streamResolverRetries, setStreamResolverRetries] = useState(1);
+  const streamResolverRetriesRef = useRef(1);
 
   const dismissedUpNextRef = useRef(false);
   const nextEpisodeTriggeredRef = useRef(false);
@@ -261,10 +264,15 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           setTickerIntervalSec(s.watchProgressTickerInterval);
           tickerIntervalRef.current = s.watchProgressTickerInterval;
         }
-        if (typeof s.streamResolverTimeout === 'number' && s.streamResolverTimeout >= 2 && s.streamResolverTimeout <= 30) {
+        if (typeof s.streamResolverTimeout === 'number' && (s.streamResolverTimeout === 0 || (s.streamResolverTimeout >= 2 && s.streamResolverTimeout <= 30))) {
           setStreamResolverTimeout(s.streamResolverTimeout);
           streamResolverTimeoutRef.current = s.streamResolverTimeout;
         }
+        if (typeof s.streamResolverRetries === 'number' && s.streamResolverRetries >= 0 && s.streamResolverRetries <= 3) {
+          setStreamResolverRetries(s.streamResolverRetries);
+          streamResolverRetriesRef.current = s.streamResolverRetries;
+        }
+
       }
     });
   }, []);
@@ -282,18 +290,101 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       setPlayerMode('loading');
       setResolvingStatus('Initializing stream resolver...');
 
-      const activeTimeoutMs = (streamResolverTimeoutRef.current || streamResolverTimeout || 5) * 1000;
+      const rawTimeout = typeof streamResolverTimeoutRef.current === 'number'
+        ? streamResolverTimeoutRef.current
+        : (typeof streamResolverTimeout === 'number' ? streamResolverTimeout : 0);
+      const isUnlimited = rawTimeout === 0;
+      const activeTimeoutMs = isUnlimited ? 0 : rawTimeout * 1000;
 
-      // 0. FAST PATH: If selected provider is LARI21 (Asean), resolve directly with customizable timeout
+      // 0a. FAST PATH: If selected provider is PencuriMovie (Malay), resolve directly with customizable timeout & retry
+      if (providerId === 'pencurimovie-my') {
+        const maxRetries = typeof streamResolverRetriesRef.current === 'number'
+          ? streamResolverRetriesRef.current
+          : (typeof streamResolverRetries === 'number' ? streamResolverRetries : 1);
+
+        for (let attempt = 0; attempt <= maxRetries; attempt++) {
+          if (!isMounted) return;
+          try {
+            if (attempt > 0) {
+              console.log(`[Resolver] Retrying PencuriMovie (attempt ${attempt}/${maxRetries}), clearing cache...`);
+              setResolvingStatus(`Retrying PencuriMovie (${attempt}/${maxRetries})...`);
+              await clearPencuriCache(title, releaseYear, season, episode, mediaType === 'tv');
+              if (originalTitle && originalTitle !== title) {
+                await clearPencuriCache(originalTitle, releaseYear, season, episode, mediaType === 'tv');
+              }
+            } else {
+              console.log(`[Resolver] Fast-path Malay Provider (PencuriMovie) [timeout: ${isUnlimited ? 'unlimited' : activeTimeoutMs + 'ms'}]...`);
+              setResolvingStatus('Resolving PencuriMovie Stream...');
+            }
+
+            const pencuriPromise = resolvePencuriStream(title, releaseYear, season, episode, mediaType, originalTitle, (status) => {
+              if (isMounted) setResolvingStatus(status);
+            });
+            const pencuriRes = isUnlimited
+              ? await pencuriPromise
+              : await Promise.race([
+                  pencuriPromise,
+                  new Promise<null>((resolve) => setTimeout(() => resolve(null), activeTimeoutMs))
+                ]);
+            if (!isMounted) return;
+            if (pencuriRes && pencuriRes.embedUrl) {
+              console.log('[Resolver] ✅ Playing via PencuriMovie Embed Iframe:', pencuriRes.embedUrl);
+              setResolvingStatus('Connected to PencuriMovie');
+              setResolvedPencuriUrl(pencuriRes.embedUrl);
+              setPlayerMode('embed');
+              setDirectStreamUrl(null);
+              setDirectStreamLabel('PencuriMovie (Malay)');
+              setIsExtracting(false);
+              setExtractionFailed(false);
+              setIsLoading(false);
+              setIsProbing(false);
+              isPlayingRef.current = true;
+              if (autoCycleTimeoutRef.current) {
+                clearTimeout(autoCycleTimeoutRef.current);
+                autoCycleTimeoutRef.current = null;
+              }
+              return;
+            }
+
+            if (attempt < maxRetries) {
+              console.warn(`[Resolver] PencuriMovie attempt ${attempt + 1}/${maxRetries + 1} returned no stream, preparing retry...`);
+              await clearPencuriCache(title, releaseYear, season, episode, mediaType === 'tv');
+              continue;
+            }
+          } catch (err) {
+            console.warn(`[Resolver] PencuriMovie error on attempt ${attempt + 1}:`, err);
+            if (attempt < maxRetries) {
+              await clearPencuriCache(title, releaseYear, season, episode, mediaType === 'tv');
+              continue;
+            }
+          }
+        }
+
+        console.warn('[Resolver] PencuriMovie resolution exhausted all retries, auto-failover to next Asian provider...');
+        setResolvingStatus('Failing over to next Asian provider...');
+        const asianFallbackId = (topAsianProviders && topAsianProviders.length > 0)
+          ? topAsianProviders.find(p => p !== 'pencurimovie-my') || 'vidlink'
+          : 'vidlink';
+        const fallbackProvider = getProviderById(asianFallbackId);
+        onProviderChange(fallbackProvider);
+        return;
+      }
+
+
+      // 0b. FAST PATH: If selected provider is LARI21 (Asean), resolve directly with customizable timeout
       if (providerId === 'lari21-asian' || providerId === 'lk21-asian') {
         try {
-          console.log(`[Resolver] Fast-path Asian Provider (LARI21) [timeout: ${activeTimeoutMs}ms]...`);
+          console.log(`[Resolver] Fast-path Asian Provider (LARI21) [timeout: ${isUnlimited ? 'unlimited' : activeTimeoutMs + 'ms'}]...`);
           setResolvingStatus('Resolving LARI21 Asian Stream...');
           const lari21Promise = resolveLari21Stream(title, releaseYear, originalTitle, (status) => {
             if (isMounted) setResolvingStatus(status);
           });
-          const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), activeTimeoutMs));
-          const lari21Res = await Promise.race([lari21Promise, timeoutPromise]);
+          const lari21Res = isUnlimited
+            ? await lari21Promise
+            : await Promise.race([
+                lari21Promise,
+                new Promise<null>((resolve) => setTimeout(() => resolve(null), activeTimeoutMs))
+              ]);
           if (!isMounted) return;
           if (lari21Res && lari21Res.embedUrl) {
             console.log('[Resolver] ✅ Playing via LARI21 Embed Iframe:', lari21Res.embedUrl);
@@ -327,11 +418,15 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       // 0b. FAST PATH: If selected provider is KissKH (Korean), resolve directly to isolated embed player with customizable timeout & failover
       if (providerId === 'kisskh-kdrama' || providerId === 'kisskh') {
         try {
-          console.log(`[Resolver] Fast-path Korean Provider (KissKH) [timeout: ${activeTimeoutMs}ms]...`);
+          console.log(`[Resolver] Fast-path Korean Provider (KissKH) [timeout: ${isUnlimited ? 'unlimited' : activeTimeoutMs + 'ms'}]...`);
           setResolvingStatus('Resolving KissKH Korean Stream...');
           const kisskhPromise = resolveKisskhStream(title, releaseYear, season, episode, originalTitle);
-          const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), activeTimeoutMs));
-          const kisskhRes = await Promise.race([kisskhPromise, timeoutPromise]);
+          const kisskhRes = isUnlimited
+            ? await kisskhPromise
+            : await Promise.race([
+                kisskhPromise,
+                new Promise<null>((resolve) => setTimeout(() => resolve(null), activeTimeoutMs))
+              ]);
           if (!isMounted) return;
           if (kisskhRes && kisskhRes.embedUrl) {
             console.log('[Resolver] ✅ Playing via KissKH Isolated Player:', kisskhRes.embedUrl);
@@ -496,6 +591,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   }, [title]);
 
   const [resolvedLari21Url, setResolvedLari21Url] = useState<string | null>(null);
+  const [resolvedPencuriUrl, setResolvedPencuriUrl] = useState<string | null>(null);
   const [resolvedKisskhUrl, setResolvedKisskhUrl] = useState<string | null>(null);
   const [resolvedDramacoolUrl, setResolvedDramacoolUrl] = useState<string | null>(null);
   const [dramacoolServers, setDramacoolServers] = useState<DramacoolServer[]>([]);
@@ -503,6 +599,13 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
   const provider = getProviderById(providerId);
   const baseStreamUrl = useMemo(() => {
+    // For PencuriMovie Malay provider
+    if (provider.id === 'pencurimovie-my') {
+      if (resolvedPencuriUrl) {
+        return resolvedPencuriUrl;
+      }
+      return '';
+    }
     // For Dramacool Korean provider
     if (provider.id === 'dramacool-kdrama') {
       if (resolvedDramacoolUrl) {
@@ -532,12 +635,12 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     return mediaType === 'movie'
       ? provider.getMovieUrl(tmdbId)
       : provider.getTVUrl(tmdbId, season, episode);
-  }, [provider, resolvedDramacoolUrl, resolvedKisskhUrl, resolvedLari21Url, resolvedMalId, mediaType, tmdbId, season, episode]);
+  }, [provider, resolvedDramacoolUrl, resolvedKisskhUrl, resolvedLari21Url, resolvedPencuriUrl, resolvedMalId, mediaType, tmdbId, season, episode]);
 
   const streamUrl = useMemo(() => {
     if (!baseStreamUrl) return '';
-    // LARI21 and MegaPlay embeds do not support custom start/t/time query parameters and can crash or show a black screen
-    if (provider.id === 'lari21-asian' || provider.id === 'lk21-asian' || provider.category === 'asian' || provider.id === 'megaplay-anime') {
+    // PencuriMovie, LARI21 and MegaPlay embeds do not support custom start/t/time query parameters and can crash or show a black screen
+    if (provider.id === 'pencurimovie-my' || provider.id === 'lari21-asian' || provider.id === 'lk21-asian' || provider.category === 'asian' || provider.id === 'megaplay-anime') {
       return baseStreamUrl;
     }
     // CineSrc: pass continueprompt=false to suppress the "Resume watching?" dialog, autonext=false to disable native upnext overlay, and pass t= for auto-resume
@@ -585,8 +688,8 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     if ((!totalDurationSec || totalDurationSec <= 0) && durationRef.current > 0) {
       totalDurationSec = durationRef.current;
     }
-    if ((!totalDurationSec || totalDurationSec <= 0) && isAnime && mediaType === 'tv') {
-      totalDurationSec = 1440; // 24 minutes standard anime episode duration fallback
+    if (!totalDurationSec || totalDurationSec <= 0) {
+      totalDurationSec = mediaType === 'tv' ? (isAnime ? 1440 : 2700) : 5400;
     }
     if (currentSec < 0) return;
 
@@ -1083,12 +1186,13 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
       // Otherwise, advance elapsed watch session time smoothly by user-configured interval seconds
       const nextTime = (currentTimeRef.current || 0) + intervalSec;
-      const fallbackDur = durationRef.current || (episodeRuntimeMinutes ? episodeRuntimeMinutes * 60 : 0);
+      const defaultFallback = mediaType === 'tv' ? (isAnime ? 1440 : 2700) : 5400;
+      const fallbackDur = durationRef.current || (episodeRuntimeMinutes ? episodeRuntimeMinutes * 60 : 0) || defaultFallback;
       recordProgress(nextTime, fallbackDur);
     }, intervalMs);
 
     return () => clearInterval(tickerInterval);
-  }, [playerMode, hasError, allFailed, recordProgress, episodeRuntimeMinutes, tickerIntervalSec]);
+  }, [playerMode, hasError, allFailed, recordProgress, episodeRuntimeMinutes, tickerIntervalSec, mediaType, isAnime]);
 
   // HLS Player attachment for direct streams
   useEffect(() => {
@@ -1226,7 +1330,8 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       setResumeTimestamp(targetTimestamp);
 
       // Provisional duration from metadata
-      const provisionalDuration = (episodeRuntimeMinutes ? episodeRuntimeMinutes * 60 : 0) || (existing?.duration || 0) || (isAnime && mediaType === 'tv' ? 1440 : 0);
+      const defaultFallback = mediaType === 'tv' ? (isAnime ? 1440 : 2700) : 5400;
+      const provisionalDuration = (episodeRuntimeMinutes ? episodeRuntimeMinutes * 60 : 0) || (existing?.duration || 0) || defaultFallback;
       durationRef.current = provisionalDuration;
 
       const progressPercent = (!isExplicitRestart && provisionalDuration > 0 && targetTimestamp > 0)

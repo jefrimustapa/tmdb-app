@@ -902,8 +902,11 @@ export const Watch: React.FC = () => {
             voteAverage={details.vote_average}
             season={seasonParam}
             episode={episodeParam}
-            episodeTitle={currentEpisode?.name}
-            episodeRuntimeMinutes={mediaType === 'movie' ? ('runtime' in details ? details.runtime : undefined) : currentEpisode?.runtime}
+            episodeRuntimeMinutes={
+              mediaType === 'movie'
+                ? ('runtime' in details && details.runtime ? details.runtime : 90)
+                : (currentEpisode?.runtime || ('episode_run_time' in details && Array.isArray(details.episode_run_time) && details.episode_run_time[0]) || 45)
+            }
             providerId={providerId}
             initialTimestamp={timestampParam}
             isAnime={isAnime}

@@ -529,48 +529,7 @@ export const Settings: React.FC = () => {
                 </div>
               </div>
 
-              {/* Provider Stream Resolution Timeout */}
-              <div className="p-4 sm:p-5 space-y-3">
-                <div className="flex items-center justify-between gap-2 flex-wrap">
-                  <div className="flex items-center gap-2">
-                    <Clock className="w-4 h-4 text-hbo-cyan flex-shrink-0" />
-                    <h3 className="text-sm sm:text-base font-bold text-white">Stream Resolver Timeout</h3>
-                  </div>
-                  <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-hbo-dark border border-hbo-border text-hbo-cyan font-bold">
-                    {`${settings.streamResolverTimeout || 5}s`}
-                  </span>
-                </div>
-                <p className="text-xs text-gray-400">
-                  Maximum time allowed for fast-path providers (KissKH, LARI21) to connect before auto-failing over to the next priority provider.
-                </p>
 
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
-                  {[
-                    { seconds: 3, label: '3 Seconds', desc: 'Aggressive' },
-                    { seconds: 5, label: '5s (Default)', desc: 'Balanced' },
-                    { seconds: 8, label: '8 Seconds', desc: 'Patient' },
-                    { seconds: 12, label: '12 Seconds', desc: 'Slow Network' }
-                  ].map((opt) => {
-                    const isSelected = (settings.streamResolverTimeout ?? 5) === opt.seconds;
-                    return (
-                      <button
-                        key={opt.seconds}
-                        onClick={() => handleUpdate({ streamResolverTimeout: opt.seconds })}
-                        className={`p-2.5 rounded-xl border text-left transition-all ${
-                          isSelected
-                            ? 'bg-hbo-cyan/20 border-hbo-cyan text-white shadow-hbo-glow'
-                            : 'bg-hbo-dark/60 border-hbo-border text-gray-400 hover:text-gray-200'
-                        }`}
-                      >
-                        <p className={`text-xs font-bold ${isSelected ? 'text-hbo-cyan' : 'text-white'}`}>
-                          {opt.label}
-                        </p>
-                        <p className="text-[10px] text-gray-500 mt-0.5">{opt.desc}</p>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
 
               {/* Stream Resolvers Engine */}
               <div className="p-4 sm:p-5 space-y-3">
@@ -672,6 +631,92 @@ export const Settings: React.FC = () => {
                     />
                   </div>
                 )}
+                <div className="pt-3 border-t border-white/5 space-y-2 mt-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-gray-300 flex items-center gap-1.5">
+                      <Clock className="w-3.5 h-3.5 text-hbo-cyan" />
+                      <span>Stream Resolver Timeout</span>
+                    </span>
+                    <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-hbo-dark border border-hbo-border text-hbo-cyan font-bold">
+                      {(settings.streamResolverTimeout ?? 0) === 0 ? 'Unlimited' : `${settings.streamResolverTimeout}s`}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-gray-400">
+                    Maximum wait time for provider handshake before auto-failing over to the next priority server.
+                  </p>
+                  <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5 pt-1">
+                    {[
+                      { sec: 0, label: 'Unlimited', desc: 'Default' },
+                      { sec: 10, label: '10s', desc: 'Fast' },
+                      { sec: 15, label: '15s', desc: 'Quick' },
+                      { sec: 20, label: '20s', desc: 'Medium' },
+                      { sec: 25, label: '25s', desc: 'Relaxed' },
+                      { sec: 30, label: '30s', desc: 'Max' }
+                    ].map((opt) => {
+                      const isSelected = (settings.streamResolverTimeout ?? 0) === opt.sec;
+                      return (
+                        <button
+                          key={opt.sec}
+                          type="button"
+                          onClick={() => handleUpdate({ streamResolverTimeout: opt.sec })}
+                          className={`py-2 px-1 rounded-xl border text-center transition-all flex flex-col items-center justify-center ${
+                            isSelected
+                              ? 'bg-hbo-purple/40 border-hbo-cyan text-white font-bold shadow-md ring-1 ring-hbo-cyan/50'
+                              : 'bg-hbo-dark/60 border-hbo-border text-gray-300 hover:bg-hbo-hover'
+                          }`}
+                        >
+                          <span className="text-xs font-bold text-white">{opt.label}</span>
+                          <span className={`text-[9px] ${isSelected ? 'text-hbo-cyan font-semibold' : 'text-gray-500'}`}>
+                            {opt.desc}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Stream Resolver Retries */}
+                <div className="pt-3 border-t border-white/5 space-y-2 mt-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-gray-300 flex items-center gap-1.5">
+                      <RefreshCw className="w-3.5 h-3.5 text-hbo-cyan" />
+                      <span>Resolver Retry Attempts</span>
+                    </span>
+                    <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-hbo-dark border border-hbo-border text-hbo-cyan font-bold">
+                      {(settings.streamResolverRetries ?? 1) === 0 ? 'No Retry' : `${settings.streamResolverRetries ?? 1}×`}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-gray-400">
+                    How many times to retry a failed provider before failing over. Each retry clears the cache first.
+                  </p>
+                  <div className="grid grid-cols-4 gap-1.5 pt-1">
+                    {[
+                      { val: 0, label: '0×', desc: 'None' },
+                      { val: 1, label: '1×', desc: 'Default' },
+                      { val: 2, label: '2×', desc: 'Moderate' },
+                      { val: 3, label: '3×', desc: 'Aggressive' },
+                    ].map((opt) => {
+                      const isSelected = (settings.streamResolverRetries ?? 1) === opt.val;
+                      return (
+                        <button
+                          key={opt.val}
+                          type="button"
+                          onClick={() => handleUpdate({ streamResolverRetries: opt.val })}
+                          className={`py-2 px-1 rounded-xl border text-center transition-all flex flex-col items-center justify-center ${
+                            isSelected
+                              ? 'bg-hbo-purple/40 border-hbo-cyan text-white font-bold shadow-md ring-1 ring-hbo-cyan/50'
+                              : 'bg-hbo-dark/60 border-hbo-border text-gray-300 hover:bg-hbo-hover'
+                          }`}
+                        >
+                          <span className="text-xs font-bold text-white">{opt.label}</span>
+                          <span className={`text-[9px] ${isSelected ? 'text-hbo-cyan font-semibold' : 'text-gray-500'}`}>
+                            {opt.desc}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
 
               {/* Embed Resolver Priority Slots */}
@@ -859,6 +904,9 @@ export const Settings: React.FC = () => {
                                     )}
                                     {provider.badge === 'Asian' && (
                                       <span className="text-[9px] text-amber-400 font-semibold block">Asian Specialist</span>
+                                    )}
+                                    {provider.badge === 'Abyss' && (
+                                      <span className="text-[9px] text-cyan-400 font-semibold block">Abyss Server Specialist</span>
                                     )}
                                   </div>
                                   {isSelected && <Check className="w-3 h-3 text-hbo-cyan flex-shrink-0" />}

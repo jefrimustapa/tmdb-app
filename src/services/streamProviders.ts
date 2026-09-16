@@ -256,6 +256,16 @@ export const STREAM_PROVIDERS: StreamProvider[] = [
     getAsianUrl: (resolvedUrl: string) => resolvedUrl
   },
   {
+    id: 'pencurimovie-my',
+    name: 'PencuriMovie (Abyss)',
+    tagline: 'Southeast Asian & Malay series and movies via Abyss server',
+    badge: 'Abyss',
+    category: 'asian',
+    getMovieUrl: () => '',
+    getTVUrl: () => '',
+    getAsianUrl: (resolvedUrl: string) => resolvedUrl
+  },
+  {
     id: 'kisskh-kdrama',
     name: 'KissKH (K-Drama)',
     tagline: 'Dedicated Korean & Asian drama catalog with multi-language subtitles',

@@ -161,6 +161,7 @@ export const Settings: React.FC = () => {
   const [showDirectExtractorDrawer, setShowDirectExtractorDrawer] = useState(false);
   const [showEmbedResolverDrawer, setShowEmbedResolverDrawer] = useState(false);
   const [showEmbedTimeoutDrawer, setShowEmbedTimeoutDrawer] = useState(false);
+  const [showEmbedRetryDrawer, setShowEmbedRetryDrawer] = useState(false);
   const [activePriorityDrawer, setActivePriorityDrawer] = useState<'general' | 'anime' | 'asian' | 'korean' | null>(null);
   const [showTickerDrawer, setShowTickerDrawer] = useState(false);
   const [showHeaderTimeoutDrawer, setShowHeaderTimeoutDrawer] = useState(false);
@@ -171,7 +172,7 @@ export const Settings: React.FC = () => {
   const { detectedPlatform, activeLayout } = useDevice();
 
   const isPickerModalOpen = pickerModalSlot !== null;
-  const isAnyModalOpen = isPickerModalOpen || showMaturityDrawer || showTriggerDrawer || showAutoplayDrawer || showAutoplayTriggerDrawer || showAutoplayTimeoutDrawer || showEnginesDrawer || showTorboxDrawer || showDirectExtractorDrawer || showEmbedResolverDrawer || showEmbedTimeoutDrawer || activePriorityDrawer !== null || showTickerDrawer || showHeaderTimeoutDrawer || showPerfHudDrawer || showBackupDrawer;
+  const isAnyModalOpen = isPickerModalOpen || showMaturityDrawer || showTriggerDrawer || showAutoplayDrawer || showAutoplayTriggerDrawer || showAutoplayTimeoutDrawer || showEnginesDrawer || showTorboxDrawer || showDirectExtractorDrawer || showEmbedResolverDrawer || showEmbedTimeoutDrawer || showEmbedRetryDrawer || activePriorityDrawer !== null || showTickerDrawer || showHeaderTimeoutDrawer || showPerfHudDrawer || showBackupDrawer;
 
   // Viewport scroll helpers for TV remote navigation (snaps to absolute top / bottom)
   const scrollToPanelTop = () => {
@@ -288,7 +289,17 @@ export const Settings: React.FC = () => {
           selectedEl.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
         }
       }, 50);
+    } else if (showEmbedRetryDrawer) {
+      setTimeout(() => {
+        const selectedEl = document.querySelector<HTMLElement>('[data-embed-retry-drawer-item][data-embed-retry-selected="true"]') ||
+                           document.querySelector<HTMLElement>('[data-embed-retry-drawer-item]');
+        if (selectedEl) {
+          selectedEl.focus();
+          selectedEl.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        }
+      }, 50);
     } else if (showEmbedResolverDrawer) {
+
       setTimeout(() => {
         const defaultEl = document.getElementById('drawer-embed-sub-timeout') ||
                           document.querySelector<HTMLElement>('[data-embed-drawer-item="true"]');
@@ -3180,7 +3191,7 @@ export const Settings: React.FC = () => {
                         <div className="flex items-center gap-2 text-xs font-semibold">
                           <span className="text-emerald-400 flex items-center gap-1">
                             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                            Always Active • {settings.streamResolverTimeout || 5}s Timeout
+                            Always Active • {(settings.streamResolverTimeout ?? 0) === 0 ? 'Unlimited' : `${settings.streamResolverTimeout}s`} Timeout
                           </span>
                         </div>
                       </div>
@@ -3468,7 +3479,7 @@ export const Settings: React.FC = () => {
                         onKeyDown={(e) => {
                           if (e.key === 'ArrowDown') {
                             e.preventDefault();
-                            const target = document.getElementById('drawer-embed-priority-general');
+                            const target = document.getElementById('drawer-embed-sub-retries');
                             target?.focus();
                             target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
                           }
@@ -3479,10 +3490,48 @@ export const Settings: React.FC = () => {
                         }}
                         className="px-3 py-1.5 rounded-lg border text-xs font-bold transition-all tv-focus-target flex items-center gap-1.5 border-hbo-border bg-hbo-dark/80 hover:bg-hbo-hover text-white flex-shrink-0"
                       >
-                        <span className="text-hbo-cyan">{settings.streamResolverTimeout || 5} Seconds</span>
+                        <span className="text-hbo-cyan">{(settings.streamResolverTimeout ?? 0) === 0 ? 'Unlimited' : `${settings.streamResolverTimeout} Seconds`}</span>
                         <ChevronRight className="w-3.5 h-3.5 text-gray-400" />
                       </button>
                     </div>
+
+                    {/* Item 2: Stream Resolver Retries Hub Button */}
+                    <div className="bg-black/40 border border-hbo-border rounded-xl p-3.5 flex items-center justify-between">
+                      <div className="min-w-0 pr-2">
+                        <div className="font-bold text-xs text-white flex items-center gap-1.5 mb-0.5">
+                          <RefreshCw className="w-3.5 h-3.5 text-hbo-cyan" />
+                          <span>Resolver Retries</span>
+                        </div>
+                        <p className="text-[10px] text-gray-400">Retry count on failure before failover (clears cache).</p>
+                      </div>
+                      <button
+                        id="drawer-embed-sub-retries"
+                        data-embed-drawer-item="true"
+                        type="button"
+                        onKeyDown={(e) => {
+                          if (e.key === 'ArrowUp') {
+                            e.preventDefault();
+                            const target = document.getElementById('drawer-embed-sub-timeout');
+                            target?.focus();
+                            target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                          } else if (e.key === 'ArrowDown') {
+                            e.preventDefault();
+                            const target = document.getElementById('drawer-embed-priority-general');
+                            target?.focus();
+                            target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                          }
+                        }}
+                        onClick={() => {
+                          setShowEmbedResolverDrawer(false);
+                          setShowEmbedRetryDrawer(true);
+                        }}
+                        className="px-3 py-1.5 rounded-lg border text-xs font-bold transition-all tv-focus-target flex items-center gap-1.5 border-hbo-border bg-hbo-dark/80 hover:bg-hbo-hover text-white flex-shrink-0"
+                      >
+                        <span className="text-hbo-cyan">{(settings.streamResolverRetries ?? 1) === 0 ? 'No Retry' : `${settings.streamResolverRetries ?? 1}× Attempts`}</span>
+                        <ChevronRight className="w-3.5 h-3.5 text-gray-400" />
+                      </button>
+                    </div>
+
 
                     {/* Item 3: Category Priority Submenu Items (General, Anime, Asean, Korean) */}
                     <div className="space-y-2">
@@ -3516,7 +3565,7 @@ export const Settings: React.FC = () => {
                             onKeyDown={(e) => {
                               if (e.key === 'ArrowUp') {
                                 e.preventDefault();
-                                document.getElementById('drawer-embed-sub-timeout')?.focus();
+                                document.getElementById('drawer-embed-sub-retries')?.focus();
                               } else if (e.key === 'ArrowDown') {
                                 e.preventDefault();
                                 document.getElementById('drawer-embed-priority-anime')?.focus();
@@ -3731,12 +3780,14 @@ export const Settings: React.FC = () => {
             <div className="flex-1 overflow-y-auto px-6 py-6 space-y-2.5 font-sans">
               {(() => {
                 const options = [
-                  { seconds: 3, label: '3 Seconds', desc: 'Aggressive failover for ultra-fast connections.' },
-                  { seconds: 5, label: '5 Seconds (Default)', desc: 'Balanced response time for general home internet.' },
-                  { seconds: 8, label: '8 Seconds', desc: 'Patient connection for medium or busy networks.' },
-                  { seconds: 12, label: '12 Seconds', desc: 'Extended wait for slower networks and high latency Wi-Fi.' },
+                  { seconds: 0, label: 'Unlimited (Default)', desc: 'Wait until stream resolves without timing out prematurely.' },
+                  { seconds: 10, label: '10 Seconds', desc: 'Fast failover for high-speed fiber connections.' },
+                  { seconds: 15, label: '15 Seconds', desc: 'Quick handshake for standard broadband.' },
+                  { seconds: 20, label: '20 Seconds', desc: 'Balanced wait time for multi-step stream scrapers.' },
+                  { seconds: 25, label: '25 Seconds', desc: 'Relaxed connection for slower networks & busy Wi-Fi.' },
+                  { seconds: 30, label: '30 Seconds', desc: 'Maximum patience for high-latency mobile or VPN links.' },
                 ];
-                const currentVal = settings.streamResolverTimeout || 5;
+                const currentVal = settings.streamResolverTimeout ?? 0;
 
                 return options.map((opt, idx) => {
                   const isSelected = currentVal === opt.seconds;
@@ -3796,7 +3847,110 @@ export const Settings: React.FC = () => {
       )}
 
       {/* ========================================================================= */}
+      {/* Android TV Stream Resolver Retry Right Drawer (Level 3)                   */}
+      {/* ========================================================================= */}
+      {showEmbedRetryDrawer && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          data-drawer-container="true"
+          className="fixed inset-0 z-[9999] flex justify-end bg-black/80 backdrop-blur-md animate-fade-in"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowEmbedRetryDrawer(false);
+              setShowEmbedResolverDrawer(true);
+            }
+          }}
+        >
+          {/* Left Side Parent Path Context */}
+          <div className="flex-1 hidden md:flex flex-col justify-center pl-16 pr-8 pointer-events-none select-none">
+            <div className="flex items-center gap-2 text-xs font-bold text-gray-400 tracking-wider uppercase mb-2">
+              <span className="text-gray-400">Settings</span>
+              <ChevronRight className="w-3.5 h-3.5 text-gray-500" />
+              <span className="text-gray-400">Playback &amp; Streaming</span>
+              <ChevronRight className="w-3.5 h-3.5 text-gray-500" />
+              <span className="text-gray-400">Stream Engines</span>
+              <ChevronRight className="w-3.5 h-3.5 text-gray-500" />
+              <span className="text-hbo-cyan font-semibold">Embed Resolver</span>
+            </div>
+            <h1 className="text-3xl font-extrabold text-white tracking-tight mb-2">Resolver Retries</h1>
+            <p className="text-sm text-gray-400 max-w-md leading-relaxed">
+              How many times to retry a failed provider before failing over. Each retry clears cache before attempting fresh.
+            </p>
+          </div>
+
+          <div className="w-full max-w-md h-full bg-hbo-card/95 border-l border-hbo-border/80 shadow-2xl flex flex-col justify-between animate-slide-in-right overflow-hidden">
+            {/* Drawer Body: Single Column Options */}
+            <div className="flex-1 overflow-y-auto px-6 py-6 space-y-2.5 font-sans">
+              {(() => {
+                const options = [
+                  { retries: 0, label: '0× (No Retry)', desc: 'Fail over to backup provider immediately upon first failure.' },
+                  { retries: 1, label: '1× Attempt (Default)', desc: 'Retry once after clearing cache before triggering failover.' },
+                  { retries: 2, label: '2× Attempts (Moderate)', desc: 'Retry up to 2 times with cache reset for flaky network links.' },
+                  { retries: 3, label: '3× Attempts (Aggressive)', desc: 'Maximum persistence before abandoning provider.' },
+                ];
+                const currentVal = settings.streamResolverRetries ?? 1;
+
+                return options.map((opt, idx) => {
+                  const isSelected = currentVal === opt.retries;
+                  return (
+                    <button
+                      key={opt.retries}
+                      id={`drawer-embed-retry-${opt.retries}`}
+                      data-embed-retry-drawer-item="true"
+                      data-embed-retry-selected={isSelected ? 'true' : 'false'}
+                      type="button"
+                      onKeyDown={(e) => {
+                        if (e.key === 'ArrowUp' && idx > 0) {
+                          e.preventDefault();
+                          document.getElementById(`drawer-embed-retry-${options[idx - 1].retries}`)?.focus();
+                        } else if (e.key === 'ArrowDown' && idx < options.length - 1) {
+                          e.preventDefault();
+                          document.getElementById(`drawer-embed-retry-${options[idx + 1].retries}`)?.focus();
+                        }
+                      }}
+                      onClick={() => {
+                        handleUpdate({ streamResolverRetries: opt.retries });
+                        setShowEmbedRetryDrawer(false);
+                        setShowEmbedResolverDrawer(true);
+                      }}
+                      className={`w-full p-4 rounded-xl border text-left transition-all tv-focus-target flex items-center justify-between gap-3 ${
+                        isSelected
+                          ? 'bg-hbo-purple/30 border-hbo-cyan text-white shadow-hbo-glow ring-1 ring-hbo-cyan/40'
+                          : 'bg-black/30 border-hbo-border hover:border-gray-600 text-gray-300'
+                      }`}
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center justify-between gap-2 mb-0.5">
+                          <span className={`font-bold text-xs sm:text-sm ${isSelected ? 'text-hbo-cyan' : 'text-white'}`}>
+                            {opt.label}
+                          </span>
+                          {isSelected && (
+                            <div className="flex items-center gap-1 text-[11px] font-bold text-hbo-cyan">
+                              <Check className="w-3.5 h-3.5 stroke-[2.5]" />
+                              <span>Selected</span>
+                            </div>
+                          )}
+                        </div>
+                        <p className="text-[11px] text-gray-400 leading-snug">{opt.desc}</p>
+                      </div>
+                    </button>
+                  );
+                });
+              })()}
+            </div>
+
+            {/* Drawer Footer Hint */}
+            <div className="p-4 border-t border-hbo-border/50 bg-black/40 flex items-center justify-center text-xs text-gray-400 select-none">
+              <span>Press <strong className="text-white font-semibold">Back</strong> to return</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
       {/* Android TV Category Priority Server Right Drawer (Level 3)                */}
+
       {/* ========================================================================= */}
       {activePriorityDrawer !== null && (
         <div
