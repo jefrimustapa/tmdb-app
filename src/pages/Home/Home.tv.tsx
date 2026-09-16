@@ -106,6 +106,23 @@ export const Home: React.FC = () => {
         setNewReleaseTV(newTVItems);
         setIsLoading(false);
 
+        // Immediately commit primary rails into cache so returning from Settings/other pages is instant (0ms)
+        const initialCache: HomeFeedCache = {
+          trending: trendItems,
+          popularMovies: popMItems,
+          popularTV: popTVItems,
+          suggestions: homeFeedCache?.suggestions || [],
+          suggestionSubtitle: homeFeedCache?.suggestionSubtitle || 'Top picks and acclaimed masterworks tailored for you',
+          newReleaseMovies: newMItems,
+          newReleaseTV: newTVItems,
+          history: homeFeedCache?.history || [],
+          timestamp: Date.now()
+        };
+        homeFeedCache = initialCache;
+        try {
+          localStorage.setItem(HOME_CACHE_KEY, JSON.stringify(initialCache));
+        } catch {}
+
         // Fetch personalized suggestions asynchronously in background without blocking rail display
         getPersonalizedSuggestions(forceRefresh).then((suggRes) => {
           if (!isMounted) return;
@@ -113,13 +130,9 @@ export const Home: React.FC = () => {
           setSuggestionSubtitle(suggRes.subtitle);
 
           const updatedCache: HomeFeedCache = {
-            trending: trendItems,
-            popularMovies: popMItems,
-            popularTV: popTVItems,
+            ...initialCache,
             suggestions: suggRes.items || [],
             suggestionSubtitle: suggRes.subtitle,
-            newReleaseMovies: newMItems,
-            newReleaseTV: newTVItems,
             history: homeFeedCache?.history || [],
             timestamp: Date.now()
           };
@@ -140,14 +153,13 @@ export const Home: React.FC = () => {
 
     loadHomeData();
 
-    // Listen for settings or library changes to invalidate cache and refresh suggestions
+    // Listen for settings changes to refresh suggestions in background without destroying primary rails
     const handleSettingsChanged = () => {
-      homeFeedCache = null;
-      try {
-        localStorage.removeItem(HOME_CACHE_KEY);
-        localStorage.removeItem('tmdb_suggestions_cache');
-      } catch {}
-      loadHomeData(true);
+      getPersonalizedSuggestions(true).then((suggRes) => {
+        if (!isMounted) return;
+        setSuggestions(suggRes.items || []);
+        setSuggestionSubtitle(suggRes.subtitle);
+      }).catch(() => {});
     };
 
     window.addEventListener('tmdb_settings_changed', handleSettingsChanged);

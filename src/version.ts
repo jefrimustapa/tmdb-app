@@ -2,12 +2,13 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20260916-0440';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.fix-tv-navbar-laggy.20260916-0440';
+export const APP_BUILD_NUMBER = '20260916-0517';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.fix-tv-remote-back-n.20260916-0517';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
-export const APP_BRANCH = 'fix-tv-navbar-laggy';
-export const APP_CHANGELOG = `* fix(device): prioritize native AndroidBridge over spoofed user-agent for accurate phone detection (#108)
+export const APP_BRANCH = 'fix-tv-remote-back-n';
+export const APP_CHANGELOG = `* fix(tv): eliminate navigation lag on TV navbar during Home data load (#109)
+* fix(device): prioritize native AndroidBridge over spoofed user-agent for accurate phone detection (#108)
 * fix(tv): shield modal dpad navigation and lock iframe focus on watch page (#107)
 * feat(ui): auto-resize media cards across movie, series, library, and search grids (#106)
 * fix(device): improve platform detection accuracy for desktop web and touchscreen laptops (#105)
@@ -20,5 +21,4 @@ export const APP_CHANGELOG = `* fix(device): prioritize native AndroidBridge ove
 * refactor: scope CineSrc landscape menu CSS to phones and round navbar container in perf mode (#97)
 * feat(search): replace searchMulti with parallel searchMovies and searchTV to improve title fuzzy matching (#96)
 * fix(tv): fix vertical and horizontal navigation on details page (#95)
-* feat(tv): align search debounce with mobile and fix clear button vertical centering (#94)
-* fix(tv): enable play/pause toggle with d-pad center/ok button for cinesrc provider (#93)`;
+* feat(tv): align search debounce with mobile and fix clear button vertical centering (#94)`;
