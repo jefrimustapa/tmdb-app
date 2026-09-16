@@ -20,7 +20,17 @@ export function useTVNavigation(isEnabled = true) {
   useEffect(() => {
     if (!isEnabled) return;
 
+    let focusEstablished = false;
+
     const setInitialFocus = () => {
+      // If user has already focused the TV navbar (or any interactive element in the sidebar), DO NOT STEAL FOCUS!
+      const active = document.activeElement;
+      if (active && active !== document.body && active !== document.documentElement) {
+        if (active.closest('aside') !== null || active.getAttribute('data-tv-nav') === 'true') {
+          return;
+        }
+      }
+
       lastFocusedContentEl = null;
       const pathname = location.pathname;
       const mainContent = document.querySelector('main');
@@ -69,13 +79,18 @@ export function useTVNavigation(isEnabled = true) {
       if (target) {
         target.focus();
         target.scrollIntoView({ behavior: getScrollBehavior(), block: 'nearest', inline: 'center' });
+        focusEstablished = true;
       }
     };
 
     const timers: NodeJS.Timeout[] = [];
     // Progressive polling: fast checks for instant cached data, and extended checks for cold API network loads
     [40, 120, 250, 500, 850, 1300].forEach((delay) => {
-      timers.push(setTimeout(setInitialFocus, delay));
+      timers.push(setTimeout(() => {
+        if (!focusEstablished) {
+          setInitialFocus();
+        }
+      }, delay));
     });
 
     return () => {
@@ -151,6 +166,36 @@ export function useTVNavigation(isEnabled = true) {
       // Execute before ANY querySelectorAll('.tv-focus-target') or .offsetParent
       // to eliminate layout reflow / thrashing completely on low-power TV CPUs.
       // =========================================================================
+
+      // Fast-path 0: TV Navbar (Sidebar) Up / Down Navigation & Left Boundary Lock (0ms Latency)
+      const isCurrentInNav = currentFocused && (
+        currentFocused.closest('aside') !== null || 
+        currentFocused.getAttribute('data-tv-nav') === 'true'
+      );
+
+      if (isCurrentInNav) {
+        if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+          e.preventDefault();
+          const allNav = Array.from(document.querySelectorAll<HTMLElement>('aside [data-tv-nav="true"], aside .tv-focus-target'));
+          const currNavIdx = allNav.indexOf(currentFocused);
+          if (currNavIdx !== -1) {
+            const nextIdx = e.key === 'ArrowDown'
+              ? Math.min(allNav.length - 1, currNavIdx + 1)
+              : Math.max(0, currNavIdx - 1);
+            const targetNav = allNav[nextIdx];
+            if (targetNav) {
+              targetNav.focus({ preventScroll: true });
+            }
+          }
+          return;
+        }
+
+        if (e.key === 'ArrowLeft') {
+          // Hard boundary lock: Leftmost edge of TV interface (no-op, 0ms)
+          e.preventDefault();
+          return;
+        }
+      }
 
       // Fast-path 1: Hero Billboard Navigation (Full-Width Sliding Rail)
       const heroBtn = currentFocused ? currentFocused.closest('[data-hero-btn]') : null;
@@ -584,24 +629,6 @@ export function useTVNavigation(isEnabled = true) {
 
         // Candidate filtering rules:
         let candidateElements = focusableElements.filter(el => el !== currentFocused);
-
-        if (isCurrentInNav && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
-          // Linear navigation inside Sidebar
-          const allNav = Array.from(document.querySelectorAll<HTMLElement>('aside .tv-focus-target, [data-tv-nav="true"]'))
-            .filter(el => el.offsetParent !== null && !el.hasAttribute('disabled'));
-          const currNavIdx = allNav.indexOf(currentFocused);
-          if (currNavIdx !== -1) {
-            e.preventDefault();
-            if (e.key === 'ArrowDown') {
-              const nextNav = allNav[Math.min(allNav.length - 1, currNavIdx + 1)];
-              nextNav?.focus();
-            } else {
-              const prevNav = allNav[Math.max(0, currNavIdx - 1)];
-              prevNav?.focus();
-            }
-            return;
-          }
-        }
 
         if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
           // On Settings page: Category rail linear up/down
