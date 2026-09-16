@@ -2,12 +2,12 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20260916-0545';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.fix-tv-remote-back-n.20260916-0545';
+export const APP_BUILD_NUMBER = '20260916-1210';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-tv-settings-vis.20260916-1210';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
-export const APP_BRANCH = 'fix-tv-remote-back-n';
-export const APP_CHANGELOG = `* fix(tv): eliminate delay on remote back navigation to Home and land focus on TV navbar Home icon
+export const APP_BRANCH = 'feat-tv-settings-vis';
+export const APP_CHANGELOG = `* fix(tv): eliminate delay on remote back navigation and land focus on TV navbar Home icon (#110)
 * fix(tv): eliminate navigation lag on TV navbar during Home data load (#109)
 * fix(device): prioritize native AndroidBridge over spoofed user-agent for accurate phone detection (#108)
 * fix(tv): shield modal dpad navigation and lock iframe focus on watch page (#107)
