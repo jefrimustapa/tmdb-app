@@ -2,13 +2,12 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20260916-0351';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-tv-watch-dpad-s.20260916-0351';
+export const APP_BUILD_NUMBER = '20260916-0410';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.fix-phone-platform-d.20260916-0410';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
-export const APP_BRANCH = 'feat-tv-watch-dpad-s';
-export const APP_CHANGELOG = `* fix(tv): route dpad keys directly to modal window and lock iframe focus on watch page
-* fix(tv): add native modal state bridge and shield settings modal dpad navigation
+export const APP_BRANCH = 'fix-phone-platform-d';
+export const APP_CHANGELOG = `* fix(tv): shield modal dpad navigation and lock iframe focus on watch page (#107)
 * feat(ui): auto-resize media cards across movie, series, library, and search grids (#106)
 * fix(device): improve platform detection accuracy for desktop web and touchscreen laptops (#105)
 * feat: add PencuriMovie provider, resolver retry settings, and network resilience (#104)
@@ -21,4 +20,5 @@ export const APP_CHANGELOG = `* fix(tv): route dpad keys directly to modal windo
 * feat(search): replace searchMulti with parallel searchMovies and searchTV to improve title fuzzy matching (#96)
 * fix(tv): fix vertical and horizontal navigation on details page (#95)
 * feat(tv): align search debounce with mobile and fix clear button vertical centering (#94)
-* fix(tv): enable play/pause toggle with d-pad center/ok button for cinesrc provider (#93)`;
+* fix(tv): enable play/pause toggle with d-pad center/ok button for cinesrc provider (#93)
+* fix(tv): eliminate navigation delay between sidebar home and hero banner and optimize D-pad responsiveness (#92)`;
