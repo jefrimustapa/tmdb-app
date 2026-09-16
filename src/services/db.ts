@@ -61,7 +61,7 @@ export const DEFAULT_SETTINGS: UserSettings = {
   preferredProvider: 'vidlink',
   topProviders: ['vidlink', 'moviesapi', 'cinesrc'],
   topAnimeProviders: ['megaplay-anime', 'cinesrc', 'moviesapi'],
-  topAsianProviders: ['vidlink', '111movies', 'lari21-asian'],
+  topAsianProviders: ['pencurimovie-my', 'vidlink', '111movies'],
   topKoreanProviders: ['kisskh-kdrama', 'cinesrc', 'moviesapi'],
   deviceMode: 'auto',
   autoplayNext: true,
@@ -79,7 +79,8 @@ export const DEFAULT_SETTINGS: UserSettings = {
   directStreamApiUrl: 'https://tmdb-api-yfbu.onrender.com',
   torboxApiKey: 'fd12d8fe-2429-43eb-bcb3-1a3d2dfeb5f9',
   streamHeaderTimeout: 5,
-  streamResolverTimeout: 5,
+  streamResolverTimeout: 0,
+  streamResolverRetries: 1,
   includeNightlyUpdates: false,
   autoUpdateCheck: true,
   virtualCursorEnabled: true,
@@ -326,12 +327,20 @@ export const dbService = {
       ];
       await db.settings.put(settings);
     }
-    if (!settings.topAsianProviders || settings.topAsianProviders.length < 3 || settings.topAsianProviders[0] === 'lk21-asian' || settings.topAsianProviders[0] === 'cinesrc' || (settings.topAsianProviders[0] === 'lari21-asian' && settings.topAsianProviders[1] === 'cinesrc')) {
+    if (!settings.topAsianProviders || settings.topAsianProviders.length < 3 || settings.topAsianProviders[0] === 'lk21-asian' || settings.topAsianProviders[0] === 'cinesrc' || settings.topAsianProviders[0] === 'vidlink' || (settings.topAsianProviders[0] === 'lari21-asian' && settings.topAsianProviders[1] === 'cinesrc')) {
       settings.topAsianProviders = [
+        'pencurimovie-my',
         'vidlink',
-        '111movies',
-        'lari21-asian'
+        '111movies'
       ];
+      await db.settings.put(settings);
+    }
+    if (settings.streamResolverTimeout === undefined || (settings.streamResolverTimeout !== 0 && (settings.streamResolverTimeout < 10 || settings.streamResolverTimeout > 30))) {
+      settings.streamResolverTimeout = 0;
+      await db.settings.put(settings);
+    }
+    if (settings.streamResolverRetries === undefined || settings.streamResolverRetries < 0 || settings.streamResolverRetries > 3) {
+      settings.streamResolverRetries = 1;
       await db.settings.put(settings);
     }
     if (!settings.topKoreanProviders || settings.topKoreanProviders.length < 3) {
@@ -401,6 +410,14 @@ export const dbService = {
       });
     } catch (err) {
       console.warn('Failed to cache rating in IndexedDB:', err);
+    }
+  },
+
+  async deleteRatingCacheItem(id: string): Promise<void> {
+    try {
+      await db.ratingCache.delete(id);
+    } catch (err) {
+      console.warn('Failed to delete item from rating cache in IndexedDB:', err);
     }
   },
 
