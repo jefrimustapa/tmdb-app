@@ -1178,7 +1178,7 @@ export const Settings: React.FC = () => {
                 onClick={() => setActiveCategory(cat.id)}
                 onFocus={() => setActiveCategory(cat.id)}
                 onKeyDown={(e) => {
-                  if (e.key === 'ArrowRight') {
+                  if (e.key === 'ArrowRight' || e.keyCode === 22) {
                     e.preventDefault();
                     if (cat.id === 'playback') {
                       const target = document.getElementById('playback-btn-autoplay-hub') ||
@@ -1210,8 +1210,8 @@ export const Settings: React.FC = () => {
                 }}
                 className={`w-full p-3.5 rounded-2xl border text-left transition-all tv-focus-target flex items-center justify-between gap-3 min-h-[66px] ${
                   isSelected
-                    ? 'bg-gradient-to-r from-hbo-purple/60 via-hbo-purple/30 to-hbo-cyan/20 border-hbo-cyan shadow-hbo-glow text-white ring-2 ring-hbo-cyan/60'
-                    : 'bg-hbo-card/70 border-hbo-border hover:bg-hbo-hover hover:border-white/20 text-gray-300'
+                    ? 'bg-gradient-to-r from-hbo-purple/40 via-hbo-purple/20 to-transparent border-hbo-purple text-white focus:border-hbo-cyan focus:ring-2 focus:ring-hbo-cyan focus:shadow-hbo-glow focus:from-hbo-purple/60 focus:to-hbo-cyan/20'
+                    : 'bg-hbo-card/70 border-hbo-border hover:bg-hbo-hover hover:border-white/20 text-gray-300 focus:border-hbo-cyan focus:ring-2 focus:ring-hbo-cyan focus:text-white'
                 }`}
               >
                 <div className="flex items-center gap-3.5 min-w-0 flex-1">
