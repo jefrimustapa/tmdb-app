@@ -2427,27 +2427,48 @@ public class MainActivity extends BridgeActivity {
             }
         }
 
-        if (isTV() && !isWatchPageActive && event.getAction() == KeyEvent.ACTION_DOWN) {
+        if (isTV() && !isWatchPageActive) {
             int keyCode = event.getKeyCode();
-            if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER || keyCode == KeyEvent.KEYCODE_NUMPAD_ENTER) {
-                if (event.getRepeatCount() > 0) return true;
-                WebView webView = bridge.getWebView();
-                if (webView != null) {
-                    webView.evaluateJavascript(
-                        "(function() {" +
-                        "  var active = document.activeElement;" +
-                        "  console.log('[TMDB Streamer] Enter pressed! activeElement:', active ? (active.tagName + '#' + active.id + ' text: ' + (active.textContent || '').trim().substring(0, 30)) : 'null');" +
-                        "  if (active && active !== document.body && active !== document.documentElement) {" +
-                        "    if (typeof active.click === 'function') {" +
-                        "      active.click();" +
-                        "      return true;" +
-                        "    }" +
-                        "  }" +
-                        "  return false;" +
-                        "})()",
-                        null
-                    );
-                    return true;
+            if (keyCode == KeyEvent.KEYCODE_BACK) {
+                if (event.getAction() == KeyEvent.ACTION_DOWN) {
+                    if (event.getRepeatCount() > 0) return true;
+                    Log.i("TMDB_APP", "[Native Key] Back pressed on TV (non-watch) -> posting tmdb_remote_back");
+                    WebView webView = bridge.getWebView();
+                    if (webView != null) {
+                        webView.post(() -> {
+                            webView.evaluateJavascript(
+                                "(function() {" +
+                                "  window.dispatchEvent(new CustomEvent('tmdb_remote_back'));" +
+                                "})()",
+                                null
+                            );
+                        });
+                    }
+                }
+                return true; // Synchronously consume both ACTION_DOWN and ACTION_UP so system does not fire duplicate events
+            }
+
+            if (event.getAction() == KeyEvent.ACTION_DOWN) {
+                if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER || keyCode == KeyEvent.KEYCODE_NUMPAD_ENTER) {
+                    if (event.getRepeatCount() > 0) return true;
+                    WebView webView = bridge.getWebView();
+                    if (webView != null) {
+                        webView.evaluateJavascript(
+                            "(function() {" +
+                            "  var active = document.activeElement;" +
+                            "  console.log('[TMDB Streamer] Enter pressed! activeElement:', active ? (active.tagName + '#' + active.id + ' text: ' + (active.textContent || '').trim().substring(0, 30)) : 'null');" +
+                            "  if (active && active !== document.body && active !== document.documentElement) {" +
+                            "    if (typeof active.click === 'function') {" +
+                            "      active.click();" +
+                            "      return true;" +
+                            "    }" +
+                            "  }" +
+                            "  return false;" +
+                            "})()",
+                            null
+                        );
+                        return true;
+                    }
                 }
             }
         }

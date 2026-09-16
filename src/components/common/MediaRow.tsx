@@ -1,4 +1,4 @@
-import React, { useRef, memo } from 'react';
+import React, { useRef, useState, useCallback, useEffect, memo } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import type { TMDBMediaItem } from '../../types/tmdb';
 import { MediaCard } from './MediaCard';
@@ -11,10 +11,26 @@ interface MediaRowProps {
   variant?: 'poster' | 'landscape';
 }
 
+const INITIAL_RENDER_COUNT = 10;
+
 const MediaRowComponent: React.FC<MediaRowProps> = ({ title, subtitle, items, type, variant = 'poster' }) => {
   const rowRef = useRef<HTMLDivElement>(null);
+  const [renderedCount, setRenderedCount] = useState(() => Math.min(items?.length || 0, INITIAL_RENDER_COUNT));
+
+  useEffect(() => {
+    if (items?.length && renderedCount < INITIAL_RENDER_COUNT) {
+      setRenderedCount(Math.min(items.length, INITIAL_RENDER_COUNT));
+    }
+  }, [items?.length, renderedCount]);
+
+  const expandItems = useCallback(() => {
+    if (renderedCount < (items?.length || 0)) {
+      setRenderedCount(items.length);
+    }
+  }, [renderedCount, items?.length]);
 
   const scroll = (direction: 'left' | 'right') => {
+    expandItems();
     if (rowRef.current) {
       const scrollAmount = rowRef.current.clientWidth * 0.75;
       rowRef.current.scrollBy({
@@ -52,10 +68,12 @@ const MediaRowComponent: React.FC<MediaRowProps> = ({ title, subtitle, items, ty
         {/* Horizontal Carousel */}
         <div
           ref={rowRef}
+          onFocusCapture={expandItems}
+          onMouseEnter={expandItems}
           style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-x pan-y' }}
           className="flex items-center gap-3.5 overflow-x-auto no-scrollbar py-4 pl-4 sm:pl-8 pr-6 sm:pr-8 -my-2 touch-pan-x touch-pan-y overscroll-x-contain"
         >
-          {items.map((item) => (
+          {items.slice(0, renderedCount).map((item) => (
             <MediaCard key={item.id} item={item} type={type} variant={variant} />
           ))}
         </div>

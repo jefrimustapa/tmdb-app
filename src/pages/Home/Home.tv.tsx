@@ -51,6 +51,33 @@ export const Home: React.FC = () => {
   const [newReleaseTV, setNewReleaseTV] = useState<TMDBMediaItem[]>(() => homeFeedCache?.newReleaseTV || []);
   const [isLoading, setIsLoading] = useState(() => !homeFeedCache);
 
+  // Progressive staged rail mounting: Mount top visible viewport in 0ms, then stage below-the-fold rails
+  const [mountStage, setMountStage] = useState(1);
+
+  useEffect(() => {
+    const timer1 = setTimeout(() => {
+      setMountStage((s) => Math.max(s, 2));
+    }, 60);
+
+    const timer2 = setTimeout(() => {
+      setMountStage(3);
+    }, 140);
+
+    // If user presses D-pad down before timers fire, immediately mount all rails
+    const handleEarlyScroll = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowDown' || e.keyCode === 40 || e.keyCode === 20) {
+        setMountStage(3);
+      }
+    };
+    window.addEventListener('keydown', handleEarlyScroll, { passive: true });
+
+    return () => {
+      clearTimeout(timer1);
+      clearTimeout(timer2);
+      window.removeEventListener('keydown', handleEarlyScroll);
+    };
+  }, []);
+
   useEffect(() => {
     let isMounted = true;
 
@@ -106,6 +133,23 @@ export const Home: React.FC = () => {
         setNewReleaseTV(newTVItems);
         setIsLoading(false);
 
+        // Immediately commit primary rails into cache so returning from Settings/other pages is instant (0ms)
+        const initialCache: HomeFeedCache = {
+          trending: trendItems,
+          popularMovies: popMItems,
+          popularTV: popTVItems,
+          suggestions: homeFeedCache?.suggestions || [],
+          suggestionSubtitle: homeFeedCache?.suggestionSubtitle || 'Top picks and acclaimed masterworks tailored for you',
+          newReleaseMovies: newMItems,
+          newReleaseTV: newTVItems,
+          history: homeFeedCache?.history || [],
+          timestamp: Date.now()
+        };
+        homeFeedCache = initialCache;
+        try {
+          localStorage.setItem(HOME_CACHE_KEY, JSON.stringify(initialCache));
+        } catch {}
+
         // Fetch personalized suggestions asynchronously in background without blocking rail display
         getPersonalizedSuggestions(forceRefresh).then((suggRes) => {
           if (!isMounted) return;
@@ -113,13 +157,9 @@ export const Home: React.FC = () => {
           setSuggestionSubtitle(suggRes.subtitle);
 
           const updatedCache: HomeFeedCache = {
-            trending: trendItems,
-            popularMovies: popMItems,
-            popularTV: popTVItems,
+            ...initialCache,
             suggestions: suggRes.items || [],
             suggestionSubtitle: suggRes.subtitle,
-            newReleaseMovies: newMItems,
-            newReleaseTV: newTVItems,
             history: homeFeedCache?.history || [],
             timestamp: Date.now()
           };
@@ -140,14 +180,13 @@ export const Home: React.FC = () => {
 
     loadHomeData();
 
-    // Listen for settings or library changes to invalidate cache and refresh suggestions
+    // Listen for settings changes to refresh suggestions in background without destroying primary rails
     const handleSettingsChanged = () => {
-      homeFeedCache = null;
-      try {
-        localStorage.removeItem(HOME_CACHE_KEY);
-        localStorage.removeItem('tmdb_suggestions_cache');
-      } catch {}
-      loadHomeData(true);
+      getPersonalizedSuggestions(true).then((suggRes) => {
+        if (!isMounted) return;
+        setSuggestions(suggRes.items || []);
+        setSuggestionSubtitle(suggRes.subtitle);
+      }).catch(() => {});
     };
 
     window.addEventListener('tmdb_settings_changed', handleSettingsChanged);
@@ -235,39 +274,47 @@ export const Home: React.FC = () => {
         items={trending}
       />
 
-      <MediaRow
-        title="Popular Movies"
-        subtitle="Critically acclaimed and high grossing films"
-        items={popularMovies}
-        type="movie"
-      />
+      {mountStage >= 2 && (
+        <>
+          <MediaRow
+            title="Popular Movies"
+            subtitle="Critically acclaimed and high grossing films"
+            items={popularMovies}
+            type="movie"
+          />
 
-      <MediaRow
-        title="Trending TV Shows"
-        subtitle="Captivating series and multi-season dramas"
-        items={popularTV}
-        type="tv"
-      />
+          <MediaRow
+            title="Trending TV Shows"
+            subtitle="Captivating series and multi-season dramas"
+            items={popularTV}
+            type="tv"
+          />
+        </>
+      )}
 
-      <MediaRow
-        title="New Release Movie"
-        subtitle="Latest blockbuster films and digital premieres"
-        items={newReleaseMovies}
-        type="movie"
-      />
+      {mountStage >= 3 && (
+        <>
+          <MediaRow
+            title="New Release Movie"
+            subtitle="Latest blockbuster films and digital premieres"
+            items={newReleaseMovies}
+            type="movie"
+          />
 
-      <MediaRow
-        title="New Release Series"
-        subtitle="Fresh seasons and newly premiering shows"
-        items={newReleaseTV}
-        type="tv"
-      />
+          <MediaRow
+            title="New Release Series"
+            subtitle="Fresh seasons and newly premiering shows"
+            items={newReleaseTV}
+            type="tv"
+          />
 
-      <MediaRow
-        title="Suggestions"
-        subtitle={suggestionSubtitle}
-        items={suggestions}
-      />
+          <MediaRow
+            title="Suggestions"
+            subtitle={suggestionSubtitle}
+            items={suggestions}
+          />
+        </>
+      )}
     </div>
   );
 };
