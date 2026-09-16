@@ -530,6 +530,11 @@ public class MainActivity extends BridgeActivity {
                 }
 
                 @JavascriptInterface
+                public boolean isPhoneDevice() {
+                    return isPhone();
+                }
+
+                @JavascriptInterface
                 public void setDropdownOpen(boolean open) {
                     isDropdownOpen = open;
                     Log.i("TMDB_APP", "[AndroidBridge] setDropdownOpen: " + open);

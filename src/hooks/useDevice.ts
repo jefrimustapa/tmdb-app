@@ -9,11 +9,42 @@ export function useDevice() {
     const checkDevice = () => {
       const ua = navigator.userAgent.toLowerCase();
 
-      // 1. TV Detection (Highest Priority)
-      const isBridgeTV = typeof (window as any).AndroidBridge?.isTVDevice === 'function'
-        ? (window as any).AndroidBridge.isTVDevice()
-        : false;
+      // 0. Native Android Bridge Check (Absolute Authority)
+      // MainActivity.java intentionally spoofs a Windows Desktop UA to bypass 403 provider bot blocks.
+      // Therefore, inside the native Android app, we MUST query AndroidBridge directly!
+      const isBridge = typeof (window as any).AndroidBridge !== 'undefined';
+      if (isBridge) {
+        const isBridgeTV = typeof (window as any).AndroidBridge?.isTVDevice === 'function'
+          ? (window as any).AndroidBridge.isTVDevice()
+          : false;
+        const isBridgeTablet = typeof (window as any).AndroidBridge?.isTabletDevice === 'function'
+          ? (window as any).AndroidBridge.isTabletDevice()
+          : false;
+        const isBridgePhone = typeof (window as any).AndroidBridge?.isPhoneDevice === 'function'
+          ? (window as any).AndroidBridge.isPhoneDevice()
+          : (!isBridgeTV && !isBridgeTablet);
 
+        if (isBridgeTV) {
+          setIsTV(true);
+          setIsTablet(false);
+          setIsPhone(false);
+          return;
+        }
+        if (isBridgeTablet) {
+          setIsTV(false);
+          setIsTablet(true);
+          setIsPhone(false);
+          return;
+        }
+        if (isBridgePhone) {
+          setIsTV(false);
+          setIsTablet(false);
+          setIsPhone(true);
+          return;
+        }
+      }
+
+      // 1. Web TV User Agent Detection
       const isTVUserAgent =
         ua.includes('smart-tv') ||
         ua.includes('smarttv') ||
@@ -31,9 +62,7 @@ export function useDevice() {
         ua.includes('mibox') ||
         ua.includes('mitv');
 
-      const isTVDetected = isBridgeTV || isTVUserAgent;
-
-      if (isTVDetected) {
+      if (isTVUserAgent) {
         setIsTV(true);
         setIsTablet(false);
         setIsPhone(false);
@@ -70,11 +99,7 @@ export function useDevice() {
         return;
       }
 
-      // 4. Tablet Detection
-      const isBridgeTablet = typeof (window as any).AndroidBridge?.isTabletDevice === 'function'
-        ? (window as any).AndroidBridge.isTabletDevice()
-        : false;
-
+      // 4. Tablet Detection (for Web / non-bridge browsers)
       // Android Tablet: Android OS without 'mobile' token in UA
       const isAndroidTablet = ua.includes('android') && !ua.includes('mobile');
 
@@ -86,7 +111,7 @@ export function useDevice() {
       // Touch Tablet: touch-first device without fine pointer, non-desktop OS, and screen min dimension >= 600
       const isTouchTablet = !isDesktopOS && hasTouch && hasCoarsePointer && !hasFinePointer && screenMin >= 600;
 
-      const isTabletDetected = isBridgeTablet || isAndroidTablet || isIPad || isTouchTablet;
+      const isTabletDetected = isAndroidTablet || isIPad || isTouchTablet;
 
       if (isTabletDetected) {
         setIsTV(false);
