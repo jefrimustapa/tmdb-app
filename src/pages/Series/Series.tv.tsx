@@ -258,8 +258,8 @@ export const Series: React.FC = () => {
         <>
           <div className="grid grid-cols-5 gap-3.5 sm:gap-4 py-2 px-1">
             {series.map((item) => (
-              <div key={item.id} className="flex justify-center">
-                <MediaCard item={item} type="tv" />
+              <div key={item.id} className="w-full flex justify-center">
+                <MediaCard item={item} type="tv" fullWidth />
               </div>
             ))}
           </div>

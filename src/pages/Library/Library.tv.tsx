@@ -150,7 +150,7 @@ export const Library: React.FC = () => {
           {history.length > 0 ? (
             <div className="grid grid-cols-5 gap-3.5 sm:gap-4 py-2 px-1">
               {history.map((item) => (
-                <div key={`${item.tmdbId}-${item.mediaType}`} className="flex justify-center">
+                <div key={`${item.tmdbId}-${item.mediaType}`} className="w-full flex justify-center">
                   <MediaCard
                     item={convertToMediaItem(item)}
                     type={item.mediaType}
@@ -160,6 +160,7 @@ export const Library: React.FC = () => {
                     stillPath={item.stillPath}
                     progress={item.progressPercent}
                     timestamp={item.timestamp}
+                    fullWidth
                     onDelete={() => {
                       dbService.removeFromHistory(item.tmdbId, item.mediaType);
                       setHistory((prev) => prev.filter((h) => !(h.tmdbId === item.tmdbId && h.mediaType === item.mediaType)));
@@ -183,10 +184,11 @@ export const Library: React.FC = () => {
           {likes.length > 0 ? (
             <div className="grid grid-cols-5 gap-3.5 sm:gap-4 py-2 px-1">
               {likes.map((item) => (
-                <div key={`${item.tmdbId}-${item.mediaType}`} className="flex justify-center">
+                <div key={`${item.tmdbId}-${item.mediaType}`} className="w-full flex justify-center">
                   <MediaCard
                     item={convertToMediaItem(item)}
                     type={item.mediaType}
+                    fullWidth
                     onDelete={() => {
                       dbService.toggleLike(item);
                       setLikes((prev) => prev.filter((l) => !(l.tmdbId === item.tmdbId && l.mediaType === item.mediaType)));
@@ -210,10 +212,11 @@ export const Library: React.FC = () => {
           {watchlist.length > 0 ? (
             <div className="grid grid-cols-5 gap-3.5 sm:gap-4 py-2 px-1">
               {watchlist.map((item) => (
-                <div key={`${item.tmdbId}-${item.mediaType}`} className="flex justify-center">
+                <div key={`${item.tmdbId}-${item.mediaType}`} className="w-full flex justify-center">
                   <MediaCard
                     item={convertToMediaItem(item)}
                     type={item.mediaType}
+                    fullWidth
                     onDelete={() => {
                       dbService.toggleWatchlist(item);
                       setWatchlist((prev) => prev.filter((w) => !(w.tmdbId === item.tmdbId && w.mediaType === item.mediaType)));

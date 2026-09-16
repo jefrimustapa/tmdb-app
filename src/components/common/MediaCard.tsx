@@ -19,6 +19,8 @@ interface MediaCardProps {
   progress?: number;
   timestamp?: number;
   onDelete?: () => void;
+  fullWidth?: boolean;
+  className?: string;
 }
 
 const MediaCardComponent: React.FC<MediaCardProps> = ({
@@ -31,7 +33,9 @@ const MediaCardComponent: React.FC<MediaCardProps> = ({
   stillPath,
   progress,
   timestamp,
-  onDelete
+  onDelete,
+  fullWidth = false,
+  className = '',
 }) => {
   const navigate = useNavigate();
   const mediaType: 'movie' | 'tv' = (type === 'tv' || item.media_type === 'tv' || (!item.title && !!item.name)) ? 'tv' : 'movie';
@@ -334,11 +338,15 @@ const MediaCardComponent: React.FC<MediaCardProps> = ({
         onMouseUp={handleTouchEnd}
         onClick={handleCardClick}
         style={{ touchAction: 'pan-x pan-y' }}
-        className={`group relative flex-shrink-0 rounded-xl overflow-hidden bg-hbo-card border border-hbo-border/40 tv-focus-target cursor-pointer focus:outline-none select-none touch-pan-x touch-pan-y ${
-          isLandscape
-            ? 'w-[164px] sm:w-[172px] lg:w-[176px] max-w-[180px]'
-            : 'w-[130px] sm:w-[140px] lg:w-[144px] max-w-[148px]'
-        }`}
+        className={`group relative rounded-xl overflow-hidden bg-hbo-card border border-hbo-border/40 tv-focus-target cursor-pointer focus:outline-none select-none touch-pan-x touch-pan-y ${
+          fullWidth
+            ? 'w-full'
+            : `flex-shrink-0 ${
+                isLandscape
+                  ? 'w-[164px] sm:w-[172px] lg:w-[176px] max-w-[180px]'
+                  : 'w-[130px] sm:w-[140px] lg:w-[144px] max-w-[148px]'
+              }`
+        } ${className}`}
       >
         <div className={`block relative w-full overflow-hidden bg-gray-900 ${
           isLandscape ? 'aspect-video' : 'aspect-[2/3]'

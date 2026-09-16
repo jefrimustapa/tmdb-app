@@ -258,8 +258,8 @@ export const Movies: React.FC = () => {
         <>
           <div className="grid grid-cols-5 gap-3.5 sm:gap-4 py-2 px-1">
             {movies.map((movie) => (
-              <div key={movie.id} className="flex justify-center">
-                <MediaCard item={movie} type="movie" />
+              <div key={movie.id} className="w-full flex justify-center">
+                <MediaCard item={movie} type="movie" fullWidth />
               </div>
             ))}
           </div>

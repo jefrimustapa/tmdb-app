@@ -559,8 +559,8 @@ export const Search: React.FC = () => {
           {filteredAndSortedResults.length > 0 ? (
             <div className="grid grid-cols-5 gap-3.5 sm:gap-4 py-4 px-1">
               {filteredAndSortedResults.map((item) => (
-                <div key={`${item.media_type || 'item'}-${item.id}`} className="flex justify-center">
-                  <MediaCard item={item} />
+                <div key={`${item.media_type || 'item'}-${item.id}`} className="w-full flex justify-center">
+                  <MediaCard item={item} fullWidth />
                 </div>
               ))}
             </div>

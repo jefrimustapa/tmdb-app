@@ -2,12 +2,13 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20260916-0318';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.fix-web-platform-det.20260916-0318';
+export const APP_BUILD_NUMBER = '20260916-0333';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-auto-resize-car.20260916-0333';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
-export const APP_BRANCH = 'fix-web-platform-det';
-export const APP_CHANGELOG = `* feat: add PencuriMovie provider, resolver retry settings, and network resilience
+export const APP_BRANCH = 'feat-auto-resize-car';
+export const APP_CHANGELOG = `* fix(device): improve platform detection accuracy for desktop web and touchscreen laptops (#105)
+* feat: add PencuriMovie provider, resolver retry settings, and network resilience (#104)
 * feat(tv): redesign leanback TV settings with nested drawers and dpad auto-scroll (#103)
 * perf(tv): improve Home screen initial loading time and rail batching (#101)
 * fix: handle unsupported and malformed subtitles, optimize video playback CPU usage, and refine virtual cursor click (#100)
@@ -20,5 +21,4 @@ export const APP_CHANGELOG = `* feat: add PencuriMovie provider, resolver retry 
 * fix(tv): enable play/pause toggle with d-pad center/ok button for cinesrc provider (#93)
 * fix(tv): eliminate navigation delay between sidebar home and hero banner and optimize D-pad responsiveness (#92)
 * fix(tv): synchronize 2D spatial D-Pad navigation for watch page header (#91)
-* fix(tv): fix remote D-Pad navigation and focus for Up Next episode popup (#90)
-* feat(settings): update autoplay next episode threshold to 96-104% and countdown to 20-80s (#89)`;
+* fix(tv): fix remote D-Pad navigation and focus for Up Next episode popup (#90)`;
