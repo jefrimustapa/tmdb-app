@@ -26,6 +26,7 @@ import {
   CalendarX,
   ChevronDown,
   ChevronRight,
+  ChevronLeft,
   Radio,
   FileText,
   Clock,
@@ -43,6 +44,7 @@ type MobileCategory = 'playback' | 'display' | 'content' | 'system';
 interface SettingsDrawerProps {
   isOpen: boolean;
   onClose: () => void;
+  onBack?: () => void;
   title: string;
   subtitle?: string;
   categoryLabel?: string;
@@ -52,6 +54,7 @@ interface SettingsDrawerProps {
 const SettingsDrawer: React.FC<SettingsDrawerProps> = ({
   isOpen,
   onClose,
+  onBack,
   title,
   subtitle,
   categoryLabel,
@@ -60,11 +63,24 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({
   useEffect(() => {
     if (!isOpen) return;
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') {
+        if (onBack) onBack();
+        else onClose();
+      }
     };
     window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onClose]);
+
+    const prevOverflow = document.body.style.overflow;
+    const prevTouchAction = document.body.style.touchAction;
+    document.body.style.overflow = 'hidden';
+    document.body.style.touchAction = 'none';
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      document.body.style.overflow = prevOverflow;
+      document.body.style.touchAction = prevTouchAction;
+    };
+  }, [isOpen, onClose, onBack]);
 
   if (!isOpen) return null;
 
@@ -72,31 +88,48 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({
     <div
       role="dialog"
       aria-modal="true"
-      className="fixed inset-0 z-[9999] flex flex-col justify-end lg:justify-end lg:items-end bg-black/80 backdrop-blur-sm animate-fade-in"
+      className="fixed inset-0 z-[9999] flex flex-col justify-end lg:justify-end lg:items-end bg-black/80 backdrop-blur-sm animate-fade-in overscroll-none"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
+      onTouchMove={(e) => {
+        if (e.target === e.currentTarget) {
+          e.preventDefault();
+        }
+      }}
     >
       <div
-        className="w-full max-h-[85vh] lg:max-h-full lg:h-full lg:max-w-md bg-hbo-card/95 border-t lg:border-t-0 lg:border-l border-hbo-border/80 rounded-t-3xl lg:rounded-t-none lg:rounded-l-3xl shadow-2xl flex flex-col overflow-hidden animate-slide-up lg:animate-slide-in-right select-none"
+        className="w-full max-h-[85vh] lg:max-h-full lg:h-full lg:max-w-md bg-hbo-card/95 border-t lg:border-t-0 lg:border-l border-hbo-border/80 rounded-t-3xl lg:rounded-t-none lg:rounded-l-3xl shadow-2xl flex flex-col min-h-0 overflow-hidden animate-slide-up lg:animate-slide-in-right pb-[max(1.25rem,env(safe-area-inset-bottom,24px))]"
       >
         {/* Mobile Swipe Handle */}
         <div className="w-12 h-1.5 rounded-full bg-white/20 mx-auto mt-3 mb-1 lg:hidden flex-shrink-0" />
 
         {/* Drawer Header */}
         <div className="p-4 sm:p-6 pb-3 border-b border-white/5 flex items-start justify-between gap-3 flex-shrink-0">
-          <div>
-            {categoryLabel && (
-              <p className="text-[10px] font-bold uppercase tracking-wider text-hbo-cyan mb-1">
-                {categoryLabel}
-              </p>
+          <div className="flex items-start gap-2.5 min-w-0 flex-1">
+            {onBack && (
+              <button
+                type="button"
+                onClick={onBack}
+                className="p-1.5 -ml-1 rounded-full bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white transition-colors flex-shrink-0 mt-0.5"
+                aria-label="Go back"
+              >
+                <ChevronLeft className="w-5 h-5" />
+              </button>
             )}
-            <h2 className="text-base sm:text-lg font-bold text-white tracking-tight leading-snug">
-              {title}
-            </h2>
-            {subtitle && (
-              <p className="text-xs text-gray-400 mt-1 leading-relaxed">{subtitle}</p>
-            )}
+            <div className="min-w-0 flex-1">
+              {categoryLabel && (
+                <p className="text-[10px] font-bold uppercase tracking-wider text-hbo-cyan mb-1 truncate">
+                  {categoryLabel}
+                </p>
+              )}
+              <h2 className="text-base sm:text-lg font-bold text-white tracking-tight leading-snug truncate">
+                {title}
+              </h2>
+              {subtitle && (
+                <p className="text-xs text-gray-400 mt-1 leading-relaxed">{subtitle}</p>
+              )}
+            </div>
           </div>
           <button
             type="button"
@@ -109,7 +142,10 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({
         </div>
 
         {/* Drawer Content Body */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-3.5 no-scrollbar">
+        <div
+          className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-4 sm:p-6 pb-8 space-y-3.5 no-scrollbar touch-pan-y"
+          style={{ WebkitOverflowScrolling: 'touch' }}
+        >
           {children}
         </div>
       </div>
@@ -126,7 +162,31 @@ export const Settings: React.FC = () => {
   const [updateError, setUpdateError] = useState<string | null>(null);
   const [activeCategory, setActiveCategory] = useState<MobileCategory>('playback');
   const [isFilterFrozen, setIsFilterFrozen] = useState(false);
-  const [activeDrawer, setActiveDrawer] = useState<'autoplay' | 'resolvers' | 'ticker' | 'headerTimeout' | 'perfHud' | 'maturity' | 'backup' | null>(null);
+  const [activeDrawer, setActiveDrawer] = useState<
+    | 'autoplay'
+    | 'autoplayTrigger'
+    | 'autoplayTimeout'
+    | 'ticker'
+    | 'resolvers'
+    | 'priorityPicker'
+    | 'adblock'
+    | 'headerTimeout'
+    | 'perfMode'
+    | 'perfHud'
+    | 'maturity'
+    | 'filterAdult'
+    | 'filterUnreleased'
+    | 'autoUpdate'
+    | 'nightlyUpdate'
+    | 'backup'
+    | null
+  >(null);
+  const [priorityPickerSlot, setPriorityPickerSlot] = useState<{
+    tab: 'general' | 'anime' | 'asian' | 'korean';
+    index: number;
+    label: string;
+    currentId: string;
+  } | null>(null);
 
   const filterSentinelRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -237,13 +297,12 @@ export const Settings: React.FC = () => {
 
   const [showEasterEgg, setShowEasterEgg] = useState(false);
   const [priorityCategoryTab, setPriorityCategoryTab] = useState<'general' | 'anime' | 'asian' | 'korean'>('general');
-  const [openDropdownSlot, setOpenDropdownSlot] = useState<number | null>(null);
   const clickCountRef = useRef(0);
   const clickTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     try {
-      (window as any).AndroidBridge?.setDropdownOpen?.(openDropdownSlot !== null);
+      (window as any).AndroidBridge?.setDropdownOpen?.(activeDrawer !== null);
     } catch {}
 
     return () => {
@@ -251,7 +310,7 @@ export const Settings: React.FC = () => {
         (window as any).AndroidBridge?.setDropdownOpen?.(false);
       } catch {}
     };
-  }, [openDropdownSlot]);
+  }, [activeDrawer]);
 
   const handleBuildNumberClick = () => {
     clickCountRef.current += 1;
@@ -311,9 +370,9 @@ export const Settings: React.FC = () => {
     : 'Disabled';
 
   return (
-    <div className="min-h-screen pt-[calc(max(1rem,env(safe-area-inset-top,24px))+3.75rem)] sm:pt-24 pb-36 px-3.5 sm:px-6 lg:px-8 max-w-6xl mx-auto select-none">
+    <div className="min-h-screen pt-[calc(max(0.5rem,env(safe-area-inset-top,16px))+3.25rem)] sm:pt-24 pb-36 px-3.5 sm:px-6 lg:px-8 max-w-6xl mx-auto">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6 pb-4 border-b border-hbo-border/60">
+      <div className="flex items-center justify-between mb-3 pb-2.5 sm:mb-6 sm:pb-4 border-b border-hbo-border/60">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-2xl bg-hbo-purple/20 border border-hbo-purple/40 flex items-center justify-center flex-shrink-0 shadow-inner">
             <SettingsIcon className="w-5 h-5 text-hbo-purple-light" />
@@ -333,14 +392,14 @@ export const Settings: React.FC = () => {
       </div>
 
       {/* Top Scrollable Tab Bar for Small Screens & Tablet Portrait (< lg) */}
-      <div ref={filterSentinelRef} className="lg:hidden relative mb-6">
-        {isFilterFrozen && <div className="h-[48px]" />}
+      <div ref={filterSentinelRef} className="lg:hidden relative mb-4 sm:mb-6">
+        {isFilterFrozen && <div className="h-[44px]" />}
 
         <div
           className={`transition-all duration-150 z-30 ${
             isFilterFrozen
-              ? 'fixed top-[calc(max(0.75rem,env(safe-area-inset-top,20px))+3rem)] left-0 right-0 px-3.5 sm:px-6 py-2.5 bg-[#050508] border-b border-hbo-border/80 shadow-2xl overflow-x-auto no-scrollbar'
-              : 'relative -mx-3.5 sm:-mx-6 px-3.5 sm:px-6 py-2 bg-[#050508] border-b border-hbo-border/60 overflow-x-auto no-scrollbar shadow-lg'
+              ? 'fixed top-[calc(max(0.5rem,env(safe-area-inset-top,16px))+2.75rem)] left-0 right-0 px-3.5 sm:px-6 py-2 bg-[#050508] border-b border-hbo-border/80 shadow-2xl overflow-x-auto no-scrollbar'
+              : 'relative -mx-3.5 sm:-mx-6 px-3.5 sm:px-6 py-1.5 bg-[#050508] border-b border-hbo-border/60 overflow-x-auto no-scrollbar shadow-lg'
           }`}
         >
           <div className="flex items-center gap-2 min-w-max">
@@ -423,69 +482,43 @@ export const Settings: React.FC = () => {
               </div>
 
               <div className="bg-hbo-card border border-hbo-border rounded-2xl overflow-hidden shadow-lg divide-y divide-white/5">
-                {/* Auto-Play Next Episode Main Card */}
-                <div className="p-4 sm:p-5 space-y-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <Sparkles className="w-4 h-4 text-hbo-purple-light flex-shrink-0" />
-                        <h3 className="text-sm sm:text-base font-bold text-white">Auto-Play Next Episode</h3>
-                      </div>
-                      <p className="text-xs text-gray-400 mt-1">
-                        Display Up Next overlay and advance automatically when episode concludes.
-                      </p>
+                {/* Auto-Play Next Episode Hub Row */}
+                <div
+                  onClick={() => setActiveDrawer('autoplay')}
+                  className="p-4 sm:p-5 flex items-center justify-between gap-3 cursor-pointer hover:bg-white/[0.02] transition-colors"
+                >
+                  <div className="flex-1 min-w-0 pr-2">
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="w-4 h-4 text-hbo-purple-light flex-shrink-0" />
+                      <h3 className="text-sm sm:text-base font-bold text-white">Auto-Play Next Episode</h3>
                     </div>
-
-                    <button
-                      onClick={() => handleUpdate({ autoplayNext: settings.autoplayNext === false ? true : false })}
-                      className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 flex-shrink-0 border ${
-                        settings.autoplayNext !== false
-                          ? 'bg-emerald-500/20 border-emerald-400 text-emerald-400'
-                          : 'bg-white/5 border-white/10 text-gray-400'
-                      }`}
-                    >
-                      {settings.autoplayNext !== false ? (
-                        <>
-                          <Check className="w-3.5 h-3.5 stroke-[2.5]" />
-                          <span>Enabled</span>
-                        </>
-                      ) : (
-                        <>
-                          <X className="w-3.5 h-3.5 stroke-[2.5]" />
-                          <span>Disabled</span>
-                        </>
-                      )}
-                    </button>
+                    <p className="text-xs text-gray-400 mt-1">
+                      Display Up Next overlay and advance automatically when episode concludes.
+                    </p>
                   </div>
 
-                  {/* Sub-setting Hub Row: Timing & Countdown Drawer Trigger */}
-                  {settings.autoplayNext !== false && (
-                    <button
-                      type="button"
-                      onClick={() => setActiveDrawer('autoplay')}
-                      className="w-full mt-2 p-3 rounded-xl bg-black/40 hover:bg-black/60 border border-white/5 hover:border-hbo-cyan/40 transition-all flex items-center justify-between gap-3 text-left"
-                    >
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <Clock className="w-4 h-4 text-hbo-cyan flex-shrink-0" />
-                        <div>
-                          <p className="text-xs font-bold text-white">Trigger Timing & Countdown Duration</p>
-                          <p className="text-[11px] text-gray-400">Configure trigger percentage and seconds</p>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-2 flex-shrink-0">
-                        <span className="text-[11px] px-2.5 py-1 rounded-full bg-hbo-dark border border-hbo-border text-hbo-cyan font-bold">
-                          {settings.upNextTriggerPercent || 96}% • {settings.upNextTimeout || 20}s
-                        </span>
-                        <ChevronRight className="w-4 h-4 text-gray-400" />
-                      </div>
-                    </button>
-                  )}
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    {settings.autoplayNext !== false ? (
+                      <span className="text-[11px] px-2.5 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 font-bold flex items-center gap-1.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                        <span>Enabled • {settings.upNextTriggerPercent || 96}% • {settings.upNextTimeout || 20}s</span>
+                      </span>
+                    ) : (
+                      <span className="text-[11px] px-2.5 py-1 rounded-full bg-white/5 border border-white/10 text-gray-400 font-bold flex items-center gap-1.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-gray-500" />
+                        <span>Disabled</span>
+                      </span>
+                    )}
+                    <ChevronRight className="w-4 h-4 text-gray-400" />
+                  </div>
                 </div>
 
                 {/* Watch Progress Update Interval Hub Row */}
-                <div className="p-4 sm:p-5 flex items-center justify-between gap-3">
-                  <div className="flex-1 min-w-0">
+                <div
+                  onClick={() => setActiveDrawer('ticker')}
+                  className="p-4 sm:p-5 flex items-center justify-between gap-3 cursor-pointer hover:bg-white/[0.02] transition-colors"
+                >
+                  <div className="flex-1 min-w-0 pr-2">
                     <div className="flex items-center gap-2">
                       <Clock className="w-4 h-4 text-hbo-cyan flex-shrink-0" />
                       <h3 className="text-sm sm:text-base font-bold text-white">Watch Progress Interval</h3>
@@ -495,21 +528,20 @@ export const Settings: React.FC = () => {
                     </p>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={() => setActiveDrawer('ticker')}
-                    className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 hover:border-hbo-cyan transition-all flex-shrink-0"
-                  >
+                  <div className="flex items-center gap-2 flex-shrink-0">
                     <span className="text-xs font-bold text-hbo-cyan">
                       {settings.watchProgressTickerInterval || 2} Seconds
                     </span>
                     <ChevronRight className="w-4 h-4 text-gray-400" />
-                  </button>
+                  </div>
                 </div>
 
                 {/* Stream Resolvers Engine & Priority Servers Hub Row */}
-                <div className="p-4 sm:p-5 flex items-center justify-between gap-3">
-                  <div className="flex-1 min-w-0">
+                <div
+                  onClick={() => setActiveDrawer('resolvers')}
+                  className="p-4 sm:p-5 flex items-center justify-between gap-3 cursor-pointer hover:bg-white/[0.02] transition-colors"
+                >
+                  <div className="flex-1 min-w-0 pr-2">
                     <div className="flex items-center gap-2">
                       <Zap className="w-4 h-4 text-hbo-cyan flex-shrink-0" />
                       <h3 className="text-sm sm:text-base font-bold text-white">Stream Resolver Engines & Priority</h3>
@@ -519,21 +551,20 @@ export const Settings: React.FC = () => {
                     </p>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={() => setActiveDrawer('resolvers')}
-                    className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 hover:border-hbo-cyan transition-all flex-shrink-0"
-                  >
+                  <div className="flex items-center gap-2 flex-shrink-0">
                     <span className="text-xs font-bold text-hbo-cyan">
                       {(settings.enabledResolvers?.length || 1)} Active
                     </span>
                     <ChevronRight className="w-4 h-4 text-gray-400" />
-                  </button>
+                  </div>
                 </div>
 
-                {/* Ad & Popup Sandboxing Shield */}
-                <div className="p-4 sm:p-5 flex items-center justify-between gap-3">
-                  <div className="flex-1 min-w-0">
+                {/* Ad & Popup Sandboxing Shield Hub Row */}
+                <div
+                  onClick={() => setActiveDrawer('adblock')}
+                  className="p-4 sm:p-5 flex items-center justify-between gap-3 cursor-pointer hover:bg-white/[0.02] transition-colors"
+                >
+                  <div className="flex-1 min-w-0 pr-2">
                     <div className="flex items-center gap-2">
                       <ShieldCheck className="w-4 h-4 text-green-400 flex-shrink-0" />
                       <h3 className="text-sm sm:text-base font-bold text-white">Ad & Popup Sandboxing</h3>
@@ -543,26 +574,20 @@ export const Settings: React.FC = () => {
                     </p>
                   </div>
 
-                  <button
-                    onClick={() => handleUpdate({ adBlockShield: !settings.adBlockShield })}
-                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 flex-shrink-0 border ${
-                      settings.adBlockShield
-                        ? 'bg-emerald-500/20 border-emerald-400 text-emerald-400'
-                        : 'bg-white/5 border-white/10 text-gray-400'
-                    }`}
-                  >
+                  <div className="flex items-center gap-2 flex-shrink-0">
                     {settings.adBlockShield ? (
-                      <>
-                        <Check className="w-3.5 h-3.5 stroke-[2.5]" />
+                      <span className="text-[11px] px-2.5 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 font-bold flex items-center gap-1.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
                         <span>Enabled</span>
-                      </>
+                      </span>
                     ) : (
-                      <>
-                        <X className="w-3.5 h-3.5 stroke-[2.5]" />
+                      <span className="text-[11px] px-2.5 py-1 rounded-full bg-white/5 border border-white/10 text-gray-400 font-bold flex items-center gap-1.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-gray-500" />
                         <span>Disabled</span>
-                      </>
+                      </span>
                     )}
-                  </button>
+                    <ChevronRight className="w-4 h-4 text-gray-400" />
+                  </div>
                 </div>
               </div>
             </div>
@@ -580,8 +605,11 @@ export const Settings: React.FC = () => {
 
               <div className="bg-hbo-card border border-hbo-border rounded-2xl overflow-hidden shadow-lg divide-y divide-white/5">
                 {/* Stream Header Auto-Hide Timeout Hub Row */}
-                <div className="p-4 sm:p-5 flex items-center justify-between gap-3">
-                  <div className="flex-1 min-w-0">
+                <div
+                  onClick={() => setActiveDrawer('headerTimeout')}
+                  className="p-4 sm:p-5 flex items-center justify-between gap-3 cursor-pointer hover:bg-white/[0.02] transition-colors"
+                >
+                  <div className="flex-1 min-w-0 pr-2">
                     <div className="flex items-center gap-2">
                       <EyeOff className="w-4 h-4 text-hbo-cyan flex-shrink-0" />
                       <h3 className="text-sm sm:text-base font-bold text-white">Stream Header Auto-Hide</h3>
@@ -591,21 +619,20 @@ export const Settings: React.FC = () => {
                     </p>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={() => setActiveDrawer('headerTimeout')}
-                    className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 hover:border-hbo-cyan transition-all flex-shrink-0"
-                  >
+                  <div className="flex items-center gap-2 flex-shrink-0">
                     <span className="text-xs font-bold text-hbo-cyan">
                       {(settings.streamHeaderTimeout || 5) === 0 ? 'Always Visible' : `${settings.streamHeaderTimeout || 5}s`}
                     </span>
                     <ChevronRight className="w-4 h-4 text-gray-400" />
-                  </button>
+                  </div>
                 </div>
 
-                {/* UI Performance Mode */}
-                <div className="p-4 sm:p-5 flex items-center justify-between gap-3">
-                  <div className="flex-1 min-w-0">
+                {/* UI Performance Mode Hub Row */}
+                <div
+                  onClick={() => setActiveDrawer('perfMode')}
+                  className="p-4 sm:p-5 flex items-center justify-between gap-3 cursor-pointer hover:bg-white/[0.02] transition-colors"
+                >
+                  <div className="flex-1 min-w-0 pr-2">
                     <div className="flex items-center gap-2">
                       <Zap className="w-4 h-4 text-hbo-cyan flex-shrink-0" />
                       <h3 className="text-sm sm:text-base font-bold text-white">UI Performance Mode (Lite)</h3>
@@ -615,21 +642,28 @@ export const Settings: React.FC = () => {
                     </p>
                   </div>
 
-                  <button
-                    onClick={() => handleUpdate({ performanceMode: !(settings.performanceMode ?? false) })}
-                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 flex-shrink-0 border ${
-                      (settings.performanceMode ?? false)
-                        ? 'bg-hbo-cyan text-black shadow-hbo-glow font-extrabold border-hbo-cyan'
-                        : 'bg-white/5 border-white/10 text-gray-400'
-                    }`}
-                  >
-                    {(settings.performanceMode ?? false) ? 'Enabled' : 'Disabled'}
-                  </button>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    {(settings.performanceMode ?? false) ? (
+                      <span className="text-[11px] px-2.5 py-1 rounded-full bg-hbo-cyan/15 border border-hbo-cyan/30 text-hbo-cyan font-bold flex items-center gap-1.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-hbo-cyan" />
+                        <span>Enabled</span>
+                      </span>
+                    ) : (
+                      <span className="text-[11px] px-2.5 py-1 rounded-full bg-white/5 border border-white/10 text-gray-400 font-bold flex items-center gap-1.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-gray-500" />
+                        <span>Disabled</span>
+                      </span>
+                    )}
+                    <ChevronRight className="w-4 h-4 text-gray-400" />
+                  </div>
                 </div>
 
                 {/* Performance HUD Hub Row */}
-                <div className="p-4 sm:p-5 flex items-center justify-between gap-3">
-                  <div className="flex-1 min-w-0">
+                <div
+                  onClick={() => setActiveDrawer('perfHud')}
+                  className="p-4 sm:p-5 flex items-center justify-between gap-3 cursor-pointer hover:bg-white/[0.02] transition-colors"
+                >
+                  <div className="flex-1 min-w-0 pr-2">
                     <div className="flex items-center gap-2">
                       <h3 className="text-sm sm:text-base font-bold text-white">Performance HUD</h3>
                       <span className="px-2 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wider bg-hbo-cyan/10 text-hbo-cyan border border-hbo-cyan/20">
@@ -641,16 +675,12 @@ export const Settings: React.FC = () => {
                     </p>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={() => setActiveDrawer('perfHud')}
-                    className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 hover:border-hbo-cyan transition-all flex-shrink-0"
-                  >
+                  <div className="flex items-center gap-2 flex-shrink-0">
                     <span className="text-xs font-bold text-hbo-cyan">
                       {perfHudLabel}
                     </span>
                     <ChevronRight className="w-4 h-4 text-gray-400" />
-                  </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -692,8 +722,11 @@ export const Settings: React.FC = () => {
                 </div>
 
                 {/* Adult Content SafeSearch */}
-                <div className="p-4 sm:p-5 flex items-center justify-between gap-3">
-                  <div className="flex-1 min-w-0">
+                <div
+                  onClick={() => setActiveDrawer('filterAdult')}
+                  className="p-4 sm:p-5 flex items-center justify-between gap-3 cursor-pointer hover:bg-white/[0.02] transition-colors"
+                >
+                  <div className="flex-1 min-w-0 pr-2">
                     <div className="flex items-center gap-2">
                       <EyeOff className="w-4 h-4 text-amber-400 flex-shrink-0" />
                       <h3 className="text-sm sm:text-base font-bold text-white">Filter Adult & Explicit Content</h3>
@@ -703,31 +736,28 @@ export const Settings: React.FC = () => {
                     </p>
                   </div>
 
-                  <button
-                    onClick={() => handleUpdate({ filterAdult: settings.filterAdult === false ? true : false })}
-                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 flex-shrink-0 border ${
-                      settings.filterAdult !== false
-                        ? 'bg-emerald-500/20 border-emerald-400 text-emerald-400'
-                        : 'bg-white/5 border-white/10 text-gray-400'
-                    }`}
-                  >
+                  <div className="flex items-center gap-2 flex-shrink-0">
                     {settings.filterAdult !== false ? (
-                      <>
-                        <Check className="w-3.5 h-3.5 stroke-[2.5]" />
+                      <span className="text-[11px] px-2.5 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 font-bold flex items-center gap-1.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
                         <span>Enabled</span>
-                      </>
+                      </span>
                     ) : (
-                      <>
-                        <X className="w-3.5 h-3.5 stroke-[2.5]" />
+                      <span className="text-[11px] px-2.5 py-1 rounded-full bg-white/5 border border-white/10 text-gray-400 font-bold flex items-center gap-1.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-gray-500" />
                         <span>Disabled</span>
-                      </>
+                      </span>
                     )}
-                  </button>
+                    <ChevronRight className="w-4 h-4 text-gray-400" />
+                  </div>
                 </div>
 
                 {/* Unreleased Content Filter */}
-                <div className="p-4 sm:p-5 flex items-center justify-between gap-3">
-                  <div className="flex-1 min-w-0">
+                <div
+                  onClick={() => setActiveDrawer('filterUnreleased')}
+                  className="p-4 sm:p-5 flex items-center justify-between gap-3 cursor-pointer hover:bg-white/[0.02] transition-colors"
+                >
+                  <div className="flex-1 min-w-0 pr-2">
                     <div className="flex items-center gap-2">
                       <CalendarX className="w-4 h-4 text-hbo-cyan flex-shrink-0" />
                       <h3 className="text-sm sm:text-base font-bold text-white">Filter Unreleased Titles</h3>
@@ -737,26 +767,20 @@ export const Settings: React.FC = () => {
                     </p>
                   </div>
 
-                  <button
-                    onClick={() => handleUpdate({ filterUnreleased: settings.filterUnreleased === false ? true : false })}
-                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 flex-shrink-0 border ${
-                      settings.filterUnreleased !== false
-                        ? 'bg-emerald-500/20 border-emerald-400 text-emerald-400'
-                        : 'bg-white/5 border-white/10 text-gray-400'
-                    }`}
-                  >
+                  <div className="flex items-center gap-2 flex-shrink-0">
                     {settings.filterUnreleased !== false ? (
-                      <>
-                        <Check className="w-3.5 h-3.5 stroke-[2.5]" />
+                      <span className="text-[11px] px-2.5 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 font-bold flex items-center gap-1.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
                         <span>Enabled</span>
-                      </>
+                      </span>
                     ) : (
-                      <>
-                        <X className="w-3.5 h-3.5 stroke-[2.5]" />
+                      <span className="text-[11px] px-2.5 py-1 rounded-full bg-white/5 border border-white/10 text-gray-400 font-bold flex items-center gap-1.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-gray-500" />
                         <span>Disabled</span>
-                      </>
+                      </span>
                     )}
-                  </button>
+                    <ChevronRight className="w-4 h-4 text-gray-400" />
+                  </div>
                 </div>
               </div>
             </div>
@@ -833,78 +857,74 @@ export const Settings: React.FC = () => {
                   )}
                 </div>
 
-                {/* Auto-Check & Nightly Channel Options */}
-                <div className="p-4 sm:p-5 space-y-3.5">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="flex-1 min-w-0">
-                      <h4 className="text-xs font-bold text-gray-200 flex items-center gap-2">
-                        <RefreshCw className="w-3.5 h-3.5 text-hbo-cyan" />
-                        <span>Auto-Check on Startup</span>
-                      </h4>
-                      <p className="text-[11px] text-gray-400 mt-0.5">
-                        Automatically check for updates when opening the app.
-                      </p>
-                    </div>
-
-                    <button
-                      onClick={() => handleUpdate({ autoUpdateCheck: !(settings.autoUpdateCheck ?? true) })}
-                      className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 flex-shrink-0 border ${
-                        (settings.autoUpdateCheck ?? true)
-                          ? 'bg-emerald-500/20 border-emerald-400 text-emerald-400'
-                          : 'bg-white/5 border-white/10 text-gray-400'
-                      }`}
-                    >
-                      {(settings.autoUpdateCheck ?? true) ? (
-                        <>
-                          <Check className="w-3.5 h-3.5 stroke-[2.5]" />
-                          <span>Enabled</span>
-                        </>
-                      ) : (
-                        <>
-                          <X className="w-3.5 h-3.5 stroke-[2.5]" />
-                          <span>Disabled</span>
-                        </>
-                      )}
-                    </button>
+                {/* Auto-Check on Startup Row */}
+                <div
+                  onClick={() => setActiveDrawer('autoUpdate')}
+                  className="p-4 sm:p-5 flex items-center justify-between gap-3 cursor-pointer hover:bg-white/[0.02] transition-colors"
+                >
+                  <div className="flex-1 min-w-0 pr-2">
+                    <h4 className="text-xs sm:text-sm font-bold text-gray-200 flex items-center gap-2">
+                      <RefreshCw className="w-3.5 h-3.5 text-hbo-cyan" />
+                      <span>Auto-Check on Startup</span>
+                    </h4>
+                    <p className="text-[11px] text-gray-400 mt-0.5">
+                      Automatically check for updates when opening the app.
+                    </p>
                   </div>
 
-                  <div className="pt-3 border-t border-white/5 flex items-center justify-between gap-3">
-                    <div className="flex-1 min-w-0">
-                      <h4 className="text-xs font-bold text-gray-200 flex items-center gap-2">
-                        <Moon className="w-3.5 h-3.5 text-amber-400" />
-                        <span>Include Nightly Builds</span>
-                      </h4>
-                      <p className="text-[11px] text-gray-400 mt-0.5">
-                        Receive automated daily pre-release builds.
-                      </p>
-                    </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    {(settings.autoUpdateCheck ?? true) ? (
+                      <span className="text-[11px] px-2.5 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 font-bold flex items-center gap-1.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                        <span>Enabled</span>
+                      </span>
+                    ) : (
+                      <span className="text-[11px] px-2.5 py-1 rounded-full bg-white/5 border border-white/10 text-gray-400 font-bold flex items-center gap-1.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-gray-500" />
+                        <span>Disabled</span>
+                      </span>
+                    )}
+                    <ChevronRight className="w-4 h-4 text-gray-400" />
+                  </div>
+                </div>
 
-                    <button
-                      onClick={() => handleUpdate({ includeNightlyUpdates: !settings.includeNightlyUpdates })}
-                      className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 flex-shrink-0 border ${
-                        settings.includeNightlyUpdates
-                          ? 'bg-emerald-500/20 border-emerald-400 text-emerald-400'
-                          : 'bg-white/5 border-white/10 text-gray-400'
-                      }`}
-                    >
-                      {settings.includeNightlyUpdates ? (
-                        <>
-                          <Check className="w-3.5 h-3.5 stroke-[2.5]" />
-                          <span>Enabled</span>
-                        </>
-                      ) : (
-                        <>
-                          <X className="w-3.5 h-3.5 stroke-[2.5]" />
-                          <span>Disabled</span>
-                        </>
-                      )}
-                    </button>
+                {/* Include Nightly Builds Row */}
+                <div
+                  onClick={() => setActiveDrawer('nightlyUpdate')}
+                  className="p-4 sm:p-5 flex items-center justify-between gap-3 cursor-pointer hover:bg-white/[0.02] transition-colors"
+                >
+                  <div className="flex-1 min-w-0 pr-2">
+                    <h4 className="text-xs sm:text-sm font-bold text-gray-200 flex items-center gap-2">
+                      <Moon className="w-3.5 h-3.5 text-amber-400" />
+                      <span>Include Nightly Builds</span>
+                    </h4>
+                    <p className="text-[11px] text-gray-400 mt-0.5">
+                      Receive automated daily pre-release builds.
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    {settings.includeNightlyUpdates ? (
+                      <span className="text-[11px] px-2.5 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 font-bold flex items-center gap-1.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                        <span>Enabled</span>
+                      </span>
+                    ) : (
+                      <span className="text-[11px] px-2.5 py-1 rounded-full bg-white/5 border border-white/10 text-gray-400 font-bold flex items-center gap-1.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-gray-500" />
+                        <span>Disabled</span>
+                      </span>
+                    )}
+                    <ChevronRight className="w-4 h-4 text-gray-400" />
                   </div>
                 </div>
 
                 {/* Persistent Storage & Backup Hub Row */}
-                <div className="p-4 sm:p-5 flex items-center justify-between gap-3">
-                  <div className="flex-1 min-w-0">
+                <div
+                  onClick={() => setActiveDrawer('backup')}
+                  className="p-4 sm:p-5 flex items-center justify-between gap-3 cursor-pointer hover:bg-white/[0.02] transition-colors"
+                >
+                  <div className="flex-1 min-w-0 pr-2">
                     <div className="flex items-center gap-2">
                       <HardDrive className="w-4 h-4 text-hbo-cyan" />
                       <h4 className="text-sm font-bold text-white">Persistent Storage & Backup</h4>
@@ -914,16 +934,12 @@ export const Settings: React.FC = () => {
                     </p>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={() => setActiveDrawer('backup')}
-                    className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 hover:border-hbo-cyan transition-all flex-shrink-0"
-                  >
+                  <div className="flex items-center gap-2 flex-shrink-0">
                     <span className="text-xs font-bold text-emerald-400">
                       {backupMeta.available ? 'Auto-Protected' : 'Manage'}
                     </span>
                     <ChevronRight className="w-4 h-4 text-gray-400" />
-                  </button>
+                  </div>
                 </div>
 
                 {/* Version & Build Info Card */}
@@ -960,83 +976,185 @@ export const Settings: React.FC = () => {
       {/* ADAPTIVE DRAWERS (Bottom on < lg, Right-Side on >= lg)                   */}
       {/* ========================================================================= */}
 
-      {/* 1. Autoplay Settings Drawer */}
+      {/* 1. Autoplay Master Drawer */}
       <SettingsDrawer
         isOpen={activeDrawer === 'autoplay'}
         onClose={() => setActiveDrawer(null)}
-        title="Auto-Play Timing & Countdown"
-        subtitle="Configure when the Up Next popup appears and how long countdown runs."
+        title="Auto-Play Next Episode"
+        subtitle="Automatic episode transitions, 'Up Next' preview card, and countdown timers."
         categoryLabel="Playback & Stream"
       >
-        <div className="space-y-4">
-          <div>
-            <span className="text-xs font-semibold text-gray-300 flex items-center gap-1.5 mb-2">
-              <Percent className="w-3.5 h-3.5 text-hbo-cyan" />
-              <span>Trigger Timing (% of Episode)</span>
-            </span>
-            <div className="grid grid-cols-5 gap-1.5">
-              {[
-                { percent: 96, label: '96%', desc: 'Credits' },
-                { percent: 98, label: '98%', desc: 'Late' },
-                { percent: 100, label: '100%', desc: 'End' },
-                { percent: 102, label: '102%', desc: 'Outro' },
-                { percent: 104, label: '104%', desc: 'Max' },
-              ].map((opt) => {
-                const isSelected = (settings.upNextTriggerPercent || 96) === opt.percent;
-                return (
-                  <button
-                    key={opt.percent}
-                    type="button"
-                    onClick={() => handleUpdate({ upNextTriggerPercent: opt.percent })}
-                    className={`py-2 px-1 rounded-xl border text-center transition-all flex flex-col items-center justify-center ${
-                      isSelected
-                        ? 'bg-hbo-purple/40 border-hbo-cyan text-white font-bold shadow-md ring-1 ring-hbo-cyan/50'
-                        : 'bg-hbo-dark/60 border-hbo-border text-gray-300 hover:bg-hbo-hover'
-                    }`}
-                  >
-                    <span className="text-xs font-bold text-white">{opt.label}</span>
-                    <span className={`text-[9px] ${isSelected ? 'text-hbo-cyan font-semibold' : 'text-gray-500'}`}>
-                      {opt.desc}
-                    </span>
-                  </button>
-                );
-              })}
+        <div className="space-y-3">
+          {/* Master Enable/Disable Button */}
+          <button
+            type="button"
+            onClick={() => handleUpdate({ autoplayNext: settings.autoplayNext === false ? true : false })}
+            className="w-full flex items-center justify-between gap-3 p-4 rounded-xl text-left transition-all border bg-black/40 border-white/10 hover:border-white/20"
+          >
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center justify-between gap-2 mb-1">
+                <span className="font-bold text-sm text-white">Auto-Play Next Episode</span>
+                <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wide border ${
+                  settings.autoplayNext !== false
+                    ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40'
+                    : 'bg-white/5 text-gray-400 border-white/10'
+                }`}>
+                  {settings.autoplayNext !== false ? 'Enabled' : 'Disabled'}
+                </span>
+              </div>
+              <p className="text-[11px] text-gray-400 leading-snug">
+                Advance automatically and show 'Up Next' prompt when current episode reaches completion
+              </p>
             </div>
-          </div>
+          </button>
 
-          <div className="pt-3 border-t border-white/5">
-            <span className="text-xs font-semibold text-gray-300 flex items-center gap-1.5 mb-2">
-              <Clock className="w-3.5 h-3.5 text-hbo-cyan" />
-              <span>Countdown Duration</span>
-            </span>
-            <div className="grid grid-cols-4 gap-1.5">
-              {[
-                { seconds: 10, label: '10s', desc: 'Fast' },
-                { seconds: 15, label: '15s', desc: 'Quick' },
-                { seconds: 20, label: '20s', desc: 'Default' },
-                { seconds: 30, label: '30s', desc: 'Relaxed' },
-              ].map((opt) => {
-                const isSelected = (settings.upNextTimeout || 20) === opt.seconds;
-                return (
-                  <button
-                    key={opt.seconds}
-                    type="button"
-                    onClick={() => handleUpdate({ upNextTimeout: opt.seconds })}
-                    className={`py-2 px-1 rounded-xl border text-center transition-all flex flex-col items-center justify-center ${
-                      isSelected
-                        ? 'bg-hbo-purple/40 border-hbo-cyan text-white font-bold shadow-md ring-1 ring-hbo-cyan/50'
-                        : 'bg-hbo-dark/60 border-hbo-border text-gray-300 hover:bg-hbo-hover'
-                    }`}
-                  >
-                    <span className="text-xs font-bold text-white">{opt.label}</span>
-                    <span className={`text-[9px] ${isSelected ? 'text-hbo-cyan font-semibold' : 'text-gray-500'}`}>
-                      {opt.desc}
-                    </span>
-                  </button>
-                );
-              })}
+          {/* Sub-Drawers for Timing & Countdown */}
+          {settings.autoplayNext !== false && (
+            <div className="space-y-2 pt-2">
+              <span className="text-[10px] font-black uppercase tracking-wider text-gray-400 px-1">
+                Configuration Options
+              </span>
+
+              {/* Sub-Drawer Link: Trigger Timing */}
+              <button
+                type="button"
+                onClick={() => setActiveDrawer('autoplayTrigger')}
+                className="w-full flex items-center justify-between gap-3 p-3.5 rounded-xl text-left transition-all border bg-black/30 border-white/5 hover:border-hbo-cyan/40 hover:bg-white/[0.03]"
+              >
+                <div className="flex items-center gap-3 min-w-0 flex-1">
+                  <div className="w-8 h-8 rounded-lg bg-hbo-cyan/10 border border-hbo-cyan/30 flex items-center justify-center flex-shrink-0">
+                    <Percent className="w-4 h-4 text-hbo-cyan" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-2 mb-0.5">
+                      <span className="font-bold text-xs sm:text-sm text-white">Trigger Timing</span>
+                      <span className="text-xs font-bold text-hbo-cyan">
+                        {settings.upNextTriggerPercent || 96}%
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-gray-400 truncate">
+                      Episode completion threshold when the preview card appears
+                    </p>
+                  </div>
+                </div>
+                <ChevronRight className="w-4 h-4 text-gray-400 flex-shrink-0" />
+              </button>
+
+              {/* Sub-Drawer Link: Countdown Duration */}
+              <button
+                type="button"
+                onClick={() => setActiveDrawer('autoplayTimeout')}
+                className="w-full flex items-center justify-between gap-3 p-3.5 rounded-xl text-left transition-all border bg-black/30 border-white/5 hover:border-hbo-cyan/40 hover:bg-white/[0.03]"
+              >
+                <div className="flex items-center gap-3 min-w-0 flex-1">
+                  <div className="w-8 h-8 rounded-lg bg-hbo-purple/10 border border-hbo-purple/30 flex items-center justify-center flex-shrink-0">
+                    <Clock className="w-4 h-4 text-hbo-purple-light" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-2 mb-0.5">
+                      <span className="font-bold text-xs sm:text-sm text-white">Countdown Duration</span>
+                      <span className="text-xs font-bold text-hbo-cyan">
+                        {settings.upNextTimeout || 20}s
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-gray-400 truncate">
+                      Countdown duration before the next episode advances
+                    </p>
+                  </div>
+                </div>
+                <ChevronRight className="w-4 h-4 text-gray-400 flex-shrink-0" />
+              </button>
             </div>
-          </div>
+          )}
+        </div>
+      </SettingsDrawer>
+
+      {/* 1a. Level 2 Sub-Drawer: Trigger Timing */}
+      <SettingsDrawer
+        isOpen={activeDrawer === 'autoplayTrigger'}
+        onClose={() => setActiveDrawer(null)}
+        onBack={() => setActiveDrawer('autoplay')}
+        title="Popup Trigger Timing"
+        subtitle="Select the episode progress percentage that triggers the 'Up Next' prompt."
+        categoryLabel="Playback > Auto-Play"
+      >
+        <div className="space-y-2">
+          {[
+            { percent: 96, label: '96% - Credits Outro (Recommended)', desc: 'Earliest trigger for shows with standard end credits' },
+            { percent: 98, label: '98% - Late Credits', desc: 'Slightly delayed trigger for shows with short credits' },
+            { percent: 100, label: '100% - Episode Conclusion', desc: 'Triggers exactly when video reaches its full duration' },
+            { percent: 102, label: '102% - Extended Padding', desc: 'Allows full outro song and silence before prompt' },
+            { percent: 104, label: '104% - Maximum Tail', desc: 'Only advances at absolute player terminus' },
+          ].map((opt) => {
+            const isSelected = (settings.upNextTriggerPercent || 96) === opt.percent;
+            return (
+              <button
+                key={opt.percent}
+                type="button"
+                onClick={() => {
+                  handleUpdate({ upNextTriggerPercent: opt.percent });
+                  setActiveDrawer('autoplay');
+                }}
+                className={`w-full p-3.5 rounded-xl border text-left transition-all flex items-center justify-between gap-3 ${
+                  isSelected
+                    ? 'bg-hbo-purple/30 border-hbo-cyan text-white shadow-hbo-glow'
+                    : 'bg-black/30 border-white/5 hover:border-white/20 text-gray-300'
+                }`}
+              >
+                <div>
+                  <p className={`text-xs sm:text-sm font-bold ${isSelected ? 'text-hbo-cyan' : 'text-white'}`}>
+                    {opt.label}
+                  </p>
+                  <p className="text-[11px] text-gray-400 mt-0.5">{opt.desc}</p>
+                </div>
+                {isSelected && <Check className="w-4 h-4 text-hbo-cyan stroke-[2.5] flex-shrink-0" />}
+              </button>
+            );
+          })}
+        </div>
+      </SettingsDrawer>
+
+      {/* 1b. Level 2 Sub-Drawer: Countdown Duration */}
+      <SettingsDrawer
+        isOpen={activeDrawer === 'autoplayTimeout'}
+        onClose={() => setActiveDrawer(null)}
+        onBack={() => setActiveDrawer('autoplay')}
+        title="Countdown Duration"
+        subtitle="Select the seconds to display the countdown before auto-playing next episode."
+        categoryLabel="Playback > Auto-Play"
+      >
+        <div className="space-y-2">
+          {[
+            { seconds: 10, label: '10 Seconds (Fast)', desc: 'Quick transition for rapid binge-watching' },
+            { seconds: 15, label: '15 Seconds (Quick)', desc: 'Brief window to cancel before auto-advancing' },
+            { seconds: 20, label: '20 Seconds (Default)', desc: 'Recommended balance for comfortable previews' },
+            { seconds: 30, label: '30 Seconds (Relaxed)', desc: 'Extended duration with plenty of time to inspect details' },
+          ].map((opt) => {
+            const isSelected = (settings.upNextTimeout || 20) === opt.seconds;
+            return (
+              <button
+                key={opt.seconds}
+                type="button"
+                onClick={() => {
+                  handleUpdate({ upNextTimeout: opt.seconds });
+                  setActiveDrawer('autoplay');
+                }}
+                className={`w-full p-3.5 rounded-xl border text-left transition-all flex items-center justify-between gap-3 ${
+                  isSelected
+                    ? 'bg-hbo-purple/30 border-hbo-cyan text-white shadow-hbo-glow'
+                    : 'bg-black/30 border-white/5 hover:border-white/20 text-gray-300'
+                }`}
+              >
+                <div>
+                  <p className={`text-xs sm:text-sm font-bold ${isSelected ? 'text-hbo-cyan' : 'text-white'}`}>
+                    {opt.label}
+                  </p>
+                  <p className="text-[11px] text-gray-400 mt-0.5">{opt.desc}</p>
+                </div>
+                {isSelected && <Check className="w-4 h-4 text-hbo-cyan stroke-[2.5] flex-shrink-0" />}
+              </button>
+            );
+          })}
         </div>
       </SettingsDrawer>
 
@@ -1188,17 +1306,14 @@ export const Settings: React.FC = () => {
                 <button
                   key={tab}
                   type="button"
-                  onClick={() => {
-                    setPriorityCategoryTab(tab);
-                    setOpenDropdownSlot(null);
-                  }}
+                  onClick={() => setPriorityCategoryTab(tab)}
                   className={`flex-1 py-1 px-1.5 rounded-lg text-[11px] font-bold capitalize transition-all ${
                     priorityCategoryTab === tab
                       ? 'bg-hbo-purple text-white shadow-md'
                       : 'text-gray-400 hover:text-white'
                   }`}
                 >
-                  {tab === 'general' ? 'Movies & TV' : tab}
+                  {tab === 'general' ? 'General' : tab}
                 </button>
               ))}
             </div>
@@ -1262,50 +1377,20 @@ export const Settings: React.FC = () => {
 
                     <button
                       type="button"
-                      onClick={() => setOpenDropdownSlot(openDropdownSlot === index ? null : index)}
-                      className="w-full flex items-center justify-between bg-hbo-card/90 border border-hbo-border text-white text-xs font-bold rounded-xl px-3 py-2 hover:border-hbo-cyan transition-all"
+                      onClick={() => {
+                        setPriorityPickerSlot({
+                          tab: priorityCategoryTab,
+                          index,
+                          label,
+                          currentId: selectedId,
+                        });
+                        setActiveDrawer('priorityPicker');
+                      }}
+                      className="w-full flex items-center justify-between bg-hbo-card/90 border border-hbo-border text-white text-xs font-bold rounded-xl px-3 py-2.5 hover:border-hbo-cyan transition-all"
                     >
                       <span className="truncate pr-2">{selectedObj.name}</span>
-                      <ChevronDown className={`w-3.5 h-3.5 text-gray-400 flex-shrink-0 transition-transform ${openDropdownSlot === index ? 'rotate-180 text-hbo-cyan' : ''}`} />
+                      <ChevronRight className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
                     </button>
-
-                    {openDropdownSlot === index && (
-                      <div className="absolute left-0 right-0 top-[calc(100%+4px)] z-50 bg-hbo-card/98 border border-hbo-border rounded-xl shadow-2xl p-1.5 max-h-[180px] overflow-y-auto space-y-1 backdrop-blur-2xl">
-                        {STREAM_PROVIDERS.map((provider) => {
-                          const isSelected = selectedId === provider.id;
-                          return (
-                            <button
-                              key={provider.id}
-                              onClick={() => {
-                                const updated = [...currentTop] as [string, string, string];
-                                updated[index] = provider.id;
-                                if (isKoreanTab) {
-                                  handleUpdate({ topKoreanProviders: updated });
-                                } else if (isAsianTab) {
-                                  handleUpdate({ topAsianProviders: updated });
-                                } else if (isAnimeTab) {
-                                  handleUpdate({ topAnimeProviders: updated });
-                                } else {
-                                  handleUpdate({
-                                    topProviders: updated,
-                                    preferredProvider: updated[0]
-                                  });
-                                }
-                                setOpenDropdownSlot(null);
-                              }}
-                              className={`w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg text-left text-xs transition-all ${
-                                isSelected
-                                  ? 'bg-hbo-purple/40 border border-hbo-cyan/60 text-white font-bold'
-                                  : 'text-gray-300 hover:bg-hbo-hover hover:text-white'
-                              }`}
-                            >
-                              <span className="truncate">{provider.name}</span>
-                              {isSelected && <Check className="w-3 h-3 text-hbo-cyan flex-shrink-0" />}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    )}
                   </div>
                 );
               })}
@@ -1314,7 +1399,123 @@ export const Settings: React.FC = () => {
         </div>
       </SettingsDrawer>
 
-      {/* 4. Stream Header Auto-Hide Timeout Drawer */}
+      {/* 3a. Level 2 Sub-Drawer: Stream Provider Selection */}
+      <SettingsDrawer
+        isOpen={activeDrawer === 'priorityPicker'}
+        onClose={() => setActiveDrawer(null)}
+        onBack={() => setActiveDrawer('resolvers')}
+        title="Select Stream Provider"
+        subtitle={priorityPickerSlot ? `Assign provider for ${priorityPickerSlot.label}` : 'Choose streaming provider'}
+        categoryLabel="Playback > Resolvers"
+      >
+        <div className="space-y-2">
+          {STREAM_PROVIDERS.map((provider) => {
+            const isSelected = priorityPickerSlot?.currentId === provider.id;
+            return (
+              <button
+                key={provider.id}
+                type="button"
+                onClick={() => {
+                  if (!priorityPickerSlot) return;
+                  const { tab, index } = priorityPickerSlot;
+                  if (tab === 'korean') {
+                    const current = settings.topKoreanProviders && settings.topKoreanProviders.length >= 3
+                      ? [...settings.topKoreanProviders]
+                      : ['kisskh-kdrama', 'cinesrc', 'moviesapi'];
+                    current[index] = provider.id;
+                    handleUpdate({ topKoreanProviders: current as [string, string, string] });
+                  } else if (tab === 'asian') {
+                    const current = settings.topAsianProviders && settings.topAsianProviders.length >= 3
+                      ? [...settings.topAsianProviders]
+                      : ['vidlink', '111movies', 'lari21-asian'];
+                    current[index] = provider.id;
+                    handleUpdate({ topAsianProviders: current as [string, string, string] });
+                  } else if (tab === 'anime') {
+                    const current = settings.topAnimeProviders && settings.topAnimeProviders.length >= 3
+                      ? [...settings.topAnimeProviders]
+                      : ['megaplay-anime', 'cinesrc', 'moviesapi'];
+                    current[index] = provider.id;
+                    handleUpdate({ topAnimeProviders: current as [string, string, string] });
+                  } else {
+                    const current = settings.topProviders && settings.topProviders.length >= 3
+                      ? [...settings.topProviders]
+                      : ['vidlink', 'moviesapi', 'cinesrc'];
+                    current[index] = provider.id;
+                    handleUpdate({
+                      topProviders: current as [string, string, string],
+                      preferredProvider: current[0]
+                    });
+                  }
+                  setActiveDrawer('resolvers');
+                }}
+                className={`w-full p-3.5 rounded-xl border text-left transition-all flex items-center justify-between gap-3 ${
+                  isSelected
+                    ? 'bg-hbo-purple/30 border-hbo-cyan text-white shadow-hbo-glow'
+                    : 'bg-black/30 border-white/5 hover:border-white/20 text-gray-300'
+                }`}
+              >
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <span className="text-[10px] px-2 py-0.5 rounded bg-white/10 text-gray-300 font-bold flex-shrink-0">
+                    {provider.badge}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className={`text-xs sm:text-sm font-bold ${isSelected ? 'text-hbo-cyan' : 'text-white'} truncate`}>
+                      {provider.name}
+                    </p>
+                  </div>
+                </div>
+                {isSelected && <Check className="w-4 h-4 text-hbo-cyan stroke-[2.5] flex-shrink-0" />}
+              </button>
+            );
+          })}
+        </div>
+      </SettingsDrawer>
+
+      {/* 4. Ad & Popup Sandboxing Shield Drawer */}
+      <SettingsDrawer
+        isOpen={activeDrawer === 'adblock'}
+        onClose={() => setActiveDrawer(null)}
+        title="Ad & Popup Sandboxing Shield"
+        subtitle="Hardware-level iframe sandbox policies to prevent redirects and malicious popups."
+        categoryLabel="Playback & Stream"
+      >
+        <div className="space-y-4">
+          <button
+            type="button"
+            onClick={() => handleUpdate({ adBlockShield: !settings.adBlockShield })}
+            className="w-full flex items-center justify-between gap-3 p-4 rounded-xl text-left transition-all border bg-black/40 border-white/10 hover:border-white/20"
+          >
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center justify-between gap-2 mb-1">
+                <span className="font-bold text-sm text-white">Ad &amp; Popup Sandboxing</span>
+                <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wide border ${
+                  settings.adBlockShield
+                    ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40'
+                    : 'bg-white/5 text-gray-400 border-white/10'
+                }`}>
+                  {settings.adBlockShield ? 'Enabled' : 'Disabled'}
+                </span>
+              </div>
+              <p className="text-[11px] text-gray-400 leading-snug">
+                Blocks external script injection, window hijacking, and automatic browser redirects
+              </p>
+            </div>
+          </button>
+
+          <div className="p-4 rounded-xl bg-white/[0.02] border border-white/5 space-y-2 text-xs text-gray-400 leading-relaxed">
+            <p className="font-bold text-white flex items-center gap-1.5">
+              <ShieldCheck className="w-4 h-4 text-green-400" />
+              <span>Sandbox Protection Benefits</span>
+            </p>
+            <p>
+              When enabled, all embedded streaming mirrors run inside a locked down iframe with restricted permissions.
+              This prevents rogue advertising domains from launching new tabs or hijacking your playback session.
+            </p>
+          </div>
+        </div>
+      </SettingsDrawer>
+
+      {/* 5. Stream Header Auto-Hide Timeout Drawer */}
       <SettingsDrawer
         isOpen={activeDrawer === 'headerTimeout'}
         onClose={() => setActiveDrawer(null)}
@@ -1358,7 +1559,52 @@ export const Settings: React.FC = () => {
         </div>
       </SettingsDrawer>
 
-      {/* 5. Performance HUD Drawer */}
+      {/* 6. UI Performance Mode (Lite) Drawer */}
+      <SettingsDrawer
+        isOpen={activeDrawer === 'perfMode'}
+        onClose={() => setActiveDrawer(null)}
+        title="UI Performance Mode (Lite)"
+        subtitle="Graphic optimizations designed for lower-end devices or battery conservation."
+        categoryLabel="Display & UI"
+      >
+        <div className="space-y-4">
+          <button
+            type="button"
+            onClick={() => handleUpdate({ performanceMode: !(settings.performanceMode ?? false) })}
+            className="w-full flex items-center justify-between gap-3 p-4 rounded-xl text-left transition-all border bg-black/40 border-white/10 hover:border-white/20"
+          >
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center justify-between gap-2 mb-1">
+                <span className="font-bold text-sm text-white">UI Performance Mode</span>
+                <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wide border ${
+                  (settings.performanceMode ?? false)
+                    ? 'bg-hbo-cyan/20 text-hbo-cyan border-hbo-cyan/40'
+                    : 'bg-white/5 text-gray-400 border-white/10'
+                }`}>
+                  {(settings.performanceMode ?? false) ? 'Enabled' : 'Disabled'}
+                </span>
+              </div>
+              <p className="text-[11px] text-gray-400 leading-snug">
+                Disables backdrop blur filters and reduces UI shadows to increase overall frame rates
+              </p>
+            </div>
+          </button>
+
+          <div className="p-4 rounded-xl bg-white/[0.02] border border-white/5 space-y-2 text-xs text-gray-400 leading-relaxed">
+            <p className="font-bold text-white flex items-center gap-1.5">
+              <Zap className="w-4 h-4 text-hbo-cyan" />
+              <span>Optimizations Included</span>
+            </p>
+            <ul className="list-disc list-inside space-y-1 text-gray-300">
+              <li>Replaces multi-pass GPU Gaussian blurs with solid translucent backdrops</li>
+              <li>Reduces layout repaints and box shadow recalculations</li>
+              <li>Improves UI responsiveness and extends battery life</li>
+            </ul>
+          </div>
+        </div>
+      </SettingsDrawer>
+
+      {/* 7. Performance HUD Drawer */}
       <SettingsDrawer
         isOpen={activeDrawer === 'perfHud'}
         onClose={() => setActiveDrawer(null)}
@@ -1405,7 +1651,7 @@ export const Settings: React.FC = () => {
         </div>
       </SettingsDrawer>
 
-      {/* 6. Catalog Maturity Filter Drawer */}
+      {/* 8. Catalog Maturity Filter Drawer */}
       <SettingsDrawer
         isOpen={activeDrawer === 'maturity'}
         onClose={() => setActiveDrawer(null)}
@@ -1449,7 +1695,179 @@ export const Settings: React.FC = () => {
         </div>
       </SettingsDrawer>
 
-      {/* 7. Persistent Storage & Backup Drawer */}
+      {/* 9. Filter Adult & Explicit Content Drawer */}
+      <SettingsDrawer
+        isOpen={activeDrawer === 'filterAdult'}
+        onClose={() => setActiveDrawer(null)}
+        title="Filter Adult & Explicit Content"
+        subtitle="SafeSearch configuration to exclude explicit sexual and adult rated material."
+        categoryLabel="Content Controls"
+      >
+        <div className="space-y-4">
+          <button
+            type="button"
+            onClick={() => handleUpdate({ filterAdult: settings.filterAdult === false ? true : false })}
+            className="w-full flex items-center justify-between gap-3 p-4 rounded-xl text-left transition-all border bg-black/40 border-white/10 hover:border-white/20"
+          >
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center justify-between gap-2 mb-1">
+                <span className="font-bold text-sm text-white">Adult SafeSearch Filter</span>
+                <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wide border ${
+                  settings.filterAdult !== false
+                    ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40'
+                    : 'bg-white/5 text-gray-400 border-white/10'
+                }`}>
+                  {settings.filterAdult !== false ? 'Enabled' : 'Disabled'}
+                </span>
+              </div>
+              <p className="text-[11px] text-gray-400 leading-snug">
+                Filter out explicit 18SX, R18+, NC-17, and pornography metadata from search and categories
+              </p>
+            </div>
+          </button>
+
+          <div className="p-4 rounded-xl bg-white/[0.02] border border-white/5 space-y-2 text-xs text-gray-400 leading-relaxed">
+            <p className="font-bold text-white flex items-center gap-1.5">
+              <EyeOff className="w-4 h-4 text-amber-400" />
+              <span>SafeSearch Protection</span>
+            </p>
+            <p>
+              When enabled, TMDB and backend queries automatically append explicit content exclusion flags, preventing accidental display of adult-only video recommendations.
+            </p>
+          </div>
+        </div>
+      </SettingsDrawer>
+
+      {/* 10. Filter Unreleased Titles Drawer */}
+      <SettingsDrawer
+        isOpen={activeDrawer === 'filterUnreleased'}
+        onClose={() => setActiveDrawer(null)}
+        title="Filter Unreleased Titles"
+        subtitle="Hide movies and series that have not yet arrived in theaters or on broadcast networks."
+        categoryLabel="Content Controls"
+      >
+        <div className="space-y-4">
+          <button
+            type="button"
+            onClick={() => handleUpdate({ filterUnreleased: settings.filterUnreleased === false ? true : false })}
+            className="w-full flex items-center justify-between gap-3 p-4 rounded-xl text-left transition-all border bg-black/40 border-white/10 hover:border-white/20"
+          >
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center justify-between gap-2 mb-1">
+                <span className="font-bold text-sm text-white">Hide Unreleased Titles</span>
+                <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wide border ${
+                  settings.filterUnreleased !== false
+                    ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40'
+                    : 'bg-white/5 text-gray-400 border-white/10'
+                }`}>
+                  {settings.filterUnreleased !== false ? 'Enabled' : 'Disabled'}
+                </span>
+              </div>
+              <p className="text-[11px] text-gray-400 leading-snug">
+                Excludes upcoming movies and TV series that are still in production or pre-premiere
+              </p>
+            </div>
+          </button>
+
+          <div className="p-4 rounded-xl bg-white/[0.02] border border-white/5 space-y-2 text-xs text-gray-400 leading-relaxed">
+            <p className="font-bold text-white flex items-center gap-1.5">
+              <CalendarX className="w-4 h-4 text-hbo-cyan" />
+              <span>Catalog Cleanliness</span>
+            </p>
+            <p>
+              When enabled, media cards whose air dates or theatrical releases are in the future will be filtered out from rows and search, avoiding dead streams for unreleased media.
+            </p>
+          </div>
+        </div>
+      </SettingsDrawer>
+
+      {/* 11. Auto-Check on Startup Drawer */}
+      <SettingsDrawer
+        isOpen={activeDrawer === 'autoUpdate'}
+        onClose={() => setActiveDrawer(null)}
+        title="Auto-Check on Startup"
+        subtitle="Check for app updates automatically whenever the application launches."
+        categoryLabel="System & Updates"
+      >
+        <div className="space-y-4">
+          <button
+            type="button"
+            onClick={() => handleUpdate({ autoUpdateCheck: !(settings.autoUpdateCheck ?? true) })}
+            className="w-full flex items-center justify-between gap-3 p-4 rounded-xl text-left transition-all border bg-black/40 border-white/10 hover:border-white/20"
+          >
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center justify-between gap-2 mb-1">
+                <span className="font-bold text-sm text-white">Auto-Check on Startup</span>
+                <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wide border ${
+                  (settings.autoUpdateCheck ?? true)
+                    ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40'
+                    : 'bg-white/5 text-gray-400 border-white/10'
+                }`}>
+                  {(settings.autoUpdateCheck ?? true) ? 'Enabled' : 'Disabled'}
+                </span>
+              </div>
+              <p className="text-[11px] text-gray-400 leading-snug">
+                Check GitHub releases silently on background launch and display non-intrusive update badges
+              </p>
+            </div>
+          </button>
+
+          <div className="p-4 rounded-xl bg-white/[0.02] border border-white/5 space-y-2 text-xs text-gray-400 leading-relaxed">
+            <p className="font-bold text-white flex items-center gap-1.5">
+              <RefreshCw className="w-4 h-4 text-hbo-cyan" />
+              <span>Seamless Updates</span>
+            </p>
+            <p>
+              Keeping this enabled ensures you are immediately notified when bugfixes, new stream providers, or UI enhancements become available.
+            </p>
+          </div>
+        </div>
+      </SettingsDrawer>
+
+      {/* 12. Include Nightly Builds Drawer */}
+      <SettingsDrawer
+        isOpen={activeDrawer === 'nightlyUpdate'}
+        onClose={() => setActiveDrawer(null)}
+        title="Include Nightly Builds"
+        subtitle="Subscribe to experimental daily releases and pre-release test channels."
+        categoryLabel="System & Updates"
+      >
+        <div className="space-y-4">
+          <button
+            type="button"
+            onClick={() => handleUpdate({ includeNightlyUpdates: !settings.includeNightlyUpdates })}
+            className="w-full flex items-center justify-between gap-3 p-4 rounded-xl text-left transition-all border bg-black/40 border-white/10 hover:border-white/20"
+          >
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center justify-between gap-2 mb-1">
+                <span className="font-bold text-sm text-white">Include Nightly Builds</span>
+                <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wide border ${
+                  settings.includeNightlyUpdates
+                    ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40'
+                    : 'bg-white/5 text-gray-400 border-white/10'
+                }`}>
+                  {settings.includeNightlyUpdates ? 'Enabled' : 'Disabled'}
+                </span>
+              </div>
+              <p className="text-[11px] text-gray-400 leading-snug">
+                Receive automated nightly pre-release builds and early experimental features
+              </p>
+            </div>
+          </button>
+
+          <div className="p-4 rounded-xl bg-white/[0.02] border border-white/5 space-y-2 text-xs text-gray-400 leading-relaxed">
+            <p className="font-bold text-white flex items-center gap-1.5">
+              <Moon className="w-4 h-4 text-amber-400" />
+              <span>Channel Information</span>
+            </p>
+            <p>
+              Nightly builds contain early bugfixes and new resolver scripts before official stable release tag creation. Nightly builds can occasionally introduce experimental behaviors.
+            </p>
+          </div>
+        </div>
+      </SettingsDrawer>
+
+      {/* 13. Persistent Storage & Backup Drawer */}
       <SettingsDrawer
         isOpen={activeDrawer === 'backup'}
         onClose={() => setActiveDrawer(null)}

@@ -1210,7 +1210,7 @@ export const Settings: React.FC = () => {
                 }}
                 className={`w-full p-3.5 rounded-2xl border text-left transition-all tv-focus-target flex items-center justify-between gap-3 min-h-[66px] ${
                   isSelected
-                    ? 'bg-gradient-to-r from-hbo-purple/40 via-hbo-purple/20 to-transparent border-white/10 text-white focus:border-hbo-cyan focus:ring-2 focus:ring-hbo-cyan focus:shadow-hbo-glow focus:from-hbo-purple/60 focus:to-hbo-cyan/20'
+                    ? 'bg-gradient-to-r from-hbo-purple/40 via-hbo-purple/20 to-transparent border-hbo-purple text-white focus:border-hbo-cyan focus:ring-2 focus:ring-hbo-cyan focus:shadow-hbo-glow focus:from-hbo-purple/60 focus:to-hbo-cyan/20'
                     : 'bg-hbo-card/70 border-hbo-border hover:bg-hbo-hover hover:border-white/20 text-gray-300 focus:border-hbo-cyan focus:ring-2 focus:ring-hbo-cyan focus:text-white'
                 }`}
               >
