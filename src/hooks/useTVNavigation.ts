@@ -23,8 +23,26 @@ export function useTVNavigation(isEnabled = true) {
     let focusEstablished = false;
 
     const setInitialFocus = () => {
-      // If user has already focused the TV navbar (or any interactive element in the sidebar), DO NOT STEAL FOCUS!
       const active = document.activeElement;
+      const pathname = location.pathname;
+
+      // When returning to Home (/):
+      if (pathname === '/') {
+        // If returning from Settings or other pages via back button OR focus is still on Settings sidebar item:
+        if ((window as any).__tmdbFocusSidebarOnHome || (active && active.getAttribute('data-nav-path') === '/settings')) {
+          (window as any).__tmdbFocusSidebarOnHome = false;
+          const homeNav = document.querySelector<HTMLElement>('aside a[data-nav-path="/"]') ||
+                          document.querySelector<HTMLElement>('aside .tv-focus-target');
+          if (homeNav) {
+            homeNav.focus({ preventScroll: true });
+            window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+            focusEstablished = true;
+            return;
+          }
+        }
+      }
+
+      // If user has already focused the TV navbar (or any interactive element in the sidebar), DO NOT STEAL FOCUS!
       if (active && active !== document.body && active !== document.documentElement) {
         if (active.closest('aside') !== null || active.getAttribute('data-tv-nav') === 'true') {
           return;
@@ -32,7 +50,6 @@ export function useTVNavigation(isEnabled = true) {
       }
 
       lastFocusedContentEl = null;
-      const pathname = location.pathname;
       const mainContent = document.querySelector('main');
       let target: HTMLElement | null = null;
 
@@ -145,6 +162,24 @@ export function useTVNavigation(isEnabled = true) {
 
         // On Watch page, Watch.tv.tsx handles all other header and player navigation directly
         return;
+      }
+
+      // Handle Back / Escape keys on non-watch pages (TV Leanback UX)
+      if (e.key === 'Escape' || e.keyCode === 27 || e.keyCode === 4 || e.key === 'BrowserBack' || e.key === 'GoBack') {
+        if (window.location.pathname === '/') {
+          const active = document.activeElement;
+          const isFocusedInNavbar = active && (active.closest('aside') !== null || active.getAttribute('data-tv-nav') === 'true');
+          if (!isFocusedInNavbar) {
+            e.preventDefault();
+            const homeNav = document.querySelector<HTMLElement>('aside a[data-nav-path="/"]') ||
+                            document.querySelector<HTMLElement>('aside .tv-focus-target');
+            if (homeNav) {
+              homeNav.focus({ preventScroll: true });
+              window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+              return;
+            }
+          }
+        }
       }
 
       // Fast-path D-Pad key-repeat throttling during rapid hold
