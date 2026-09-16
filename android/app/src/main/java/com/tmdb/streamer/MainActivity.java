@@ -383,17 +383,22 @@ public class MainActivity extends BridgeActivity {
                         URL url = new URL(targetUrl);
                         HttpURLConnection conn = (HttpURLConnection) url.openConnection();
                         conn.setRequestMethod("GET");
-                        conn.setConnectTimeout(4000);
-                        conn.setReadTimeout(5000);
+                        conn.setConnectTimeout(10000);
+                        conn.setReadTimeout(20000);
                         conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36");
                         conn.setRequestProperty("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8");
                         conn.setRequestProperty("Accept-Language", "en-US,en;q=0.9,id;q=0.8");
                         if (referer != null && !referer.isEmpty()) {
                             conn.setRequestProperty("Referer", referer);
                         }
-                        if (origin != null && !origin.isEmpty()) {
+                        // Only set Origin if it is a real external domain (not localhost/capacitor)
+                        if (origin != null && !origin.isEmpty()
+                                && !origin.contains("localhost")
+                                && !origin.startsWith("capacitor://")
+                                && !origin.startsWith("file://")) {
                             conn.setRequestProperty("Origin", origin);
                         }
+
                         // Do NOT pass stale/corrupted cookies (especially stale cf_clearance) to videonode.de
                         if (!targetUrl.contains("videonode.de")) {
                             String cookie = android.webkit.CookieManager.getInstance().getCookie(targetUrl);
@@ -438,8 +443,8 @@ public class MainActivity extends BridgeActivity {
                         HttpURLConnection conn = (HttpURLConnection) url.openConnection();
                         conn.setRequestMethod("POST");
                         conn.setDoOutput(true);
-                        conn.setConnectTimeout(4000);
-                        conn.setReadTimeout(5000);
+                        conn.setConnectTimeout(10000);
+                        conn.setReadTimeout(20000);
                         conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36");
                         if (contentType != null && !contentType.isEmpty()) {
                             conn.setRequestProperty("Content-Type", contentType);
@@ -447,9 +452,15 @@ public class MainActivity extends BridgeActivity {
                         if (referer != null && !referer.isEmpty()) {
                             conn.setRequestProperty("Referer", referer);
                         }
-                        if (origin != null && !origin.isEmpty()) {
+                        // Only set Origin if it matches the target domain (skip localhost/capacitor origin
+                        // which causes servers like PencuriMovie to silently drop/timeout the request)
+                        if (origin != null && !origin.isEmpty()
+                                && !origin.contains("localhost")
+                                && !origin.startsWith("capacitor://")
+                                && !origin.startsWith("file://")) {
                             conn.setRequestProperty("Origin", origin);
                         }
+
                         if (!targetUrl.contains("playcdn.de") && !targetUrl.contains("videonode.de")) {
                             String cookie = android.webkit.CookieManager.getInstance().getCookie(targetUrl);
                             if (cookie != null && !cookie.isEmpty()) {

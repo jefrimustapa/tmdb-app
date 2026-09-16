@@ -94,6 +94,7 @@ export interface UserSettings {
   directStreamMode?: boolean; // Legacy fallback flag
   streamHeaderTimeout: number; // in seconds, e.g. 3, 5, 8, or 0 for always visible
   streamResolverTimeout?: number; // Provider stream resolution timeout in seconds (3-15s, default 5s)
+  streamResolverRetries?: number; // Number of retry attempts on provider failure (0-3, default 1)
   includeNightlyUpdates: boolean; // Option to check for and install Nightly pre-releases
   autoUpdateCheck?: boolean; // Automatically check for updates on application startup
   virtualCursorEnabled?: boolean; // TV Mode on-demand virtual cursor
