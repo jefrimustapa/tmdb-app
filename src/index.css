@@ -93,14 +93,14 @@ aside .tv-focus-target:focus-visible,
   background-color: transparent !important;
 }
 
-/* Standard Mode (Performance Mode Disabled): Scale icon up on focus with Cyan Glow */
+/* Standard Mode (Performance Mode Disabled): Crisp Cyan Glow without heavy drop-shadow rasterization */
 aside .tv-focus-target:focus .tv-nav-icon,
 aside .tv-focus-target:focus-visible .tv-nav-icon,
 [data-tv-nav="true"].tv-focus-target:focus .tv-nav-icon,
 [data-tv-nav="true"].tv-focus-target:focus-visible .tv-nav-icon {
   color: #00f0ff !important;
-  filter: drop-shadow(0 0 10px rgba(0, 240, 255, 0.95)) !important;
-  transform: scale(1.22) translateZ(0);
+  filter: drop-shadow(0 0 5px rgba(0, 240, 255, 0.8)) !important;
+  transform: scale(1.15) translateZ(0);
 }
 
 aside .tv-focus-target:focus .tv-nav-label,

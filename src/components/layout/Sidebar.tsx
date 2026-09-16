@@ -30,7 +30,7 @@ export const Sidebar: React.FC = () => {
   };
 
   return (
-    <aside className="fixed left-0 top-0 bottom-0 w-20 lg:w-64 bg-hbo-dark/95 border-r border-hbo-border/60 z-40 flex flex-col justify-between p-3 lg:p-4 backdrop-blur-xl select-none">
+    <aside className="fixed left-0 top-0 bottom-0 w-20 lg:w-64 bg-hbo-dark/95 border-r border-hbo-border/60 z-40 flex flex-col justify-between p-3 lg:p-4 select-none">
       {/* 1. Top Pinned Logo (Horizontally Centered) */}
       <div className="w-full flex items-center justify-center flex-shrink-0">
         <Logo size="md" showText={true} className="hidden lg:flex" />
@@ -49,7 +49,7 @@ export const Sidebar: React.FC = () => {
               data-nav-path={link.path}
               data-active-route={link.path === '/' ? location.pathname === '/' : location.pathname.startsWith(link.path)}
               className={({ isActive }) =>
-                `group relative flex items-center justify-center lg:justify-start gap-3.5 px-3 py-3 rounded-xl font-semibold text-sm transition-all tv-focus-target ${
+                `group relative flex items-center justify-center lg:justify-start gap-3.5 px-3 py-3 rounded-xl font-semibold text-sm transition-colors duration-75 tv-focus-target ${
                   isActive
                     ? 'active text-white'
                     : 'text-gray-400 hover:text-white'
@@ -62,10 +62,10 @@ export const Sidebar: React.FC = () => {
                   {isActive && (
                     <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-4 rounded-r-full bg-hbo-purple-light shadow-[0_0_8px_rgba(144,85,255,0.9)] pointer-events-none" />
                   )}
-                  <Icon className={`w-5 h-5 flex-shrink-0 transition-all duration-150 tv-nav-icon ${
+                  <Icon className={`w-5 h-5 flex-shrink-0 transition-colors duration-75 tv-nav-icon ${
                     isActive ? 'text-white' : 'text-gray-400 group-hover:text-white'
                   }`} />
-                  <span className={`hidden lg:inline transition-colors duration-150 tv-nav-label ${
+                  <span className={`hidden lg:inline transition-colors duration-75 tv-nav-label ${
                     isActive ? 'text-white font-bold' : 'text-gray-400 group-hover:text-white'
                   }`}>
                     {link.label}
