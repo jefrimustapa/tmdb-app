@@ -169,12 +169,9 @@ export const Watch: React.FC = () => {
       if (document.activeElement && (document.activeElement.tagName === 'BUTTON' || (document.activeElement as HTMLElement).dataset?.watchHeaderItem === 'true')) {
         (document.activeElement as HTMLElement).blur();
       }
-      const iframe = document.querySelector<HTMLIFrameElement>('iframe');
-      if (iframe) {
-        try {
-          iframe.focus();
-        } catch {}
-      }
+      try {
+        window.focus();
+      } catch {}
     }, delayMs);
   }, []);
 
@@ -311,10 +308,7 @@ export const Watch: React.FC = () => {
       if (document.activeElement && typeof (document.activeElement as HTMLElement).blur === 'function') {
         (document.activeElement as HTMLElement).blur();
       }
-      const iframe = document.querySelector<HTMLIFrameElement>('iframe');
-      if (iframe) {
-        try { iframe.focus(); } catch {}
-      }
+      try { window.focus(); } catch {}
     };
 
     window.addEventListener('tmdb_exit_watch', onExitWatch);
