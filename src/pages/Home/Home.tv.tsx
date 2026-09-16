@@ -51,6 +51,33 @@ export const Home: React.FC = () => {
   const [newReleaseTV, setNewReleaseTV] = useState<TMDBMediaItem[]>(() => homeFeedCache?.newReleaseTV || []);
   const [isLoading, setIsLoading] = useState(() => !homeFeedCache);
 
+  // Progressive staged rail mounting: Mount top visible viewport in 0ms, then stage below-the-fold rails
+  const [mountStage, setMountStage] = useState(1);
+
+  useEffect(() => {
+    const timer1 = setTimeout(() => {
+      setMountStage((s) => Math.max(s, 2));
+    }, 60);
+
+    const timer2 = setTimeout(() => {
+      setMountStage(3);
+    }, 140);
+
+    // If user presses D-pad down before timers fire, immediately mount all rails
+    const handleEarlyScroll = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowDown' || e.keyCode === 40 || e.keyCode === 20) {
+        setMountStage(3);
+      }
+    };
+    window.addEventListener('keydown', handleEarlyScroll, { passive: true });
+
+    return () => {
+      clearTimeout(timer1);
+      clearTimeout(timer2);
+      window.removeEventListener('keydown', handleEarlyScroll);
+    };
+  }, []);
+
   useEffect(() => {
     let isMounted = true;
 
@@ -247,39 +274,47 @@ export const Home: React.FC = () => {
         items={trending}
       />
 
-      <MediaRow
-        title="Popular Movies"
-        subtitle="Critically acclaimed and high grossing films"
-        items={popularMovies}
-        type="movie"
-      />
+      {mountStage >= 2 && (
+        <>
+          <MediaRow
+            title="Popular Movies"
+            subtitle="Critically acclaimed and high grossing films"
+            items={popularMovies}
+            type="movie"
+          />
 
-      <MediaRow
-        title="Trending TV Shows"
-        subtitle="Captivating series and multi-season dramas"
-        items={popularTV}
-        type="tv"
-      />
+          <MediaRow
+            title="Trending TV Shows"
+            subtitle="Captivating series and multi-season dramas"
+            items={popularTV}
+            type="tv"
+          />
+        </>
+      )}
 
-      <MediaRow
-        title="New Release Movie"
-        subtitle="Latest blockbuster films and digital premieres"
-        items={newReleaseMovies}
-        type="movie"
-      />
+      {mountStage >= 3 && (
+        <>
+          <MediaRow
+            title="New Release Movie"
+            subtitle="Latest blockbuster films and digital premieres"
+            items={newReleaseMovies}
+            type="movie"
+          />
 
-      <MediaRow
-        title="New Release Series"
-        subtitle="Fresh seasons and newly premiering shows"
-        items={newReleaseTV}
-        type="tv"
-      />
+          <MediaRow
+            title="New Release Series"
+            subtitle="Fresh seasons and newly premiering shows"
+            items={newReleaseTV}
+            type="tv"
+          />
 
-      <MediaRow
-        title="Suggestions"
-        subtitle={suggestionSubtitle}
-        items={suggestions}
-      />
+          <MediaRow
+            title="Suggestions"
+            subtitle={suggestionSubtitle}
+            items={suggestions}
+          />
+        </>
+      )}
     </div>
   );
 };
