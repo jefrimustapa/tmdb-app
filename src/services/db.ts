@@ -61,6 +61,7 @@ export const DEFAULT_SETTINGS: UserSettings = {
   preferredProvider: 'vidlink',
   topProviders: ['vidlink', 'moviesapi', 'cinesrc'],
   topAnimeProviders: ['megaplay-anime', 'cinesrc', 'moviesapi'],
+  topAseanProviders: ['pencurimovie-my', 'vidlink', '111movies'],
   topAsianProviders: ['pencurimovie-my', 'vidlink', '111movies'],
   topKoreanProviders: ['kisskh-kdrama', 'cinesrc', 'moviesapi'],
   deviceMode: 'auto',
@@ -327,12 +328,14 @@ export const dbService = {
       ];
       await db.settings.put(settings);
     }
-    if (!settings.topAsianProviders || settings.topAsianProviders.length < 3 || settings.topAsianProviders[0] === 'lk21-asian' || settings.topAsianProviders[0] === 'cinesrc' || settings.topAsianProviders[0] === 'vidlink' || (settings.topAsianProviders[0] === 'lari21-asian' && settings.topAsianProviders[1] === 'cinesrc')) {
-      settings.topAsianProviders = [
-        'pencurimovie-my',
-        'vidlink',
-        '111movies'
-      ];
+    if (!settings.topAseanProviders || settings.topAseanProviders.length < 3) {
+      settings.topAseanProviders = (settings.topAsianProviders && settings.topAsianProviders.length >= 3)
+        ? settings.topAsianProviders
+        : ['pencurimovie-my', 'vidlink', '111movies'];
+      await db.settings.put(settings);
+    }
+    if (!settings.topAsianProviders || settings.topAsianProviders.length < 3) {
+      settings.topAsianProviders = settings.topAseanProviders;
       await db.settings.put(settings);
     }
     if (settings.streamResolverTimeout === undefined || (settings.streamResolverTimeout !== 0 && (settings.streamResolverTimeout < 10 || settings.streamResolverTimeout > 30))) {

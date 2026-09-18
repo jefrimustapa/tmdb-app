@@ -1,14 +1,19 @@
+export type StreamProviderCategory =
+  | 'general'
+  | 'anime'
+  | 'korean'
+  | 'asean'
+  | 'malaysian'
+  | 'hollywood';
+
 export interface StreamProvider {
   id: string;
   name: string;
   tagline: string;
-  badge: string;
-  category?: 'general' | 'anime' | 'asian' | 'korean';
+  categories: StreamProviderCategory[];
   getMovieUrl: (tmdbId: number) => string;
   getTVUrl: (tmdbId: number, season: number, episode: number) => string;
   getAnimeUrl?: (malId: number, season?: number, episode?: number, type?: 'sub' | 'dub') => string;
-  getAsianUrl?: (resolvedUrl: string) => string;
-  getKoreanUrl?: (resolvedUrl: string) => string;
 }
 
 export interface ActiveStream {
