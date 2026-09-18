@@ -14,10 +14,10 @@ import {
   ShieldCheck
 } from 'lucide-react';
 import { SubtitleTrack } from '../../services/subtitleService';
-import { STREAM_PROVIDERS, getOrderedProviders } from '../../services/streamProviders';
+import { STREAM_PROVIDERS, getOrderedProviders, CATEGORY_BADGE_CONFIG } from '../../services/streamProviders';
 import type { StreamProvider } from '../../types/stream';
 
-export type WatchSettingsTab = 'subtitles' | 'server';
+export type WatchSettingsTab = 'subtitles' | 'servers' | 'server';
 
 interface WatchSettingsModalProps {
   isOpen: boolean;
@@ -37,7 +37,8 @@ interface WatchSettingsModalProps {
   serverIndex?: number;
   totalServers?: number;
   isAnime?: boolean;
-  isAsian?: boolean;
+  isAsean?: boolean;
+  isAsian?: boolean; // Backward compatibility alias
   isKorean?: boolean;
 }
 
@@ -57,12 +58,14 @@ export const WatchSettingsModal: React.FC<WatchSettingsModalProps> = ({
   serverIndex = 1,
   totalServers = STREAM_PROVIDERS.length,
   isAnime = false,
+  isAsean = false,
   isAsian = false,
   isKorean = false
 }) => {
-  const [activeTab, setActiveTab] = useState<WatchSettingsTab>(defaultTab);
+  const [activeTab, setActiveTab] = useState<WatchSettingsTab>(defaultTab === 'servers' ? 'server' : defaultTab);
   const [filterLang, setFilterLang] = useState<'all' | 'ms' | 'en'>('all');
   const modalRef = useRef<HTMLDivElement>(null);
+  const activeAsean = isAsean || isAsian;
 
   useEffect(() => {
     if (isOpen) {
@@ -72,10 +75,10 @@ export const WatchSettingsModal: React.FC<WatchSettingsModalProps> = ({
 
   const displayProviders = React.useMemo(() => {
     if (isKorean) return getOrderedProviders(undefined, false, false, true);
-    if (isAsian) return getOrderedProviders(undefined, false, true, false);
+    if (activeAsean) return getOrderedProviders(undefined, false, true, false);
     if (isAnime) return getOrderedProviders(undefined, true, false, false);
     return STREAM_PROVIDERS;
-  }, [isAnime, isAsian, isKorean]);
+  }, [isAnime, activeAsean, isKorean]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -655,13 +658,22 @@ export const WatchSettingsModal: React.FC<WatchSettingsModalProps> = ({
                     </div>
 
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-semibold text-sm text-white truncate">{p.name}</span>
-                        {p.badge && (
-                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-hbo-cyan/20 border border-hbo-cyan/30 text-hbo-cyan font-bold tracking-wider flex-shrink-0">
-                            {p.badge}
-                          </span>
-                        )}
+                        <div className="flex items-center gap-1 flex-wrap">
+                          {p.categories.map((cat) => {
+                            const conf = CATEGORY_BADGE_CONFIG[cat];
+                            if (!conf) return null;
+                            return (
+                              <span
+                                key={cat}
+                                className={`text-[9px] px-1.5 py-0.5 rounded font-bold whitespace-nowrap border ${conf.className}`}
+                              >
+                                {conf.label}
+                              </span>
+                            );
+                          })}
+                        </div>
                       </div>
                       <div className="flex items-center gap-2 mt-0.5 text-xs text-gray-400">
                         <span>Server #{idx + 1}</span>

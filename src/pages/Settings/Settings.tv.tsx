@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { dbService } from '../../services/db';
 import type { UserSettings } from '../../types/db';
-import { STREAM_PROVIDERS } from '../../services/streamProviders';
+import { STREAM_PROVIDERS, CATEGORY_BADGE_CONFIG } from '../../services/streamProviders';
 import { useDevice } from '../../hooks/useDevice';
 import { Logo } from '../../components/common/Logo';
 import { APP_VERSION, APP_BUILD_NUMBER, APP_VERSION_FULL, APP_BUILD_CHANNEL, APP_CHANGELOG } from '../../version';
@@ -149,7 +149,7 @@ export const Settings: React.FC = () => {
 
   const [showEasterEgg, setShowEasterEgg] = useState(false);
   const easterEggScrollRef = useRef<HTMLDivElement>(null);
-  const [priorityCategoryTab, setPriorityCategoryTab] = useState<'general' | 'anime' | 'asian' | 'korean'>('general');
+  const [priorityCategoryTab, setPriorityCategoryTab] = useState<'general' | 'anime' | 'asean' | 'korean'>('general');
   const [pickerModalSlot, setPickerModalSlot] = useState<number | null>(null);
   const [showMaturityDrawer, setShowMaturityDrawer] = useState(false);
   const [showTriggerDrawer, setShowTriggerDrawer] = useState(false);
@@ -162,7 +162,7 @@ export const Settings: React.FC = () => {
   const [showEmbedResolverDrawer, setShowEmbedResolverDrawer] = useState(false);
   const [showEmbedTimeoutDrawer, setShowEmbedTimeoutDrawer] = useState(false);
   const [showEmbedRetryDrawer, setShowEmbedRetryDrawer] = useState(false);
-  const [activePriorityDrawer, setActivePriorityDrawer] = useState<'general' | 'anime' | 'asian' | 'korean' | null>(null);
+  const [activePriorityDrawer, setActivePriorityDrawer] = useState<'general' | 'anime' | 'asean' | 'korean' | null>(null);
   const [showTickerDrawer, setShowTickerDrawer] = useState(false);
   const [showHeaderTimeoutDrawer, setShowHeaderTimeoutDrawer] = useState(false);
   const [showPerfHudDrawer, setShowPerfHudDrawer] = useState(false);
@@ -2317,16 +2317,16 @@ export const Settings: React.FC = () => {
             <div className="flex-1 overflow-y-auto p-3 space-y-2 focus-scroll-container">
               {(() => {
                 const isKoreanTab = priorityCategoryTab === 'korean';
-                const isAsianTab = priorityCategoryTab === 'asian';
+                const isAseanTab = priorityCategoryTab === 'asean';
                 const isAnimeTab = priorityCategoryTab === 'anime';
                 const currentTop = isKoreanTab
                   ? (settings.topKoreanProviders && settings.topKoreanProviders.length >= 3
                       ? settings.topKoreanProviders
                       : ['kisskh-kdrama', 'cinesrc', 'moviesapi'])
-                  : isAsianTab
-                  ? (settings.topAsianProviders && settings.topAsianProviders.length >= 3
-                      ? settings.topAsianProviders
-                      : ['vidlink', '111movies', 'lari21-asian'])
+                  : isAseanTab
+                  ? ((settings.topAseanProviders || (settings as any).topAsianProviders) && (settings.topAseanProviders || (settings as any).topAsianProviders).length >= 3
+                      ? (settings.topAseanProviders || (settings as any).topAsianProviders)
+                      : ['pencurimovie-my', 'vidlink', '111movies'])
                   : isAnimeTab
                   ? (settings.topAnimeProviders && settings.topAnimeProviders.length >= 3
                       ? settings.topAnimeProviders
@@ -2368,8 +2368,11 @@ export const Settings: React.FC = () => {
                         updated[pickerModalSlot] = provider.id;
                         if (isKoreanTab) {
                           handleUpdate({ topKoreanProviders: updated });
-                        } else if (isAsianTab) {
-                          handleUpdate({ topAsianProviders: updated });
+                        } else if (isAseanTab) {
+                          handleUpdate({
+                            topAseanProviders: updated,
+                            topAsianProviders: updated
+                          });
                         } else if (isAnimeTab) {
                           handleUpdate({ topAnimeProviders: updated });
                         } else {
@@ -2398,16 +2401,19 @@ export const Settings: React.FC = () => {
                           )}
                         </div>
                         <p className="text-[11px] text-gray-400 line-clamp-1">{provider.tagline}</p>
-                        <div className="flex items-center gap-2 mt-1">
-                          {provider.badge === 'Anime' && (
-                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-pink-500/20 text-pink-300 border border-pink-500/30 font-semibold">Anime Specialist</span>
-                          )}
-                          {provider.badge === 'Asian' && (
-                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 font-semibold">Asian Specialist</span>
-                          )}
-                          {provider.badge === 'TorBox' && (
-                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-semibold">TorBox Debrid</span>
-                          )}
+                        <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                          {provider.categories.map((cat) => {
+                            const config = CATEGORY_BADGE_CONFIG[cat];
+                            if (!config) return null;
+                            return (
+                              <span
+                                key={cat}
+                                className={`text-[9px] px-1.5 py-0.5 rounded font-semibold border ${config.className}`}
+                              >
+                                {config.label}
+                              </span>
+                            );
+                          })}
                         </div>
                       </div>
                     </button>
@@ -3642,16 +3648,16 @@ export const Settings: React.FC = () => {
 
                       {/* Asean Priority Submenu Button */}
                       {(() => {
-                        const top = (settings.topAsianProviders && settings.topAsianProviders.length >= 3)
-                          ? settings.topAsianProviders
-                          : ['vidlink', '111movies', 'lari21-asian'];
+                        const top = ((settings.topAseanProviders || (settings as any).topAsianProviders) && (settings.topAseanProviders || (settings as any).topAsianProviders).length >= 3)
+                          ? (settings.topAseanProviders || (settings as any).topAsianProviders)
+                          : ['pencurimovie-my', 'vidlink', '111movies'];
                         const p1 = STREAM_PROVIDERS.find(p => p.id === top[0])?.name || top[0];
                         const p2 = STREAM_PROVIDERS.find(p => p.id === top[1])?.name || top[1];
                         const p3 = STREAM_PROVIDERS.find(p => p.id === top[2])?.name || top[2];
 
                         return (
                           <button
-                            id="drawer-embed-priority-asian"
+                            id="drawer-embed-priority-asean"
                             data-embed-drawer-item="true"
                             type="button"
                             onKeyDown={(e) => {
@@ -3664,9 +3670,9 @@ export const Settings: React.FC = () => {
                               }
                             }}
                             onClick={() => {
-                              setPriorityCategoryTab('asian');
+                              setPriorityCategoryTab('asean');
                               setShowEmbedResolverDrawer(false);
-                              setActivePriorityDrawer('asian');
+                              setActivePriorityDrawer('asean');
                             }}
                             className="w-full p-3.5 rounded-2xl border text-left transition-all tv-focus-target flex items-center justify-between gap-3 bg-hbo-dark/60 border-hbo-border hover:bg-hbo-hover hover:border-white/20"
                           >
@@ -3703,7 +3709,7 @@ export const Settings: React.FC = () => {
                             onKeyDown={(e) => {
                               if (e.key === 'ArrowUp') {
                                 e.preventDefault();
-                                document.getElementById('drawer-embed-priority-asian')?.focus();
+                                document.getElementById('drawer-embed-priority-asean')?.focus();
                               }
                             }}
                             onClick={() => {
@@ -3983,7 +3989,7 @@ export const Settings: React.FC = () => {
             <h1 className="text-3xl font-extrabold text-white tracking-tight mb-2">
               {activePriorityDrawer === 'korean'
                 ? 'Korean Priority Servers'
-                : activePriorityDrawer === 'asian'
+                : activePriorityDrawer === 'asean'
                 ? 'Asean Priority Servers'
                 : activePriorityDrawer === 'anime'
                 ? 'Anime Priority Servers'
@@ -3992,7 +3998,7 @@ export const Settings: React.FC = () => {
             <p className="text-sm text-gray-400 max-w-md leading-relaxed">
               {activePriorityDrawer === 'korean'
                 ? 'Select primary and fallback stream resolvers optimized for Korean dramas & variety shows.'
-                : activePriorityDrawer === 'asian'
+                : activePriorityDrawer === 'asean'
                 ? 'Select primary and fallback stream resolvers optimized for Southeast Asian & Chinese drama content.'
                 : activePriorityDrawer === 'anime'
                 ? 'Select primary and fallback stream resolvers dedicated to anime series and movies.'
@@ -4012,16 +4018,16 @@ export const Settings: React.FC = () => {
 
               {(() => {
                 const isKoreanTab = activePriorityDrawer === 'korean';
-                const isAsianTab = activePriorityDrawer === 'asian';
+                const isAseanTab = activePriorityDrawer === 'asean';
                 const isAnimeTab = activePriorityDrawer === 'anime';
                 const currentTop = isKoreanTab
                   ? (settings.topKoreanProviders && settings.topKoreanProviders.length >= 3
                       ? settings.topKoreanProviders
                       : ['kisskh-kdrama', 'cinesrc', 'moviesapi'])
-                  : isAsianTab
-                  ? (settings.topAsianProviders && settings.topAsianProviders.length >= 3
-                      ? settings.topAsianProviders
-                      : ['vidlink', '111movies', 'lari21-asian'])
+                  : isAseanTab
+                  ? ((settings.topAseanProviders || (settings as any).topAsianProviders) && (settings.topAseanProviders || (settings as any).topAsianProviders).length >= 3
+                      ? (settings.topAseanProviders || (settings as any).topAsianProviders)
+                      : ['pencurimovie-my', 'vidlink', '111movies'])
                   : isAnimeTab
                   ? (settings.topAnimeProviders && settings.topAnimeProviders.length >= 3
                       ? settings.topAnimeProviders
@@ -4036,11 +4042,11 @@ export const Settings: React.FC = () => {
                       { index: 1, priorityLabel: '#2 Failover 1', badgeClass: 'bg-hbo-purple/30 text-hbo-purple-light border-hbo-purple/40', defaultId: 'cinesrc', desc: 'First automatic fallback if #1 fails or times out' },
                       { index: 2, priorityLabel: '#3 Failover 2', badgeClass: 'bg-hbo-cyan/20 text-hbo-cyan border-hbo-cyan/40', defaultId: 'moviesapi', desc: 'Second fallback mirror' }
                     ]
-                  : isAsianTab
+                  : isAseanTab
                   ? [
-                      { index: 0, priorityLabel: '#1 Primary', badgeClass: 'bg-amber-500/20 text-amber-300 border-amber-500/40', defaultId: 'vidlink', desc: 'First-choice server for Asian drama streams' },
-                      { index: 1, priorityLabel: '#2 Failover 1', badgeClass: 'bg-hbo-purple/30 text-hbo-purple-light border-hbo-purple/40', defaultId: '111movies', desc: 'First automatic fallback if #1 fails or times out' },
-                      { index: 2, priorityLabel: '#3 Failover 2', badgeClass: 'bg-hbo-cyan/20 text-hbo-cyan border-hbo-cyan/40', defaultId: 'lari21-asian', desc: 'Second fallback mirror' }
+                      { index: 0, priorityLabel: '#1 Primary', badgeClass: 'bg-amber-500/20 text-amber-300 border-amber-500/40', defaultId: 'pencurimovie-my', desc: 'First-choice server for Asean drama streams' },
+                      { index: 1, priorityLabel: '#2 Failover 1', badgeClass: 'bg-hbo-purple/30 text-hbo-purple-light border-hbo-purple/40', defaultId: 'vidlink', desc: 'First automatic fallback if #1 fails or times out' },
+                      { index: 2, priorityLabel: '#3 Failover 2', badgeClass: 'bg-hbo-cyan/20 text-hbo-cyan border-hbo-cyan/40', defaultId: '111movies', desc: 'Second fallback mirror' }
                     ]
                   : isAnimeTab
                   ? [
@@ -4063,11 +4069,24 @@ export const Settings: React.FC = () => {
                       key={`${activePriorityDrawer}-${index}`}
                       className="bg-black/40 border border-hbo-border rounded-xl p-4 space-y-2.5"
                     >
-                      <div className="flex items-center justify-between">
-                        <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded border ${badgeClass}`}>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded border ${badgeClass} flex-shrink-0`}>
                           {priorityLabel}
                         </span>
-                        <span className="text-[11px] text-gray-400">Slot #{index + 1}</span>
+                        <div className="flex items-center gap-1 flex-wrap justify-end">
+                          {selectedProviderObj.categories.map((cat) => {
+                            const config = CATEGORY_BADGE_CONFIG[cat];
+                            if (!config) return null;
+                            return (
+                              <span
+                                key={cat}
+                                className={`text-[9px] px-1.5 py-0.5 rounded font-bold border ${config.className}`}
+                              >
+                                {config.label}
+                              </span>
+                            );
+                          })}
+                        </div>
                       </div>
                       <p className="text-[11px] text-gray-400 leading-snug">{desc}</p>
 

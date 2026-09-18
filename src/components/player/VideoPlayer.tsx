@@ -36,7 +36,8 @@ interface VideoPlayerProps {
   initialTimestamp?: number;
   episodeRuntimeMinutes?: number;
   isAnime?: boolean;
-  isAsian?: boolean;
+  isAsean?: boolean;
+  isAsian?: boolean; // Backward compatibility alias
   isKorean?: boolean;
   releaseYear?: string | number;
   originalTitle?: string;
@@ -64,6 +65,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   initialTimestamp = 0,
   episodeRuntimeMinutes,
   isAnime = false,
+  isAsean = false,
   isAsian = false,
   isKorean = false,
   releaseYear,
@@ -72,6 +74,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   customSubtitleOffset = 0,
   customSubtitleEnabled = false
 }) => {
+  const activeAsean = isAsean || isAsian;
   const [iframeKey, setIframeKey] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
@@ -89,7 +92,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const [showControls, setShowControls] = useState(true);
   const [topProviders, setTopProviders] = useState<string[]>(['vidlink', 'moviesapi', 'cinesrc']);
   const [topAnimeProviders, setTopAnimeProviders] = useState<string[]>(['megaplay-anime', 'cinesrc', 'moviesapi']);
-  const [topAsianProviders, setTopAsianProviders] = useState<string[]>(['vidlink', '111movies', 'lari21-asian']);
+  const [topAseanProviders, setTopAseanProviders] = useState<string[]>(['pencurimovie-my', 'vidlink', '111movies']);
   const [topKoreanProviders, setTopKoreanProviders] = useState<string[]>(['kisskh-kdrama', 'cinesrc', 'moviesapi']);
   const [enabledResolvers, setEnabledResolvers] = useState<StreamResolverType[]>(['embed']);
   const [playbackCurrentTime, setPlaybackCurrentTime] = useState<number>(0);
@@ -242,8 +245,9 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         if (s.topAnimeProviders && s.topAnimeProviders.length >= 3) {
           setTopAnimeProviders(s.topAnimeProviders);
         }
-        if (s.topAsianProviders && s.topAsianProviders.length >= 3) {
-          setTopAsianProviders(s.topAsianProviders);
+        const aseanList = s.topAseanProviders || (s as any).topAsianProviders;
+        if (aseanList && aseanList.length >= 3) {
+          setTopAseanProviders(aseanList);
         }
         if (s.topKoreanProviders && s.topKoreanProviders.length >= 3) {
           setTopKoreanProviders(s.topKoreanProviders);
@@ -360,12 +364,12 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           }
         }
 
-        console.warn('[Resolver] PencuriMovie resolution exhausted all retries, auto-failover to next Asian provider...');
-        setResolvingStatus('Failing over to next Asian provider...');
-        const asianFallbackId = (topAsianProviders && topAsianProviders.length > 0)
-          ? topAsianProviders.find(p => p !== 'pencurimovie-my') || 'vidlink'
+        console.warn('[Resolver] PencuriMovie resolution exhausted all retries, auto-failover to next Asean provider...');
+        setResolvingStatus('Failing over to next Asean provider...');
+        const aseanFallbackId = (topAseanProviders && topAseanProviders.length > 0)
+          ? topAseanProviders.find(p => p !== 'pencurimovie-my') || 'vidlink'
           : 'vidlink';
-        const fallbackProvider = getProviderById(asianFallbackId);
+        const fallbackProvider = getProviderById(aseanFallbackId);
         onProviderChange(fallbackProvider);
         return;
       }
@@ -374,8 +378,8 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       // 0b. FAST PATH: If selected provider is LARI21 (Asean), resolve directly with customizable timeout
       if (providerId === 'lari21-asian' || providerId === 'lk21-asian') {
         try {
-          console.log(`[Resolver] Fast-path Asian Provider (LARI21) [timeout: ${isUnlimited ? 'unlimited' : activeTimeoutMs + 'ms'}]...`);
-          setResolvingStatus('Resolving LARI21 Asian Stream...');
+          console.log(`[Resolver] Fast-path Asean Provider (LARI21) [timeout: ${isUnlimited ? 'unlimited' : activeTimeoutMs + 'ms'}]...`);
+          setResolvingStatus('Resolving LARI21 Asean Stream...');
           const lari21Promise = resolveLari21Stream(title, releaseYear, originalTitle, (status) => {
             if (isMounted) setResolvingStatus(status);
           });
@@ -398,13 +402,13 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             setIsLoading(false);
             return;
           }
-          console.warn('[Resolver] LARI21 resolution returned no stream or timed out, auto-failover to next Asian provider...');
-          setResolvingStatus('Failing over to next Asian provider...');
-          // Fast failover to next provider in Asian priority list
-          const asianFallbackId = (topAsianProviders && topAsianProviders.length > 0)
-            ? topAsianProviders.find(p => p !== 'lari21-asian' && p !== 'lk21-asian') || 'vidlink'
+          console.warn('[Resolver] LARI21 resolution returned no stream or timed out, auto-failover to next Asean provider...');
+          setResolvingStatus('Failing over to next Asean provider...');
+          // Fast failover to next provider in Asean priority list
+          const aseanFallbackId = (topAseanProviders && topAseanProviders.length > 0)
+            ? topAseanProviders.find(p => p !== 'lari21-asian' && p !== 'lk21-asian') || 'vidlink'
             : 'vidlink';
-          const fallbackProvider = getProviderById(asianFallbackId);
+          const fallbackProvider = getProviderById(aseanFallbackId);
           onProviderChange(fallbackProvider);
           return;
         } catch (err) {
@@ -569,7 +573,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     return () => {
       isMounted = false;
     };
-  }, [enabledResolvers, tmdbId, title, mediaType, season, episode, directStreamApiUrl, torboxApiKey, isAsian, providerId, releaseYear, originalTitle]);
+  }, [enabledResolvers, tmdbId, title, mediaType, season, episode, directStreamApiUrl, torboxApiKey, activeAsean, providerId, releaseYear, originalTitle, topAnimeProviders, topAseanProviders]);
 
   const [resumeTimestamp, setResumeTimestamp] = useState<number>(initialTimestamp || 0);
   const [resolvedMalId, setResolvedMalId] = useState<number | null>(null);
@@ -620,15 +624,15 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       }
       return '';
     }
-    // For LARI21 Asian provider
-    if (provider.id === 'lari21-asian' || provider.id === 'lk21-asian' || provider.category === 'asian') {
+    // For LARI21 Asean provider
+    if (provider.id === 'lari21-asian' || provider.id === 'lk21-asian') {
       if (resolvedLari21Url) {
         return resolvedLari21Url;
       }
       return '';
     }
     // For anime providers with resolved MAL ID, use getAnimeUrl for both TV episodes and Movies/OVAs
-    if (provider.category === 'anime' && provider.getAnimeUrl && resolvedMalId) {
+    if (provider.categories.includes('anime') && provider.getAnimeUrl && resolvedMalId) {
       return provider.getAnimeUrl(resolvedMalId, season, episode, 'sub');
     }
     // For standard titles or general movie/TV providers, use TMDB ID
@@ -640,7 +644,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const streamUrl = useMemo(() => {
     if (!baseStreamUrl) return '';
     // PencuriMovie, LARI21 and MegaPlay embeds do not support custom start/t/time query parameters and can crash or show a black screen
-    if (provider.id === 'pencurimovie-my' || provider.id === 'lari21-asian' || provider.id === 'lk21-asian' || provider.category === 'asian' || provider.id === 'megaplay-anime') {
+    if (provider.id === 'pencurimovie-my' || provider.id === 'lari21-asian' || provider.id === 'lk21-asian' || provider.categories.includes('asean') || provider.categories.includes('malaysian') || provider.id === 'megaplay-anime') {
       return baseStreamUrl;
     }
     // CineSrc: pass continueprompt=false to suppress the "Resume watching?" dialog, autonext=false to disable native upnext overlay, and pass t= for auto-resume
@@ -656,7 +660,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     }
 
     // KissKH supports hash fragment #t= for seamless auto-resume or restart via injected observer
-    if (provider.id === 'kisskh-kdrama' || provider.id === 'kisskh' || provider.category === 'korean') {
+    if (provider.id === 'kisskh-kdrama' || provider.id === 'kisskh' || provider.categories.includes('korean')) {
       if (initialTimestamp === 0) {
         return `${baseStreamUrl}#t=0`;
       }
@@ -676,7 +680,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       return `${baseStreamUrl}${sep}start=${resumeTimestamp}`;
     }
     return `${baseStreamUrl}${sep}start=${resumeTimestamp}&t=${resumeTimestamp}&time=${resumeTimestamp}#t=${resumeTimestamp}`;
-  }, [baseStreamUrl, resumeTimestamp, initialTimestamp, provider.id, provider.category]);
+  }, [baseStreamUrl, resumeTimestamp, initialTimestamp, provider.id, provider.categories]);
 
   const lastSaveTimeRef = useRef<number>(0);
 
@@ -1360,11 +1364,11 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const activeTopProviders = useMemo(() => {
     if (isKorean) return topKoreanProviders;
     if (isAnime) return topAnimeProviders;
-    if (isAsian) return topAsianProviders;
+    if (activeAsean) return topAseanProviders;
     return topProviders;
-  }, [isAnime, isAsian, isKorean, topAnimeProviders, topAsianProviders, topKoreanProviders, topProviders]);
+  }, [isAnime, activeAsean, isKorean, topAnimeProviders, topAseanProviders, topKoreanProviders, topProviders]);
 
-  const orderedProviders = React.useMemo(() => getOrderedProviders(activeTopProviders, isAnime, isAsian, isKorean), [activeTopProviders, isAnime, isAsian, isKorean]);
+  const orderedProviders = React.useMemo(() => getOrderedProviders(activeTopProviders, isAnime, activeAsean, isKorean), [activeTopProviders, isAnime, activeAsean, isKorean]);
 
   const cycleToNextProvider = useCallback(() => {
     resetControlsTimer();

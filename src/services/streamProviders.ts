@@ -1,11 +1,23 @@
-import type { StreamProvider } from '../types/stream';
+import type { StreamProvider, StreamProviderCategory } from '../types/stream';
+
+export const CATEGORY_BADGE_CONFIG: Record<
+  StreamProviderCategory,
+  { label: string; className: string }
+> = {
+  anime: { label: 'Anime', className: 'bg-pink-500/20 text-pink-300 border-pink-500/40' },
+  korean: { label: 'K-Drama', className: 'bg-rose-500/20 text-rose-300 border-rose-500/40' },
+  asean: { label: 'Asean', className: 'bg-amber-500/20 text-amber-300 border-amber-500/40' },
+  malaysian: { label: 'Malay', className: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' },
+  hollywood: { label: 'Hollywood', className: 'bg-blue-500/20 text-blue-300 border-blue-500/40' },
+  general: { label: 'General', className: 'bg-white/10 text-gray-300 border-white/15' },
+};
 
 export const STREAM_PROVIDERS: StreamProvider[] = [
   {
     id: 'vidlink',
     name: 'VidLink (Primary)',
     tagline: 'Fast 1080p stream with subtitle support & fast CDN',
-    badge: 'Recommended',
+    categories: ['hollywood', 'general'],
     getMovieUrl: (tmdbId: number) => `https://vidlink.pro/movie/${tmdbId}?autoplay=true&autostart=true&primaryColor=673ab7&secondaryColor=9055ff&iconColor=00d2ff&nextbutton=true`,
     getTVUrl: (tmdbId: number, s: number, e: number) => `https://vidlink.pro/tv/${tmdbId}/${s}/${e}?autoplay=true&autostart=true&primaryColor=673ab7&secondaryColor=9055ff&iconColor=00d2ff&nextbutton=true`
   },
@@ -13,7 +25,7 @@ export const STREAM_PROVIDERS: StreamProvider[] = [
     id: 'moviesapi',
     name: 'MoviesAPI (No Ads)',
     tagline: 'Direct cloud server with fast responsive playback',
-    badge: 'Cloud',
+    categories: ['hollywood', 'general'],
     getMovieUrl: (tmdbId: number) => `https://moviesapi.to/movie/${tmdbId}?autoplay=1`,
     getTVUrl: (tmdbId: number, s: number, e: number) => `https://moviesapi.to/tv/${tmdbId}-${s}-${e}?autoplay=1`
   },
@@ -21,7 +33,7 @@ export const STREAM_PROVIDERS: StreamProvider[] = [
     id: 'cinesrc',
     name: 'CineSrc (No Ads)',
     tagline: 'High speed fast streaming server without popups',
-    badge: 'Fast',
+    categories: ['hollywood', 'general'],
     getMovieUrl: (tmdbId: number) => `https://cinesrc.st/embed/movie/${tmdbId}`,
     getTVUrl: (tmdbId: number, s: number, e: number) => `https://cinesrc.st/embed/tv/${tmdbId}?s=${s}&e=${e}`
   },
@@ -29,7 +41,7 @@ export const STREAM_PROVIDERS: StreamProvider[] = [
     id: 'cinezo',
     name: 'Cinezo (No Ads)',
     tagline: 'Clean player with multiple streaming mirrors',
-    badge: 'HD',
+    categories: ['hollywood', 'general'],
     getMovieUrl: (tmdbId: number) => `https://player.cinezo.live/embed/movie/${tmdbId}`,
     getTVUrl: (tmdbId: number, s: number, e: number) => `https://player.cinezo.live/embed/tv/${tmdbId}/${s}/${e}`
   },
@@ -37,7 +49,7 @@ export const STREAM_PROVIDERS: StreamProvider[] = [
     id: 'peestream',
     name: 'PeeStream (No Ads)',
     tagline: 'Fast bufferless CDN stream with auto quality',
-    badge: 'Direct',
+    categories: ['hollywood', 'general'],
     getMovieUrl: (tmdbId: number) => `https://peestream.in/embed/?tmdbId=${tmdbId}&type=movie`,
     getTVUrl: (tmdbId: number, s: number, e: number) => `https://peestream.in/embed/?tmdbId=${tmdbId}&type=show&season=${s}&episode=${e}`
   },
@@ -45,7 +57,7 @@ export const STREAM_PROVIDERS: StreamProvider[] = [
     id: 'flaxmovies',
     name: 'FlaxMovies (No Ads)',
     tagline: 'Streamlined server with seamless episode navigation',
-    badge: 'HD',
+    categories: ['hollywood', 'general'],
     getMovieUrl: (tmdbId: number) => `https://flaxmovies.xyz/embed/movie/${tmdbId}`,
     getTVUrl: (tmdbId: number, s: number, e: number) => `https://flaxmovies.xyz/embed/tv/${tmdbId}/${s}/${e}`
   },
@@ -53,7 +65,7 @@ export const STREAM_PROVIDERS: StreamProvider[] = [
     id: 'videasy',
     name: 'VidEasy',
     tagline: 'High definition multi-audio stream player',
-    badge: '1080p',
+    categories: ['hollywood', 'general'],
     getMovieUrl: (tmdbId: number) => `https://player.videasy.net/movie/${tmdbId}`,
     getTVUrl: (tmdbId: number, s: number, e: number) => `https://player.videasy.net/tv/${tmdbId}/${s}/${e}`
   },
@@ -61,7 +73,7 @@ export const STREAM_PROVIDERS: StreamProvider[] = [
     id: '111movies',
     name: '111Movies',
     tagline: 'Fast responsive playback with minimal buffer',
-    badge: 'HD',
+    categories: ['hollywood', 'general'],
     getMovieUrl: (tmdbId: number) => `https://111movies.com/movie/${tmdbId}`,
     getTVUrl: (tmdbId: number, s: number, e: number) => `https://111movies.com/tv/${tmdbId}/${s}/${e}`
   },
@@ -69,7 +81,7 @@ export const STREAM_PROVIDERS: StreamProvider[] = [
     id: 'vidzee',
     name: 'VidZee',
     tagline: 'Optimized player with instant stream start',
-    badge: 'Cloud',
+    categories: ['hollywood', 'general'],
     getMovieUrl: (tmdbId: number) => `https://player.vidzee.wtf/embed/movie/${tmdbId}`,
     getTVUrl: (tmdbId: number, s: number, e: number) => `https://player.vidzee.wtf/embed/tv/${tmdbId}/${s}/${e}`
   },
@@ -77,7 +89,7 @@ export const STREAM_PROVIDERS: StreamProvider[] = [
     id: 'vidsrc-to',
     name: 'VidSrc TO',
     tagline: 'Direct cloud server with quick loading',
-    badge: 'HD',
+    categories: ['hollywood', 'general'],
     getMovieUrl: (tmdbId: number) => `https://vidsrc.to/embed/movie/${tmdbId}?autoplay=1`,
     getTVUrl: (tmdbId: number, s: number, e: number) => `https://vidsrc.to/embed/tv/${tmdbId}/${s}/${e}?autoplay=1`
   },
@@ -85,7 +97,7 @@ export const STREAM_PROVIDERS: StreamProvider[] = [
     id: '2embed',
     name: '2Embed CC',
     tagline: 'Global distributed stream network',
-    badge: 'Stable',
+    categories: ['hollywood', 'general'],
     getMovieUrl: (tmdbId: number) => `https://www.2embed.cc/embed/${tmdbId}?autoplay=1`,
     getTVUrl: (tmdbId: number, s: number, e: number) => `https://www.2embed.cc/embedtv/${tmdbId}&s=${s}&e=${e}&autoplay=1`
   },
@@ -93,7 +105,7 @@ export const STREAM_PROVIDERS: StreamProvider[] = [
     id: 'mapple',
     name: 'Mapple',
     tagline: 'High-bandwidth mirror with fast response',
-    badge: 'Fast',
+    categories: ['hollywood', 'general'],
     getMovieUrl: (tmdbId: number) => `https://mapple.uk/watch/movie/${tmdbId}`,
     getTVUrl: (tmdbId: number, s: number, e: number) => `https://mapple.uk/watch/tv/${tmdbId}-${s}-${e}`
   },
@@ -101,7 +113,7 @@ export const STREAM_PROVIDERS: StreamProvider[] = [
     id: 'superembed',
     name: 'SuperEmbed',
     tagline: 'High stability server for international titles',
-    badge: 'Direct',
+    categories: ['hollywood', 'general'],
     getMovieUrl: (tmdbId: number) => `https://multiembed.mov/directstream.php?video_id=${tmdbId}&tmdb=1&autoplay=1`,
     getTVUrl: (tmdbId: number, s: number, e: number) => `https://multiembed.mov/directstream.php?video_id=${tmdbId}&tmdb=1&s=${s}&e=${e}&autoplay=1`
   },
@@ -109,7 +121,7 @@ export const STREAM_PROVIDERS: StreamProvider[] = [
     id: 'autoembed',
     name: 'AutoEmbed',
     tagline: 'Automated failover mirror with smart source switching',
-    badge: 'Auto',
+    categories: ['hollywood', 'general'],
     getMovieUrl: (tmdbId: number) => `https://player.autoembed.cc/embed/movie/${tmdbId}`,
     getTVUrl: (tmdbId: number, s: number, e: number) => `https://player.autoembed.cc/embed/tv/${tmdbId}/${s}/${e}`
   },
@@ -117,7 +129,7 @@ export const STREAM_PROVIDERS: StreamProvider[] = [
     id: 'vixsrc',
     name: 'VixSrc',
     tagline: 'Fast and secure video server for new releases',
-    badge: 'HD',
+    categories: ['hollywood', 'general'],
     getMovieUrl: (tmdbId: number) => `https://vixsrc.to/movie/${tmdbId}`,
     getTVUrl: (tmdbId: number, s: number, e: number) => `https://vixsrc.to/tv/${tmdbId}/${s}/${e}`
   },
@@ -125,7 +137,7 @@ export const STREAM_PROVIDERS: StreamProvider[] = [
     id: 'vidlove',
     name: 'VidLove',
     tagline: 'Clean embed player with high quality audio',
-    badge: 'Direct',
+    categories: ['hollywood', 'general'],
     getMovieUrl: (tmdbId: number) => `https://player.vidlove.cc/embed/movie/${tmdbId}`,
     getTVUrl: (tmdbId: number, s: number, e: number) => `https://player.vidlove.cc/embed/tv/${tmdbId}/${s}/${e}`
   },
@@ -133,7 +145,7 @@ export const STREAM_PROVIDERS: StreamProvider[] = [
     id: 'vidfast',
     name: 'VidFast',
     tagline: 'Ultra-low latency streaming with fast seek support',
-    badge: 'Fast',
+    categories: ['hollywood', 'general'],
     getMovieUrl: (tmdbId: number) => `https://vidfast.vc/movie/${tmdbId}`,
     getTVUrl: (tmdbId: number, s: number, e: number) => `https://vidfast.vc/tv/${tmdbId}/${s}/${e}`
   },
@@ -141,7 +153,7 @@ export const STREAM_PROVIDERS: StreamProvider[] = [
     id: 'filmu',
     name: 'Filmu',
     tagline: 'Global cloud streaming cluster for movies & series',
-    badge: 'HD',
+    categories: ['hollywood', 'general'],
     getMovieUrl: (tmdbId: number) => `https://embed.filmu.in/movie/${tmdbId}`,
     getTVUrl: (tmdbId: number, s: number, e: number) => `https://embed.filmu.in/tv/${tmdbId}/${s}/${e}`
   },
@@ -149,7 +161,7 @@ export const STREAM_PROVIDERS: StreamProvider[] = [
     id: 'vidcore',
     name: 'VidCore',
     tagline: 'Modern stream player with fast CDN buffers',
-    badge: 'Cloud',
+    categories: ['hollywood', 'general'],
     getMovieUrl: (tmdbId: number) => `https://vidcore.net/movie/${tmdbId}?theme=%239055ff`,
     getTVUrl: (tmdbId: number, s: number, e: number) => `https://vidcore.net/tv/${tmdbId}/${s}/${e}?theme=%239055ff`
   },
@@ -157,7 +169,7 @@ export const STREAM_PROVIDERS: StreamProvider[] = [
     id: 'vaplayer',
     name: 'VAPlayer',
     tagline: 'High performance video stream with multi-subtitle tracks',
-    badge: '1080p',
+    categories: ['hollywood', 'general'],
     getMovieUrl: (tmdbId: number) => `https://vaplayer.ru/embed/movie/${tmdbId}?color=9055ff`,
     getTVUrl: (tmdbId: number, s: number, e: number) => `https://vaplayer.ru/embed/tv/${tmdbId}/${s}/${e}?color=9055ff`
   },
@@ -165,7 +177,7 @@ export const STREAM_PROVIDERS: StreamProvider[] = [
     id: 'vares',
     name: 'Vares',
     tagline: 'Lightning fast playback engine for popular titles',
-    badge: 'Fast',
+    categories: ['hollywood', 'general'],
     getMovieUrl: (tmdbId: number) => `https://vares.app/movie/${tmdbId}`,
     getTVUrl: (tmdbId: number, s: number, e: number) => `https://vares.app/tv/${tmdbId}/${s}/${e}`
   },
@@ -173,7 +185,7 @@ export const STREAM_PROVIDERS: StreamProvider[] = [
     id: 'vidking',
     name: 'VidKing',
     tagline: 'Direct mirror with high bitrate video quality',
-    badge: 'Direct',
+    categories: ['hollywood', 'general'],
     getMovieUrl: (tmdbId: number) => `https://www.vidking.net/embed/movie/${tmdbId}`,
     getTVUrl: (tmdbId: number, s: number, e: number) => `https://www.vidking.net/embed/tv/${tmdbId}/${s}/${e}`
   },
@@ -181,7 +193,7 @@ export const STREAM_PROVIDERS: StreamProvider[] = [
     id: 'vidbolt',
     name: 'VidBolt',
     tagline: 'High speed CDN playback with fast start time',
-    badge: 'Fast',
+    categories: ['hollywood', 'general'],
     getMovieUrl: (tmdbId: number) => `https://vidbolt.xyz/movie/${tmdbId}`,
     getTVUrl: (tmdbId: number, s: number, e: number) => `https://vidbolt.xyz/tv/${tmdbId}/${s}/${e}`
   },
@@ -189,7 +201,7 @@ export const STREAM_PROVIDERS: StreamProvider[] = [
     id: 'vidnest',
     name: 'VidNest',
     tagline: 'Reliable secondary stream mirror with wide library',
-    badge: 'HD',
+    categories: ['hollywood', 'general'],
     getMovieUrl: (tmdbId: number) => `https://vidnest.fun/movie/${tmdbId}`,
     getTVUrl: (tmdbId: number, s: number, e: number) => `https://vidnest.fun/tv/${tmdbId}/${s}/${e}`
   },
@@ -197,7 +209,7 @@ export const STREAM_PROVIDERS: StreamProvider[] = [
     id: 'vidsrcsu',
     name: 'VidSrc SU',
     tagline: 'Dedicated redundant VidSrc cluster with auto-sync',
-    badge: 'Stable',
+    categories: ['hollywood', 'general'],
     getMovieUrl: (tmdbId: number) => `https://vidsrc.su/movie/${tmdbId}?autoplay=true&colour=9055ff`,
     getTVUrl: (tmdbId: number, s: number, e: number) => `https://vidsrc.su/tv/${tmdbId}/${s}/${e}?autoplay=true&colour=9055ff`
   },
@@ -205,7 +217,7 @@ export const STREAM_PROVIDERS: StreamProvider[] = [
     id: 'vidgod',
     name: 'VidGod',
     tagline: 'Decentralized streaming cloud with smooth seeking',
-    badge: 'Cloud',
+    categories: ['hollywood', 'general'],
     getMovieUrl: (tmdbId: number) => `https://vidgod.net/movie/${tmdbId}`,
     getTVUrl: (tmdbId: number, s: number, e: number) => `https://vidgod.net/tv/${tmdbId}/${s}/${e}`
   },
@@ -213,7 +225,7 @@ export const STREAM_PROVIDERS: StreamProvider[] = [
     id: 'vidsrcme',
     name: 'VidSrc ME',
     tagline: 'Original VidSrc engine with comprehensive catalog coverage',
-    badge: 'Classic',
+    categories: ['hollywood', 'general'],
     getMovieUrl: (tmdbId: number) => `https://vidsrc.me/embed/movie?tmdb=${tmdbId}`,
     getTVUrl: (tmdbId: number, s: number, e: number) => `https://vidsrc.me/embed/tv?tmdb=${tmdbId}&season=${s}&episode=${e}`
   },
@@ -221,7 +233,7 @@ export const STREAM_PROVIDERS: StreamProvider[] = [
     id: '1embed',
     name: '1Embed',
     tagline: 'Simple clean stream embed for quick access',
-    badge: 'Direct',
+    categories: ['hollywood', 'general'],
     getMovieUrl: (tmdbId: number) => `https://1embed.cc/embed/movie/${tmdbId}`,
     getTVUrl: (tmdbId: number, s: number, e: number) => `https://1embed.cc/embed/tv/${tmdbId}/${s}/${e}`
   },
@@ -229,7 +241,7 @@ export const STREAM_PROVIDERS: StreamProvider[] = [
     id: 'smashystream',
     name: 'SmashyStream',
     tagline: 'Multi-player streaming server with fast load times',
-    badge: 'Reliable',
+    categories: ['hollywood', 'general'],
     getMovieUrl: (tmdbId: number) => `https://embed.smashystream.com/playere.php?tmdb=${tmdbId}&autoplay=1`,
     getTVUrl: (tmdbId: number, s: number, e: number) => `https://embed.smashystream.com/playere.php?tmdb=${tmdbId}&season=${s}&episode=${e}&autoplay=1`
   },
@@ -237,8 +249,7 @@ export const STREAM_PROVIDERS: StreamProvider[] = [
     id: 'megaplay-anime',
     name: 'MegaPlay (Anime)',
     tagline: 'Dedicated HiAnime library with MAL & AniList catalog mapping',
-    badge: 'Anime',
-    category: 'anime',
+    categories: ['anime'],
     getMovieUrl: () => '',
     getTVUrl: () => '',
     getAnimeUrl: (malId: number, _season?: number, episode = 1, type: 'sub' | 'dub' = 'sub') => {
@@ -249,38 +260,31 @@ export const STREAM_PROVIDERS: StreamProvider[] = [
     id: 'lari21-asian',
     name: 'LARI21 (Asean)',
     tagline: 'Southeast Asian & Indonesian movies with Indo subtitles via LayarIcon21 TurboVIP',
-    badge: 'Asean',
-    category: 'asian',
+    categories: ['asean'],
     getMovieUrl: () => '',
-    getTVUrl: () => '',
-    getAsianUrl: (resolvedUrl: string) => resolvedUrl
+    getTVUrl: () => ''
   },
   {
     id: 'pencurimovie-my',
     name: 'PencuriMovie (Abyss)',
     tagline: 'Southeast Asian & Malay series and movies via Abyss server',
-    badge: 'Abyss',
-    category: 'asian',
+    categories: ['malaysian', 'asean'],
     getMovieUrl: () => '',
-    getTVUrl: () => '',
-    getAsianUrl: (resolvedUrl: string) => resolvedUrl
+    getTVUrl: () => ''
   },
   {
     id: 'kisskh-kdrama',
     name: 'KissKH (K-Drama)',
     tagline: 'Dedicated Korean & Asian drama catalog with multi-language subtitles',
-    badge: 'K-Drama',
-    category: 'korean',
+    categories: ['korean', 'asean'],
     getMovieUrl: () => '',
-    getTVUrl: () => '',
-    getKoreanUrl: (resolvedUrl: string) => resolvedUrl
+    getTVUrl: () => ''
   },
   {
     id: 'vidsrc-kdrama',
     name: 'VidSrc (K-Drama)',
     tagline: 'High-speed Korean & Asian drama streaming with multi-subtitles via VidSrc SU',
-    badge: 'K-Drama',
-    category: 'korean',
+    categories: ['korean'],
     getMovieUrl: (tmdbId: number) => `https://vidsrc.su/embed/movie/${tmdbId}`,
     getTVUrl: (tmdbId: number, s: number, e: number) => `https://vidsrc.su/embed/tv/${tmdbId}/${s}/${e}`
   },
@@ -288,11 +292,9 @@ export const STREAM_PROVIDERS: StreamProvider[] = [
     id: 'dramacool-kdrama',
     name: 'Dramacool (K-Drama)',
     tagline: 'Extensive Korean & Asian drama catalog with English subtitles via Dramacool MY',
-    badge: 'K-Drama',
-    category: 'korean',
+    categories: ['korean', 'asean'],
     getMovieUrl: () => '',
-    getTVUrl: () => '',
-    getKoreanUrl: (resolvedUrl: string) => resolvedUrl
+    getTVUrl: () => ''
   }
 ];
 
@@ -300,28 +302,24 @@ export function getProviderById(id: string): StreamProvider {
   return STREAM_PROVIDERS.find(p => p.id === id) || STREAM_PROVIDERS[0];
 }
 
-export function getOrderedProviders(topProviders?: string[], isAnime = false, isAsian = false, isKorean = false): StreamProvider[] {
+export function getOrderedProviders(
+  topProviders?: string[],
+  isAnime = false,
+  isAsean = false,
+  isKorean = false,
+  isMalay = false
+): StreamProvider[] {
   let baseList = [...STREAM_PROVIDERS];
 
-  // If anime context, prioritize providers tagged category: 'anime'
+  // Prioritize based on content context
   if (isAnime) {
-    baseList.sort((a, b) => {
-      const aIsAnime = a.category === 'anime' ? 1 : 0;
-      const bIsAnime = b.category === 'anime' ? 1 : 0;
-      return bIsAnime - aIsAnime;
-    });
+    baseList.sort((a, b) => (b.categories.includes('anime') ? 1 : 0) - (a.categories.includes('anime') ? 1 : 0));
   } else if (isKorean) {
-    baseList.sort((a, b) => {
-      const aIsKorean = a.category === 'korean' ? 1 : 0;
-      const bIsKorean = b.category === 'korean' ? 1 : 0;
-      return bIsKorean - aIsKorean;
-    });
-  } else if (isAsian) {
-    baseList.sort((a, b) => {
-      const aIsAsian = a.category === 'asian' ? 1 : 0;
-      const bIsAsian = b.category === 'asian' ? 1 : 0;
-      return bIsAsian - aIsAsian;
-    });
+    baseList.sort((a, b) => (b.categories.includes('korean') ? 1 : 0) - (a.categories.includes('korean') ? 1 : 0));
+  } else if (isMalay) {
+    baseList.sort((a, b) => (b.categories.includes('malaysian') ? 1 : 0) - (a.categories.includes('malaysian') ? 1 : 0));
+  } else if (isAsean) {
+    baseList.sort((a, b) => (b.categories.includes('asean') ? 1 : 0) - (a.categories.includes('asean') ? 1 : 0));
   }
 
   if (!topProviders || topProviders.length === 0) return baseList;

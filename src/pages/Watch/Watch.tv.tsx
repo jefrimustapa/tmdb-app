@@ -51,7 +51,7 @@ export const Watch: React.FC = () => {
 
   const isKorean = useMemo(() => isKoreanMedia(details), [details]);
   const isAnime = useMemo(() => isAnimeMedia(details), [details]);
-  const isAsian = useMemo(() => isAseanMedia(details), [details]);
+  const isAsean = useMemo(() => isAseanMedia(details), [details]);
 
   const [isProbing, setIsProbing] = useState(false);
   const [serverIndex, setServerIndex] = useState(1);
@@ -203,11 +203,11 @@ export const Watch: React.FC = () => {
           if (!userSelectedProvider) {
             const koreanFlag = isKoreanMedia(fetchedDetails);
             const animeFlag = isAnimeMedia(fetchedDetails);
-            const asianFlag = isAseanMedia(fetchedDetails);
+            const aseanFlag = isAseanMedia(fetchedDetails);
             const defaultProvider = koreanFlag
               ? (s.topKoreanProviders?.[0] || 'kisskh-kdrama')
-              : asianFlag
-              ? (s.topAsianProviders?.[0] || 'vidlink')
+              : aseanFlag
+              ? (s.topAseanProviders?.[0] || (s as any).topAsianProviders?.[0] || 'vidlink')
               : animeFlag
               ? (s.topAnimeProviders?.[0] || 'megaplay-anime')
               : (s.topProviders?.[0] || s.preferredProvider || 'vidlink');
@@ -904,7 +904,7 @@ export const Watch: React.FC = () => {
             providerId={providerId}
             initialTimestamp={timestampParam}
             isAnime={isAnime}
-            isAsian={isAsian}
+            isAsean={isAsean}
             isKorean={isKorean}
             releaseYear={releaseYear}
             originalTitle={details.original_title || details.original_name}
@@ -943,7 +943,7 @@ export const Watch: React.FC = () => {
           isProbing={isProbing}
           serverIndex={serverIndex}
           isAnime={isAnime}
-          isAsian={isAsian}
+          isAsean={isAsean}
           isKorean={isKorean}
         />
 
