@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { dbService } from '../../services/db';
 import type { UserSettings } from '../../types/db';
-import { STREAM_PROVIDERS } from '../../services/streamProviders';
+import { STREAM_PROVIDERS, CATEGORY_BADGE_CONFIG } from '../../services/streamProviders';
 import { useDevice } from '../../hooks/useDevice';
 import { Logo } from '../../components/common/Logo';
 import { APP_VERSION, APP_BUILD_NUMBER, APP_VERSION_FULL, APP_BUILD_CHANNEL, APP_CHANGELOG } from '../../version';
@@ -182,7 +182,7 @@ export const Settings: React.FC = () => {
     | null
   >(null);
   const [priorityPickerSlot, setPriorityPickerSlot] = useState<{
-    tab: 'general' | 'anime' | 'asian' | 'korean';
+    tab: 'general' | 'anime' | 'asean' | 'korean';
     index: number;
     label: string;
     currentId: string;
@@ -296,7 +296,7 @@ export const Settings: React.FC = () => {
   };
 
   const [showEasterEgg, setShowEasterEgg] = useState(false);
-  const [priorityCategoryTab, setPriorityCategoryTab] = useState<'general' | 'anime' | 'asian' | 'korean'>('general');
+  const [priorityCategoryTab, setPriorityCategoryTab] = useState<'general' | 'anime' | 'asean' | 'korean'>('general');
   const clickCountRef = useRef(0);
   const clickTimerRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -1302,7 +1302,7 @@ export const Settings: React.FC = () => {
           <div className="pt-3 border-t border-white/5 space-y-3">
             <span className="text-xs font-semibold text-gray-300 block">Embed Failover Priority Servers</span>
             <div className="flex items-center gap-1.5 p-1 bg-black/40 border border-white/10 rounded-xl">
-              {(['general', 'anime', 'asian', 'korean'] as const).map((tab) => (
+              {(['general', 'anime', 'asean', 'korean'] as const).map((tab) => (
                 <button
                   key={tab}
                   type="button"
@@ -1313,7 +1313,7 @@ export const Settings: React.FC = () => {
                       : 'text-gray-400 hover:text-white'
                   }`}
                 >
-                  {tab === 'general' ? 'General' : tab}
+                  {tab === 'general' ? 'General' : tab === 'asean' ? 'ASEAN' : tab}
                 </button>
               ))}
             </div>
@@ -1325,11 +1325,11 @@ export const Settings: React.FC = () => {
                     { index: 1, label: 'Korean #2 (Failover 1)', badgeClass: 'bg-hbo-purple/30 text-hbo-purple-light border-hbo-purple/40', defaultId: 'cinesrc' },
                     { index: 2, label: 'Korean #3 (Failover 2)', badgeClass: 'bg-hbo-cyan/20 text-hbo-cyan border-hbo-cyan/40', defaultId: 'moviesapi' }
                   ]
-                : priorityCategoryTab === 'asian'
+                : priorityCategoryTab === 'asean'
                 ? [
-                    { index: 0, label: 'Asean #1 (Primary)', badgeClass: 'bg-amber-500/20 text-amber-300 border-amber-500/40', defaultId: 'vidlink' },
-                    { index: 1, label: 'Asean #2 (Failover 1)', badgeClass: 'bg-hbo-purple/30 text-hbo-purple-light border-hbo-purple/40', defaultId: '111movies' },
-                    { index: 2, label: 'Asean #3 (Failover 2)', badgeClass: 'bg-hbo-cyan/20 text-hbo-cyan border-hbo-cyan/40', defaultId: 'lari21-asian' }
+                    { index: 0, label: 'Asean #1 (Primary)', badgeClass: 'bg-amber-500/20 text-amber-300 border-amber-500/40', defaultId: 'pencurimovie-my' },
+                    { index: 1, label: 'Asean #2 (Failover 1)', badgeClass: 'bg-hbo-purple/30 text-hbo-purple-light border-hbo-purple/40', defaultId: 'vidlink' },
+                    { index: 2, label: 'Asean #3 (Failover 2)', badgeClass: 'bg-hbo-cyan/20 text-hbo-cyan border-hbo-cyan/40', defaultId: '111movies' }
                   ]
                 : priorityCategoryTab === 'anime'
                 ? [
@@ -1344,16 +1344,16 @@ export const Settings: React.FC = () => {
                   ]
               ).map(({ index, label, badgeClass, defaultId }) => {
                 const isKoreanTab = priorityCategoryTab === 'korean';
-                const isAsianTab = priorityCategoryTab === 'asian';
+                const isAseanTab = priorityCategoryTab === 'asean';
                 const isAnimeTab = priorityCategoryTab === 'anime';
                 const currentTop = isKoreanTab
                   ? (settings.topKoreanProviders && settings.topKoreanProviders.length >= 3
                       ? settings.topKoreanProviders
                       : ['kisskh-kdrama', 'cinesrc', 'moviesapi'])
-                  : isAsianTab
-                  ? (settings.topAsianProviders && settings.topAsianProviders.length >= 3
-                      ? settings.topAsianProviders
-                      : ['vidlink', '111movies', 'lari21-asian'])
+                  : isAseanTab
+                  ? ((settings.topAseanProviders || (settings as any).topAsianProviders) && (settings.topAseanProviders || (settings as any).topAsianProviders).length >= 3
+                      ? (settings.topAseanProviders || (settings as any).topAsianProviders)
+                      : ['pencurimovie-my', 'vidlink', '111movies'])
                   : isAnimeTab
                   ? (settings.topAnimeProviders && settings.topAnimeProviders.length >= 3
                       ? settings.topAnimeProviders
@@ -1366,13 +1366,24 @@ export const Settings: React.FC = () => {
 
                 return (
                   <div key={`${priorityCategoryTab}-${index}`} className="bg-hbo-dark/70 border border-hbo-border/90 rounded-xl p-3 space-y-2 relative">
-                    <div className="flex items-center justify-between">
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${badgeClass}`}>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${badgeClass} flex-shrink-0`}>
                         {label}
                       </span>
-                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/10 text-gray-300 font-bold">
-                        {selectedObj.badge}
-                      </span>
+                      <div className="flex items-center gap-1 flex-wrap justify-end">
+                        {selectedObj.categories.map((cat) => {
+                          const config = CATEGORY_BADGE_CONFIG[cat];
+                          if (!config) return null;
+                          return (
+                            <span
+                              key={cat}
+                              className={`text-[9px] px-1.5 py-0.5 rounded font-bold border ${config.className}`}
+                            >
+                              {config.label}
+                            </span>
+                          );
+                        })}
+                      </div>
                     </div>
 
                     <button
@@ -1424,12 +1435,15 @@ export const Settings: React.FC = () => {
                       : ['kisskh-kdrama', 'cinesrc', 'moviesapi'];
                     current[index] = provider.id;
                     handleUpdate({ topKoreanProviders: current as [string, string, string] });
-                  } else if (tab === 'asian') {
-                    const current = settings.topAsianProviders && settings.topAsianProviders.length >= 3
-                      ? [...settings.topAsianProviders]
-                      : ['vidlink', '111movies', 'lari21-asian'];
+                  } else if (tab === 'asean') {
+                    const current = (settings.topAseanProviders || (settings as any).topAsianProviders) && (settings.topAseanProviders || (settings as any).topAsianProviders).length >= 3
+                      ? [...(settings.topAseanProviders || (settings as any).topAsianProviders)]
+                      : ['pencurimovie-my', 'vidlink', '111movies'];
                     current[index] = provider.id;
-                    handleUpdate({ topAsianProviders: current as [string, string, string] });
+                    handleUpdate({
+                      topAseanProviders: current as [string, string, string],
+                      topAsianProviders: current as [string, string, string]
+                    });
                   } else if (tab === 'anime') {
                     const current = settings.topAnimeProviders && settings.topAnimeProviders.length >= 3
                       ? [...settings.topAnimeProviders]
@@ -1455,9 +1469,20 @@ export const Settings: React.FC = () => {
                 }`}
               >
                 <div className="flex items-center gap-2.5 min-w-0">
-                  <span className="text-[10px] px-2 py-0.5 rounded bg-white/10 text-gray-300 font-bold flex-shrink-0">
-                    {provider.badge}
-                  </span>
+                  <div className="flex items-center gap-1 flex-wrap flex-shrink-0">
+                    {provider.categories.map((cat) => {
+                      const config = CATEGORY_BADGE_CONFIG[cat];
+                      if (!config) return null;
+                      return (
+                        <span
+                          key={cat}
+                          className={`text-[9px] px-1.5 py-0.5 rounded font-bold border ${config.className}`}
+                        >
+                          {config.label}
+                        </span>
+                      );
+                    })}
+                  </div>
                   <div className="min-w-0 flex-1">
                     <p className={`text-xs sm:text-sm font-bold ${isSelected ? 'text-hbo-cyan' : 'text-white'} truncate`}>
                       {provider.name}

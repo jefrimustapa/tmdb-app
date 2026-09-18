@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Server, ChevronDown, Check, ShieldCheck, X } from 'lucide-react';
-import { STREAM_PROVIDERS, getProviderById, getOrderedProviders } from '../../services/streamProviders';
+import { STREAM_PROVIDERS, getProviderById, getOrderedProviders, CATEGORY_BADGE_CONFIG } from '../../services/streamProviders';
 import type { StreamProvider } from '../../types/stream';
 
 interface ProviderPickerTVProps {
@@ -12,7 +12,8 @@ interface ProviderPickerTVProps {
   serverIndex?: number;
   totalServers?: number;
   isAnime?: boolean;
-  isAsian?: boolean;
+  isAsean?: boolean;
+  isAsian?: boolean; // Backward compatibility alias
   isKorean?: boolean;
 }
 
@@ -24,18 +25,20 @@ export const ProviderPickerTV: React.FC<ProviderPickerTVProps> = ({
   serverIndex = 1,
   totalServers = STREAM_PROVIDERS.length,
   isAnime = false,
+  isAsean = false,
   isAsian = false,
   isKorean = false,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const modalRef = useRef<HTMLDivElement>(null);
+  const activeAsean = isAsean || isAsian;
 
   const displayProviders = React.useMemo(() => {
     if (isKorean) return getOrderedProviders(undefined, false, false, true);
-    if (isAsian) return getOrderedProviders(undefined, false, true, false);
+    if (activeAsean) return getOrderedProviders(undefined, false, true, false);
     if (isAnime) return getOrderedProviders(undefined, true, false, false);
     return STREAM_PROVIDERS;
-  }, [isAnime, isAsian, isKorean]);
+  }, [isAnime, activeAsean, isKorean]);
 
   const selectedProvider = getProviderById(currentProviderId);
   const shortServerName = selectedProvider.name.replace(/\s*\([^)]*\)/g, '').trim();
@@ -216,22 +219,24 @@ export const ProviderPickerTV: React.FC<ProviderPickerTVProps> = ({
                           : 'bg-white/5 hover:bg-white/10 border-white/5 text-gray-300'
                       }`}
                     >
-                      <div className="min-w-0 flex-1 flex items-center gap-2 pr-1">
+                      <div className="min-w-0 flex-1 flex items-center gap-2 pr-1 flex-wrap">
                         <p className={`text-xs sm:text-sm font-bold truncate ${isSelected ? 'text-hbo-cyan' : 'text-white'}`}>
                           {cleanName}
                         </p>
-                        <span className="text-white/40 text-xs select-none">•</span>
-                        <span className={`text-[10px] px-2 py-0.5 rounded font-bold whitespace-nowrap flex-shrink-0 ${
-                          provider.badge === 'Anime'
-                            ? 'bg-gradient-to-r from-pink-500/30 to-purple-500/30 text-pink-300 border border-pink-500/40'
-                            : provider.badge === 'K-Drama'
-                            ? 'bg-gradient-to-r from-rose-500/30 to-pink-500/30 text-rose-300 border border-rose-500/40'
-                            : provider.badge === 'Asean'
-                            ? 'bg-gradient-to-r from-amber-500/30 to-red-500/30 text-amber-300 border border-amber-500/40'
-                            : 'bg-white/10 text-gray-300'
-                        }`}>
-                          {provider.badge}
-                        </span>
+                        <div className="flex items-center gap-1 flex-wrap">
+                          {provider.categories.map((cat) => {
+                            const conf = CATEGORY_BADGE_CONFIG[cat];
+                            if (!conf) return null;
+                            return (
+                              <span
+                                key={cat}
+                                className={`text-[9px] px-1.5 py-0.5 rounded font-bold whitespace-nowrap border ${conf.className}`}
+                              >
+                                {conf.label}
+                              </span>
+                            );
+                          })}
+                        </div>
                       </div>
                       {isSelected && (
                         <div className="flex-shrink-0">
