@@ -68,11 +68,14 @@ export type VirtualCursorStyle =
   | 'minimal_dot'
   | 'classic_hand';
 
-export type StreamResolverType = 'embed' | 'private_extractor' | 'torbox';
+import type { OriginCountryCode } from './stream';
+
+export type StreamResolverType = 'embed' | 'private_extractor' | 'torbox' | 'telegram';
 
 export interface UserSettings {
   id: string; // 'current_settings'
   preferredProvider: string;
+
   topProviders?: [string, string, string] | string[];
   topAnimeProviders?: [string, string, string] | string[];
   topAseanProviders?: [string, string, string] | string[];
@@ -92,6 +95,9 @@ export interface UserSettings {
   enabledResolvers: StreamResolverType[]; // Multi or single enabled engines (e.g. ['torbox', 'private_extractor', 'embed'])
   directStreamApiUrl?: string; // Custom or default Consumet API URL (e.g. https://tmdb-api-yfbu.onrender.com)
   torboxApiKey?: string; // TorBox API Key (for 4K HDR & 1080p cloud streams)
+  enabledTelegramProviders?: string[]; // e.g. ['telegram-msm32']
+  telegramProviderCountries?: Record<string, OriginCountryCode[]>; // e.g. { 'telegram-msm32': ['MY', 'ID', 'SG'] }
+  msm32GetterUrl?: string; // e.g. 'http://localhost:3033'
   directStreamMode?: boolean; // Legacy fallback flag
   streamHeaderTimeout: number; // in seconds, e.g. 3, 5, 8, or 0 for always visible
   streamResolverTimeout?: number; // Provider stream resolution timeout in seconds (3-15s, default 5s)

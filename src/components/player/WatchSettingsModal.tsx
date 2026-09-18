@@ -11,11 +11,13 @@ import {
   RotateCcw,
   AlertCircle,
   Loader2,
-  ShieldCheck
+  ShieldCheck,
+  Send
 } from 'lucide-react';
 import { SubtitleTrack } from '../../services/subtitleService';
-import { STREAM_PROVIDERS, getOrderedProviders, CATEGORY_BADGE_CONFIG } from '../../services/streamProviders';
-import type { StreamProvider } from '../../types/stream';
+import { STREAM_PROVIDERS, getOrderedProviders, getProvidersByEngine, getProviderById, CATEGORY_BADGE_CONFIG, ORIGIN_COUNTRY_LABELS } from '../../services/streamProviders';
+import type { StreamProvider, StreamEngineType } from '../../types/stream';
+import type { StreamResolverType } from '../../types/db';
 
 export type WatchSettingsTab = 'subtitles' | 'servers' | 'server';
 
@@ -33,6 +35,7 @@ interface WatchSettingsModalProps {
   // Provider / Server Props
   currentProviderId: string;
   onSelectProvider: (provider: StreamProvider) => void;
+  enabledResolvers?: StreamResolverType[];
   isProbing?: boolean;
   serverIndex?: number;
   totalServers?: number;
@@ -54,6 +57,7 @@ export const WatchSettingsModal: React.FC<WatchSettingsModalProps> = ({
   isLoadingSubtitles = false,
   currentProviderId,
   onSelectProvider,
+  enabledResolvers,
   isProbing = false,
   serverIndex = 1,
   totalServers = STREAM_PROVIDERS.length,
@@ -67,18 +71,37 @@ export const WatchSettingsModal: React.FC<WatchSettingsModalProps> = ({
   const modalRef = useRef<HTMLDivElement>(null);
   const activeAsean = isAsean || isAsian;
 
+  const hasEmbed = !enabledResolvers || enabledResolvers.includes('embed');
+  const hasTelegram = Boolean(enabledResolvers && enabledResolvers.includes('telegram'));
+
+  const selectedProvider = getProviderById(currentProviderId);
+  const [engineTab, setEngineTab] = useState<StreamEngineType>(
+    !hasEmbed && hasTelegram
+      ? 'telegram'
+      : (selectedProvider.engine === 'telegram' ? 'telegram' : 'embed')
+  );
+
   useEffect(() => {
     if (isOpen) {
       setActiveTab(defaultTab);
+      if (!hasEmbed && hasTelegram) {
+        setEngineTab('telegram');
+      } else if (hasEmbed && !hasTelegram) {
+        setEngineTab('embed');
+      } else {
+        setEngineTab(selectedProvider.engine || 'embed');
+      }
     }
-  }, [isOpen, defaultTab]);
+  }, [isOpen, defaultTab, hasEmbed, hasTelegram, selectedProvider.engine]);
 
   const displayProviders = React.useMemo(() => {
-    if (isKorean) return getOrderedProviders(undefined, false, false, true);
-    if (activeAsean) return getOrderedProviders(undefined, false, true, false);
-    if (isAnime) return getOrderedProviders(undefined, true, false, false);
-    return STREAM_PROVIDERS;
-  }, [isAnime, activeAsean, isKorean]);
+    const list = getProvidersByEngine(engineTab);
+    if (engineTab === 'telegram') return list;
+    if (isKorean) return getOrderedProviders(undefined, false, false, true).filter(p => (p.engine || 'embed') === 'embed');
+    if (activeAsean) return getOrderedProviders(undefined, false, true, false).filter(p => (p.engine || 'embed') === 'embed');
+    if (isAnime) return getOrderedProviders(undefined, true, false, false).filter(p => (p.engine || 'embed') === 'embed');
+    return list;
+  }, [engineTab, isAnime, activeAsean, isKorean]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -628,6 +651,36 @@ export const WatchSettingsModal: React.FC<WatchSettingsModalProps> = ({
         {/* TAB 2: STREAM SERVERS */}
         {activeTab === 'server' && (
           <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-2 overscroll-contain min-h-0">
+            {/* Engine Tabs (Only if both Embed & Telegram are available) */}
+            {hasEmbed && hasTelegram && (
+              <div className="grid grid-cols-2 gap-2 mb-2 p-1 rounded-xl bg-white/5 border border-white/10 flex-shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setEngineTab('embed')}
+                  className={`flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-lg text-xs font-bold transition ${
+                    engineTab === 'embed'
+                      ? 'bg-hbo-purple text-white shadow-md'
+                      : 'text-gray-400 hover:text-white'
+                  }`}
+                >
+                  <Server className="w-3.5 h-3.5" />
+                  Embed Providers
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEngineTab('telegram')}
+                  className={`flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-lg text-xs font-bold transition ${
+                    engineTab === 'telegram'
+                      ? 'bg-sky-600 text-white shadow-md'
+                      : 'text-gray-400 hover:text-white'
+                  }`}
+                >
+                  <Send className="w-3.5 h-3.5" />
+                  Telegram Providers
+                </button>
+              </div>
+            )}
+
             {displayProviders.map((p, idx) => {
               const isSelected = p.id === currentProviderId;
 
@@ -661,6 +714,14 @@ export const WatchSettingsModal: React.FC<WatchSettingsModalProps> = ({
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-semibold text-sm text-white truncate">{p.name}</span>
                         <div className="flex items-center gap-1 flex-wrap">
+                          {p.countries && p.countries.length > 0 && p.countries.map(c => (
+                            <span
+                              key={c}
+                              className="text-[9px] px-1.5 py-0.5 rounded font-bold whitespace-nowrap bg-sky-500/20 text-sky-300 border border-sky-500/40"
+                            >
+                              {ORIGIN_COUNTRY_LABELS[c] || c}
+                            </span>
+                          ))}
                           {p.categories.map((cat) => {
                             const conf = CATEGORY_BADGE_CONFIG[cat];
                             if (!conf) return null;

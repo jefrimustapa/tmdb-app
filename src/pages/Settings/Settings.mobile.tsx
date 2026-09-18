@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { dbService } from '../../services/db';
 import type { UserSettings } from '../../types/db';
-import { STREAM_PROVIDERS, CATEGORY_BADGE_CONFIG } from '../../services/streamProviders';
+import { STREAM_PROVIDERS, CATEGORY_BADGE_CONFIG, ORIGIN_COUNTRY_LABELS } from '../../services/streamProviders';
+import type { OriginCountryCode } from '../../types/stream';
+import { msm32Service, type Msm32HealthResult } from '../../services/msm32MappingService';
 import { useDevice } from '../../hooks/useDevice';
 import { Logo } from '../../components/common/Logo';
 import { APP_VERSION, APP_BUILD_NUMBER, APP_VERSION_FULL, APP_BUILD_CHANNEL, APP_CHANGELOG } from '../../version';
@@ -37,6 +39,7 @@ import {
   HardDrive,
   Save,
   SlidersHorizontal,
+  Send,
 } from 'lucide-react';
 
 type MobileCategory = 'playback' | 'display' | 'content' | 'system';
@@ -187,6 +190,9 @@ export const Settings: React.FC = () => {
     label: string;
     currentId: string;
   } | null>(null);
+
+  const [testingMsm32, setTestingMsm32] = useState(false);
+  const [msm32TestResult, setMsm32TestResult] = useState<Msm32HealthResult | null>(null);
 
   const filterSentinelRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -1223,6 +1229,12 @@ export const Settings: React.FC = () => {
                 desc: 'Direct HTTPS 4K HDR & 1080p BluRay cloud streams via TorBox CDN.'
               },
               {
+                id: 'telegram' as const,
+                title: 'Telegram Provider',
+                tag: 'Direct MTProto',
+                desc: 'Direct in-app video streaming from Telegram bots (MovieSubMalay / @msm32bot).'
+              },
+              {
                 id: 'private_extractor' as const,
                 title: 'Private Extractor',
                 tag: 'Consumet API',
@@ -1238,18 +1250,18 @@ export const Settings: React.FC = () => {
               const currentEnabled = settings.enabledResolvers && settings.enabledResolvers.length > 0
                 ? settings.enabledResolvers
                 : ['embed'];
-              const isEnabled = currentEnabled.includes(resOption.id);
+              const isEnabled = currentEnabled.includes(resOption.id as any);
 
               return (
                 <button
                   key={resOption.id}
                   onClick={() => {
-                    let updated: ('embed' | 'private_extractor' | 'torbox')[];
+                    let updated: ('embed' | 'private_extractor' | 'torbox' | 'telegram')[];
                     if (isEnabled) {
                       if (currentEnabled.length === 1) return;
-                      updated = currentEnabled.filter(r => r !== resOption.id) as ('embed' | 'private_extractor' | 'torbox')[];
+                      updated = currentEnabled.filter(r => r !== resOption.id) as ('embed' | 'private_extractor' | 'torbox' | 'telegram')[];
                     } else {
-                      updated = [...currentEnabled, resOption.id] as ('embed' | 'private_extractor' | 'torbox')[];
+                      updated = [...currentEnabled, resOption.id] as ('embed' | 'private_extractor' | 'torbox' | 'telegram')[];
                     }
                     handleUpdate({
                       enabledResolvers: updated,
@@ -1280,6 +1292,156 @@ export const Settings: React.FC = () => {
               );
             })}
           </div>
+
+          {/* Telegram Provider Configuration */}
+          {(settings.enabledResolvers || []).includes('telegram') && (
+            <div className="p-3.5 rounded-xl bg-sky-950/20 border border-sky-500/40 text-xs text-gray-300 space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="font-bold text-sky-400 flex items-center gap-1.5">
+                  <Send className="w-3.5 h-3.5 text-sky-400" />
+                  <span>Telegram Sub-Providers (MovieSubMalay)</span>
+                </p>
+                <span className="text-[10px] bg-sky-500/20 text-sky-300 px-2 py-0.5 rounded border border-sky-500/40 font-bold">
+                  Zero-Disk Stream
+                </span>
+              </div>
+
+              {/* Sub-provider Enable Switch */}
+              <div className="flex items-center justify-between py-1 border-b border-white/5">
+                <div>
+                  <span className="font-semibold text-white block text-xs">MovieSubMalay (@msm32bot)</span>
+                  <span className="text-[10px] text-gray-400">Stream direct Malay & Asian releases in custom player</span>
+                </div>
+                {(() => {
+                  const enabledTg = settings.enabledTelegramProviders || ['telegram-msm32'];
+                  const isMsmEnabled = enabledTg.includes('telegram-msm32');
+                  return (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const updated = isMsmEnabled
+                          ? enabledTg.filter(id => id !== 'telegram-msm32')
+                          : [...enabledTg, 'telegram-msm32'];
+                        handleUpdate({ enabledTelegramProviders: updated });
+                      }}
+                      className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all flex items-center gap-1 border ${
+                        isMsmEnabled
+                          ? 'bg-sky-500/20 text-sky-300 border-sky-500/40'
+                          : 'bg-white/5 text-gray-400 border-white/10'
+                      }`}
+                    >
+                      {isMsmEnabled ? <Check className="w-3 h-3 stroke-[2.5]" /> : <X className="w-3 h-3 stroke-[2.5]" />}
+                      <span>{isMsmEnabled ? 'Active' : 'Disabled'}</span>
+                    </button>
+                  );
+                })()}
+              </div>
+
+              {/* MSM Getter Server URL + Test Connection */}
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-semibold text-gray-300 block">
+                  MSM Getter Microservice URL:
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    placeholder="http://localhost:3033"
+                    value={settings.msm32GetterUrl || ''}
+                    onChange={(e) => handleUpdate({ msm32GetterUrl: e.target.value })}
+                    className="flex-1 bg-black/60 border border-gray-700 focus:border-sky-400 text-white px-3 py-2 rounded-lg text-xs font-mono outline-none"
+                  />
+                  <button
+                    type="button"
+                    disabled={testingMsm32}
+                    onClick={async () => {
+                      setTestingMsm32(true);
+                      setMsm32TestResult(null);
+                      try {
+                        const res = await msm32Service.testConnection(settings.msm32GetterUrl);
+                        setMsm32TestResult(res);
+                      } catch (err: any) {
+                        setMsm32TestResult({ ok: false, error: err?.message || 'Connection failed' });
+                      } finally {
+                        setTestingMsm32(false);
+                      }
+                    }}
+                    className="px-3 py-2 rounded-lg bg-sky-500 hover:bg-sky-400 text-black font-bold text-xs flex items-center gap-1.5 flex-shrink-0 transition-colors disabled:opacity-50"
+                  >
+                    <RefreshCw className={`w-3 h-3 ${testingMsm32 ? 'animate-spin' : ''}`} />
+                    <span>Test</span>
+                  </button>
+                </div>
+                {msm32TestResult && (
+                  <div className={`p-2 rounded-lg text-[11px] flex items-center gap-1.5 border ${
+                    msm32TestResult.ok
+                      ? 'bg-emerald-950/40 text-emerald-300 border-emerald-500/40'
+                      : 'bg-rose-950/40 text-rose-300 border-rose-500/40'
+                  }`}>
+                    {msm32TestResult.ok ? (
+                      <Check className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
+                    ) : (
+                      <AlertCircle className="w-3.5 h-3.5 text-rose-400 flex-shrink-0" />
+                    )}
+                    <span className="truncate">
+                      {msm32TestResult.ok
+                        ? `Connected! Status: ${msm32TestResult.status || 'online'} • Telegram MTProto: ${msm32TestResult.isConnected ? 'Ready' : 'Standby'}`
+                        : `Error: ${msm32TestResult.error}`}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* Supported Countries of Origin */}
+              <div className="space-y-1.5 pt-1">
+                <span className="text-[11px] font-semibold text-gray-300 block">
+                  MSM32 Active Country Origin Filters:
+                </span>
+                {(() => {
+                  const currentCountries: OriginCountryCode[] =
+                    (settings.telegramProviderCountries && settings.telegramProviderCountries['telegram-msm32']) ||
+                    ['MY', 'ID', 'SG'];
+                  const availableCodes: OriginCountryCode[] = ['MY', 'ID', 'SG', 'TH', 'KR', 'JP', 'GLOBAL'];
+
+                  return (
+                    <div className="flex flex-wrap gap-1.5">
+                      {availableCodes.map((code) => {
+                        const isSelected = currentCountries.includes(code);
+                        return (
+                          <button
+                            key={code}
+                            type="button"
+                            onClick={() => {
+                              let updated: OriginCountryCode[];
+                              if (isSelected) {
+                                if (currentCountries.length === 1) return;
+                                updated = currentCountries.filter(c => c !== code);
+                              } else {
+                                updated = [...currentCountries, code];
+                              }
+                              const existingMap = settings.telegramProviderCountries || {};
+                              handleUpdate({
+                                telegramProviderCountries: {
+                                  ...existingMap,
+                                  'telegram-msm32': updated
+                                }
+                              });
+                            }}
+                            className={`px-2 py-1 rounded-md text-[10px] font-bold border transition-all ${
+                              isSelected
+                                ? 'bg-sky-500/30 text-sky-200 border-sky-400'
+                                : 'bg-black/40 text-gray-400 border-white/10 hover:border-white/20'
+                            }`}
+                          >
+                            {ORIGIN_COUNTRY_LABELS[code]}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
+          )}
 
           {/* TorBox Key Field */}
           {(settings.enabledResolvers || []).includes('torbox') && (

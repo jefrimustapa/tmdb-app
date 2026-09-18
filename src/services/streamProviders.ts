@@ -1,4 +1,4 @@
-import type { StreamProvider, StreamProviderCategory } from '../types/stream';
+import type { StreamProvider, StreamProviderCategory, StreamEngineType, OriginCountryCode } from '../types/stream';
 
 export const CATEGORY_BADGE_CONFIG: Record<
   StreamProviderCategory,
@@ -292,15 +292,70 @@ export const STREAM_PROVIDERS: StreamProvider[] = [
     id: 'dramacool-kdrama',
     name: 'Dramacool (K-Drama)',
     tagline: 'Extensive Korean & Asian drama catalog with English subtitles via Dramacool MY',
+    engine: 'embed',
+    countries: ['KR', 'CN', 'JP', 'GLOBAL'],
     categories: ['korean', 'asean'],
+    getMovieUrl: () => '',
+    getTVUrl: () => ''
+  },
+  {
+    id: 'telegram-msm32',
+    name: 'MovieSubMalay (MSM32)',
+    tagline: 'Direct Telegram stream resolver for Malay & Southeast Asian cinema',
+    engine: 'telegram',
+    countries: ['MY', 'ID', 'SG'],
+    categories: ['malaysian', 'asean'],
     getMovieUrl: () => '',
     getTVUrl: () => ''
   }
 ];
 
+export const ORIGIN_COUNTRY_LABELS: Record<OriginCountryCode, string> = {
+  MY: 'Malaysia 🇲🇾',
+  ID: 'Indonesia 🇮🇩',
+  KR: 'South Korea 🇰🇷',
+  JP: 'Japan 🇯🇵',
+  US: 'United States 🇺🇸',
+  GB: 'United Kingdom 🇬🇧',
+  TH: 'Thailand 🇹🇭',
+  PH: 'Philippines 🇵🇭',
+  SG: 'Singapore 🇸🇬',
+  CN: 'China 🇨🇳',
+  GLOBAL: 'Global / Other 🌐',
+};
+
 export function getProviderById(id: string): StreamProvider {
   return STREAM_PROVIDERS.find(p => p.id === id) || STREAM_PROVIDERS[0];
 }
+
+export function getProvidersByEngine(
+  engine: StreamEngineType = 'embed',
+  providers: StreamProvider[] = STREAM_PROVIDERS
+): StreamProvider[] {
+  return providers.filter(p => (p.engine || 'embed') === engine);
+}
+
+export function getEffectiveCountries(
+  provider: StreamProvider,
+  customCountries?: Record<string, OriginCountryCode[]>
+): OriginCountryCode[] {
+  if (customCountries && customCountries[provider.id]) {
+    return customCountries[provider.id];
+  }
+  return provider.countries || ['GLOBAL'];
+}
+
+export function isProviderMatchingOrigin(
+  provider: StreamProvider,
+  originCountry?: string,
+  customCountries?: Record<string, OriginCountryCode[]>
+): boolean {
+  if (!originCountry) return true;
+  const effective = getEffectiveCountries(provider, customCountries);
+  if (effective.includes('GLOBAL')) return true;
+  return effective.includes(originCountry.toUpperCase() as OriginCountryCode);
+}
+
 
 export function getOrderedProviders(
   topProviders?: string[],

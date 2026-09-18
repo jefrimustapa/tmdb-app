@@ -1,12 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Server, ChevronDown, Check, ShieldCheck, X } from 'lucide-react';
-import { STREAM_PROVIDERS, getProviderById, getOrderedProviders, CATEGORY_BADGE_CONFIG } from '../../services/streamProviders';
-import type { StreamProvider } from '../../types/stream';
+import { Server, ChevronDown, Check, ShieldCheck, X, Send } from 'lucide-react';
+import { STREAM_PROVIDERS, getProviderById, getOrderedProviders, getProvidersByEngine, CATEGORY_BADGE_CONFIG, ORIGIN_COUNTRY_LABELS } from '../../services/streamProviders';
+import type { StreamProvider, StreamEngineType } from '../../types/stream';
+import type { StreamResolverType } from '../../types/db';
 
 interface ProviderPickerMobileProps {
   currentProviderId: string;
   onSelect: (provider: StreamProvider) => void;
+  enabledResolvers?: StreamResolverType[];
   compact?: boolean;
   isProbing?: boolean;
   serverIndex?: number;
@@ -20,6 +22,7 @@ interface ProviderPickerMobileProps {
 export const ProviderPickerMobile: React.FC<ProviderPickerMobileProps> = ({
   currentProviderId,
   onSelect,
+  enabledResolvers,
   compact = false,
   isProbing = false,
   serverIndex = 1,
@@ -31,18 +34,41 @@ export const ProviderPickerMobile: React.FC<ProviderPickerMobileProps> = ({
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const activeAsean = isAsean || isAsian;
+  const selectedProvider = getProviderById(currentProviderId);
+
+  const hasEmbed = !enabledResolvers || enabledResolvers.includes('embed');
+  const hasTelegram = Boolean(enabledResolvers && enabledResolvers.includes('telegram'));
+
+  const [engineTab, setEngineTab] = useState<StreamEngineType>(
+    !hasEmbed && hasTelegram
+      ? 'telegram'
+      : (selectedProvider.engine === 'telegram' ? 'telegram' : 'embed')
+  );
+
+  useEffect(() => {
+    if (isOpen) {
+      if (!hasEmbed && hasTelegram) {
+        setEngineTab('telegram');
+      } else if (hasEmbed && !hasTelegram) {
+        setEngineTab('embed');
+      } else {
+        setEngineTab(selectedProvider.engine || 'embed');
+      }
+    }
+  }, [isOpen, hasEmbed, hasTelegram, selectedProvider.engine]);
 
   const displayProviders = React.useMemo(() => {
+    const list = getProvidersByEngine(engineTab);
+    if (engineTab === 'telegram') return list;
     return isKorean
-      ? getOrderedProviders(undefined, false, false, true)
+      ? getOrderedProviders(undefined, false, false, true).filter(p => (p.engine || 'embed') === 'embed')
       : isAnime
-      ? getOrderedProviders(undefined, true, false, false)
+      ? getOrderedProviders(undefined, true, false, false).filter(p => (p.engine || 'embed') === 'embed')
       : activeAsean
-      ? getOrderedProviders(undefined, false, true, false)
-      : STREAM_PROVIDERS;
-  }, [isAnime, activeAsean, isKorean]);
+      ? getOrderedProviders(undefined, false, true, false).filter(p => (p.engine || 'embed') === 'embed')
+      : list;
+  }, [engineTab, isAnime, activeAsean, isKorean]);
 
-  const selectedProvider = getProviderById(currentProviderId);
   const shortServerName = selectedProvider.name.replace(/\s*\([^)]*\)/g, '').trim();
 
   const handleSelect = (provider: StreamProvider) => {
@@ -102,6 +128,36 @@ export const ProviderPickerMobile: React.FC<ProviderPickerMobileProps> = ({
                     <X className="w-4 h-4" />
                   </button>
                 </div>
+
+                {/* Engine Selector Tabs (Shown only when both engines are enabled) */}
+                {hasEmbed && hasTelegram && (
+                  <div className="w-full grid grid-cols-2 gap-2 mt-3 p-1 rounded-xl bg-white/5 border border-white/10">
+                    <button
+                      type="button"
+                      onClick={() => setEngineTab('embed')}
+                      className={`flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-lg text-xs font-bold transition ${
+                        engineTab === 'embed'
+                          ? 'bg-hbo-purple text-white shadow-md'
+                          : 'text-gray-400 hover:text-white'
+                      }`}
+                    >
+                      <Server className="w-3.5 h-3.5" />
+                      Embed Providers
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEngineTab('telegram')}
+                      className={`flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-lg text-xs font-bold transition ${
+                        engineTab === 'telegram'
+                          ? 'bg-blue-600 text-white shadow-md'
+                          : 'text-gray-400 hover:text-white'
+                      }`}
+                    >
+                      <Send className="w-3.5 h-3.5" />
+                      Telegram Providers
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* Scrollable Server List */}
@@ -109,42 +165,63 @@ export const ProviderPickerMobile: React.FC<ProviderPickerMobileProps> = ({
                 className="flex-1 overflow-y-auto px-4 py-3 space-y-2 touch-pan-y overscroll-contain"
                 style={{ WebkitOverflowScrolling: 'touch' }}
               >
-                {displayProviders.map((provider) => {
-                  const isSelected = provider.id === currentProviderId;
-                  const cleanName = provider.name.replace(/\s*\([^)]*\)/g, '').trim();
-                  return (
-                    <button
-                      key={provider.id}
-                      onClick={() => handleSelect(provider)}
-                      className={`w-full flex items-center justify-between gap-3 px-4 py-3 rounded-2xl text-left transition-all active:scale-[0.98] ${
-                        isSelected
-                          ? 'bg-gradient-to-r from-hbo-purple/50 to-hbo-cyan/20 border-2 border-hbo-cyan text-white shadow-lg shadow-hbo-cyan/20'
-                          : 'bg-white/5 hover:bg-white/10 border border-white/10 text-gray-300'
-                      }`}
-                    >
-                      <div className="min-w-0 flex-1 flex items-center gap-2 flex-wrap">
-                        <p className={`text-sm font-bold truncate ${isSelected ? 'text-hbo-cyan' : 'text-white'}`}>
-                          {cleanName}
-                        </p>
-                        <div className="flex items-center gap-1 flex-wrap">
-                          {provider.categories.map((cat) => {
-                            const conf = CATEGORY_BADGE_CONFIG[cat];
-                            if (!conf) return null;
-                            return (
-                              <span
-                                key={cat}
-                                className={`text-[9px] px-1.5 py-0.5 rounded font-bold whitespace-nowrap border ${conf.className}`}
-                              >
-                                {conf.label}
-                              </span>
-                            );
-                          })}
+                {displayProviders.length === 0 ? (
+                  <div className="text-center py-8 text-gray-400 text-xs">
+                    No providers available for this engine.
+                  </div>
+                ) : (
+                  displayProviders.map((provider) => {
+                    const isSelected = provider.id === currentProviderId;
+                    const cleanName = provider.name.replace(/\s*\([^)]*\)/g, '').trim();
+                    return (
+                      <button
+                        key={provider.id}
+                        onClick={() => handleSelect(provider)}
+                        className={`w-full flex items-center justify-between gap-3 px-4 py-3 rounded-2xl text-left transition-all active:scale-[0.98] ${
+                          isSelected
+                            ? 'bg-gradient-to-r from-hbo-purple/50 to-hbo-cyan/20 border-2 border-hbo-cyan text-white shadow-lg shadow-hbo-cyan/20'
+                            : 'bg-white/5 hover:bg-white/10 border border-white/10 text-gray-300'
+                        }`}
+                      >
+                        <div className="min-w-0 flex-1 flex flex-col gap-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className={`text-sm font-bold truncate ${isSelected ? 'text-hbo-cyan' : 'text-white'}`}>
+                              {cleanName}
+                            </p>
+                            <div className="flex items-center gap-1 flex-wrap">
+                              {provider.categories.map((cat) => {
+                                const conf = CATEGORY_BADGE_CONFIG[cat];
+                                if (!conf) return null;
+                                return (
+                                  <span
+                                    key={cat}
+                                    className={`text-[9px] px-1.5 py-0.5 rounded font-bold whitespace-nowrap border ${conf.className}`}
+                                  >
+                                    {conf.label}
+                                  </span>
+                                );
+                              })}
+                            </div>
+                          </div>
+                          {/* Countries */}
+                          {provider.countries && provider.countries.length > 0 && (
+                            <div className="flex items-center gap-1 flex-wrap">
+                              {provider.countries.map((c) => (
+                                <span
+                                  key={c}
+                                  className="text-[9px] px-1 py-0.2 text-gray-400 bg-white/5 rounded border border-white/10"
+                                >
+                                  {ORIGIN_COUNTRY_LABELS[c] || c}
+                                </span>
+                              ))}
+                            </div>
+                          )}
                         </div>
-                      </div>
-                      {isSelected && <Check className="w-5 h-5 text-hbo-cyan flex-shrink-0 ml-2" />}
-                    </button>
-                  );
-                })}
+                        {isSelected && <Check className="w-5 h-5 text-hbo-cyan flex-shrink-0 ml-2" />}
+                      </button>
+                    );
+                  })
+                )}
               </div>
             </div>
           </div>,
@@ -153,3 +230,4 @@ export const ProviderPickerMobile: React.FC<ProviderPickerMobileProps> = ({
     </div>
   );
 };
+

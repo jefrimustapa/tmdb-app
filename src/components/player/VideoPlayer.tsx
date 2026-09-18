@@ -14,6 +14,7 @@ import { resolveLari21Stream } from '../../services/lariMappingService';
 import { resolvePencuriStream, clearPencuriCache } from '../../services/pencuriMappingService';
 import { resolveKisskhStream } from '../../services/kisskhMappingService';
 import { resolveDramacoolStream, type DramacoolServer } from '../../services/dramacoolMappingService';
+import { msm32Service } from '../../services/msm32MappingService';
 import { SubtitleOverlay } from './SubtitleOverlay';
 import type { SubtitleCue } from '../../services/subtitleService';
 
@@ -300,8 +301,69 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       const isUnlimited = rawTimeout === 0;
       const activeTimeoutMs = isUnlimited ? 0 : rawTimeout * 1000;
 
+      // 0. TELEGRAM PROVIDER (MovieSubMalay MSM32)
+      if (providerId === 'telegram-msm32' || provider.engine === 'telegram') {
+        try {
+          console.log(`[Resolver] Telegram Provider (${provider.name})...`);
+          const msmRes = await msm32Service.resolveStream(
+            title,
+            releaseYear,
+            mediaType === 'tv' ? season : undefined,
+            mediaType === 'tv' ? episode : undefined
+          );
+
+          if (msmRes && msmRes.streamUrl) {
+            console.log('[Resolver] ✅ Playing via Telegram Direct Stream:', msmRes.streamUrl);
+            setResolvingStatus('Connected to Telegram Stream');
+            setResolvedMsm32Url(msmRes.streamUrl);
+            setDirectStreamUrl(msmRes.streamUrl);
+            setDirectStreamLabel('Telegram (MSM32)');
+            setPlayerMode('direct');
+            setIsExtracting(false);
+            setExtractionFailed(false);
+            setIsLoading(false);
+            setIsProbing(false);
+            isPlayingRef.current = true;
+            if (autoCycleTimeoutRef.current) {
+              clearTimeout(autoCycleTimeoutRef.current);
+              autoCycleTimeoutRef.current = null;
+            }
+            return;
+          }
+
+          console.warn('[Resolver] Telegram stream not found');
+          if (enabledResolvers.includes('embed')) {
+            setResolvingStatus('Telegram stream not found, switching to primary embed...');
+            const fallbackProvider = getProviderById('vidlink');
+            onProviderChange(fallbackProvider);
+            return;
+          } else {
+            console.log('[Resolver] Telegram stream not found and Embed Resolver is disabled.');
+            setResolvingStatus('No stream found in Telegram Provider.');
+            setPlayerMode('error');
+            setIsExtracting(false);
+            setIsLoading(false);
+            return;
+          }
+        } catch (err) {
+          console.warn('[Resolver] Telegram resolution error:', err);
+          if (enabledResolvers.includes('embed')) {
+            const fallbackProvider = getProviderById('vidlink');
+            onProviderChange(fallbackProvider);
+            return;
+          } else {
+            setResolvingStatus('Telegram resolver error.');
+            setPlayerMode('error');
+            setIsExtracting(false);
+            setIsLoading(false);
+            return;
+          }
+        }
+      }
+
       // 0a. FAST PATH: If selected provider is PencuriMovie (Malay), resolve directly with customizable timeout & retry
       if (providerId === 'pencurimovie-my') {
+
         const maxRetries = typeof streamResolverRetriesRef.current === 'number'
           ? streamResolverRetriesRef.current
           : (typeof streamResolverRetries === 'number' ? streamResolverRetries : 1);
@@ -551,6 +613,37 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         }
       }
 
+      // 3. Try Telegram if enabled
+      if (enabledResolvers.includes('telegram')) {
+        try {
+          console.log('[Resolver] Checking Telegram Provider (MovieSubMalay)...');
+          setResolvingStatus('Checking Telegram MovieSubMalay Resolver...');
+          const msmRes = await msm32Service.resolveStream(
+            title,
+            releaseYear,
+            mediaType === 'tv' ? season : undefined,
+            mediaType === 'tv' ? episode : undefined
+          );
+          if (!isMounted) return;
+          if (msmRes && msmRes.streamUrl) {
+            console.log('[Resolver] ✅ Playing via Telegram Direct Stream:', msmRes.streamUrl);
+            setResolvingStatus('Connected to Telegram Stream');
+            setResolvedMsm32Url(msmRes.streamUrl);
+            setDirectStreamUrl(msmRes.streamUrl);
+            setDirectStreamLabel('Telegram (MSM32)');
+            setPlayerMode('direct');
+            setIsExtracting(false);
+            setExtractionFailed(false);
+            setIsLoading(false);
+            setIsProbing(false);
+            isPlayingRef.current = true;
+            return;
+          }
+        } catch (err) {
+          console.warn('[Resolver] Telegram waterfall error:', err);
+        }
+      }
+
       if (!isMounted) return;
 
       // 4. Fallback to Embed Resolver ONLY if explicitly enabled
@@ -598,11 +691,19 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const [resolvedPencuriUrl, setResolvedPencuriUrl] = useState<string | null>(null);
   const [resolvedKisskhUrl, setResolvedKisskhUrl] = useState<string | null>(null);
   const [resolvedDramacoolUrl, setResolvedDramacoolUrl] = useState<string | null>(null);
+  const [resolvedMsm32Url, setResolvedMsm32Url] = useState<string | null>(null);
   const [dramacoolServers, setDramacoolServers] = useState<DramacoolServer[]>([]);
   const [activeDramacoolServerIndex, setActiveDramacoolServerIndex] = useState<number>(0);
 
   const provider = getProviderById(providerId);
   const baseStreamUrl = useMemo(() => {
+    // For MovieSubMalay Telegram provider
+    if (provider.id === 'telegram-msm32' || provider.engine === 'telegram') {
+      if (resolvedMsm32Url) {
+        return resolvedMsm32Url;
+      }
+      return '';
+    }
     // For PencuriMovie Malay provider
     if (provider.id === 'pencurimovie-my') {
       if (resolvedPencuriUrl) {
@@ -639,7 +740,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     return mediaType === 'movie'
       ? provider.getMovieUrl(tmdbId)
       : provider.getTVUrl(tmdbId, season, episode);
-  }, [provider, resolvedDramacoolUrl, resolvedKisskhUrl, resolvedLari21Url, resolvedPencuriUrl, resolvedMalId, mediaType, tmdbId, season, episode]);
+  }, [provider, resolvedDramacoolUrl, resolvedKisskhUrl, resolvedLari21Url, resolvedPencuriUrl, resolvedMsm32Url, resolvedMalId, mediaType, tmdbId, season, episode]);
 
   const streamUrl = useMemo(() => {
     if (!baseStreamUrl) return '';
@@ -1811,7 +1912,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             Could Not Resolve Direct Stream
           </h3>
           <p className="text-xs sm:text-sm text-gray-400 max-w-md mb-6 leading-relaxed">
-            The active direct stream engines (<span className="text-white font-semibold">{enabledResolvers.map(r => r === 'torbox' ? 'TorBox 4K' : 'Private Extractor').join(', ')}</span>) did not return a working direct video stream for "<span className="text-white">{title}</span>".
+            The active direct stream engines (<span className="text-white font-semibold">{enabledResolvers.map(r => r === 'torbox' ? 'TorBox 4K' : r === 'telegram' ? 'Telegram (MSM32)' : 'Private Extractor').join(', ')}</span>) did not return a working direct video stream for "<span className="text-white">{title}</span>".
             <br /><br />
             <span className="text-gray-300">Embed Resolver is currently disabled in your Settings.</span>
           </p>

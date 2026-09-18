@@ -12,7 +12,8 @@ import { isAnimeMedia } from '../../services/animeMappingService';
 import { isAseanMedia, isKoreanMedia } from '../../services/lariMappingService';
 import { ArrowLeft, SkipForward, SkipBack, Settings, FastForward, Rewind } from 'lucide-react';
 
-import type { VirtualCursorStyle } from '../../types/db';
+import type { VirtualCursorStyle, StreamResolverType } from '../../types/db';
+
 
 export const Watch: React.FC = () => {
   const { type, id } = useParams<{ type: 'movie' | 'tv'; id: string }>();
@@ -47,7 +48,7 @@ export const Watch: React.FC = () => {
   const tmdbId = parseInt(id || '0', 10);
   const mediaType = (type === 'tv' ? 'tv' : 'movie') as 'movie' | 'tv';
 
-  const [enabledResolvers, setEnabledResolvers] = useState<('embed' | 'private_extractor' | 'torbox')[]>(['embed']);
+  const [enabledResolvers, setEnabledResolvers] = useState<StreamResolverType[]>(['embed']);
 
   const isKorean = useMemo(() => isKoreanMedia(details), [details]);
   const isAnime = useMemo(() => isAnimeMedia(details), [details]);
@@ -200,17 +201,27 @@ export const Watch: React.FC = () => {
         if (fetchedSeason) setSeasonDetails(fetchedSeason);
 
         if (s) {
+          const activeResolvers = s.enabledResolvers && s.enabledResolvers.length > 0 ? s.enabledResolvers : ['embed'];
+          const hasEmbed = activeResolvers.includes('embed');
+          const hasTelegram = activeResolvers.includes('telegram');
+
           if (!userSelectedProvider) {
             const koreanFlag = isKoreanMedia(fetchedDetails);
             const animeFlag = isAnimeMedia(fetchedDetails);
             const aseanFlag = isAseanMedia(fetchedDetails);
-            const defaultProvider = koreanFlag
-              ? (s.topKoreanProviders?.[0] || 'kisskh-kdrama')
-              : aseanFlag
-              ? (s.topAseanProviders?.[0] || (s as any).topAsianProviders?.[0] || 'vidlink')
-              : animeFlag
-              ? (s.topAnimeProviders?.[0] || 'megaplay-anime')
-              : (s.topProviders?.[0] || s.preferredProvider || 'vidlink');
+
+            let defaultProvider = 'vidlink';
+            if (hasTelegram && (!hasEmbed || aseanFlag)) {
+              defaultProvider = 'telegram-msm32';
+            } else if (koreanFlag) {
+              defaultProvider = s.topKoreanProviders?.[0] || 'kisskh-kdrama';
+            } else if (aseanFlag) {
+              defaultProvider = s.topAseanProviders?.[0] || (s as any).topAsianProviders?.[0] || 'vidlink';
+            } else if (animeFlag) {
+              defaultProvider = s.topAnimeProviders?.[0] || 'megaplay-anime';
+            } else {
+              defaultProvider = s.topProviders?.[0] || s.preferredProvider || 'vidlink';
+            }
             setProviderId(defaultProvider);
           }
           if (s.streamHeaderTimeout !== undefined) {
@@ -945,6 +956,7 @@ export const Watch: React.FC = () => {
           isAnime={isAnime}
           isAsean={isAsean}
           isKorean={isKorean}
+          enabledResolvers={enabledResolvers}
         />
 
         {/* TV Virtual On-Demand Cursor */}
