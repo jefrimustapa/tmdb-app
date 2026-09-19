@@ -654,7 +654,7 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
         </div>
 
         {/* Standard End-to-End Bottom Bar: Scrubber, Timers, Volume */}
-        <div className="w-full bg-gradient-to-t from-black/95 via-black/80 to-transparent backdrop-blur-md px-4 sm:px-6 pt-6 pb-4 sm:pb-6 pointer-events-auto space-y-2.5">
+        <div className="w-full px-4 sm:px-6 pt-6 pb-4 sm:pb-6 pointer-events-auto space-y-2.5">
 
           {/* Progress / Scrub Bar */}
           <div className="relative flex items-center w-full group/scrubber cursor-pointer">
