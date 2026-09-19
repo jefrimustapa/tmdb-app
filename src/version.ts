@@ -2,12 +2,13 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20260919-1903';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-tmdb-to-mal-mul.20260919-1903';
+export const APP_BUILD_NUMBER = '20260919-1923';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-watch-playback-.20260919-1923';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
-export const APP_BRANCH = 'feat-tmdb-to-mal-mul';
-export const APP_CHANGELOG = `* fix(player): resolve selected embed provider directly without Telegram waterfall (#119)
+export const APP_BRANCH = 'feat-watch-playback-';
+export const APP_CHANGELOG = `* feat(anime): support multi-season and continuous episode offset mapping to MAL, replace TV tag with year in MySpace (#120)
+* fix(player): resolve selected embed provider directly without Telegram waterfall (#119)
 * feat(telegram-msm): series pagination, settings restructure, cache clearing & player controls refinement (#118)
 * feat(tv): support play, pause, seek with remote control and OSD feedback in custom player (#117)
 * feat: remove torbox and private extractor engines, sync active server indicator to watch header (#116)
@@ -20,5 +21,4 @@ export const APP_CHANGELOG = `* fix(player): resolve selected embed provider dir
 * fix(tv): eliminate delay on remote back navigation and land focus on TV navbar Home icon (#110)
 * fix(tv): eliminate navigation lag on TV navbar during Home data load (#109)
 * fix(device): prioritize native AndroidBridge over spoofed user-agent for accurate phone detection (#108)
-* fix(tv): shield modal dpad navigation and lock iframe focus on watch page (#107)
-* feat(ui): auto-resize media cards across movie, series, library, and search grids (#106)`;
+* fix(tv): shield modal dpad navigation and lock iframe focus on watch page (#107)`;

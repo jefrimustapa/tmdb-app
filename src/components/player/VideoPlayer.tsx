@@ -46,6 +46,7 @@ interface VideoPlayerProps {
   customSubtitleCues?: SubtitleCue[];
   customSubtitleOffset?: number;
   customSubtitleEnabled?: boolean;
+  customSubtitleFontSize?: number;
   details?: any;
   originCountries?: OriginCountryCode[];
 }
@@ -80,7 +81,8 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   originalTitle,
   customSubtitleCues = [],
   customSubtitleOffset = 0,
-  customSubtitleEnabled = false
+  customSubtitleEnabled = false,
+  customSubtitleFontSize = 100
 }) => {
   const activeAsean = isAsean || isAsian;
   const [iframeKey, setIframeKey] = useState(0);
@@ -2087,6 +2089,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         currentTime={playbackCurrentTime}
         offsetSeconds={customSubtitleOffset}
         enabled={customSubtitleEnabled}
+        fontSize={customSubtitleFontSize}
       />
 
       {/* Up Next Episode Overlay (Compact & Sleek) */}

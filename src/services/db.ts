@@ -93,6 +93,7 @@ export const DEFAULT_SETTINGS: UserSettings = {
   virtualCursorStyle: 'hbo_max',
   performanceMode: getDefaultPerformanceMode(),
   showPerformanceHud: false,
+  subtitleFontSize: 100,
   updatedAt: Date.now()
 };
 
