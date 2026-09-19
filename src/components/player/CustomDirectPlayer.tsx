@@ -91,19 +91,35 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
 
   const hasSeekedInitialRef = useRef(false);
 
-  // Auto-hide controls helper
+  const isPlayingRef = useRef(false);
+  const [showUnmuteHint, setShowUnmuteHint] = useState(false);
+
+  // Auto-hide controls helper (ONLY hides if actively playing)
   const resetControlsTimer = useCallback(() => {
     setShowControls(true);
     if (controlsTimerRef.current) {
       clearTimeout(controlsTimerRef.current);
     }
     // Only auto-hide if playing and not actively dragging scrubber
-    if (!isDraggingScrubber) {
+    if (isPlayingRef.current && !isDraggingScrubber) {
       controlsTimerRef.current = setTimeout(() => {
         setShowControls(false);
       }, 3500);
     }
   }, [isDraggingScrubber]);
+
+  // Keep controls persistently visible whenever paused
+  useEffect(() => {
+    isPlayingRef.current = isPlaying;
+    if (!isPlaying) {
+      setShowControls(true);
+      if (controlsTimerRef.current) {
+        clearTimeout(controlsTimerRef.current);
+      }
+    } else {
+      resetControlsTimer();
+    }
+  }, [isPlaying, resetControlsTimer]);
 
   const [loadTimedOut, setLoadTimedOut] = useState(false);
 
@@ -131,10 +147,22 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
     };
   }, [isInitialLoading]);
 
+  const attachedSrcRef = useRef<string | null>(null);
+  const onErrorRef = useRef(onError);
+  useEffect(() => {
+    onErrorRef.current = onError;
+  }, [onError]);
+
   // Video Source Attachment (HLS or Native MP4/MKV)
   useEffect(() => {
     const video = videoRef.current;
     if (!video || !src) return;
+
+    // CRITICAL: Prevent re-attachment loop if src has not changed!
+    if (attachedSrcRef.current === src) {
+      return;
+    }
+    attachedSrcRef.current = src;
 
     setIsInitialLoading(true);
     setIsBuffering(false);
@@ -170,7 +198,7 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
               break;
             default:
               hls.destroy();
-              onError?.(data);
+              onErrorRef.current?.(data);
               break;
           }
         }
@@ -188,11 +216,27 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
       // Direct stream URL (MP4 / MKV from MSM32)
       video.src = src;
       video.load();
-      video.play().catch((err) => {
-        console.warn('[CustomDirectPlayer] Autoplay attempt:', err);
+      video.play().then(() => {
+        setIsPlaying(true);
+        isPlayingRef.current = true;
+      }).catch(async (err) => {
+        console.warn('[CustomDirectPlayer] Unmuted autoplay blocked by policy, attempting muted autoplay:', err);
+        try {
+          video.muted = true;
+          setIsMuted(true);
+          await video.play();
+          setIsPlaying(true);
+          isPlayingRef.current = true;
+          setShowUnmuteHint(true);
+        } catch (mutedErr) {
+          console.warn('[CustomDirectPlayer] Autoplay fully blocked, awaiting user tap:', mutedErr);
+          setIsPlaying(false);
+          isPlayingRef.current = false;
+          setShowControls(true);
+        }
       });
     }
-  }, [src, onError]);
+  }, [src]);
 
   // Handle Play/Pause
   const handleTogglePlay = useCallback(() => {
@@ -208,6 +252,15 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
     }
     resetControlsTimer();
   }, [resetControlsTimer]);
+
+  const handleUnmute = useCallback(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    video.muted = false;
+    setIsMuted(false);
+    setShowUnmuteHint(false);
+    video.play().catch(console.warn);
+  }, []);
 
   // Handle Relative Seek (+10s or -10s)
   const handleSeekRelative = useCallback((seconds: number) => {
@@ -355,6 +408,8 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
         controls={false}
         autoPlay
         playsInline
+        webkit-playsinline="true"
+        poster="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
         muted={isMuted}
         className="w-full h-full object-contain bg-black transform-gpu will-change-transform"
         onLoadedMetadata={(e) => {
@@ -370,7 +425,6 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
           }
           setIsInitialLoading(false);
           setIsBuffering(false);
-          el.play().catch(console.warn);
         }}
         onCanPlay={() => {
           setIsInitialLoading(false);
