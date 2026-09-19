@@ -2,23 +2,23 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20260919-0632';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-add-provider-te.20260919-0632';
+export const APP_BUILD_NUMBER = '20260919-0753';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.fix-telegram-prefer-.20260919-0753';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
-export const APP_BRANCH = 'feat-add-provider-te';
-export const APP_CHANGELOG = `* feat(player): add US origin filter, abort Telegram resolution on exit, and clean up buffering audio
-* feat(settings): add engine priority sorting subdrawer, enable/disable embed on tv, and embed timeout/retry on mobile
-* feat(telegram): remove url textbox, auto-ping on settings open, and fix watch provider selection
-* fix(tv): move telegram chunk buffer & origin filters to subdrawers with full dpad navigation
-* chore: bump build version
-* fix(player): always autostart custom direct player unmuted with full volume
-* fix(player): skip Telegram MSM when title origin does not match filter and try next engine
-* fix(player): enforce country origin filters on Telegram MSM provider for Anime and non-matching titles
-* feat(settings): move stream chunk and country filters to dedicated sub-drawers
-* feat(settings): separate stream engine settings into dedicated sub-drawers
-* fix: hardcode maxQuality=720 in MSM getter resolve request
-* fix: remove bottom bar background — fully transparent
-* fix: end-to-end bottom bar + server count fix + embed/direct server separation
-* feat(player): convert bottom glass bar to docked drawer style
-* feat(settings): add configurable Telegram stream chunk slice buffer size (256KB, 512KB, 1MB)`;
+export const APP_BRANCH = 'fix-telegram-prefer-';
+export const APP_CHANGELOG = `* feat: Telegram Provider (@msm32bot), Custom Direct Player UI, and Settings Restructure (#113)
+* refactor(providers): restructure provider categories and preferences for ASEAN and regional content (#112)
+* feat(settings): TV active category border, mobile sub-drawers hierarchy, scroll lock & General tab rename (#111)
+* fix(tv): eliminate delay on remote back navigation and land focus on TV navbar Home icon (#110)
+* fix(tv): eliminate navigation lag on TV navbar during Home data load (#109)
+* fix(device): prioritize native AndroidBridge over spoofed user-agent for accurate phone detection (#108)
+* fix(tv): shield modal dpad navigation and lock iframe focus on watch page (#107)
+* feat(ui): auto-resize media cards across movie, series, library, and search grids (#106)
+* fix(device): improve platform detection accuracy for desktop web and touchscreen laptops (#105)
+* feat: add PencuriMovie provider, resolver retry settings, and network resilience (#104)
+* feat(tv): redesign leanback TV settings with nested drawers and dpad auto-scroll (#103)
+* perf(tv): improve Home screen initial loading time and rail batching (#101)
+* fix: handle unsupported and malformed subtitles, optimize video playback CPU usage, and refine virtual cursor click (#100)
+* feat: implement custom subtitle service with OpenSubtitles v3 and bright67 engine (#99)
+* feat(tablet): set 4 cols portrait and 6 cols landscape on movies, series, myspace, and search; remove search clear button scale animation (#98)`;
