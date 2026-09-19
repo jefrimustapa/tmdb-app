@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { ShieldCheck, RefreshCw, AlertCircle, Maximize2, Minimize2, Zap, Tv, ArrowLeft, Play, ExternalLink, SkipForward, Radio } from 'lucide-react';
 import Hls from 'hls.js';
-import type { StreamProvider } from '../../types/stream';
-import { STREAM_PROVIDERS, getProviderById, getOrderedProviders } from '../../services/streamProviders';
+import type { StreamProvider, OriginCountryCode } from '../../types/stream';
+import { STREAM_PROVIDERS, getProviderById, getOrderedProviders, extractMediaOriginCountries, isProviderMatchingMedia } from '../../services/streamProviders';
 import { dbService } from '../../services/db';
 import { fetchDirectStream, DEFAULT_DIRECT_STREAM_API } from '../../services/directStreamService';
 import { fetchTorboxStream } from '../../services/torboxService';
@@ -97,6 +97,8 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const [topAseanProviders, setTopAseanProviders] = useState<string[]>(['pencurimovie-my', 'vidlink', '111movies']);
   const [topKoreanProviders, setTopKoreanProviders] = useState<string[]>(['kisskh-kdrama', 'cinesrc', 'moviesapi']);
   const [enabledResolvers, setEnabledResolvers] = useState<StreamResolverType[]>(['embed']);
+  const [enabledTelegramProviders, setEnabledTelegramProviders] = useState<string[]>(['telegram-msm32']);
+  const [telegramProviderCountries, setTelegramProviderCountries] = useState<Record<string, OriginCountryCode[]>>({ 'telegram-msm32': ['MY', 'ID', 'SG'] });
   const [playbackCurrentTime, setPlaybackCurrentTime] = useState<number>(0);
 
   // Up Next state
@@ -240,6 +242,12 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         }
         if (s.torboxApiKey) {
           setTorboxApiKey(s.torboxApiKey);
+        }
+        if (s.enabledTelegramProviders && s.enabledTelegramProviders.length > 0) {
+          setEnabledTelegramProviders(s.enabledTelegramProviders);
+        }
+        if (s.telegramProviderCountries) {
+          setTelegramProviderCountries(s.telegramProviderCountries);
         }
         if (s.topProviders && s.topProviders.length >= 3) {
           setTopProviders(s.topProviders);
@@ -1469,12 +1477,17 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     const list = getOrderedProviders(activeTopProviders, isAnime, activeAsean, isKorean);
     const hasEmbed = enabledResolvers.includes('embed');
     const hasTelegram = enabledResolvers.includes('telegram');
+    const mediaOrigins = extractMediaOriginCountries(undefined, isAnime, isKorean, activeAsean);
+
     return list.filter((p) => {
       const isDirect = p.engine === 'telegram';
-      if (isDirect) return hasTelegram;
+      if (isDirect) {
+        if (!hasTelegram) return false;
+        return isProviderMatchingMedia(p, mediaOrigins, telegramProviderCountries, enabledTelegramProviders);
+      }
       return hasEmbed;
     });
-  }, [activeTopProviders, isAnime, activeAsean, isKorean, enabledResolvers]);
+  }, [activeTopProviders, isAnime, activeAsean, isKorean, enabledResolvers, telegramProviderCountries, enabledTelegramProviders]);
 
   // Notify parent of probing status updates
   useEffect(() => {

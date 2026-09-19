@@ -18,9 +18,10 @@ import {
   Sparkles
 } from 'lucide-react';
 import { SubtitleTrack } from '../../services/subtitleService';
-import { STREAM_PROVIDERS, getOrderedProviders, getProvidersByEngine, getProviderById, CATEGORY_BADGE_CONFIG, ORIGIN_COUNTRY_LABELS } from '../../services/streamProviders';
-import type { StreamProvider, StreamEngineType } from '../../types/stream';
+import { STREAM_PROVIDERS, getOrderedProviders, getProvidersByEngine, getProviderById, CATEGORY_BADGE_CONFIG, ORIGIN_COUNTRY_LABELS, extractMediaOriginCountries, isProviderMatchingMedia } from '../../services/streamProviders';
+import type { StreamProvider, StreamEngineType, OriginCountryCode } from '../../types/stream';
 import type { StreamResolverType } from '../../types/db';
+import { dbService } from '../../services/db';
 
 export type WatchSettingsTab = 'subtitles' | 'servers' | 'server';
 
@@ -77,11 +78,26 @@ export const WatchSettingsModal: React.FC<WatchSettingsModalProps> = ({
   const hasEmbed = !enabledResolvers || enabledResolvers.includes('embed');
   const hasTelegram = Boolean(enabledResolvers && enabledResolvers.includes('telegram'));
 
-  // 1. Direct Stream Providers (Telegram / Native Player)
+  const [tgCountries, setTgCountries] = useState<Record<string, OriginCountryCode[]> | undefined>();
+  const [tgEnabledList, setTgEnabledList] = useState<string[] | undefined>();
+
+  useEffect(() => {
+    if (isOpen) {
+      dbService.getSettings().then((s) => {
+        if (s?.telegramProviderCountries) setTgCountries(s.telegramProviderCountries);
+        if (s?.enabledTelegramProviders) setTgEnabledList(s.enabledTelegramProviders);
+      });
+    }
+  }, [isOpen]);
+
+  // 1. Direct Stream Providers (Telegram / Native Player filtered by origin matching)
   const directProviders = React.useMemo(() => {
     if (!hasTelegram) return [];
-    return getProvidersByEngine('telegram');
-  }, [hasTelegram]);
+    const mediaOrigins = extractMediaOriginCountries(undefined, isAnime, isKorean, activeAsean);
+    return getProvidersByEngine('telegram').filter((p) =>
+      isProviderMatchingMedia(p, mediaOrigins, tgCountries, tgEnabledList)
+    );
+  }, [hasTelegram, isAnime, isKorean, activeAsean, tgCountries, tgEnabledList]);
 
   // 2. Embed Stream Providers (Web Iframe Mirrors)
   const embedProviders = React.useMemo(() => {

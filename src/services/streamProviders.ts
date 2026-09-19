@@ -345,6 +345,58 @@ export function getEffectiveCountries(
   return provider.countries || ['GLOBAL'];
 }
 
+export function extractMediaOriginCountries(
+  media?: any,
+  isAnime?: boolean,
+  isKorean?: boolean,
+  isAsean?: boolean
+): OriginCountryCode[] {
+  const result = new Set<OriginCountryCode>();
+  if (isAnime) result.add('JP');
+  if (isKorean) result.add('KR');
+
+  if (media) {
+    if (Array.isArray(media.origin_country)) {
+      media.origin_country.forEach((c: string) => {
+        if (c) result.add(c.toUpperCase() as OriginCountryCode);
+      });
+    }
+    if (Array.isArray(media.production_countries)) {
+      media.production_countries.forEach((pc: any) => {
+        if (pc?.iso_3166_1) result.add(pc.iso_3166_1.toUpperCase() as OriginCountryCode);
+      });
+    }
+    const lang = (media.original_language || '').toLowerCase();
+    if (lang === 'ja') result.add('JP');
+    if (lang === 'ko') result.add('KR');
+    if (lang === 'ms') result.add('MY');
+    if (lang === 'id') result.add('ID');
+    if (lang === 'th') result.add('TH');
+    if (lang === 'tl') result.add('PH');
+    if (lang === 'zh') result.add('CN');
+  }
+
+  return Array.from(result);
+}
+
+export function isProviderMatchingMedia(
+  provider: StreamProvider,
+  mediaOriginCountries: OriginCountryCode[],
+  customCountries?: Record<string, OriginCountryCode[]>,
+  enabledTelegramProviders?: string[]
+): boolean {
+  if (provider.engine === 'telegram') {
+    const enabledTg = enabledTelegramProviders || ['telegram-msm32'];
+    if (!enabledTg.includes(provider.id)) return false;
+
+    const effective = getEffectiveCountries(provider, customCountries);
+    if (effective.includes('GLOBAL')) return true;
+    if (!mediaOriginCountries || mediaOriginCountries.length === 0) return true;
+    return mediaOriginCountries.some(c => effective.includes(c));
+  }
+  return true;
+}
+
 export function isProviderMatchingOrigin(
   provider: StreamProvider,
   originCountry?: string,

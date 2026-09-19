@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Server, ChevronDown, Check, ShieldCheck, X, Send } from 'lucide-react';
-import { STREAM_PROVIDERS, getProviderById, getOrderedProviders, getProvidersByEngine, CATEGORY_BADGE_CONFIG, ORIGIN_COUNTRY_LABELS } from '../../services/streamProviders';
-import type { StreamProvider, StreamEngineType } from '../../types/stream';
+import { STREAM_PROVIDERS, getProviderById, getOrderedProviders, getProvidersByEngine, CATEGORY_BADGE_CONFIG, ORIGIN_COUNTRY_LABELS, extractMediaOriginCountries, isProviderMatchingMedia } from '../../services/streamProviders';
+import type { StreamProvider, StreamEngineType, OriginCountryCode } from '../../types/stream';
 import type { StreamResolverType } from '../../types/db';
+import { dbService } from '../../services/db';
 
 interface ProviderPickerMobileProps {
   currentProviderId: string;
@@ -44,9 +45,15 @@ export const ProviderPickerMobile: React.FC<ProviderPickerMobileProps> = ({
       ? 'telegram'
       : (selectedProvider.engine === 'telegram' ? 'telegram' : 'embed')
   );
+  const [tgCountries, setTgCountries] = useState<Record<string, OriginCountryCode[]> | undefined>();
+  const [tgEnabledList, setTgEnabledList] = useState<string[] | undefined>();
 
   useEffect(() => {
     if (isOpen) {
+      dbService.getSettings().then((s) => {
+        if (s?.telegramProviderCountries) setTgCountries(s.telegramProviderCountries);
+        if (s?.enabledTelegramProviders) setTgEnabledList(s.enabledTelegramProviders);
+      });
       if (!hasEmbed && hasTelegram) {
         setEngineTab('telegram');
       } else if (hasEmbed && !hasTelegram) {
@@ -59,7 +66,10 @@ export const ProviderPickerMobile: React.FC<ProviderPickerMobileProps> = ({
 
   const displayProviders = React.useMemo(() => {
     const list = getProvidersByEngine(engineTab);
-    if (engineTab === 'telegram') return list;
+    if (engineTab === 'telegram') {
+      const mediaOrigins = extractMediaOriginCountries(undefined, isAnime, isKorean, activeAsean);
+      return list.filter((p) => isProviderMatchingMedia(p, mediaOrigins, tgCountries, tgEnabledList));
+    }
     return isKorean
       ? getOrderedProviders(undefined, false, false, true).filter(p => (p.engine || 'embed') === 'embed')
       : isAnime
@@ -67,7 +77,7 @@ export const ProviderPickerMobile: React.FC<ProviderPickerMobileProps> = ({
       : activeAsean
       ? getOrderedProviders(undefined, false, true, false).filter(p => (p.engine || 'embed') === 'embed')
       : list;
-  }, [engineTab, isAnime, activeAsean, isKorean]);
+  }, [engineTab, isAnime, activeAsean, isKorean, tgCountries, tgEnabledList]);
 
   const shortServerName = selectedProvider.name.replace(/\s*\([^)]*\)/g, '').trim();
 

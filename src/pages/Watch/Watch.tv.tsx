@@ -7,7 +7,7 @@ import { WatchSettingsModal, type WatchSettingsTab } from '../../components/play
 import { TVVirtualCursor } from '../../components/player/TVVirtualCursor';
 import { searchSubtitles, fetchAndParseSubtitle, type SubtitleTrack, type SubtitleCue } from '../../services/subtitleService';
 import { dbService } from '../../services/db';
-import { getProviderById } from '../../services/streamProviders';
+import { getProviderById, extractMediaOriginCountries, isProviderMatchingMedia } from '../../services/streamProviders';
 import { isAnimeMedia } from '../../services/animeMappingService';
 import { isAseanMedia, isKoreanMedia } from '../../services/lariMappingService';
 import { ArrowLeft, SkipForward, SkipBack, Settings, FastForward, Rewind } from 'lucide-react';
@@ -210,16 +210,23 @@ export const Watch: React.FC = () => {
             const koreanFlag = isKoreanMedia(fetchedDetails);
             const animeFlag = isAnimeMedia(fetchedDetails);
             const aseanFlag = isAseanMedia(fetchedDetails);
+            const mediaOrigins = extractMediaOriginCountries(fetchedDetails, animeFlag, koreanFlag, aseanFlag);
+            const isTelegramMatching = isProviderMatchingMedia(
+              getProviderById('telegram-msm32'),
+              mediaOrigins,
+              s.telegramProviderCountries,
+              s.enabledTelegramProviders
+            );
 
             let defaultProvider = 'vidlink';
-            if (hasTelegram && (!hasEmbed || aseanFlag)) {
-              defaultProvider = 'telegram-msm32';
+            if (animeFlag) {
+              defaultProvider = s.topAnimeProviders?.[0] || 'megaplay-anime';
             } else if (koreanFlag) {
               defaultProvider = s.topKoreanProviders?.[0] || 'kisskh-kdrama';
+            } else if (hasTelegram && isTelegramMatching && (!hasEmbed || aseanFlag)) {
+              defaultProvider = 'telegram-msm32';
             } else if (aseanFlag) {
               defaultProvider = s.topAseanProviders?.[0] || (s as any).topAsianProviders?.[0] || 'vidlink';
-            } else if (animeFlag) {
-              defaultProvider = s.topAnimeProviders?.[0] || 'megaplay-anime';
             } else {
               defaultProvider = s.topProviders?.[0] || s.preferredProvider || 'vidlink';
             }

@@ -1,9 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Server, ChevronDown, Check, ShieldCheck, X, Send } from 'lucide-react';
-import { STREAM_PROVIDERS, getProviderById, getOrderedProviders, getProvidersByEngine, CATEGORY_BADGE_CONFIG, ORIGIN_COUNTRY_LABELS } from '../../services/streamProviders';
-import type { StreamProvider, StreamEngineType } from '../../types/stream';
+import { STREAM_PROVIDERS, getProviderById, getOrderedProviders, getProvidersByEngine, CATEGORY_BADGE_CONFIG, ORIGIN_COUNTRY_LABELS, extractMediaOriginCountries, isProviderMatchingMedia } from '../../services/streamProviders';
+import type { StreamProvider, StreamEngineType, OriginCountryCode } from '../../types/stream';
 import type { StreamResolverType } from '../../types/db';
+import { dbService } from '../../services/db';
 
 interface ProviderPickerTVProps {
   currentProviderId: string;
@@ -49,9 +50,16 @@ export const ProviderPickerTV: React.FC<ProviderPickerTVProps> = ({
 
   const [engineTab, setEngineTab] = useState<StreamEngineType>(defaultEngine);
 
+  const [tgCountries, setTgCountries] = useState<Record<string, OriginCountryCode[]> | undefined>();
+  const [tgEnabledList, setTgEnabledList] = useState<string[] | undefined>();
+
   useEffect(() => {
     if (isOpen) {
       setEngineTab(defaultEngine);
+      dbService.getSettings().then((s) => {
+        if (s?.telegramProviderCountries) setTgCountries(s.telegramProviderCountries);
+        if (s?.enabledTelegramProviders) setTgEnabledList(s.enabledTelegramProviders);
+      });
     }
   }, [isOpen, defaultEngine]);
 
@@ -59,12 +67,15 @@ export const ProviderPickerTV: React.FC<ProviderPickerTVProps> = ({
     // If only one engine is enabled, restrict strictly
     const activeEngine = hasEmbed && hasTelegram ? engineTab : hasTelegram ? 'telegram' : 'embed';
     const list = getProvidersByEngine(activeEngine);
-    if (activeEngine === 'telegram') return list;
+    if (activeEngine === 'telegram') {
+      const mediaOrigins = extractMediaOriginCountries(undefined, isAnime, isKorean, activeAsean);
+      return list.filter((p) => isProviderMatchingMedia(p, mediaOrigins, tgCountries, tgEnabledList));
+    }
     if (isKorean) return getOrderedProviders(undefined, false, false, true).filter(p => (p.engine || 'embed') === 'embed');
     if (activeAsean) return getOrderedProviders(undefined, false, true, false).filter(p => (p.engine || 'embed') === 'embed');
     if (isAnime) return getOrderedProviders(undefined, true, false, false).filter(p => (p.engine || 'embed') === 'embed');
     return list;
-  }, [engineTab, isAnime, activeAsean, isKorean, hasEmbed, hasTelegram]);
+  }, [engineTab, isAnime, activeAsean, isKorean, hasEmbed, hasTelegram, tgCountries, tgEnabledList]);
 
   const shortServerName = selectedProvider.name.replace(/\s*\([^)]*\)/g, '').trim();
 
