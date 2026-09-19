@@ -84,7 +84,7 @@ class Msm32MappingService {
     }
 
     // 1. Check local client cache first (0ms, 0 network requests)
-    const clientKey = `${(title || '').toLowerCase().trim()}_${year || ''}_${season || ''}_${episode || ''}`;
+    const clientKey = `${(title || '').toLowerCase().trim()}_${year || ''}_${season || ''}_${episode || ''}_720`;
     const localHit = this.clientCache.get(clientKey);
     if (localHit && Date.now() - localHit.timestamp < this.CACHE_TTL_MS) {
       console.log(`[MSM32] Client local cache HIT for "${title}" -> Instant stream`);
