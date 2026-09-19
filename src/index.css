@@ -49,6 +49,26 @@
   ::-webkit-scrollbar-thumb:hover {
     background: #673ab7;
   }
+
+  /* Suppress all native Android / Chromium WebView media overlay buttons & play icon */
+  video::-webkit-media-controls {
+    display: none !important;
+  }
+  video::-webkit-media-controls-enclosure {
+    display: none !important;
+  }
+  video::-webkit-media-controls-panel {
+    display: none !important;
+  }
+  video::-webkit-media-controls-play-button {
+    display: none !important;
+  }
+  video::-webkit-media-controls-start-playback-button {
+    display: none !important;
+  }
+  video::-webkit-media-controls-overlay-play-button {
+    display: none !important;
+  }
 }
 
 /* TV & D-Pad spatial focus indicators - 1.5px Selection Ring with 1.5px Padding Gap */

@@ -1,8 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Server, ChevronDown, Check, ShieldCheck, X } from 'lucide-react';
-import { STREAM_PROVIDERS, getProviderById, getOrderedProviders, CATEGORY_BADGE_CONFIG } from '../../services/streamProviders';
-import type { StreamProvider } from '../../types/stream';
+import { Server, ChevronDown, Check, ShieldCheck, X, Send } from 'lucide-react';
+import { STREAM_PROVIDERS, getProviderById, getOrderedProviders, getProvidersByEngine, CATEGORY_BADGE_CONFIG, ORIGIN_COUNTRY_LABELS, extractMediaOriginCountries, isProviderMatchingMedia } from '../../services/streamProviders';
+import type { StreamProvider, StreamEngineType, OriginCountryCode } from '../../types/stream';
+import type { StreamResolverType } from '../../types/db';
+import { dbService } from '../../services/db';
 
 interface ProviderPickerTVProps {
   currentProviderId: string;
@@ -15,6 +17,7 @@ interface ProviderPickerTVProps {
   isAsean?: boolean;
   isAsian?: boolean; // Backward compatibility alias
   isKorean?: boolean;
+  enabledResolvers?: StreamResolverType[];
 }
 
 export const ProviderPickerTV: React.FC<ProviderPickerTVProps> = ({
@@ -28,20 +31,54 @@ export const ProviderPickerTV: React.FC<ProviderPickerTVProps> = ({
   isAsean = false,
   isAsian = false,
   isKorean = false,
+  enabledResolvers,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const modalRef = useRef<HTMLDivElement>(null);
   const activeAsean = isAsean || isAsian;
+  const selectedProvider = getProviderById(currentProviderId);
+
+  const hasEmbed = !enabledResolvers || enabledResolvers.includes('embed');
+  const hasTelegram = enabledResolvers ? enabledResolvers.includes('telegram') : true;
+
+  const defaultEngine = React.useMemo<StreamEngineType>(() => {
+    if (selectedProvider.engine === 'telegram' && hasTelegram) return 'telegram';
+    if (hasEmbed) return 'embed';
+    if (hasTelegram) return 'telegram';
+    return 'embed';
+  }, [selectedProvider.engine, hasEmbed, hasTelegram]);
+
+  const [engineTab, setEngineTab] = useState<StreamEngineType>(defaultEngine);
+
+  const [tgCountries, setTgCountries] = useState<Record<string, OriginCountryCode[]> | undefined>();
+  const [tgEnabledList, setTgEnabledList] = useState<string[] | undefined>();
+
+  useEffect(() => {
+    if (isOpen) {
+      setEngineTab(defaultEngine);
+      dbService.getSettings().then((s) => {
+        if (s?.telegramProviderCountries) setTgCountries(s.telegramProviderCountries);
+        if (s?.enabledTelegramProviders) setTgEnabledList(s.enabledTelegramProviders);
+      });
+    }
+  }, [isOpen, defaultEngine]);
 
   const displayProviders = React.useMemo(() => {
-    if (isKorean) return getOrderedProviders(undefined, false, false, true);
-    if (activeAsean) return getOrderedProviders(undefined, false, true, false);
-    if (isAnime) return getOrderedProviders(undefined, true, false, false);
-    return STREAM_PROVIDERS;
-  }, [isAnime, activeAsean, isKorean]);
+    // If only one engine is enabled, restrict strictly
+    const activeEngine = hasEmbed && hasTelegram ? engineTab : hasTelegram ? 'telegram' : 'embed';
+    const list = getProvidersByEngine(activeEngine);
+    if (activeEngine === 'telegram') {
+      const mediaOrigins = extractMediaOriginCountries(undefined, isAnime, isKorean, activeAsean);
+      return list.filter((p) => isProviderMatchingMedia(p, mediaOrigins, tgCountries, tgEnabledList));
+    }
+    if (isKorean) return getOrderedProviders(undefined, false, false, true).filter(p => (p.engine || 'embed') === 'embed');
+    if (activeAsean) return getOrderedProviders(undefined, false, true, false).filter(p => (p.engine || 'embed') === 'embed');
+    if (isAnime) return getOrderedProviders(undefined, true, false, false).filter(p => (p.engine || 'embed') === 'embed');
+    return list;
+  }, [engineTab, isAnime, activeAsean, isKorean, hasEmbed, hasTelegram, tgCountries, tgEnabledList]);
 
-  const selectedProvider = getProviderById(currentProviderId);
   const shortServerName = selectedProvider.name.replace(/\s*\([^)]*\)/g, '').trim();
+
 
   // Sync AndroidBridge modal state
   useEffect(() => {
@@ -199,53 +236,106 @@ export const ProviderPickerTV: React.FC<ProviderPickerTVProps> = ({
                 </button>
               </div>
 
+              {/* Engine Selector Tabs */}
+              {hasEmbed && hasTelegram && (
+                <div className="grid grid-cols-2 gap-2 px-4 py-2 border-b border-white/10 bg-white/5">
+                  <button
+                    type="button"
+                    onClick={() => setEngineTab('embed')}
+                    tabIndex={0}
+                    className={`flex items-center justify-center gap-2 py-2 px-3 rounded-xl text-xs font-bold transition cursor-pointer tv-focus-target focus:outline-none focus:ring-2 focus:ring-hbo-cyan ${
+                      engineTab === 'embed'
+                        ? 'bg-hbo-purple text-white shadow-md'
+                        : 'text-gray-400 hover:text-white bg-white/5'
+                    }`}
+                  >
+                    <Server className="w-4 h-4" />
+                    Embed Providers
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEngineTab('telegram')}
+                    tabIndex={0}
+                    className={`flex items-center justify-center gap-2 py-2 px-3 rounded-xl text-xs font-bold transition cursor-pointer tv-focus-target focus:outline-none focus:ring-2 focus:ring-hbo-cyan ${
+                      engineTab === 'telegram'
+                        ? 'bg-blue-600 text-white shadow-md'
+                        : 'text-gray-400 hover:text-white bg-white/5'
+                    }`}
+                  >
+                    <Send className="w-4 h-4" />
+                    Telegram
+                  </button>
+                </div>
+              )}
+
               {/* Server List */}
               <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-2 overscroll-contain">
-                {displayProviders.map((provider) => {
-                  const isSelected = provider.id === currentProviderId;
-                  const cleanName = provider.name.replace(/\s*\([^)]*\)/g, '').trim();
+                {displayProviders.length === 0 ? (
+                  <div className="text-center py-8 text-gray-400 text-xs">
+                    No providers available for this engine.
+                  </div>
+                ) : (
+                  displayProviders.map((provider) => {
+                    const isSelected = provider.id === currentProviderId;
+                    const cleanName = provider.name.replace(/\s*\([^)]*\)/g, '').trim();
 
-                  return (
-                    <button
-                      key={provider.id}
-                      type="button"
-                      onClick={() => handleSelect(provider)}
-                      data-provider-selected={isSelected ? 'true' : undefined}
-                      data-provider-item="true"
-                      tabIndex={0}
-                      className={`w-full flex items-center justify-between p-3 rounded-xl text-left border transition cursor-pointer group tv-focus-target focus:outline-none focus:border-hbo-cyan focus:ring-2 focus:ring-hbo-cyan ${
-                        isSelected
-                          ? 'bg-hbo-purple/25 border-hbo-cyan/50 text-white shadow-hbo-glow'
-                          : 'bg-white/5 hover:bg-white/10 border-white/5 text-gray-300'
-                      }`}
-                    >
-                      <div className="min-w-0 flex-1 flex items-center gap-2 pr-1 flex-wrap">
-                        <p className={`text-xs sm:text-sm font-bold truncate ${isSelected ? 'text-hbo-cyan' : 'text-white'}`}>
-                          {cleanName}
-                        </p>
-                        <div className="flex items-center gap-1 flex-wrap">
-                          {provider.categories.map((cat) => {
-                            const conf = CATEGORY_BADGE_CONFIG[cat];
-                            if (!conf) return null;
-                            return (
-                              <span
-                                key={cat}
-                                className={`text-[9px] px-1.5 py-0.5 rounded font-bold whitespace-nowrap border ${conf.className}`}
-                              >
-                                {conf.label}
-                              </span>
-                            );
-                          })}
+                    return (
+                      <button
+                        key={provider.id}
+                        type="button"
+                        onClick={() => handleSelect(provider)}
+                        data-provider-selected={isSelected ? 'true' : undefined}
+                        data-provider-item="true"
+                        tabIndex={0}
+                        className={`w-full flex items-center justify-between p-3 rounded-xl text-left border transition cursor-pointer group tv-focus-target focus:outline-none focus:border-hbo-cyan focus:ring-2 focus:ring-hbo-cyan ${
+                          isSelected
+                            ? 'bg-hbo-purple/25 border-hbo-cyan/50 text-white shadow-hbo-glow'
+                            : 'bg-white/5 hover:bg-white/10 border-white/5 text-gray-300'
+                        }`}
+                      >
+                        <div className="min-w-0 flex-1 flex flex-col gap-1 pr-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className={`text-xs sm:text-sm font-bold truncate ${isSelected ? 'text-hbo-cyan' : 'text-white'}`}>
+                              {cleanName}
+                            </p>
+                            <div className="flex items-center gap-1 flex-wrap">
+                              {provider.categories.map((cat) => {
+                                const conf = CATEGORY_BADGE_CONFIG[cat];
+                                if (!conf) return null;
+                                return (
+                                  <span
+                                    key={cat}
+                                    className={`text-[9px] px-1.5 py-0.5 rounded font-bold whitespace-nowrap border ${conf.className}`}
+                                  >
+                                    {conf.label}
+                                  </span>
+                                );
+                              })}
+                            </div>
+                          </div>
+                          {/* Country Badges */}
+                          {provider.countries && provider.countries.length > 0 && (
+                            <div className="flex items-center gap-1 flex-wrap">
+                              {provider.countries.map((c) => (
+                                <span
+                                  key={c}
+                                  className="text-[9px] px-1.5 py-0.2 text-gray-400 bg-white/5 rounded border border-white/10"
+                                >
+                                  {ORIGIN_COUNTRY_LABELS[c] || c}
+                                </span>
+                              ))}
+                            </div>
+                          )}
                         </div>
-                      </div>
-                      {isSelected && (
-                        <div className="flex-shrink-0">
-                          <Check className="w-4 h-4 text-hbo-cyan" />
-                        </div>
-                      )}
-                    </button>
-                  );
-                })}
+                        {isSelected && (
+                          <div className="flex-shrink-0">
+                            <Check className="w-4 h-4 text-hbo-cyan" />
+                          </div>
+                        )}
+                      </button>
+                    );
+                  })
+                )}
               </div>
             </div>
           </div>,
