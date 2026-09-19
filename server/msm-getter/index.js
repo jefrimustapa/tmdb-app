@@ -841,6 +841,7 @@ app.get('/stream/:docId', async (req, res) => {
   try {
     await initTelegram();
     const docId = req.params.docId;
+    const rangeHeader = req.headers.range;
 
     let targetDoc = null;
     let targetMedia = null;
