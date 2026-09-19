@@ -2,18 +2,12 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20260919-1634';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-improve-telegra.20260919-1634';
+export const APP_BUILD_NUMBER = '20260919-1733';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.fix-watch-manual-pro.20260919-1733';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
-export const APP_BRANCH = 'feat-improve-telegra';
-export const APP_CHANGELOG = `* feat(settings): add clear local cache under MSM32bot and remove sequence tag next to sort order
-* fix(player,settings): restore seek animation, limit HUD to TV remote, and move slice & origin filters under MSM32bot
-* fix(player): restrict play, pause, +10s, -10s notifications to TV remote usage only
-* fix(msm32): enforce https for onrender.com and auto-fallback from unrouteable local dev endpoints in Capacitor
-* fix(msm32): isolate client cache by baseUrl and clear cache on endpoint update
-* feat(settings): add MSM32bot sub-drawer with custom microservice URL input and presets
-* feat(telegram-msm): improve series episode search and pagination handling
+export const APP_BRANCH = 'fix-watch-manual-pro';
+export const APP_CHANGELOG = `* feat(telegram-msm): series pagination, settings restructure, cache clearing & player controls refinement (#118)
 * feat(tv): support play, pause, seek with remote control and OSD feedback in custom player (#117)
 * feat: remove torbox and private extractor engines, sync active server indicator to watch header (#116)
 * fix: prioritize original titles in pencuri candidate scoring and regional drama queries (#115)
@@ -21,4 +15,10 @@ export const APP_CHANGELOG = `* feat(settings): add clear local cache under MSM3
 * fix: prioritize 720p resolution for telegram provider and quality-aware caching (#114)
 * feat: Telegram Provider (@msm32bot), Custom Direct Player UI, and Settings Restructure (#113)
 * refactor(providers): restructure provider categories and preferences for ASEAN and regional content (#112)
-* feat(settings): TV active category border, mobile sub-drawers hierarchy, scroll lock & General tab rename (#111)`;
+* feat(settings): TV active category border, mobile sub-drawers hierarchy, scroll lock & General tab rename (#111)
+* fix(tv): eliminate delay on remote back navigation and land focus on TV navbar Home icon (#110)
+* fix(tv): eliminate navigation lag on TV navbar during Home data load (#109)
+* fix(device): prioritize native AndroidBridge over spoofed user-agent for accurate phone detection (#108)
+* fix(tv): shield modal dpad navigation and lock iframe focus on watch page (#107)
+* feat(ui): auto-resize media cards across movie, series, library, and search grids (#106)
+* fix(device): improve platform detection accuracy for desktop web and touchscreen laptops (#105)`;

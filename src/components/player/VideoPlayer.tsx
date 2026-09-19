@@ -40,6 +40,7 @@ interface VideoPlayerProps {
   isAsean?: boolean;
   isAsian?: boolean; // Backward compatibility alias
   isKorean?: boolean;
+  isUserSelected?: boolean;
   releaseYear?: string | number;
   originalTitle?: string;
   customSubtitleCues?: SubtitleCue[];
@@ -74,6 +75,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   isAsean = false,
   isAsian = false,
   isKorean = false,
+  isUserSelected = false,
   releaseYear,
   originalTitle,
   customSubtitleCues = [],
@@ -661,108 +663,21 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         }
       }
 
-      const currentSettings = await dbService.getSettings();
-      const activeEnginePriority: StreamResolverType[] = (currentSettings.enginePriority && currentSettings.enginePriority.length > 0)
-        ? currentSettings.enginePriority
-        : ['telegram', 'embed'];
-
-      for (const engine of activeEnginePriority) {
-        if (!isMounted) return;
-
-        // 1. Try Telegram if enabled and title origin matches filter
-        if (engine === 'telegram' && enabledResolvers.includes('telegram') && isTelegramOriginMatching) {
-          try {
-            console.log('[Resolver] Checking Telegram Provider (MovieSubMalay)...');
-            setResolvingStatus('Checking Telegram MovieSubMalay Resolver...');
-
-            const isSoutheastAsian = Boolean(
-              activeAsean ||
-              details?.original_language === 'ms' ||
-              details?.original_language === 'id' ||
-              details?.original_language === 'th' ||
-              details?.original_language === 'tl' ||
-              details?.original_language === 'vi' ||
-              effectiveOriginCountries.some(c => ['MY', 'ID', 'SG', 'TH', 'PH', 'VN'].includes(c))
-            );
-
-            const cleanOrig = originalTitle?.trim();
-            const cleanTitle = title.trim();
-            // Malaysian/Indonesian Telegram channels only index English or romanized Latin titles.
-            // Exclude Asian script titles (Hangul, Hanzi, Kanji, Hiragana, Katakana, Thai, Arabic, Cyrillic) from Telegram search.
-            const isOrigLatin = Boolean(
-              cleanOrig &&
-              /[a-zA-Z0-9]/.test(cleanOrig) &&
-              !/[\u3000-\u303f\u3040-\u309f\u30a0-\u30ff\uff00-\uff9f\u4e00-\u9faf\u3400-\u4dbf\uac00-\ud7af\u0e00-\u0e7f\u0600-\u06ff\u0400-\u04ff]/.test(cleanOrig)
-            );
-            const hasDiffOriginal = Boolean(isOrigLatin && cleanOrig && cleanOrig.toLowerCase() !== cleanTitle.toLowerCase());
-            const candidateSet = new Set<string>();
-            if (isSoutheastAsian && hasDiffOriginal && cleanOrig) candidateSet.add(cleanOrig);
-            candidateSet.add(cleanTitle);
-            if (hasDiffOriginal && cleanOrig) candidateSet.add(cleanOrig);
-            if (/[:\-–—]/.test(cleanTitle)) {
-              const prefix = cleanTitle.split(/[:\-–—]/)[0].trim();
-              if (prefix.length >= 3 && prefix.toLowerCase() !== cleanTitle.toLowerCase()) candidateSet.add(prefix);
-              const stripped = cleanTitle.replace(/[:\-–—]/g, ' ').replace(/\s+/g, ' ').trim();
-              if (stripped.toLowerCase() !== cleanTitle.toLowerCase()) candidateSet.add(stripped);
-            }
-            const telegramSearchTitles: string[] = Array.from(candidateSet);
-
-            let msmRes: Msm32ResolveResult | null = null;
-            for (const searchTitle of telegramSearchTitles) {
-              if (!isMounted || abortController.signal.aborted) return;
-              console.log(`[Resolver] Telegram waterfall searching for "${searchTitle}"...`);
-              const res = await msm32Service.resolveStream(
-                searchTitle,
-                releaseYear,
-                mediaType === 'tv' ? season : undefined,
-                mediaType === 'tv' ? episode : undefined,
-                abortController.signal
-              );
-              if (!isMounted || abortController.signal.aborted) return;
-              if (res && res.streamUrl) {
-                if (mediaType === 'movie' && res.filename && /S\d{1,2}E\d{1,2}/i.test(res.filename) && telegramSearchTitles.length > 1 && searchTitle !== telegramSearchTitles[telegramSearchTitles.length - 1]) {
-                  console.warn(`[Resolver] Telegram waterfall result for "${searchTitle}" appears to be a TV episode (${res.filename}) for a movie, trying alternative title...`);
-                  continue;
-                }
-                msmRes = res;
-                break;
-              }
-            }
-
-            if (msmRes && msmRes.streamUrl) {
-              console.log('[Resolver] ✅ Playing via Telegram Direct Stream:', msmRes.streamUrl);
-              setResolvingStatus('Connected to Telegram Stream');
-              setResolvedMsm32Url(msmRes.streamUrl);
-              setDirectStreamUrl(msmRes.streamUrl);
-              setDirectStreamLabel('Telegram (MSM32)');
-              setPlayerMode('direct');
-              setIsExtracting(false);
-              setExtractionFailed(false);
-              setIsLoading(false);
-              setIsProbing(false);
-              isPlayingRef.current = true;
-              onActiveServerChange?.('Telegram (MSM32)', 'telegram-msm32');
-              onProviderChange(getProviderById('telegram-msm32'));
-              return;
-            }
-          } catch (err) {
-            console.warn('[Resolver] Telegram waterfall error:', err);
-          }
-        }
-
-        // 2. Try Embed Resolver if prioritized
-        if (engine === 'embed' && enabledResolvers.includes('embed')) {
-          console.log('[Resolver] Active: Embed Resolver');
-          const cleanName = provider.name.replace(/\s*\([^)]*\)/g, '').trim();
-          setResolvingStatus(`Loading embed player (${cleanName})...`);
-          setPlayerMode('embed');
-          setDirectStreamUrl(null);
-          setDirectStreamLabel('Embed Mirror');
-          setIsExtracting(false);
-          setExtractionFailed(false);
-          onActiveServerChange?.(cleanName, provider.id);
-          return;
-        }
+      // 1. Direct Embed Resolver: If requested provider is an embed provider
+      const isEmbedEngine = (provider.engine || 'embed') === 'embed';
+      if (isEmbedEngine && enabledResolvers.includes('embed')) {
+        console.log(`[Resolver] Active: Embed Resolver (${provider.name})`);
+        const cleanName = provider.name.replace(/\s*\([^)]*\)/g, '').trim();
+        setResolvingStatus(`Loading embed player (${cleanName})...`);
+        setPlayerMode('embed');
+        setDirectStreamUrl(null);
+        setDirectStreamLabel('Embed Mirror');
+        setIsExtracting(false);
+        setExtractionFailed(false);
+        setIsLoading(false);
+        setIsProbing(false);
+        onActiveServerChange?.(cleanName, provider.id);
+        return;
       }
 
       if (!isMounted || abortController.signal.aborted) return;
@@ -777,6 +692,8 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         setDirectStreamLabel('Embed Mirror');
         setIsExtracting(false);
         setExtractionFailed(false);
+        setIsLoading(false);
+        setIsProbing(false);
         onActiveServerChange?.(cleanName, provider.id);
       } else {
         console.log('[Resolver] Direct stream not resolved and Embed Resolver is disabled.');
@@ -794,7 +711,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       isMounted = false;
       abortController.abort();
     };
-  }, [enabledResolvers, tmdbId, title, mediaType, season, episode, activeAsean, providerId, releaseYear, originalTitle, topAnimeProviders, topAseanProviders]);
+  }, [enabledResolvers, tmdbId, title, mediaType, season, episode, activeAsean, providerId, releaseYear, originalTitle, topAnimeProviders, topAseanProviders, isUserSelected]);
 
   const [resumeTimestamp, setResumeTimestamp] = useState<number>(initialTimestamp || 0);
   const [resolvedMalId, setResolvedMalId] = useState<number | null>(null);

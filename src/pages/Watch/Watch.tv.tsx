@@ -945,6 +945,7 @@ export const Watch: React.FC = () => {
             isAnime={isAnime}
             isAsean={isAsean}
             isKorean={isKorean}
+            isUserSelected={userSelectedProvider}
             details={details}
             originCountries={mediaOrigins}
             releaseYear={releaseYear}
