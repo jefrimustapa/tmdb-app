@@ -908,7 +908,7 @@ app.get('/stream/:docId', async (req, res) => {
 
       const iter = client.iterDownload({
         file: targetMedia,
-        requestSize: 1024 * 1024,
+        requestSize: 512 * 1024,
       });
 
       for await (const chunk of iter) {
@@ -937,7 +937,7 @@ app.get('/stream/:docId', async (req, res) => {
 
       let offset = bigInt(start);
       let bytesLeft = chunkSize;
-      const downloadChunkSize = 1024 * 1024;
+      const downloadChunkSize = 512 * 1024;
       let aborted = false;
 
       req.on('close', () => { aborted = true; });
