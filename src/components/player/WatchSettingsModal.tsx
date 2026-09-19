@@ -47,9 +47,13 @@ interface WatchSettingsModalProps {
   isAsean?: boolean;
   isAsian?: boolean; // Backward compatibility alias
   isKorean?: boolean;
+  originCountries?: OriginCountryCode[];
+  details?: any;
 }
 
 export const WatchSettingsModal: React.FC<WatchSettingsModalProps> = ({
+  originCountries,
+  details,
   isOpen,
   onClose,
   defaultTab = 'subtitles',
@@ -93,11 +97,13 @@ export const WatchSettingsModal: React.FC<WatchSettingsModalProps> = ({
   // 1. Direct Stream Providers (Telegram / Native Player filtered by origin matching)
   const directProviders = React.useMemo(() => {
     if (!hasTelegram) return [];
-    const mediaOrigins = extractMediaOriginCountries(undefined, isAnime, isKorean, activeAsean);
+    const mediaOrigins = (originCountries && originCountries.length > 0)
+      ? originCountries
+      : extractMediaOriginCountries(details, isAnime, isKorean, activeAsean);
     return getProvidersByEngine('telegram').filter((p) =>
       isProviderMatchingMedia(p, mediaOrigins, tgCountries, tgEnabledList)
     );
-  }, [hasTelegram, isAnime, isKorean, activeAsean, tgCountries, tgEnabledList]);
+  }, [hasTelegram, originCountries, details, isAnime, isKorean, activeAsean, tgCountries, tgEnabledList]);
 
   // 2. Embed Stream Providers (Web Iframe Mirrors)
   const embedProviders = React.useMemo(() => {

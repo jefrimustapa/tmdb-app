@@ -46,9 +46,13 @@ interface VideoPlayerProps {
   customSubtitleCues?: SubtitleCue[];
   customSubtitleOffset?: number;
   customSubtitleEnabled?: boolean;
+  details?: any;
+  originCountries?: OriginCountryCode[];
 }
 
 export const VideoPlayer: React.FC<VideoPlayerProps> = ({
+  details,
+  originCountries,
   mediaType,
   tmdbId,
   title,
@@ -100,6 +104,20 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const [enabledTelegramProviders, setEnabledTelegramProviders] = useState<string[]>(['telegram-msm32']);
   const [telegramProviderCountries, setTelegramProviderCountries] = useState<Record<string, OriginCountryCode[]>>({ 'telegram-msm32': ['MY', 'ID', 'SG'] });
   const [playbackCurrentTime, setPlaybackCurrentTime] = useState<number>(0);
+
+  const effectiveOriginCountries = useMemo(() => {
+    if (originCountries && originCountries.length > 0) return originCountries;
+    return extractMediaOriginCountries(details, isAnime, isKorean, activeAsean);
+  }, [originCountries, details, isAnime, isKorean, activeAsean]);
+
+  const isTelegramOriginMatching = useMemo(() => {
+    return isProviderMatchingMedia(
+      getProviderById('telegram-msm32'),
+      effectiveOriginCountries,
+      telegramProviderCountries,
+      enabledTelegramProviders
+    );
+  }, [effectiveOriginCountries, telegramProviderCountries, enabledTelegramProviders]);
 
   // Up Next state
   const [showUpNext, setShowUpNext] = useState(false);
@@ -312,6 +330,24 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
       // 0. TELEGRAM PROVIDER (MovieSubMalay MSM32)
       if (providerId === 'telegram-msm32' || provider.engine === 'telegram') {
+        if (!isTelegramOriginMatching) {
+          console.log(`[Resolver] Title origin (${effectiveOriginCountries.join(',') || 'unknown'}) is not within telegram-msm filter, skipping to next engine...`);
+          if (enabledResolvers.includes('embed')) {
+            const fallbackProvider = isAnime
+              ? getProviderById('megaplay-anime')
+              : isKorean
+              ? getProviderById('kisskh-kdrama')
+              : getProviderById('vidlink');
+            onProviderChange(fallbackProvider);
+            return;
+          } else {
+            setResolvingStatus('Title origin is not supported by Telegram MSM filter.');
+            setPlayerMode('error');
+            setIsExtracting(false);
+            setIsLoading(false);
+            return;
+          }
+        }
         try {
           console.log(`[Resolver] Telegram Provider (${provider.name})...`);
           const msmRes = await msm32Service.resolveStream(
@@ -622,8 +658,8 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         }
       }
 
-      // 3. Try Telegram if enabled
-      if (enabledResolvers.includes('telegram')) {
+      // 3. Try Telegram if enabled and title origin matches filter
+      if (enabledResolvers.includes('telegram') && isTelegramOriginMatching) {
         try {
           console.log('[Resolver] Checking Telegram Provider (MovieSubMalay)...');
           setResolvingStatus('Checking Telegram MovieSubMalay Resolver...');
@@ -1477,17 +1513,16 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     const list = getOrderedProviders(activeTopProviders, isAnime, activeAsean, isKorean);
     const hasEmbed = enabledResolvers.includes('embed');
     const hasTelegram = enabledResolvers.includes('telegram');
-    const mediaOrigins = extractMediaOriginCountries(undefined, isAnime, isKorean, activeAsean);
 
     return list.filter((p) => {
       const isDirect = p.engine === 'telegram';
       if (isDirect) {
         if (!hasTelegram) return false;
-        return isProviderMatchingMedia(p, mediaOrigins, telegramProviderCountries, enabledTelegramProviders);
+        return isProviderMatchingMedia(p, effectiveOriginCountries, telegramProviderCountries, enabledTelegramProviders);
       }
       return hasEmbed;
     });
-  }, [activeTopProviders, isAnime, activeAsean, isKorean, enabledResolvers, telegramProviderCountries, enabledTelegramProviders]);
+  }, [activeTopProviders, isAnime, activeAsean, isKorean, enabledResolvers, effectiveOriginCountries, telegramProviderCountries, enabledTelegramProviders]);
 
   // Notify parent of probing status updates
   useEffect(() => {

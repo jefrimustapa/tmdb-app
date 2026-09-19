@@ -391,7 +391,7 @@ export function isProviderMatchingMedia(
 
     const effective = getEffectiveCountries(provider, customCountries);
     if (effective.includes('GLOBAL')) return true;
-    if (!mediaOriginCountries || mediaOriginCountries.length === 0) return true;
+    if (!mediaOriginCountries || mediaOriginCountries.length === 0) return false;
     return mediaOriginCountries.some(c => effective.includes(c));
   }
   return true;

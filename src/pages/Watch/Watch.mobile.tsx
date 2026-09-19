@@ -36,6 +36,7 @@ export const Watch: React.FC = () => {
   const isKorean = useMemo(() => isKoreanMedia(details), [details]);
   const isAnime = useMemo(() => isAnimeMedia(details), [details]);
   const isAsean = useMemo(() => isAseanMedia(details), [details]);
+  const mediaOrigins = useMemo(() => extractMediaOriginCountries(details, isAnime, isKorean, isAsean), [details, isAnime, isKorean, isAsean]);
 
   // Parallelized initial load: TMDB details, TV season details, and DB settings all fetched together
   useEffect(() => {
@@ -88,7 +89,12 @@ export const Watch: React.FC = () => {
             } else if (aseanFlag) {
               defaultProvider = s.topAseanProviders?.[0] || (s as any).topAsianProviders?.[0] || 'vidlink';
             } else {
-              defaultProvider = s.topProviders?.[0] || s.preferredProvider || 'vidlink';
+              const topPick = s.topProviders?.[0] || s.preferredProvider || 'vidlink';
+              if (topPick === 'telegram-msm32' && !isTelegramMatching) {
+                defaultProvider = s.topProviders?.find(p => p !== 'telegram-msm32') || 'vidlink';
+              } else {
+                defaultProvider = topPick;
+              }
             }
             setProviderId(defaultProvider);
           }
@@ -697,6 +703,8 @@ export const Watch: React.FC = () => {
             isAnime={isAnime}
             isAsean={isAsean}
             isKorean={isKorean}
+            details={details}
+            originCountries={mediaOrigins}
             releaseYear={releaseYear}
             originalTitle={details.original_title || details.original_name}
             onProviderChange={(p) => {
@@ -741,6 +749,8 @@ export const Watch: React.FC = () => {
         isAnime={isAnime}
         isAsean={isAsean}
         isKorean={isKorean}
+        details={details}
+        originCountries={mediaOrigins}
         enabledResolvers={enabledResolvers}
       />
 
