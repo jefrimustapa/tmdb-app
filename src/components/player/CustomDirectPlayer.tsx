@@ -81,7 +81,7 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
   // Loading & Buffering states
   const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [isBuffering, setIsBuffering] = useState(false);
-  const [loadingStatus, setLoadingStatus] = useState('Connecting to stream server...');
+  const [loadingStatus, setLoadingStatus] = useState('Buffering...');
 
   // UI state
   const [showControls, setShowControls] = useState(true);
@@ -123,15 +123,12 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
 
   const [loadTimedOut, setLoadTimedOut] = useState(false);
 
-  // Loading status messages progression & 15s watchdog
+  // 15s watchdog timeout
   useEffect(() => {
     if (!isInitialLoading) {
       setLoadTimedOut(false);
       return;
     }
-    const t1 = setTimeout(() => setLoadingStatus('Connecting to direct stream...'), 1500);
-    const t2 = setTimeout(() => setLoadingStatus('Buffering high-speed video...'), 4500);
-    const t3 = setTimeout(() => setLoadingStatus('Preparing playback...'), 8000);
     const timeout = setTimeout(() => {
       if (isInitialLoading) {
         console.warn('[CustomDirectPlayer] Load took > 15s, enabling manual controls');
@@ -140,9 +137,6 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
     }, 15000);
 
     return () => {
-      clearTimeout(t1);
-      clearTimeout(t2);
-      clearTimeout(t3);
       clearTimeout(timeout);
     };
   }, [isInitialLoading]);

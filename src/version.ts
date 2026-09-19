@@ -2,12 +2,13 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20260919-0301';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-add-provider-te.20260919-0301';
+export const APP_BUILD_NUMBER = '20260919-0307';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-add-provider-te.20260919-0307';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
 export const APP_BRANCH = 'feat-add-provider-te';
-export const APP_CHANGELOG = `* fix(player): add immediate play triggers, metadata dismiss, and watchdog timeout for direct streams
+export const APP_CHANGELOG = `* fix(player): eliminate native Android video poster and fix < 1s source reload loop
+* fix(player): add immediate play triggers, metadata dismiss, and watchdog timeout for direct streams
 * feat(player): add custom HTML5 player with themed controls, 10s skip buttons, and cinematic loading screen for direct streams
 * fix(msm-getter): define missing rangeHeader in /stream/:docId
 * feat(telegram): add multi-tier caching (central db on server + memory cache in app)
@@ -20,5 +21,4 @@ export const APP_CHANGELOG = `* fix(player): add immediate play triggers, metada
 * fix(device): prioritize native AndroidBridge over spoofed user-agent for accurate phone detection (#108)
 * fix(tv): shield modal dpad navigation and lock iframe focus on watch page (#107)
 * feat(ui): auto-resize media cards across movie, series, library, and search grids (#106)
-* fix(device): improve platform detection accuracy for desktop web and touchscreen laptops (#105)
-* feat: add PencuriMovie provider, resolver retry settings, and network resilience (#104)`;
+* fix(device): improve platform detection accuracy for desktop web and touchscreen laptops (#105)`;
