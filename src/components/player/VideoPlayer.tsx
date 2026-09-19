@@ -17,6 +17,7 @@ import { resolveDramacoolStream, type DramacoolServer } from '../../services/dra
 import { msm32Service } from '../../services/msm32MappingService';
 import { SubtitleOverlay } from './SubtitleOverlay';
 import type { SubtitleCue } from '../../services/subtitleService';
+import { CustomDirectPlayer } from './CustomDirectPlayer';
 
 interface VideoPlayerProps {
   mediaType: 'movie' | 'tv';
@@ -1770,30 +1771,63 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           : 'w-full h-full border-0 rounded-none'
       }`}
     >
-      {/* STATE 1: Resolving Stream Loading Screen */}
+      {/* STATE 1: Resolving Stream Loading Screen (Cinematic Backdrop) */}
       {playerMode === 'loading' && (
-        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/95 backdrop-blur-md px-6 text-center animate-fade-in">
-          <div className="relative mb-4">
-            <div className="w-14 h-14 border-4 border-hbo-purple/40 border-t-hbo-cyan rounded-full animate-spin shadow-hbo-glow" />
-            <div className="absolute inset-0 flex items-center justify-center">
-              <span className="w-2 h-2 rounded-full bg-hbo-cyan animate-ping" />
-            </div>
-          </div>
-          <p className="text-base font-black text-white tracking-tight flex items-center gap-2">
-            <span>Resolving Stream</span>
-            <span className="inline-flex px-2 py-0.5 rounded-md bg-hbo-cyan/20 border border-hbo-cyan/40 text-hbo-cyan text-[11px] font-bold">
-              {provider.name}
-            </span>
-          </p>
-          {resolvingStatus ? (
-            <p className="text-xs text-hbo-cyan/90 font-medium mt-2 max-w-sm animate-pulse tracking-wide">
-              {resolvingStatus}
-            </p>
-          ) : (
-            <p className="text-xs text-gray-400 mt-2">
-              Checking: {enabledResolvers.map(r => r === 'torbox' ? 'TorBox 4K' : r === 'private_extractor' ? 'Private Extractor' : 'Embed Resolver').join(' → ')}
-            </p>
+        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center overflow-hidden bg-black/90 backdrop-blur-xl px-6 text-center animate-fade-in">
+          {/* Blurred Backdrop Image */}
+          {(backdropPath || stillPath || posterPath) && (
+            <img
+              src={
+                stillPath
+                  ? tmdbImages.still(stillPath, 'original')
+                  : backdropPath
+                  ? tmdbImages.backdrop(backdropPath, 'w780')
+                  : tmdbImages.poster(posterPath!, 'w500')
+              }
+              alt=""
+              className="absolute inset-0 w-full h-full object-cover opacity-20 filter blur-2xl scale-110 pointer-events-none"
+              loading="eager"
+            />
           )}
+          <div className="absolute inset-0 bg-gradient-to-t from-black via-black/80 to-black/60 pointer-events-none" />
+
+          <div className="relative z-10 flex flex-col items-center max-w-sm px-4">
+            {posterPath && (
+              <div className="w-20 sm:w-24 aspect-[2/3] rounded-xl overflow-hidden shadow-[0_0_30px_rgba(103,58,183,0.35)] border border-white/20 mb-3 transform hover:scale-105 transition">
+                <img src={tmdbImages.poster(posterPath, 'w342')} alt={title} className="w-full h-full object-cover" />
+              </div>
+            )}
+
+            <div className="relative mb-3">
+              <div className="w-14 h-14 border-4 border-hbo-purple/30 border-t-hbo-cyan border-r-hbo-purple rounded-full animate-spin shadow-hbo-glow" />
+              <div className="absolute inset-0 flex items-center justify-center">
+                <span className="w-2.5 h-2.5 rounded-full bg-hbo-cyan animate-ping" />
+              </div>
+            </div>
+
+            <p className="text-base font-black text-white tracking-tight flex items-center gap-2 mb-1">
+              <span>Resolving Stream</span>
+              <span className="inline-flex px-2 py-0.5 rounded-md bg-hbo-cyan/20 border border-hbo-cyan/40 text-hbo-cyan text-[11px] font-bold">
+                {directStreamLabel || provider.name}
+              </span>
+            </p>
+
+            {mediaType === 'tv' && (
+              <p className="text-xs text-hbo-purple-light font-bold mb-1">
+                S{season} • E{episode} {episodeTitle ? `• ${episodeTitle}` : ''}
+              </p>
+            )}
+
+            {resolvingStatus ? (
+              <p className="text-xs text-hbo-cyan/90 font-medium mt-1 max-w-sm animate-pulse tracking-wide">
+                {resolvingStatus}
+              </p>
+            ) : (
+              <p className="text-xs text-gray-400 mt-1">
+                Checking: {enabledResolvers.map(r => r === 'torbox' ? 'TorBox 4K' : r === 'telegram' ? 'Telegram (MSM32)' : r === 'private_extractor' ? 'Private Extractor' : 'Embed Resolver').join(' → ')}
+              </p>
+            )}
+          </div>
         </div>
       )}
 
@@ -1815,35 +1849,26 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         </div>
       )}
 
-      {/* STATE 3: Native Direct Player Mode */}
+      {/* STATE 3: Custom HTML5 Direct Player Mode (Theme-matched, Custom Controls, No Native Placeholders) */}
       {playerMode === 'direct' && directStreamUrl && (
-        <video
-          ref={videoRef}
-          controls={showControls}
-          autoPlay
-          playsInline
-          muted={false}
-          className="w-full h-full object-contain bg-black transform-gpu will-change-transform"
-          onLoadedData={() => setIsLoading(false)}
-          onLoadedMetadata={(e) => {
-            const el = e.currentTarget;
-            if (el.duration > 0) {
-              durationRef.current = el.duration;
-            }
-            if (currentTimeRef.current > 10 && !hasSeekedInitialRef.current) {
-              hasSeekedInitialRef.current = true;
-              try {
-                el.currentTime = currentTimeRef.current;
-              } catch {}
-            }
-          }}
-          onTimeUpdate={(e) => {
-            const el = e.currentTarget;
-            recordProgress(el.currentTime, el.duration);
-          }}
-          onPause={(e) => {
-            const el = e.currentTarget;
-            recordProgress(el.currentTime, el.duration, true);
+        <CustomDirectPlayer
+          src={directStreamUrl}
+          title={title}
+          posterPath={posterPath}
+          backdropPath={backdropPath}
+          stillPath={stillPath}
+          season={season}
+          episode={episode}
+          episodeTitle={episodeTitle}
+          mediaType={mediaType}
+          providerLabel={directStreamLabel || provider.name}
+          initialTimestamp={currentTimeRef.current || initialTimestamp}
+          isFullscreen={isFullscreen}
+          onToggleFullscreen={handleToggleFullscreen}
+          onProgress={(current, dur, isPaused) => {
+            if (dur > 0) durationRef.current = dur;
+            currentTimeRef.current = current;
+            recordProgress(current, dur, isPaused);
           }}
           onEnded={() => {
             if (durationRef.current > 0) {

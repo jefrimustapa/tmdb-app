@@ -2,12 +2,14 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20260919-0202';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-add-provider-te.20260919-0202';
+export const APP_BUILD_NUMBER = '20260919-0227';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-add-provider-te.20260919-0227';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
 export const APP_BRANCH = 'feat-add-provider-te';
-export const APP_CHANGELOG = `* feat(telegram): point msm32 getter to production render service with https proxy support
+export const APP_CHANGELOG = `* fix(msm-getter): define missing rangeHeader in /stream/:docId
+* feat(telegram): add multi-tier caching (central db on server + memory cache in app)
+* feat(telegram): point msm32 getter to production render service with https proxy support
 * feat: add msm-getter microservice and Dockerfile for cloud deployment
 * refactor(providers): restructure provider categories and preferences for ASEAN and regional content (#112)
 * feat(settings): TV active category border, mobile sub-drawers hierarchy, scroll lock & General tab rename (#111)
@@ -19,6 +21,4 @@ export const APP_CHANGELOG = `* feat(telegram): point msm32 getter to production
 * fix(device): improve platform detection accuracy for desktop web and touchscreen laptops (#105)
 * feat: add PencuriMovie provider, resolver retry settings, and network resilience (#104)
 * feat(tv): redesign leanback TV settings with nested drawers and dpad auto-scroll (#103)
-* perf(tv): improve Home screen initial loading time and rail batching (#101)
-* fix: handle unsupported and malformed subtitles, optimize video playback CPU usage, and refine virtual cursor click (#100)
-* feat: implement custom subtitle service with OpenSubtitles v3 and bright67 engine (#99)`;
+* perf(tv): improve Home screen initial loading time and rail batching (#101)`;
