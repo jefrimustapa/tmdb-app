@@ -7,6 +7,11 @@ FROM node:20-alpine
 WORKDIR /app
 COPY --from=builder /app/node_modules ./node_modules
 COPY . .
-EXPOSE 8000
-ENV PORT=8000
+
+# Hugging Face Spaces runs as user 1000
+RUN chown -R 1000:1000 /app
+USER 1000
+
+EXPOSE 7860
+ENV PORT=7860
 CMD ["node", "index.js"]
