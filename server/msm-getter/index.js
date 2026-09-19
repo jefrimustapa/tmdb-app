@@ -484,17 +484,18 @@ app.get('/health', (req, res) => {
 
 // Resolver endpoint: /api/resolve?title=Kelas+Cikgu+Hiragi&season=1&episode=1
 app.get('/api/resolve', async (req, res) => {
-  const { title, year, season, episode, maxQuality = '720' } = req.query;
+  const { title, year, season, episode, maxQuality = '720', force, refresh } = req.query;
   if (!title) {
     return res.status(400).json({ success: false, error: 'Missing title query parameter' });
   }
 
+  const shouldBypassCache = force === 'true' || refresh === 'true';
   const targetQuality = parseInt(maxQuality, 10) || 720;
   const sNum = season ? parseInt(season, 10) : NaN;
   const eNum = episode ? parseInt(episode, 10) : NaN;
   const isTv = !isNaN(sNum) && !isNaN(eNum);
-  const epPadded = isTv ? String(eNum).padStart(2, '0') : '';
   const sPadded = isTv ? String(sNum).padStart(2, '0') : '';
+  const epPadded = isTv ? String(eNum).padStart(2, '0') : '';
   const tvTag = isTv ? `S${sPadded}E${epPadded}` : '';
 
   const queryTitle = isTv ? `${title} ${tvTag}` : `${title} ${year || ''}`.trim();
@@ -502,13 +503,13 @@ app.get('/api/resolve', async (req, res) => {
   const qualitySuffix = targetQuality <= 720 ? '_720p' : '_1080p';
   const cacheKey = `${baseCacheKey}${qualitySuffix}`;
 
-  console.log(`[RESOLVE] Request: "${queryTitle}" (isTv: ${isTv}, maxQuality: ${targetQuality}, cacheKey: "${cacheKey}")`);
+  console.log(`[RESOLVE] Request: "${queryTitle}" (isTv: ${isTv}, maxQuality: ${targetQuality}, bypassCache: ${shouldBypassCache}, cacheKey: "${cacheKey}")`);
 
   // 1. Check Central Database first (Instant < 1ms response, 0 bot queries)
-  let cached = db.get(cacheKey);
+  let cached = shouldBypassCache ? null : db.get(cacheKey);
   let fallbackCached = null;
 
-  if (!cached) {
+  if (!cached && !shouldBypassCache) {
     // Check legacy baseCacheKey without quality suffix
     const legacyCached = db.get(baseCacheKey);
     if (legacyCached && legacyCached.filename) {
@@ -567,9 +568,11 @@ app.get('/api/resolve', async (req, res) => {
     await initTelegram();
 
     // Re-check Central DB after waiting in queue
-    const cachedAfterQueue = db.get(cacheKey);
-    if (cachedAfterQueue) {
-      return cachedAfterQueue;
+    if (!shouldBypassCache) {
+      const cachedAfterQueue = db.get(cacheKey);
+      if (cachedAfterQueue) {
+        return cachedAfterQueue;
+      }
     }
 
     // Check if matching document was recently delivered in chat
