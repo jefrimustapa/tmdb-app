@@ -2,12 +2,13 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20260919-1158';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.fix-watch-header-ser.20260919-1158';
+export const APP_BUILD_NUMBER = '20260919-1214';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-tv-custom-playe.20260919-1214';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
-export const APP_BRANCH = 'fix-watch-header-ser';
-export const APP_CHANGELOG = `* fix: prioritize original titles in pencuri candidate scoring and regional drama queries (#115)
+export const APP_BRANCH = 'feat-tv-custom-playe';
+export const APP_CHANGELOG = `* feat: remove torbox and private extractor engines, sync active server indicator to watch header (#116)
+* fix: prioritize original titles in pencuri candidate scoring and regional drama queries (#115)
 * feat: add debug-search endpoint in server/msm-getter
 * fix: prioritize 720p resolution for telegram provider and quality-aware caching (#114)
 * feat: Telegram Provider (@msm32bot), Custom Direct Player UI, and Settings Restructure (#113)
@@ -20,5 +21,4 @@ export const APP_CHANGELOG = `* fix: prioritize original titles in pencuri candi
 * feat(ui): auto-resize media cards across movie, series, library, and search grids (#106)
 * fix(device): improve platform detection accuracy for desktop web and touchscreen laptops (#105)
 * feat: add PencuriMovie provider, resolver retry settings, and network resilience (#104)
-* feat(tv): redesign leanback TV settings with nested drawers and dpad auto-scroll (#103)
-* perf(tv): improve Home screen initial loading time and rail batching (#101)`;
+* feat(tv): redesign leanback TV settings with nested drawers and dpad auto-scroll (#103)`;

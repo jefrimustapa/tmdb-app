@@ -1987,6 +1987,35 @@ public class MainActivity extends BridgeActivity {
             int keyCode = event.getKeyCode();
             Log.i("TMDB_APP", "[Native Key] keyCode=" + keyCode + " isTV=" + isTV() + " isWatchPageActive=" + isWatchPageActive);
 
+            // On TV / Watch page, intercept dedicated hardware media keys and forward directly to the player
+            if (isWatchPageActive) {
+                boolean isMediaKey = (
+                    keyCode == KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE ||
+                    keyCode == KeyEvent.KEYCODE_MEDIA_PLAY ||
+                    keyCode == KeyEvent.KEYCODE_MEDIA_PAUSE ||
+                    keyCode == KeyEvent.KEYCODE_MEDIA_FAST_FORWARD ||
+                    keyCode == KeyEvent.KEYCODE_MEDIA_REWIND ||
+                    keyCode == KeyEvent.KEYCODE_MEDIA_STEP_FORWARD ||
+                    keyCode == KeyEvent.KEYCODE_MEDIA_STEP_BACKWARD ||
+                    keyCode == KeyEvent.KEYCODE_MEDIA_NEXT ||
+                    keyCode == KeyEvent.KEYCODE_MEDIA_PREVIOUS
+                );
+
+                if (isMediaKey) {
+                    runOnUiThread(() -> {
+                        WebView wv = this.bridge != null ? this.bridge.getWebView() : null;
+                        if (wv != null) {
+                            String js = String.format(
+                                "window.dispatchEvent(new CustomEvent('tmdb_remote_media_key', { detail: { keyCode: %d, repeat: %b } }));",
+                                keyCode, event.getRepeatCount() > 0
+                            );
+                            wv.evaluateJavascript(js, null);
+                        }
+                    });
+                    return true; // Consume event so Android OS does not trigger background media players
+                }
+            }
+
             // Synchronously consume Back key if any dropdown is open anywhere in the app
             if (keyCode == KeyEvent.KEYCODE_BACK && isDropdownOpen) {
                 Log.i("TMDB_APP", "[Native Key] Back key consumed by open dropdown");
