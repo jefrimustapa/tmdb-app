@@ -2,12 +2,14 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20260919-0753';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.fix-telegram-prefer-.20260919-0753';
+export const APP_BUILD_NUMBER = '20260919-0931';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.fix-asean-original-t.20260919-0931';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
-export const APP_BRANCH = 'fix-telegram-prefer-';
-export const APP_CHANGELOG = `* feat: Telegram Provider (@msm32bot), Custom Direct Player UI, and Settings Restructure (#113)
+export const APP_BRANCH = 'fix-asean-original-t';
+export const APP_CHANGELOG = `* feat: add debug-search endpoint in server/msm-getter
+* fix: prioritize 720p resolution for telegram provider and quality-aware caching (#114)
+* feat: Telegram Provider (@msm32bot), Custom Direct Player UI, and Settings Restructure (#113)
 * refactor(providers): restructure provider categories and preferences for ASEAN and regional content (#112)
 * feat(settings): TV active category border, mobile sub-drawers hierarchy, scroll lock & General tab rename (#111)
 * fix(tv): eliminate delay on remote back navigation and land focus on TV navbar Home icon (#110)
@@ -19,6 +21,4 @@ export const APP_CHANGELOG = `* feat: Telegram Provider (@msm32bot), Custom Dire
 * feat: add PencuriMovie provider, resolver retry settings, and network resilience (#104)
 * feat(tv): redesign leanback TV settings with nested drawers and dpad auto-scroll (#103)
 * perf(tv): improve Home screen initial loading time and rail batching (#101)
-* fix: handle unsupported and malformed subtitles, optimize video playback CPU usage, and refine virtual cursor click (#100)
-* feat: implement custom subtitle service with OpenSubtitles v3 and bright67 engine (#99)
-* feat(tablet): set 4 cols portrait and 6 cols landscape on movies, series, myspace, and search; remove search clear button scale animation (#98)`;
+* fix: handle unsupported and malformed subtitles, optimize video playback CPU usage, and refine virtual cursor click (#100)`;
