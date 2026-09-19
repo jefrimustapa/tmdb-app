@@ -2,12 +2,13 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20260919-0416';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-add-provider-te.20260919-0416';
+export const APP_BUILD_NUMBER = '20260919-0422';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-add-provider-te.20260919-0422';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
 export const APP_BRANCH = 'feat-add-provider-te';
-export const APP_CHANGELOG = `* fix: end-to-end bottom bar + server count fix + embed/direct server separation
+export const APP_CHANGELOG = `* fix: remove bottom bar background — fully transparent
+* fix: end-to-end bottom bar + server count fix + embed/direct server separation
 * feat(player): convert bottom glass bar to docked drawer style
 * feat(settings): add configurable Telegram stream chunk slice buffer size (256KB, 512KB, 1MB)
 * feat(player): unify buffering spinner and seek status directly inside center controls
@@ -20,5 +21,4 @@ export const APP_CHANGELOG = `* fix: end-to-end bottom bar + server count fix + 
 * fix(player): eliminate native Android video poster and fix < 1s source reload loop
 * fix(player): add immediate play triggers, metadata dismiss, and watchdog timeout for direct streams
 * feat(player): add custom HTML5 player with themed controls, 10s skip buttons, and cinematic loading screen for direct streams
-* fix(msm-getter): define missing rangeHeader in /stream/:docId
-* feat(telegram): add multi-tier caching (central db on server + memory cache in app)`;
+* fix(msm-getter): define missing rangeHeader in /stream/:docId`;

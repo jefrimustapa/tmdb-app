@@ -95,6 +95,7 @@ class Msm32MappingService {
       if (year) params.append('year', String(year));
       if (typeof season === 'number' && !isNaN(season)) params.append('season', String(season));
       if (typeof episode === 'number' && !isNaN(episode)) params.append('episode', String(episode));
+      params.append('maxQuality', '720'); // cap server-side resolution to 720p max
 
       const res = await fetch(`${baseUrl}/api/resolve?${params.toString()}`, {
         signal: controller.signal,
