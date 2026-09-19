@@ -583,12 +583,12 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
       {/* HTML5 CUSTOM CONTROLS OVERLAY (PLAY, FWD, RWD, SCRUBBER, THEME MATCHED)   */}
       {/* ========================================================================= */}
       <div
-        className={`absolute inset-0 z-20 flex flex-col justify-end p-4 sm:p-6 transition-opacity duration-300 pointer-events-none ${
+        className={`absolute inset-0 z-20 flex flex-col justify-between transition-opacity duration-300 pointer-events-none ${
           (showControls || isBuffering || seekFeedback) && !isInitialLoading ? 'opacity-100' : 'opacity-0'
         }`}
       >
         {/* Center Action Controls: Rewind 10s, Loading/Play/Pause, Forward 10s */}
-        <div className="flex items-center justify-center gap-10 sm:gap-14 my-auto pointer-events-auto">
+        <div className="flex-1 flex items-center justify-center gap-10 sm:gap-14 pointer-events-auto p-4 sm:p-6">
           {/* Rewind 10s Button - Visual Seek Feedback on Center Control */}
           <button
             type="button"
@@ -653,8 +653,11 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
           </button>
         </div>
 
-        {/* Bottom Glass Bar: Scrubber, Timers, Volume */}
-        <div className="w-full bg-black/75 backdrop-blur-xl border border-white/15 rounded-2xl p-3 sm:p-4 shadow-2xl pointer-events-auto space-y-2">
+        {/* Bottom Drawer Glass Bar: Scrubber, Timers, Volume */}
+        <div className="w-full bg-black/85 backdrop-blur-2xl border-t border-white/15 rounded-t-2xl sm:rounded-t-3xl px-4 sm:px-6 pt-2 pb-5 sm:pb-6 shadow-[0_-10px_30px_rgba(0,0,0,0.8)] pointer-events-auto space-y-2">
+          {/* Drawer Handle Indicator */}
+          <div className="w-9 h-1 bg-white/25 rounded-full mx-auto mb-1.5" />
+
           {/* Progress / Scrub Bar */}
           <div className="relative flex items-center w-full group/scrubber cursor-pointer">
             {/* Background Track */}
