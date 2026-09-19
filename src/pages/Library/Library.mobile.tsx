@@ -67,18 +67,23 @@ export const Library: React.FC = () => {
     setWatchlist((prev) => prev.filter((w) => !(w.tmdbId === item.tmdbId && w.mediaType === item.mediaType)));
   };
 
-  const convertToMediaItem = (item: WatchHistoryItem | LikedItem | WatchlistItem): TMDBMediaItem => ({
-    id: item.tmdbId,
-    title: item.title,
-    overview: '',
-    poster_path: item.posterPath,
-    backdrop_path: item.backdropPath,
-    vote_average: item.voteAverage || 0,
-    vote_count: 0,
-    popularity: 0,
-    original_language: 'en',
-    media_type: item.mediaType
-  });
+  const convertToMediaItem = (item: WatchHistoryItem | LikedItem | WatchlistItem): TMDBMediaItem => {
+    const relDate = item.releaseDate;
+    return {
+      id: item.tmdbId,
+      title: item.title,
+      overview: '',
+      poster_path: item.posterPath,
+      backdrop_path: item.backdropPath,
+      vote_average: item.voteAverage || 0,
+      vote_count: 0,
+      popularity: 0,
+      original_language: 'en',
+      media_type: item.mediaType,
+      release_date: item.mediaType === 'movie' ? relDate : undefined,
+      first_air_date: item.mediaType === 'tv' ? relDate : undefined
+    };
+  };
 
   return (
     <div className={`min-h-screen ${isTV ? 'pt-6 sm:pt-8 pb-16 px-6 lg:px-8' : 'pt-20 sm:pt-24 pb-20 px-4 sm:px-6'} max-w-7xl mx-auto`}>

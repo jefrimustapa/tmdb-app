@@ -44,7 +44,32 @@ const MediaCardComponent: React.FC<MediaCardProps> = ({
   const hasAlternativeTitle = Boolean(
     originalTitle && originalTitle.trim().toLowerCase() !== title.trim().toLowerCase()
   );
-  const releaseYear = (item.release_date || item.first_air_date || '').split('-')[0];
+  const initialYear = (item.release_date || item.first_air_date || '').split('-')[0];
+  const [releaseYear, setReleaseYear] = useState<string>(initialYear);
+
+  useEffect(() => {
+    const yr = (item.release_date || item.first_air_date || '').split('-')[0];
+    if (yr) {
+      setReleaseYear(yr);
+      return;
+    }
+    let active = true;
+    const fetchYear = async () => {
+      try {
+        const details = mediaType === 'tv'
+          ? await tmdbApi.getTVDetails(item.id)
+          : await tmdbApi.getMovieDetails(item.id);
+        if (active && details) {
+          const fetchedYear = (details.release_date || details.first_air_date || '').split('-')[0];
+          if (fetchedYear) {
+            setReleaseYear(fetchedYear);
+          }
+        }
+      } catch {}
+    };
+    fetchYear();
+    return () => { active = false; };
+  }, [item.id, item.release_date, item.first_air_date, mediaType]);
 
   const [isPerfMode, setIsPerfMode] = useState(() => 
     typeof document !== 'undefined' && document.documentElement.getAttribute('data-perf-mode') === 'true'
@@ -425,7 +450,7 @@ const MediaCardComponent: React.FC<MediaCardProps> = ({
             </div>
           ) : (
             <div className="flex items-center justify-between mt-1 text-[11px] text-gray-400 gap-1">
-              <span className="truncate">{releaseYear || mediaType.toUpperCase()}</span>
+              <span className="truncate">{releaseYear || ''}</span>
               <div className="flex items-center gap-1 flex-shrink-0">
                 <span className="uppercase text-[10px] font-bold px-1.5 py-0.5 rounded bg-hbo-purple/20 text-hbo-purple-light border border-hbo-purple/30">
                   {mediaType === 'movie' ? 'Movie' : 'Series'}

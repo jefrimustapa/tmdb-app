@@ -7,6 +7,7 @@ export interface WatchHistoryItem {
   backdropPath: string | null;
   stillPath?: string | null;
   voteAverage?: number;
+  releaseDate?: string;
   season?: number;
   episode?: number;
   episodeTitle?: string;
