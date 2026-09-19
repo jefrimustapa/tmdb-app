@@ -105,16 +105,29 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
     }
   }, [isDraggingScrubber]);
 
-  // Loading status messages progression
+  const [loadTimedOut, setLoadTimedOut] = useState(false);
+
+  // Loading status messages progression & 15s watchdog
   useEffect(() => {
-    if (!isInitialLoading) return;
+    if (!isInitialLoading) {
+      setLoadTimedOut(false);
+      return;
+    }
     const t1 = setTimeout(() => setLoadingStatus('Connecting to direct stream...'), 1500);
     const t2 = setTimeout(() => setLoadingStatus('Buffering high-speed video...'), 4500);
-    const t3 = setTimeout(() => setLoadingStatus('Preparing playback...'), 9000);
+    const t3 = setTimeout(() => setLoadingStatus('Preparing playback...'), 8000);
+    const timeout = setTimeout(() => {
+      if (isInitialLoading) {
+        console.warn('[CustomDirectPlayer] Load took > 15s, enabling manual controls');
+        setLoadTimedOut(true);
+      }
+    }, 15000);
+
     return () => {
       clearTimeout(t1);
       clearTimeout(t2);
       clearTimeout(t3);
+      clearTimeout(timeout);
     };
   }, [isInitialLoading]);
 
@@ -175,6 +188,9 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
       // Direct stream URL (MP4 / MKV from MSM32)
       video.src = src;
       video.load();
+      video.play().catch((err) => {
+        console.warn('[CustomDirectPlayer] Autoplay attempt:', err);
+      });
     }
   }, [src, onError]);
 
@@ -352,6 +368,9 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
               el.currentTime = initialTimestamp;
             } catch {}
           }
+          setIsInitialLoading(false);
+          setIsBuffering(false);
+          el.play().catch(console.warn);
         }}
         onCanPlay={() => {
           setIsInitialLoading(false);
@@ -391,6 +410,7 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
         }}
         onError={(e) => {
           console.error('[CustomDirectPlayer] Video error:', e);
+          setIsInitialLoading(false);
           onError?.(e);
         }}
       />
@@ -447,10 +467,43 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
               <span>{providerLabel}</span>
             </div>
 
-            {/* Live Progress Ticker */}
-            <p className="text-xs text-gray-300 font-medium tracking-wide animate-pulse">
-              {loadingStatus}
-            </p>
+            {/* Live Progress Ticker or Timeout Actions */}
+            {loadTimedOut ? (
+              <div className="flex flex-col items-center gap-2 mt-2">
+                <p className="text-xs text-amber-300 font-medium">
+                  Connection is taking longer than usual
+                </p>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setLoadTimedOut(false);
+                      if (videoRef.current) {
+                        videoRef.current.load();
+                        videoRef.current.play().catch(console.warn);
+                      }
+                    }}
+                    className="px-3.5 py-1.5 rounded-lg bg-gradient-to-r from-hbo-purple to-hbo-cyan text-white text-xs font-bold shadow-hbo-glow active:scale-95 transition"
+                  >
+                    Retry Play
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsInitialLoading(false);
+                      onError?.({ message: 'Playback timeout' });
+                    }}
+                    className="px-3.5 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white text-xs font-semibold border border-white/20 active:scale-95 transition"
+                  >
+                    Switch Server
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <p className="text-xs text-gray-300 font-medium tracking-wide animate-pulse">
+                {loadingStatus}
+              </p>
+            )}
           </div>
         </div>
       )}

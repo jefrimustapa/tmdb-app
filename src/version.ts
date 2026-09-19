@@ -2,12 +2,13 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20260919-0227';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-add-provider-te.20260919-0227';
+export const APP_BUILD_NUMBER = '20260919-0233';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-add-provider-te.20260919-0233';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
 export const APP_BRANCH = 'feat-add-provider-te';
-export const APP_CHANGELOG = `* fix(msm-getter): define missing rangeHeader in /stream/:docId
+export const APP_CHANGELOG = `* feat(player): add custom HTML5 player with themed controls, 10s skip buttons, and cinematic loading screen for direct streams
+* fix(msm-getter): define missing rangeHeader in /stream/:docId
 * feat(telegram): add multi-tier caching (central db on server + memory cache in app)
 * feat(telegram): point msm32 getter to production render service with https proxy support
 * feat: add msm-getter microservice and Dockerfile for cloud deployment
@@ -20,5 +21,4 @@ export const APP_CHANGELOG = `* fix(msm-getter): define missing rangeHeader in /
 * feat(ui): auto-resize media cards across movie, series, library, and search grids (#106)
 * fix(device): improve platform detection accuracy for desktop web and touchscreen laptops (#105)
 * feat: add PencuriMovie provider, resolver retry settings, and network resilience (#104)
-* feat(tv): redesign leanback TV settings with nested drawers and dpad auto-scroll (#103)
-* perf(tv): improve Home screen initial loading time and rail batching (#101)`;
+* feat(tv): redesign leanback TV settings with nested drawers and dpad auto-scroll (#103)`;
