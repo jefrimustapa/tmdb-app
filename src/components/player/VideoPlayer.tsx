@@ -4,8 +4,6 @@ import Hls from 'hls.js';
 import type { StreamProvider, OriginCountryCode } from '../../types/stream';
 import { STREAM_PROVIDERS, getProviderById, getOrderedProviders, extractMediaOriginCountries, isProviderMatchingMedia } from '../../services/streamProviders';
 import { dbService } from '../../services/db';
-import { fetchDirectStream, DEFAULT_DIRECT_STREAM_API } from '../../services/directStreamService';
-import { fetchTorboxStream } from '../../services/torboxService';
 import type { StreamResolverType } from '../../types/db';
 import { Logo } from '../common/Logo';
 import { tmdbImages, TMDB_FALLBACK_BACKDROP } from '../../services/tmdb';
@@ -32,6 +30,7 @@ interface VideoPlayerProps {
   episodeTitle?: string;
   providerId: string;
   onProviderChange: (p: StreamProvider) => void;
+  onActiveServerChange?: (serverLabel: string, activeProviderId?: string) => void;
   onProbingStatusChange?: (isProbing: boolean, currentServerIndex: number, totalServers?: number) => void;
   nextEpisodeInfo?: { season: number; episode: number; title?: string; stillPath?: string | null } | null;
   onNextEpisode?: () => void;
@@ -65,6 +64,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   episodeTitle,
   providerId,
   onProviderChange,
+  onActiveServerChange,
   onProbingStatusChange,
   nextEpisodeInfo,
   onNextEpisode,
@@ -86,8 +86,6 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const [hasError, setHasError] = useState(false);
   const [adShieldEnabled, setAdShieldEnabled] = useState(true);
   const [streamResolver, setStreamResolver] = useState<StreamResolverType>('embed');
-  const [directStreamApiUrl, setDirectStreamApiUrl] = useState(DEFAULT_DIRECT_STREAM_API);
-  const [torboxApiKey, setTorboxApiKey] = useState('');
   const [playerMode, setPlayerMode] = useState<'loading' | 'embed' | 'direct' | 'error'>('loading');
   const [directStreamUrl, setDirectStreamUrl] = useState<string | null>(null);
   const [directStreamLabel, setDirectStreamLabel] = useState<string>('');
@@ -252,15 +250,9 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         try {
           (window as any).AndroidBridge?.setAdShieldEnabled?.(s.adBlockShield);
         } catch {}
-        const activeResolver = s.streamResolver || (s.directStreamMode ? 'private_extractor' : 'embed');
+        const activeResolver = s.streamResolver || 'embed';
         setStreamResolver(activeResolver);
         setEnabledResolvers(s.enabledResolvers && s.enabledResolvers.length > 0 ? s.enabledResolvers : ['embed']);
-        if (s.directStreamApiUrl) {
-          setDirectStreamApiUrl(s.directStreamApiUrl);
-        }
-        if (s.torboxApiKey) {
-          setTorboxApiKey(s.torboxApiKey);
-        }
         if (s.enabledTelegramProviders && s.enabledTelegramProviders.length > 0) {
           setEnabledTelegramProviders(s.enabledTelegramProviders);
         }
@@ -309,7 +301,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     });
   }, []);
 
-  // Priority Stream Resolution: TorBox -> Private Extractor -> Embed Resolver
+  // Priority Stream Resolution: Telegram -> Embed Resolver
   useEffect(() => {
     let isMounted = true;
     const abortController = new AbortController();
@@ -408,6 +400,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             setIsLoading(false);
             setIsProbing(false);
             isPlayingRef.current = true;
+            onActiveServerChange?.('Telegram (MSM32)', 'telegram-msm32');
             if (autoCycleTimeoutRef.current) {
               clearTimeout(autoCycleTimeoutRef.current);
               autoCycleTimeoutRef.current = null;
@@ -489,6 +482,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
               setIsLoading(false);
               setIsProbing(false);
               isPlayingRef.current = true;
+              onActiveServerChange?.('PencuriMovie', 'pencurimovie-my');
               if (autoCycleTimeoutRef.current) {
                 clearTimeout(autoCycleTimeoutRef.current);
                 autoCycleTimeoutRef.current = null;
@@ -546,6 +540,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             setIsExtracting(false);
             setExtractionFailed(false);
             setIsLoading(false);
+            onActiveServerChange?.('LARI21', 'lari21-asian');
             return;
           }
           console.warn('[Resolver] LARI21 resolution returned no stream or timed out, auto-failover to next Asean provider...');
@@ -588,6 +583,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             setIsExtracting(false);
             setExtractionFailed(false);
             setIsLoading(false);
+            onActiveServerChange?.('KissKH', 'kisskh-kdrama');
             return;
           }
           console.warn('[Resolver] KissKH resolution returned no stream or timed out, auto-failover to next Korean provider...');
@@ -630,6 +626,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             setIsExtracting(false);
             setExtractionFailed(false);
             setIsLoading(false);
+            onActiveServerChange?.(`DramaCool (${activeServer})`, 'dramacool-kdrama');
             return;
           }
           console.warn('[Resolver] Dramacool resolution returned no stream, auto-failover to next Korean provider...');
@@ -654,58 +651,12 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       const currentSettings = await dbService.getSettings();
       const activeEnginePriority: StreamResolverType[] = (currentSettings.enginePriority && currentSettings.enginePriority.length > 0)
         ? currentSettings.enginePriority
-        : ['torbox', 'telegram', 'embed', 'private_extractor'];
+        : ['telegram', 'embed'];
 
       for (const engine of activeEnginePriority) {
         if (!isMounted) return;
 
-        // 1. Try TorBox if enabled
-        if (engine === 'torbox' && enabledResolvers.includes('torbox') && torboxApiKey && torboxApiKey.trim()) {
-          try {
-            console.log('[Resolver] Checking TorBox 4K Cloud...');
-            setResolvingStatus('Checking TorBox 4K Cloud Debrid...');
-            const torboxRes = await fetchTorboxStream(tmdbId, undefined, mediaType, season, episode, torboxApiKey);
-            if (!isMounted) return;
-            if (torboxRes && torboxRes.sources && torboxRes.sources.length > 0) {
-              console.log(`[Resolver] ✅ Playing via TorBox 4K:`, torboxRes.sources[0].url);
-              setResolvingStatus('Connected to TorBox 4K Cloud');
-              setDirectStreamUrl(torboxRes.sources[0].url);
-              setDirectStreamLabel('TorBox 4K Cloud');
-              setPlayerMode('direct');
-              setIsExtracting(false);
-              setExtractionFailed(false);
-              setIsLoading(false);
-              return;
-            }
-          } catch (err) {
-            console.warn('[Resolver] TorBox error:', err);
-          }
-        }
-
-        // 2. Try Private Consumet Extractor if enabled
-        if (engine === 'private_extractor' && enabledResolvers.includes('private_extractor')) {
-          try {
-            console.log('[Resolver] Checking Private Stream Extractor...');
-            setResolvingStatus('Querying Private Stream Extractor...');
-            const directRes = await fetchDirectStream(tmdbId, title, mediaType, season, episode, directStreamApiUrl);
-            if (!isMounted) return;
-            if (directRes && directRes.sources && directRes.sources.length > 0) {
-              console.log(`[Resolver] ✅ Playing via ${directRes.provider}:`, directRes.sources[0].url);
-              setResolvingStatus(`Connected via ${directRes.provider}`);
-              setDirectStreamUrl(directRes.sources[0].url);
-              setDirectStreamLabel(directRes.provider);
-              setPlayerMode('direct');
-              setIsExtracting(false);
-              setExtractionFailed(false);
-              setIsLoading(false);
-              return;
-            }
-          } catch (err) {
-            console.warn('[Resolver] Private extractor error:', err);
-          }
-        }
-
-        // 3. Try Telegram if enabled and title origin matches filter
+        // 1. Try Telegram if enabled and title origin matches filter
         if (engine === 'telegram' && enabledResolvers.includes('telegram') && isTelegramOriginMatching) {
           try {
             console.log('[Resolver] Checking Telegram Provider (MovieSubMalay)...');
@@ -764,6 +715,8 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
               setIsLoading(false);
               setIsProbing(false);
               isPlayingRef.current = true;
+              onActiveServerChange?.('Telegram (MSM32)', 'telegram-msm32');
+              onProviderChange(getProviderById('telegram-msm32'));
               return;
             }
           } catch (err) {
@@ -771,15 +724,17 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           }
         }
 
-        // 4. Try Embed Resolver if prioritized
+        // 2. Try Embed Resolver if prioritized
         if (engine === 'embed' && enabledResolvers.includes('embed')) {
           console.log('[Resolver] Active: Embed Resolver');
-          setResolvingStatus(`Loading embed player (${provider.name})...`);
+          const cleanName = provider.name.replace(/\s*\([^)]*\)/g, '').trim();
+          setResolvingStatus(`Loading embed player (${cleanName})...`);
           setPlayerMode('embed');
           setDirectStreamUrl(null);
           setDirectStreamLabel('Embed Mirror');
           setIsExtracting(false);
           setExtractionFailed(false);
+          onActiveServerChange?.(cleanName, provider.id);
           return;
         }
       }
@@ -789,12 +744,14 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       // Final fallback to Embed Resolver ONLY if explicitly enabled
       if (enabledResolvers.includes('embed')) {
         console.log('[Resolver] Fallback: Embed Resolver');
-        setResolvingStatus(`Loading embed player (${provider.name})...`);
+        const cleanName = provider.name.replace(/\s*\([^)]*\)/g, '').trim();
+        setResolvingStatus(`Loading embed player (${cleanName})...`);
         setPlayerMode('embed');
         setDirectStreamUrl(null);
         setDirectStreamLabel('Embed Mirror');
         setIsExtracting(false);
         setExtractionFailed(false);
+        onActiveServerChange?.(cleanName, provider.id);
       } else {
         console.log('[Resolver] Direct stream not resolved and Embed Resolver is disabled.');
         setPlayerMode('error');
@@ -811,7 +768,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       isMounted = false;
       abortController.abort();
     };
-  }, [enabledResolvers, tmdbId, title, mediaType, season, episode, directStreamApiUrl, torboxApiKey, activeAsean, providerId, releaseYear, originalTitle, topAnimeProviders, topAseanProviders]);
+  }, [enabledResolvers, tmdbId, title, mediaType, season, episode, activeAsean, providerId, releaseYear, originalTitle, topAnimeProviders, topAseanProviders]);
 
   const [resumeTimestamp, setResumeTimestamp] = useState<number>(initialTimestamp || 0);
   const [resolvedMalId, setResolvedMalId] = useState<number | null>(null);
@@ -1986,7 +1943,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
               </p>
             ) : (
               <p className="text-xs text-gray-400 mt-1">
-                Checking: {enabledResolvers.map(r => r === 'torbox' ? 'TorBox 4K' : r === 'telegram' ? 'Telegram (MSM32)' : r === 'private_extractor' ? 'Private Extractor' : 'Embed Resolver').join(' → ')}
+                Checking: {enabledResolvers.map(r => r === 'telegram' ? 'Telegram (MSM32)' : 'Embed Resolver').join(' → ')}
               </p>
             )}
           </div>
@@ -2099,7 +2056,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             Could Not Resolve Direct Stream
           </h3>
           <p className="text-xs sm:text-sm text-gray-400 max-w-md mb-6 leading-relaxed">
-            The active direct stream engines (<span className="text-white font-semibold">{enabledResolvers.map(r => r === 'torbox' ? 'TorBox 4K' : r === 'telegram' ? 'Telegram (MSM32)' : 'Private Extractor').join(', ')}</span>) did not return a working direct video stream for "<span className="text-white">{title}</span>".
+            The active direct stream engines (<span className="text-white font-semibold">{enabledResolvers.map(r => r === 'telegram' ? 'Telegram (MSM32)' : 'Embed Resolver').join(', ')}</span>) did not return a working direct video stream for "<span className="text-white">{originalTitle && originalTitle !== title ? `${title} (${originalTitle})` : title}</span>".
             <br /><br />
             <span className="text-gray-300">Embed Resolver is currently disabled in your Settings.</span>
           </p>
