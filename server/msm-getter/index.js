@@ -484,11 +484,12 @@ app.get('/health', (req, res) => {
 
 // Resolver endpoint: /api/resolve?title=Kelas+Cikgu+Hiragi&season=1&episode=1
 app.get('/api/resolve', async (req, res) => {
-  const { title, year, season, episode } = req.query;
+  const { title, year, season, episode, maxQuality = '720' } = req.query;
   if (!title) {
     return res.status(400).json({ success: false, error: 'Missing title query parameter' });
   }
 
+  const targetQuality = parseInt(maxQuality, 10) || 720;
   const sNum = season ? parseInt(season, 10) : NaN;
   const eNum = episode ? parseInt(episode, 10) : NaN;
   const isTv = !isNaN(sNum) && !isNaN(eNum);
@@ -497,14 +498,40 @@ app.get('/api/resolve', async (req, res) => {
   const tvTag = isTv ? `S${sPadded}E${epPadded}` : '';
 
   const queryTitle = isTv ? `${title} ${tvTag}` : `${title} ${year || ''}`.trim();
-  const cacheKey = normalizeTitle(isTv ? `${title} ${tvTag}` : `${title} ${year || ''}`);
+  const baseCacheKey = normalizeTitle(isTv ? `${title} ${tvTag}` : `${title} ${year || ''}`);
+  const qualitySuffix = targetQuality <= 720 ? '_720p' : '_1080p';
+  const cacheKey = `${baseCacheKey}${qualitySuffix}`;
 
-  console.log(`[RESOLVE] Request: "${queryTitle}" (isTv: ${isTv}, cacheKey: "${cacheKey}")`);
+  console.log(`[RESOLVE] Request: "${queryTitle}" (isTv: ${isTv}, maxQuality: ${targetQuality}, cacheKey: "${cacheKey}")`);
 
   // 1. Check Central Database first (Instant < 1ms response, 0 bot queries)
-  const cached = db.get(cacheKey);
+  let cached = db.get(cacheKey);
+  let fallbackCached = null;
+
+  if (!cached) {
+    // Check legacy baseCacheKey without quality suffix
+    const legacyCached = db.get(baseCacheKey);
+    if (legacyCached && legacyCached.filename) {
+      const fnLower = legacyCached.filename.toLowerCase();
+      const is1080 = fnLower.includes('1080p') || fnLower.includes('1080');
+      const is720 = fnLower.includes('720p') || fnLower.includes('720');
+      const isLowerRes = fnLower.includes('480p') || fnLower.includes('540p') || fnLower.includes('360p');
+
+      if (targetQuality <= 720) {
+        if (is720 || isLowerRes) {
+          cached = legacyCached;
+        } else if (is1080) {
+          // Keep as fallback in case 720p is not available from bot
+          fallbackCached = legacyCached;
+        }
+      } else {
+        cached = legacyCached;
+      }
+    }
+  }
+
   if (cached) {
-    console.log(`[RESOLVE] Central DB Cache HIT for "${cacheKey}" -> Doc ID: ${cached.docId}`);
+    console.log(`[RESOLVE] Central DB Cache HIT for "${cacheKey}" -> Doc ID: ${cached.docId} (${cached.filename})`);
     const host = req.get('host');
     const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'https';
     return res.json({
@@ -549,6 +576,7 @@ app.get('/api/resolve', async (req, res) => {
     const recentMsgs = await client.getMessages('msm32bot', { limit: 25 });
     const normSearch = normalizeTitle(title);
     const titleTokens = normSearch.split(' ').filter(t => t.length > 2);
+    const matchingRecentDocs = [];
 
     for (const msg of recentMsgs) {
       if (msg.media?.document) {
@@ -585,20 +613,44 @@ app.get('/api/resolve', async (req, res) => {
         }
 
         if (matchesAllTokens && matchesEpisode) {
-          const docIdStr = doc.id.toString();
-          console.log(`[RESOLVE] Found matching recent document in chat: ${filename} (ID: ${docIdStr})`);
-          const streamItem = db.set(cacheKey, {
-            docId: docIdStr,
-            accessHash: doc.accessHash?.toString() || '',
-            fileReference: doc.fileReference ? doc.fileReference.toString('hex') : '',
-            filename,
-            size: doc.size?.toString() || '0',
-            mimeType: doc.mimeType || 'video/mp4',
-            dcId: doc.dcId || 4,
-            date: doc.date,
-          });
-          return streamItem;
+          const fnLower = (filename || '').toLowerCase();
+          const is720 = fnLower.includes('720p') || fnLower.includes('720');
+          const is1080 = fnLower.includes('1080p') || fnLower.includes('1080');
+          const isLower = fnLower.includes('480p') || fnLower.includes('540p') || fnLower.includes('360p');
+
+          let qualityScore = 10;
+          if (targetQuality <= 720) {
+            if (is720) qualityScore = 50;
+            else if (isLower) qualityScore = 30;
+            else if (is1080) qualityScore = 5;
+          } else {
+            if (is1080) qualityScore = 50;
+            else if (is720) qualityScore = 30;
+          }
+
+          matchingRecentDocs.push({ doc, filename, qualityScore });
         }
+      }
+    }
+
+    if (matchingRecentDocs.length > 0) {
+      matchingRecentDocs.sort((a, b) => b.qualityScore - a.qualityScore);
+      const chosen = matchingRecentDocs[0];
+      // Pick immediately if it meets the desired quality (score >= 30) or if targetQuality > 720
+      if (chosen.qualityScore >= 30 || targetQuality > 720) {
+        const docIdStr = chosen.doc.id.toString();
+        console.log(`[RESOLVE] Found matching recent document in chat: ${chosen.filename} (ID: ${docIdStr}, score: ${chosen.qualityScore})`);
+        const streamItem = db.set(cacheKey, {
+          docId: docIdStr,
+          accessHash: chosen.doc.accessHash?.toString() || '',
+          fileReference: chosen.doc.fileReference ? chosen.doc.fileReference.toString('hex') : '',
+          filename: chosen.filename,
+          size: chosen.doc.size?.toString() || '0',
+          mimeType: chosen.doc.mimeType || 'video/mp4',
+          dcId: chosen.doc.dcId || 4,
+          date: chosen.doc.date,
+        });
+        return streamItem;
       }
     }
 
@@ -664,8 +716,15 @@ app.get('/api/resolve', async (req, res) => {
                     }
                   }
 
-                  if (btnText.includes('1080p')) score += 20;
-                  else if (btnText.includes('720p')) score += 10;
+                  if (targetQuality <= 720) {
+                    if (btnText.includes('720p') || btnText.includes('720')) score += 50;
+                    else if (btnText.includes('540p') || btnText.includes('480p') || btnText.includes('360p')) score += 30;
+                    else if (btnText.includes('1080p') || btnText.includes('1080')) score += 5;
+                    else if (btnText.includes('2160p') || btnText.includes('4k')) score -= 50;
+                  } else {
+                    if (btnText.includes('1080p') || btnText.includes('1080')) score += 50;
+                    else if (btnText.includes('720p') || btnText.includes('720')) score += 30;
+                  }
                   if (btnText.includes('malaysub') || btnText.includes('msm')) score += 5;
 
                   candidates.push({
@@ -698,6 +757,10 @@ app.get('/api/resolve', async (req, res) => {
     }
 
     if (!targetButtonId) {
+      if (fallbackCached) {
+        console.log(`[RESOLVE] 720p not found from bot, falling back to cached 1080p stream for "${baseCacheKey}"`);
+        return fallbackCached;
+      }
       const err = new Error(`No downloadable media found for "${queryTitle}" on @msm32bot`);
       err.status = 404;
       throw err;
