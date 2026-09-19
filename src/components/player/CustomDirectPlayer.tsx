@@ -6,12 +6,9 @@ import {
   RotateCw,
   Volume2,
   VolumeX,
-  Maximize2,
-  Minimize2,
   Zap,
   Sparkles,
-  Loader2,
-  Film
+  Loader2
 } from 'lucide-react';
 import Hls from 'hls.js';
 import { tmdbImages, TMDB_FALLBACK_BACKDROP } from '../../services/tmdb';
@@ -92,9 +89,8 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
   const hasSeekedInitialRef = useRef(false);
 
   const isPlayingRef = useRef(false);
-  const [showUnmuteHint, setShowUnmuteHint] = useState(false);
 
-  // Auto-hide controls helper (ONLY hides if actively playing)
+  // Auto-hide controls helper (ONLY hides if actively playing after 3 seconds)
   const resetControlsTimer = useCallback(() => {
     setShowControls(true);
     if (controlsTimerRef.current) {
@@ -104,7 +100,7 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
     if (isPlayingRef.current && !isDraggingScrubber) {
       controlsTimerRef.current = setTimeout(() => {
         setShowControls(false);
-      }, 3500);
+      }, 3000);
     }
   }, [isDraggingScrubber]);
 
@@ -221,7 +217,6 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
           await video.play();
           setIsPlaying(true);
           isPlayingRef.current = true;
-          setShowUnmuteHint(true);
         } catch (mutedErr) {
           console.warn('[CustomDirectPlayer] Autoplay fully blocked, awaiting user tap:', mutedErr);
           setIsPlaying(false);
@@ -246,15 +241,6 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
     }
     resetControlsTimer();
   }, [resetControlsTimer]);
-
-  const handleUnmute = useCallback(() => {
-    const video = videoRef.current;
-    if (!video) return;
-    video.muted = false;
-    setIsMuted(false);
-    setShowUnmuteHint(false);
-    video.play().catch(console.warn);
-  }, []);
 
   // Handle Relative Seek (+10s or -10s)
   const handleSeekRelative = useCallback((seconds: number) => {
@@ -393,7 +379,15 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
       onClick={(e) => {
         // Toggle controls if clicking on empty player space
         if ((e.target as HTMLElement).closest('button, input')) return;
-        setShowControls((prev) => !prev);
+        setShowControls((prev) => {
+          const next = !prev;
+          if (next) {
+            resetControlsTimer();
+          } else if (controlsTimerRef.current) {
+            clearTimeout(controlsTimerRef.current);
+          }
+          return next;
+        });
       }}
     >
       {/* HTML5 Video Element (controls disabled to eradicate native Android WebView placeholder) */}
@@ -585,39 +579,13 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
       {/* HTML5 CUSTOM CONTROLS OVERLAY (PLAY, FWD, RWD, SCRUBBER, THEME MATCHED)   */}
       {/* ========================================================================= */}
       <div
-        className={`absolute inset-0 z-20 flex flex-col justify-between p-4 sm:p-6 transition-opacity duration-300 pointer-events-none ${
+        className={`absolute inset-0 z-20 flex flex-col justify-end p-4 sm:p-6 transition-opacity duration-300 pointer-events-none ${
           showControls && !isInitialLoading ? 'opacity-100' : 'opacity-0'
         }`}
       >
-        {/* Top Floating Bar: Title, Episode & Stream Quality Badge */}
-        <div className="flex items-center justify-between w-full pointer-events-auto">
-          <div className="flex items-center gap-2 max-w-[80%]">
-            <div className="p-1.5 rounded-lg bg-black/60 border border-white/10 backdrop-blur-md">
-              <Film className="w-4 h-4 text-hbo-cyan" />
-            </div>
-            <div className="min-w-0">
-              <h4 className="text-xs sm:text-sm font-bold text-white truncate drop-shadow-md">
-                {title}
-              </h4>
-              {mediaType === 'tv' && (
-                <p className="text-[11px] text-hbo-purple-light font-semibold truncate drop-shadow-sm">
-                  S{season} E{episode} {episodeTitle ? `• ${episodeTitle}` : ''}
-                </p>
-              )}
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <span className="px-2.5 py-1 rounded-full bg-black/60 border border-hbo-cyan/30 text-hbo-cyan text-[10px] sm:text-xs font-bold backdrop-blur-md flex items-center gap-1 shadow-sm">
-              <Zap className="w-3 h-3" />
-              Direct 1080p
-            </span>
-          </div>
-        </div>
-
-        {/* Center Action Controls: Rewind 10s, Glowing Play/Pause, Forward 10s */}
+        {/* Center Action Controls: Rewind 10s, Solid Play/Pause, Forward 10s (Opaque, Non-gradient) */}
         <div className="flex items-center justify-center gap-6 sm:gap-8 my-auto pointer-events-auto">
-          {/* Rewind 10s Button */}
+          {/* Rewind 10s Button - Solid Opaque */}
           <button
             type="button"
             onClick={(e) => {
@@ -626,15 +594,15 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
             }}
             title="Rewind 10s"
             aria-label="Rewind 10 seconds"
-            className="relative p-3 sm:p-3.5 rounded-full bg-black/60 hover:bg-black/85 text-white/90 hover:text-white border border-white/15 hover:border-hbo-cyan hover:scale-110 active:scale-95 transition-all shadow-lg backdrop-blur-md flex items-center justify-center group"
+            className="relative p-3.5 sm:p-4 rounded-full bg-[#181824] hover:bg-[#252538] text-white border border-[#33334d] active:scale-95 transition-all shadow-xl flex items-center justify-center group"
           >
-            <RotateCcw className="w-6 h-6 sm:w-7 sm:h-7 text-white group-hover:text-hbo-cyan transition" />
-            <span className="absolute text-[9px] sm:text-[10px] font-black text-white/90 group-hover:text-hbo-cyan">
+            <RotateCcw className="w-6 h-6 sm:w-7 sm:h-7 text-white" />
+            <span className="absolute text-[9px] sm:text-[10px] font-black text-white">
               10
             </span>
           </button>
 
-          {/* Main Play / Pause Button with HBO Gradient & Glow */}
+          {/* Main Play / Pause Button - Solid Opaque White, Zero Gradient */}
           <button
             type="button"
             onClick={(e) => {
@@ -643,16 +611,16 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
             }}
             title={isPlaying ? 'Pause' : 'Play'}
             aria-label={isPlaying ? 'Pause' : 'Play'}
-            className="p-4 sm:p-5 rounded-full bg-gradient-to-r from-hbo-purple to-hbo-cyan text-white shadow-hbo-glow hover:scale-110 active:scale-95 transition-all flex items-center justify-center border border-white/30"
+            className="p-5 sm:p-6 rounded-full bg-white text-black hover:bg-gray-200 active:scale-95 transition-all flex items-center justify-center shadow-2xl"
           >
             {isPlaying ? (
-              <Pause className="w-7 h-7 sm:w-9 sm:h-9 fill-current" />
+              <Pause className="w-8 h-8 sm:w-9 sm:h-9 fill-current" />
             ) : (
-              <Play className="w-7 h-7 sm:w-9 sm:h-9 fill-current translate-x-0.5" />
+              <Play className="w-8 h-8 sm:w-9 sm:h-9 fill-current translate-x-0.5" />
             )}
           </button>
 
-          {/* Forward 10s Button */}
+          {/* Forward 10s Button - Solid Opaque */}
           <button
             type="button"
             onClick={(e) => {
@@ -661,16 +629,16 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
             }}
             title="Forward 10s"
             aria-label="Forward 10 seconds"
-            className="relative p-3 sm:p-3.5 rounded-full bg-black/60 hover:bg-black/85 text-white/90 hover:text-white border border-white/15 hover:border-hbo-cyan hover:scale-110 active:scale-95 transition-all shadow-lg backdrop-blur-md flex items-center justify-center group"
+            className="relative p-3.5 sm:p-4 rounded-full bg-[#181824] hover:bg-[#252538] text-white border border-[#33334d] active:scale-95 transition-all shadow-xl flex items-center justify-center group"
           >
-            <RotateCw className="w-6 h-6 sm:w-7 sm:h-7 text-white group-hover:text-hbo-cyan transition" />
-            <span className="absolute text-[9px] sm:text-[10px] font-black text-white/90 group-hover:text-hbo-cyan">
+            <RotateCw className="w-6 h-6 sm:w-7 sm:h-7 text-white" />
+            <span className="absolute text-[9px] sm:text-[10px] font-black text-white">
               10
             </span>
           </button>
         </div>
 
-        {/* Bottom Glass Bar: Scrubber, Timers, Volume & Fullscreen */}
+        {/* Bottom Glass Bar: Scrubber, Timers, Volume */}
         <div className="w-full bg-black/75 backdrop-blur-xl border border-white/15 rounded-2xl p-3 sm:p-4 shadow-2xl pointer-events-auto space-y-2">
           {/* Progress / Scrub Bar */}
           <div className="relative flex items-center w-full group/scrubber cursor-pointer">
@@ -681,7 +649,7 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
                 className="absolute top-0 left-0 h-full bg-white/30 rounded-full transition-all duration-300"
                 style={{ width: `${Math.min(100, bufferedPercent)}%` }}
               />
-              {/* Played Progress (HBO Purple-to-Cyan Gradient) */}
+              {/* Played Progress */}
               <div
                 className="absolute top-0 left-0 h-full bg-gradient-to-r from-hbo-purple-light to-hbo-cyan rounded-full transition-all duration-150"
                 style={{ width: `${Math.min(100, playedPercent)}%` }}
@@ -705,7 +673,7 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
             />
           </div>
 
-          {/* Bottom Controls Row: Play/Pause, Rewind, Forward, Time Display, Volume & Fullscreen */}
+          {/* Bottom Controls Row: Play/Pause, Rewind, Forward, Time Display, Volume */}
           <div className="flex items-center justify-between text-xs sm:text-sm text-white pt-1">
             {/* Left Controls */}
             <div className="flex items-center gap-3 sm:gap-4">
@@ -750,15 +718,8 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
               </div>
             </div>
 
-            {/* Right Controls: Stream Badge, Mute, Fullscreen */}
+            {/* Right Controls: Mute Toggle */}
             <div className="flex items-center gap-2 sm:gap-3">
-              {/* Stream Badge */}
-              <span className="hidden sm:inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-md bg-white/10 text-white/80 font-semibold border border-white/10">
-                <Zap className="w-3 h-3 text-hbo-cyan" />
-                {providerLabel}
-              </span>
-
-              {/* Mute Toggle */}
               <button
                 type="button"
                 onClick={handleToggleMute}
@@ -767,17 +728,6 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
                 aria-label={isMuted ? 'Unmute' : 'Mute'}
               >
                 {isMuted ? <VolumeX className="w-4 h-4 sm:w-5 sm:h-5 text-red-400" /> : <Volume2 className="w-4 h-4 sm:w-5 sm:h-5" />}
-              </button>
-
-              {/* Fullscreen Toggle */}
-              <button
-                type="button"
-                onClick={onToggleFullscreen}
-                className="p-1.5 rounded-lg hover:bg-white/10 text-white/80 hover:text-white transition active:scale-95"
-                title={isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
-                aria-label={isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
-              >
-                {isFullscreen ? <Minimize2 className="w-4 h-4 sm:w-5 sm:h-5" /> : <Maximize2 className="w-4 h-4 sm:w-5 sm:h-5" />}
               </button>
             </div>
           </div>

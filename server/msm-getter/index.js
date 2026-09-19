@@ -887,6 +887,17 @@ app.get('/stream/:docId', async (req, res) => {
       return res.status(404).send('Media document not found or expired from recent bot messages');
     }
 
+    // Handle HEAD probe requests instantly (critical for Android WebView & ExoPlayer probe)
+    if (req.method === 'HEAD') {
+      res.writeHead(200, {
+        'Content-Length': fileSize,
+        'Content-Type': mimeType,
+        'Accept-Ranges': 'bytes',
+        'Content-Disposition': `inline; filename="${encodeURIComponent(filename)}"`,
+      });
+      return res.end();
+    }
+
     if (!rangeHeader) {
       res.writeHead(200, {
         'Content-Length': fileSize,
