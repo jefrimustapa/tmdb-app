@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import {
   Subtitles,
@@ -16,7 +16,9 @@ import {
   Zap,
   Globe,
   Sparkles,
-  Type
+  Type,
+  ChevronRight,
+  ArrowLeft
 } from 'lucide-react';
 import { SubtitleTrack } from '../../services/subtitleService';
 import { STREAM_PROVIDERS, getOrderedProviders, getProvidersByEngine, getProviderById, CATEGORY_BADGE_CONFIG, ORIGIN_COUNTRY_LABELS, extractMediaOriginCountries, isProviderMatchingMedia } from '../../services/streamProviders';
@@ -81,8 +83,73 @@ export const WatchSettingsModal: React.FC<WatchSettingsModalProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<WatchSettingsTab>(defaultTab === 'servers' ? 'server' : defaultTab);
   const [filterLang, setFilterLang] = useState<'all' | 'ms' | 'en'>('all');
+  const [activeDrawer, setActiveDrawer] = useState<'none' | 'fontsize' | 'delay'>('none');
   const modalRef = useRef<HTMLDivElement>(null);
+  const drawerRef = useRef<HTMLDivElement>(null);
   const activeAsean = isAsean || isAsian;
+
+  const checkLandscape = useCallback(() => {
+    if (typeof window === 'undefined') return false;
+    const isAngleLandscape =
+      (window.screen?.orientation && window.screen.orientation.type?.includes('landscape')) ||
+      Math.abs(Number((window as any).orientation || 0)) === 90;
+    return window.innerWidth > window.innerHeight || !!isAngleLandscape;
+  }, []);
+
+  const [isLandscape, setIsLandscape] = useState(checkLandscape);
+
+  useEffect(() => {
+    let timer: NodeJS.Timeout | null = null;
+    const handleResize = (e?: any) => {
+      if (e?.type === 'tmdb_fullscreen_changed' && e.detail?.fullscreen) {
+        setIsLandscape(true);
+        return;
+      }
+      setIsLandscape(checkLandscape());
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => {
+        setIsLandscape(checkLandscape());
+      }, 150);
+    };
+
+    window.addEventListener('resize', handleResize);
+    window.addEventListener('orientationchange', handleResize);
+    window.addEventListener('tmdb_fullscreen_changed', handleResize);
+    if (window.screen?.orientation) {
+      window.screen.orientation.addEventListener('change', handleResize);
+    }
+    return () => {
+      if (timer) clearTimeout(timer);
+      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('orientationchange', handleResize);
+      window.removeEventListener('tmdb_fullscreen_changed', handleResize);
+      if (window.screen?.orientation) {
+        window.screen.orientation.removeEventListener('change', handleResize);
+      }
+    };
+  }, [checkLandscape]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      setActiveDrawer('none');
+    }
+  }, [isOpen]);
+
+  // Pull focus to first interactive element when drawer opens
+  useEffect(() => {
+    if (activeDrawer !== 'none') {
+      const timer = setTimeout(() => {
+        if (drawerRef.current) {
+          const firstItem = drawerRef.current.querySelector<HTMLElement>('[data-subdrawer-item="true"]');
+          if (firstItem) {
+            firstItem.focus();
+            firstItem.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+          }
+        }
+      }, 50);
+      return () => clearTimeout(timer);
+    }
+  }, [activeDrawer]);
 
   const hasEmbed = !enabledResolvers || enabledResolvers.includes('embed');
   const hasTelegram = Boolean(enabledResolvers && enabledResolvers.includes('telegram'));
@@ -165,6 +232,139 @@ export const WatchSettingsModal: React.FC<WatchSettingsModalProps> = ({
     } catch (e) {}
 
     const handleKeyDown = (e: KeyboardEvent) => {
+      // If a subdrawer is currently open, handle D-pad navigation exclusively within it
+      if (activeDrawer !== 'none') {
+        if (e.key === 'Escape' || e.key === 'Back' || e.keyCode === 27) {
+          e.preventDefault();
+          e.stopPropagation();
+          const prevBtnId = activeDrawer === 'fontsize' ? 'drawer-btn-fontsize' : 'drawer-btn-delay';
+          setActiveDrawer('none');
+          setTimeout(() => {
+            const prevBtn = document.getElementById(prevBtnId);
+            if (prevBtn) prevBtn.focus();
+          }, 40);
+          return;
+        }
+
+        if (!drawerRef.current) return;
+
+        const subRows: HTMLElement[][] = [];
+
+        // Row 0: Back button & Close button
+        const headerBtns = Array.from(
+          drawerRef.current.querySelectorAll<HTMLElement>('[data-subdrawer-header-btn="true"]')
+        );
+        if (headerBtns.length > 0) subRows.push(headerBtns);
+
+        // Subdrawer rows (e.g. Stepper controls row, Fine-tune row)
+        const rowEls = Array.from(
+          drawerRef.current.querySelectorAll<HTMLElement>('[data-subdrawer-row="true"]')
+        );
+        rowEls.forEach((rEl) => {
+          const items = Array.from(rEl.querySelectorAll<HTMLElement>('[data-subdrawer-item="true"]'));
+          if (items.length > 0) subRows.push(items);
+        });
+
+        // Subdrawer grids (e.g. Presets grid)
+        const gridEls = Array.from(
+          drawerRef.current.querySelectorAll<HTMLElement>('[data-subdrawer-grid="true"]')
+        );
+        gridEls.forEach((gEl) => {
+          const items = Array.from(gEl.querySelectorAll<HTMLElement>('[data-subdrawer-item="true"]'));
+          const cols = gEl.classList.contains('grid-cols-4') ? 4 : 3;
+          for (let i = 0; i < items.length; i += cols) {
+            subRows.push(items.slice(i, i + cols));
+          }
+        });
+
+        const currentSubEl = document.activeElement as HTMLElement | null;
+        let curR = -1;
+        let curC = -1;
+        if (currentSubEl) {
+          for (let r = 0; r < subRows.length; r++) {
+            const c = subRows[r].indexOf(currentSubEl);
+            if (c !== -1) {
+              curR = r;
+              curC = c;
+              break;
+            }
+          }
+        }
+
+        if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          e.stopPropagation();
+          if (curR === -1) {
+            if (subRows.length > 0 && subRows[0].length > 0) {
+              subRows[0][0].focus();
+              subRows[0][0].scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+            }
+            return;
+          }
+          if (curR < subRows.length - 1) {
+            const nextRow = subRows[curR + 1];
+            const target = nextRow[Math.min(curC >= 0 ? curC : 0, nextRow.length - 1)];
+            target?.focus();
+            target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+          }
+          return;
+        }
+
+        if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          e.stopPropagation();
+          if (curR === -1) {
+            if (subRows.length > 0 && subRows[0].length > 0) {
+              subRows[0][0].focus();
+              subRows[0][0].scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+            }
+            return;
+          }
+          if (curR > 0) {
+            const prevRow = subRows[curR - 1];
+            const target = prevRow[Math.min(curC >= 0 ? curC : 0, prevRow.length - 1)];
+            target?.focus();
+            target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+          }
+          return;
+        }
+
+        if (e.key === 'ArrowRight') {
+          if (curR >= 0) {
+            const row = subRows[curR];
+            if (curC < row.length - 1) {
+              e.preventDefault();
+              e.stopPropagation();
+              row[curC + 1].focus();
+              row[curC + 1].scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+            }
+          }
+          return;
+        }
+
+        if (e.key === 'ArrowLeft') {
+          if (curR >= 0 && curC > 0) {
+            e.preventDefault();
+            e.stopPropagation();
+            subRows[curR][curC - 1].focus();
+            subRows[curR][curC - 1].scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+          } else if (isLandscape && curC === 0) {
+            // In landscape right-side drawer, pressing left at leftmost edge closes drawer and focuses trigger button
+            e.preventDefault();
+            e.stopPropagation();
+            const prevBtnId = activeDrawer === 'fontsize' ? 'drawer-btn-fontsize' : 'drawer-btn-delay';
+            setActiveDrawer('none');
+            setTimeout(() => {
+              const prevBtn = document.getElementById(prevBtnId);
+              if (prevBtn) prevBtn.focus();
+            }, 40);
+          }
+          return;
+        }
+
+        return;
+      }
+
       if (e.key === 'Escape' || e.key === 'Back' || e.keyCode === 27) {
         e.preventDefault();
         e.stopPropagation();
@@ -181,15 +381,13 @@ export const WatchSettingsModal: React.FC<WatchSettingsModalProps> = ({
       // Group focusables into logical rows so vertical navigation jumps rows directly!
       const closeBtn = modalRef.current.querySelector<HTMLElement>('[data-close-dialog="true"]');
       const tabs = Array.from(modalRef.current.querySelectorAll<HTMLElement>('[role="tab"]'));
-      const syncBtns = Array.from(modalRef.current.querySelectorAll<HTMLElement>('[data-sync-btn="true"]'));
-      const fontBtns = Array.from(modalRef.current.querySelectorAll<HTMLElement>('[data-font-btn="true"]'));
+      const drawerBtns = Array.from(modalRef.current.querySelectorAll<HTMLElement>('[data-drawer-btn="true"]'));
       const langBtns = Array.from(modalRef.current.querySelectorAll<HTMLElement>('[data-lang-btn="true"]'));
       const listItems = Array.from(modalRef.current.querySelectorAll<HTMLElement>('[data-list-item="true"]'));
 
       const rows: HTMLElement[][] = [];
       if (tabs.length > 0) rows.push(tabs);
-      if (syncBtns.length > 0) rows.push(syncBtns);
-      if (fontBtns.length > 0) rows.push(fontBtns);
+      if (drawerBtns.length > 0) rows.push(drawerBtns);
       if (langBtns.length > 0) rows.push(langBtns);
       listItems.forEach((item) => rows.push([item]));
 
@@ -296,7 +494,7 @@ export const WatchSettingsModal: React.FC<WatchSettingsModalProps> = ({
           return;
         }
 
-        // Inside a multi-item row (sync offset buttons or language filter pills), navigate horizontally
+        // Inside a multi-item row (drawer buttons, language filter pills), navigate horizontally
         if (currentRowIdx !== -1) {
           const row = rows[currentRowIdx];
           if (row.length > 1 && currentColIdx !== -1) {
@@ -369,7 +567,7 @@ export const WatchSettingsModal: React.FC<WatchSettingsModalProps> = ({
       } catch (e) {}
       window.dispatchEvent(new CustomEvent('tmdb_resume_player'));
     };
-  }, [isOpen, activeTab, onClose]);
+  }, [isOpen, activeTab, onClose, activeDrawer, isLandscape]);
 
   if (!isOpen) return null;
 
@@ -406,7 +604,9 @@ export const WatchSettingsModal: React.FC<WatchSettingsModalProps> = ({
       <div
         ref={modalRef}
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-lg max-h-[85vh] flex flex-col bg-zinc-950/95 border border-white/10 rounded-2xl shadow-2xl shadow-black/90 overflow-hidden animate-scaleUp"
+        className={`w-full ${
+          isLandscape ? 'max-w-xl sm:max-w-2xl max-h-[90vh]' : 'max-w-lg max-h-[85vh]'
+        } flex flex-col bg-zinc-950/95 border border-white/10 rounded-2xl shadow-2xl shadow-black/90 overflow-hidden animate-scaleUp relative`}
       >
         {/* Header: Title + Close Button */}
         <div className="flex items-center justify-between px-4 py-2.5 sm:px-5 sm:py-2.5 border-b border-white/10 bg-black/40 flex-shrink-0">
@@ -480,103 +680,54 @@ export const WatchSettingsModal: React.FC<WatchSettingsModalProps> = ({
         {/* TAB 1: SUBTITLES */}
         {activeTab === 'subtitles' && (
           <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-            {/* Sync Offset Controls (Visible only if a track is actively selected) */}
-            {activeTrackId && (
-              <div className="flex items-center justify-between px-5 py-2.5 bg-black/40 border-b border-white/10 text-xs flex-shrink-0">
-                <div className="flex items-center gap-2 text-gray-300">
-                  <Clock className="w-3.5 h-3.5 text-hbo-cyan" />
-                  <span>Subtitle Sync:</span>
-                  <span className={`font-mono font-bold ${syncOffset === 0 ? 'text-gray-400' : 'text-hbo-cyan'}`}>
-                    {syncOffset > 0 ? `+${syncOffset.toFixed(1)}s` : `${syncOffset.toFixed(1)}s`}
-                  </span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <button
-                    type="button"
-                    tabIndex={0}
-                    onClick={() => onAdjustSync(Math.round((syncOffset - 0.5) * 10) / 10)}
-                    data-sync-btn="true"
-                    title="Delay subtitle by 0.5s"
-                    className="px-2 py-1 rounded-lg bg-white/10 hover:bg-white/20 active:scale-95 text-white font-medium flex items-center gap-1 transition tv-focus-target focus:outline-none focus:ring-2 focus:ring-hbo-cyan cursor-pointer"
-                  >
-                    <Minus className="w-3 h-3" />
-                    <span>0.5s</span>
-                  </button>
-                  {syncOffset !== 0 && (
-                    <button
-                      type="button"
-                      tabIndex={0}
-                      onClick={() => onAdjustSync(0)}
-                      data-sync-btn="true"
-                      title="Reset subtitle offset to 0"
-                      className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 active:scale-95 text-hbo-cyan transition tv-focus-target focus:outline-none focus:ring-2 focus:ring-hbo-cyan cursor-pointer"
-                    >
-                      <RotateCcw className="w-3 h-3" />
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    tabIndex={0}
-                    onClick={() => onAdjustSync(Math.round((syncOffset + 0.5) * 10) / 10)}
-                    data-sync-btn="true"
-                    title="Advance subtitle by 0.5s"
-                    className="px-2 py-1 rounded-lg bg-white/10 hover:bg-white/20 active:scale-95 text-white font-medium flex items-center gap-1 transition tv-focus-target focus:outline-none focus:ring-2 focus:ring-hbo-cyan cursor-pointer"
-                  >
-                    <Plus className="w-3 h-3" />
-                    <span>0.5s</span>
-                  </button>
-                </div>
-              </div>
-            )}
+            {/* Drawer Triggers: Font Size & Subtitle Delay */}
+            <div className="flex items-center gap-2 px-3 py-2 sm:px-4 sm:py-2.5 bg-black/30 border-b border-white/10 flex-shrink-0">
+              {/* Font Size Drawer Trigger Button */}
+              {onAdjustFontSize && (
+                <button
+                  type="button"
+                  tabIndex={0}
+                  id="drawer-btn-fontsize"
+                  data-drawer-btn="true"
+                  onClick={() => setActiveDrawer('fontsize')}
+                  aria-haspopup="dialog"
+                  aria-expanded={activeDrawer === 'fontsize'}
+                  className="flex-1 flex items-center justify-between py-2 px-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 active:scale-95 transition text-xs tv-focus-target focus:outline-none focus:ring-2 focus:ring-hbo-cyan cursor-pointer"
+                >
+                  <div className="flex items-center gap-2 text-gray-300">
+                    <Type className="w-3.5 h-3.5 text-hbo-cyan" />
+                    <span className="font-semibold">Font Size</span>
+                  </div>
+                  <div className="flex items-center gap-1 font-mono font-bold text-hbo-cyan">
+                    <span>{fontSize || 100}%</span>
+                    <ChevronRight className="w-3.5 h-3.5 text-gray-400" />
+                  </div>
+                </button>
+              )}
 
-            {/* Font Size Controls (Persistent Global Adjustment) */}
-            {onAdjustFontSize && (
-              <div className="flex items-center justify-between px-4 py-2 sm:px-5 sm:py-2.5 bg-black/30 border-b border-white/10 text-xs flex-shrink-0">
-                <div className="flex items-center gap-2 text-gray-300">
-                  <Type className="w-3.5 h-3.5 text-hbo-cyan" />
-                  <span>Font Size:</span>
-                  <span className={`font-mono font-bold ${(fontSize || 100) === 100 ? 'text-gray-400' : 'text-hbo-cyan'}`}>
-                    {fontSize || 100}%
-                  </span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <button
-                    type="button"
-                    tabIndex={0}
-                    onClick={() => onAdjustFontSize(Math.max(70, (fontSize || 100) - 15))}
-                    data-font-btn="true"
-                    title="Decrease subtitle font size"
-                    className="px-2 py-1 rounded-lg bg-white/10 hover:bg-white/20 active:scale-95 text-white font-medium flex items-center gap-1 transition tv-focus-target focus:outline-none focus:ring-2 focus:ring-hbo-cyan cursor-pointer"
-                  >
-                    <Minus className="w-3 h-3" />
-                    <span>15%</span>
-                  </button>
-                  {(fontSize || 100) !== 100 && (
-                    <button
-                      type="button"
-                      tabIndex={0}
-                      onClick={() => onAdjustFontSize(100)}
-                      data-font-btn="true"
-                      title="Reset font size to 100%"
-                      className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 active:scale-95 text-hbo-cyan transition tv-focus-target focus:outline-none focus:ring-2 focus:ring-hbo-cyan cursor-pointer"
-                    >
-                      <RotateCcw className="w-3 h-3" />
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    tabIndex={0}
-                    onClick={() => onAdjustFontSize(Math.min(190, (fontSize || 100) + 15))}
-                    data-font-btn="true"
-                    title="Increase subtitle font size"
-                    className="px-2 py-1 rounded-lg bg-white/10 hover:bg-white/20 active:scale-95 text-white font-medium flex items-center gap-1 transition tv-focus-target focus:outline-none focus:ring-2 focus:ring-hbo-cyan cursor-pointer"
-                  >
-                    <Plus className="w-3 h-3" />
-                    <span>15%</span>
-                  </button>
-                </div>
-              </div>
-            )}
+              {/* Subtitle Delay (Sync) Drawer Trigger Button */}
+              {activeTrackId && (
+                <button
+                  type="button"
+                  tabIndex={0}
+                  id="drawer-btn-delay"
+                  data-drawer-btn="true"
+                  onClick={() => setActiveDrawer('delay')}
+                  aria-haspopup="dialog"
+                  aria-expanded={activeDrawer === 'delay'}
+                  className="flex-1 flex items-center justify-between py-2 px-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 active:scale-95 transition text-xs tv-focus-target focus:outline-none focus:ring-2 focus:ring-hbo-cyan cursor-pointer"
+                >
+                  <div className="flex items-center gap-2 text-gray-300">
+                    <Clock className="w-3.5 h-3.5 text-hbo-cyan" />
+                    <span className="font-semibold">Delay</span>
+                  </div>
+                  <div className="flex items-center gap-1 font-mono font-bold text-hbo-cyan">
+                    <span>{syncOffset > 0 ? `+${syncOffset.toFixed(1)}s` : `${syncOffset.toFixed(1)}s`}</span>
+                    <ChevronRight className="w-3.5 h-3.5 text-gray-400" />
+                  </div>
+                </button>
+              )}
+            </div>
 
             {/* Language Tabs */}
             <div className="flex items-center gap-2 px-5 py-2.5 border-b border-white/10 bg-black/20 text-xs flex-shrink-0">
@@ -990,6 +1141,300 @@ export const WatchSettingsModal: React.FC<WatchSettingsModalProps> = ({
               </div>
             )}
           </div>
+        )}
+
+        {/* SUBDRAWER OVERLAY & PANEL (Right drawer in landscape, Bottom drawer in portrait) */}
+        {activeDrawer !== 'none' && (
+          <>
+            {/* Backdrop blur to dim the parent modal */}
+            <div
+              className="absolute inset-0 bg-black/60 backdrop-blur-[2px] z-20 animate-fade-in"
+              onClick={() => {
+                const prevBtnId = activeDrawer === 'fontsize' ? 'drawer-btn-fontsize' : 'drawer-btn-delay';
+                setActiveDrawer('none');
+                setTimeout(() => document.getElementById(prevBtnId)?.focus(), 30);
+              }}
+            />
+
+            {/* Subdrawer Panel */}
+            <div
+              ref={drawerRef}
+              data-subdrawer="true"
+              className={`absolute ${
+                isLandscape
+                  ? 'inset-y-0 right-0 w-full sm:w-80 md:w-96 border-l animate-slide-in-right'
+                  : 'inset-x-0 bottom-0 max-h-[85%] border-t rounded-t-2xl animate-slide-up'
+              } bg-zinc-950/98 border-white/10 shadow-2xl z-30 flex flex-col overflow-hidden select-none`}
+            >
+              {/* Drawer Header */}
+              <div className="flex items-center justify-between px-4 py-2.5 sm:px-5 sm:py-3 border-b border-white/10 bg-black/40 flex-shrink-0">
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    tabIndex={0}
+                    id="subdrawer-back-btn"
+                    data-subdrawer-header-btn="true"
+                    data-subdrawer-item="true"
+                    onClick={() => {
+                      const prevBtnId = activeDrawer === 'fontsize' ? 'drawer-btn-fontsize' : 'drawer-btn-delay';
+                      setActiveDrawer('none');
+                      setTimeout(() => document.getElementById(prevBtnId)?.focus(), 30);
+                    }}
+                    className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 active:scale-95 transition tv-focus-target focus:outline-none focus:ring-2 focus:ring-hbo-cyan cursor-pointer"
+                    title="Back"
+                  >
+                    <ArrowLeft className="w-4 h-4" />
+                  </button>
+                  <div className="flex items-center gap-2">
+                    {activeDrawer === 'fontsize' ? (
+                      <Type className="w-4 h-4 text-hbo-cyan" />
+                    ) : (
+                      <Clock className="w-4 h-4 text-hbo-cyan" />
+                    )}
+                    <h3 className="font-bold text-sm sm:text-base text-white">
+                      {activeDrawer === 'fontsize' ? 'Subtitle Font Size' : 'Subtitle Delay (Sync)'}
+                    </h3>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  tabIndex={0}
+                  data-subdrawer-header-btn="true"
+                  data-subdrawer-item="true"
+                  onClick={() => {
+                    const prevBtnId = activeDrawer === 'fontsize' ? 'drawer-btn-fontsize' : 'drawer-btn-delay';
+                    setActiveDrawer('none');
+                    setTimeout(() => document.getElementById(prevBtnId)?.focus(), 30);
+                  }}
+                  className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 active:scale-95 transition tv-focus-target focus:outline-none focus:ring-2 focus:ring-hbo-cyan cursor-pointer"
+                  title="Close"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Drawer Content */}
+              <div className="flex-1 overflow-y-auto p-4 space-y-4 overscroll-contain">
+                {activeDrawer === 'fontsize' && onAdjustFontSize && (
+                  <>
+                    {/* Current Scale Display */}
+                    <div className="flex flex-col items-center justify-center p-3 rounded-xl bg-black/40 border border-white/10">
+                      <span className="text-xs text-gray-400">Current Font Scale</span>
+                      <span className="text-2xl font-bold font-mono text-hbo-cyan mt-0.5">
+                        {fontSize || 100}%
+                      </span>
+                      <p className="text-[11px] text-gray-500 mt-0.5">
+                        Saved globally across all videos
+                      </p>
+                    </div>
+
+                    {/* Stepper Controls */}
+                    <div className="space-y-1.5">
+                      <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider block">
+                        Step Adjust (15%)
+                      </span>
+                      <div className="flex items-center gap-2" data-subdrawer-row="true">
+                        <button
+                          type="button"
+                          tabIndex={0}
+                          data-subdrawer-item="true"
+                          onClick={() => onAdjustFontSize(Math.max(70, (fontSize || 100) - 15))}
+                          className="flex-1 py-2 px-3 rounded-xl bg-white/10 hover:bg-white/20 active:scale-95 text-white font-semibold flex items-center justify-center gap-1.5 text-xs transition tv-focus-target focus:outline-none focus:ring-2 focus:ring-hbo-cyan cursor-pointer"
+                        >
+                          <Minus className="w-3.5 h-3.5" />
+                          <span>15%</span>
+                        </button>
+                        {(fontSize || 100) !== 100 && (
+                          <button
+                            type="button"
+                            tabIndex={0}
+                            data-subdrawer-item="true"
+                            onClick={() => onAdjustFontSize(100)}
+                            className="py-2 px-3 rounded-xl bg-white/10 hover:bg-white/20 active:scale-95 text-hbo-cyan font-semibold flex items-center justify-center gap-1 text-xs transition tv-focus-target focus:outline-none focus:ring-2 focus:ring-hbo-cyan cursor-pointer"
+                            title="Reset to 100%"
+                          >
+                            <RotateCcw className="w-3.5 h-3.5" />
+                            <span>Reset</span>
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          tabIndex={0}
+                          data-subdrawer-item="true"
+                          onClick={() => onAdjustFontSize(Math.min(190, (fontSize || 100) + 15))}
+                          className="flex-1 py-2 px-3 rounded-xl bg-white/10 hover:bg-white/20 active:scale-95 text-white font-semibold flex items-center justify-center gap-1.5 text-xs transition tv-focus-target focus:outline-none focus:ring-2 focus:ring-hbo-cyan cursor-pointer"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>15%</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Quick Presets Grid */}
+                    <div className="space-y-1.5">
+                      <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider block">
+                        Quick Presets
+                      </span>
+                      <div className="grid grid-cols-3 gap-1.5" data-subdrawer-grid="true">
+                        {[70, 85, 100, 115, 130, 145, 160, 175, 190].map((val) => {
+                          const isCur = (fontSize || 100) === val;
+                          return (
+                            <button
+                              key={val}
+                              type="button"
+                              tabIndex={0}
+                              data-subdrawer-item="true"
+                              onClick={() => onAdjustFontSize(val)}
+                              className={`py-2 px-2 rounded-lg text-xs font-mono font-bold transition text-center tv-focus-target focus:outline-none focus:ring-2 focus:ring-hbo-cyan cursor-pointer ${
+                                isCur
+                                  ? 'bg-hbo-cyan/25 text-hbo-cyan border border-hbo-cyan/40 shadow-sm'
+                                  : 'bg-white/5 hover:bg-white/10 text-gray-300 border border-transparent'
+                              }`}
+                            >
+                              {val}%
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Live Preview Sample */}
+                    <div className="p-3 rounded-xl bg-black/60 border border-white/10 space-y-1.5">
+                      <span className="text-[10px] uppercase tracking-wider text-gray-500 font-semibold block">
+                        Live Preview
+                      </span>
+                      <div className="flex items-center justify-center py-2.5 px-3 bg-black/80 rounded-lg min-h-[48px]">
+                        <span
+                          style={{ fontSize: `${((fontSize || 100) / 100) * 0.9}rem` }}
+                          className="font-bold text-white text-center leading-snug drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]"
+                        >
+                          Contoh Paparan Sarikata
+                        </span>
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {activeDrawer === 'delay' && (
+                  <>
+                    {/* Current Offset Display */}
+                    <div className="flex flex-col items-center justify-center p-3 rounded-xl bg-black/40 border border-white/10">
+                      <span className="text-xs text-gray-400">Current Delay / Offset</span>
+                      <span className="text-2xl font-bold font-mono text-hbo-cyan mt-0.5">
+                        {syncOffset > 0 ? `+${syncOffset.toFixed(1)}s` : `${syncOffset.toFixed(1)}s`}
+                      </span>
+                      <p className="text-[11px] text-gray-500 mt-0.5">
+                        {syncOffset === 0
+                          ? 'In sync with video audio'
+                          : syncOffset > 0
+                          ? `Delayed by +${syncOffset.toFixed(1)}s`
+                          : `Advanced by ${syncOffset.toFixed(1)}s`}
+                      </p>
+                    </div>
+
+                    {/* Stepper Controls (0.5s) */}
+                    <div className="space-y-1.5">
+                      <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider block">
+                        Step Adjust (0.5s)
+                      </span>
+                      <div className="flex items-center gap-2" data-subdrawer-row="true">
+                        <button
+                          type="button"
+                          tabIndex={0}
+                          data-subdrawer-item="true"
+                          onClick={() => onAdjustSync(Math.round((syncOffset - 0.5) * 10) / 10)}
+                          className="flex-1 py-2 px-3 rounded-xl bg-white/10 hover:bg-white/20 active:scale-95 text-white font-semibold flex items-center justify-center gap-1.5 text-xs transition tv-focus-target focus:outline-none focus:ring-2 focus:ring-hbo-cyan cursor-pointer"
+                        >
+                          <Minus className="w-3.5 h-3.5" />
+                          <span>0.5s</span>
+                        </button>
+                        {syncOffset !== 0 && (
+                          <button
+                            type="button"
+                            tabIndex={0}
+                            data-subdrawer-item="true"
+                            onClick={() => onAdjustSync(0)}
+                            className="py-2 px-3 rounded-xl bg-white/10 hover:bg-white/20 active:scale-95 text-hbo-cyan font-semibold flex items-center justify-center gap-1 text-xs transition tv-focus-target focus:outline-none focus:ring-2 focus:ring-hbo-cyan cursor-pointer"
+                            title="Reset to 0s"
+                          >
+                            <RotateCcw className="w-3.5 h-3.5" />
+                            <span>Reset</span>
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          tabIndex={0}
+                          data-subdrawer-item="true"
+                          onClick={() => onAdjustSync(Math.round((syncOffset + 0.5) * 10) / 10)}
+                          className="flex-1 py-2 px-3 rounded-xl bg-white/10 hover:bg-white/20 active:scale-95 text-white font-semibold flex items-center justify-center gap-1.5 text-xs transition tv-focus-target focus:outline-none focus:ring-2 focus:ring-hbo-cyan cursor-pointer"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>0.5s</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Fine-tune Controls (0.1s) */}
+                    <div className="space-y-1.5">
+                      <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider block">
+                        Fine Tune (0.1s)
+                      </span>
+                      <div className="flex items-center gap-2" data-subdrawer-row="true">
+                        <button
+                          type="button"
+                          tabIndex={0}
+                          data-subdrawer-item="true"
+                          onClick={() => onAdjustSync(Math.round((syncOffset - 0.1) * 10) / 10)}
+                          className="flex-1 py-1.5 px-3 rounded-xl bg-white/5 hover:bg-white/15 active:scale-95 text-gray-300 font-medium flex items-center justify-center gap-1 text-xs transition tv-focus-target focus:outline-none focus:ring-2 focus:ring-hbo-cyan cursor-pointer"
+                        >
+                          <Minus className="w-3 h-3" />
+                          <span>0.1s</span>
+                        </button>
+                        <button
+                          type="button"
+                          tabIndex={0}
+                          data-subdrawer-item="true"
+                          onClick={() => onAdjustSync(Math.round((syncOffset + 0.1) * 10) / 10)}
+                          className="flex-1 py-1.5 px-3 rounded-xl bg-white/5 hover:bg-white/15 active:scale-95 text-gray-300 font-medium flex items-center justify-center gap-1 text-xs transition tv-focus-target focus:outline-none focus:ring-2 focus:ring-hbo-cyan cursor-pointer"
+                        >
+                          <Plus className="w-3 h-3" />
+                          <span>0.1s</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Quick Presets */}
+                    <div className="space-y-1.5">
+                      <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider block">
+                        Quick Offset Jumps
+                      </span>
+                      <div className="grid grid-cols-4 gap-1.5" data-subdrawer-grid="true">
+                        {[-2.0, -1.0, 0, 1.0, 2.0, 3.0, 4.0, 5.0].map((val) => {
+                          const isCur = Math.abs(syncOffset - val) < 0.05;
+                          return (
+                            <button
+                              key={val}
+                              type="button"
+                              tabIndex={0}
+                              data-subdrawer-item="true"
+                              onClick={() => onAdjustSync(val)}
+                              className={`py-1.5 px-1.5 rounded-lg text-xs font-mono font-bold transition text-center tv-focus-target focus:outline-none focus:ring-2 focus:ring-hbo-cyan cursor-pointer ${
+                                isCur
+                                  ? 'bg-hbo-cyan/25 text-hbo-cyan border border-hbo-cyan/40 shadow-sm'
+                                  : 'bg-white/5 hover:bg-white/10 text-gray-300 border border-transparent'
+                              }`}
+                            >
+                              {val > 0 ? `+${val}s` : `${val}s`}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+          </>
         )}
       </div>
     </div>
