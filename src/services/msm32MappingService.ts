@@ -23,9 +23,19 @@ class Msm32MappingService {
   private async getBaseUrl(): Promise<string> {
     const settings = await dbService.getSettings();
     let url = settings?.msm32GetterUrl?.trim();
-    if (!url || url === 'http://localhost:3033') {
+    
+    // Automatically sanitize and enforce https for onrender.com
+    if (url && url.includes('onrender.com') && url.startsWith('http://')) {
+      url = url.replace('http://', 'https://');
+    }
+
+    // In native Capacitor or HTTPS web context, insecure http:// URLs get blocked by Chromium Mixed Content.
+    // If the configured URL is an unrouteable local IP or empty, default securely to Render Cloud.
+    const isHttpsContext = typeof window !== 'undefined' && window.location?.protocol === 'https:';
+    if (!url || url === 'http://localhost:3033' || (isHttpsContext && (url.startsWith('http://192.168.') || url.startsWith('http://10.') || url.startsWith('http://localhost')))) {
       url = 'https://msm-getter.onrender.com';
     }
+
     return url.replace(/\/+$/, '');
   }
 
