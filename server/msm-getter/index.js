@@ -482,6 +482,30 @@ app.get('/health', (req, res) => {
   });
 });
 
+// Diagnostic endpoint to inspect raw buttons returned by @msm32bot
+app.get('/api/debug-search', async (req, res) => {
+  try {
+    const query = req.query.q || 'Kelas Cikgu Hiragi';
+    await initTelegram();
+    const sentMsg = await client.sendMessage('msm32bot', { message: query });
+    await new Promise(r => setTimeout(r, 2000));
+    const msgs = await client.getMessages('msm32bot', { limit: 5 });
+    const buttons = [];
+    for (const m of msgs) {
+      if (m.id > sentMsg.id && m.replyMarkup?.rows) {
+        for (const row of m.replyMarkup.rows) {
+          for (const btn of row.buttons) {
+            buttons.push({ text: btn.text, url: btn.url, className: btn.className });
+          }
+        }
+      }
+    }
+    res.json({ success: true, query, count: buttons.length, buttons });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // Resolver endpoint: /api/resolve?title=Kelas+Cikgu+Hiragi&season=1&episode=1
 app.get('/api/resolve', async (req, res) => {
   const { title, year, season, episode, maxQuality = '720', force, refresh } = req.query;
