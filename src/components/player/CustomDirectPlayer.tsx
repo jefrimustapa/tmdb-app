@@ -861,12 +861,12 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
       {/* HTML5 CUSTOM CONTROLS OVERLAY (PLAY, FWD, RWD, SCRUBBER, THEME MATCHED)   */}
       {/* ========================================================================= */}
       <div
-        className={`absolute inset-0 z-20 flex flex-col justify-between transition-opacity duration-300 pointer-events-none ${
+        className={`absolute inset-0 z-20 transition-opacity duration-300 pointer-events-none ${
           (showControls || isBuffering || seekFeedback) && !isInitialLoading ? 'opacity-100' : 'opacity-0'
         }`}
       >
-        {/* Center Action Controls: Rewind 10s, Loading/Play/Pause, Forward 10s */}
-        <div className="flex-1 flex items-center justify-center gap-10 sm:gap-14 pointer-events-auto p-4 sm:p-6">
+        {/* Center Action Controls: Rewind 10s, Loading/Play/Pause, Forward 10s (True vertical & horizontal center) */}
+        <div className="absolute inset-0 flex items-center justify-center gap-10 sm:gap-14 pointer-events-none p-4 sm:p-6">
           {/* Rewind 10s Button - Visual Seek Feedback on Center Control */}
           <button
             type="button"
@@ -876,7 +876,7 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
             }}
             title="Rewind 10s"
             aria-label="Rewind 10 seconds"
-            className={`relative p-2 text-white bg-transparent border-0 transition-all duration-200 flex items-center justify-center ${
+            className={`relative p-2 text-white bg-transparent border-0 transition-all duration-200 flex items-center justify-center pointer-events-auto ${
               seekFeedback === 'rwd'
                 ? 'opacity-100 scale-125 -rotate-12'
                 : 'opacity-70 hover:opacity-100 active:scale-90'
@@ -898,7 +898,7 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
             }}
             title={isBuffering ? 'Buffering...' : isPlaying ? 'Pause' : 'Play'}
             aria-label={isBuffering ? 'Buffering...' : isPlaying ? 'Pause' : 'Play'}
-            className="p-3 text-white opacity-70 hover:opacity-100 active:scale-90 transition-all flex items-center justify-center bg-transparent border-0"
+            className="p-3 text-white opacity-70 hover:opacity-100 active:scale-90 transition-all flex items-center justify-center bg-transparent border-0 pointer-events-auto"
           >
             {isBuffering ? (
               <Loader2 className="w-14 h-14 sm:w-16 sm:h-16 animate-spin text-white opacity-90" />
@@ -918,7 +918,7 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
             }}
             title="Forward 10s"
             aria-label="Forward 10 seconds"
-            className={`relative p-2 text-white bg-transparent border-0 transition-all duration-200 flex items-center justify-center ${
+            className={`relative p-2 text-white bg-transparent border-0 transition-all duration-200 flex items-center justify-center pointer-events-auto ${
               seekFeedback === 'fwd'
                 ? 'opacity-100 scale-125 rotate-12'
                 : 'opacity-70 hover:opacity-100 active:scale-90'
@@ -932,7 +932,7 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
         </div>
 
         {/* Standard End-to-End Bottom Bar: Scrubber, Timers, Volume */}
-        <div className="w-full px-4 sm:px-6 pt-6 pb-4 sm:pb-6 pointer-events-auto space-y-2.5">
+        <div className="absolute bottom-0 left-0 right-0 w-full px-4 sm:px-6 pt-6 pb-4 sm:pb-6 pointer-events-auto space-y-2.5 bg-gradient-to-t from-black/80 via-black/40 to-transparent">
 
           {/* Progress / Scrub Bar */}
           <div className="relative flex items-center w-full group/scrubber cursor-pointer">
