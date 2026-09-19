@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import Hls from 'hls.js';
 import { tmdbImages, TMDB_FALLBACK_BACKDROP } from '../../services/tmdb';
+import { useDevice } from '../../hooks/useDevice';
 
 interface CustomDirectPlayerProps {
   src: string;
@@ -61,6 +62,7 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
   isFullscreen,
   onToggleFullscreen,
 }) => {
+  const { isTV } = useDevice();
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<Hls | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -283,7 +285,7 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
   }, [src]);
 
   // Handle Play/Pause
-  const handleTogglePlay = useCallback(() => {
+  const handleTogglePlay = useCallback((fromRemote = false) => {
     const video = videoRef.current;
     if (!video) return;
 
@@ -292,11 +294,15 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
       setIsMuted(false);
       video.play().catch(console.warn);
       setIsPlaying(true);
-      setPlayFeedback('play');
+      if (isTV && fromRemote) {
+        setPlayFeedback('play');
+      }
     } else {
       video.pause();
       setIsPlaying(false);
-      setPlayFeedback('pause');
+      if (isTV && fromRemote) {
+        setPlayFeedback('pause');
+      }
     }
 
     if (playFeedbackTimerRef.current) clearTimeout(playFeedbackTimerRef.current);
@@ -305,10 +311,10 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
     }, 700);
 
     resetControlsTimer();
-  }, [resetControlsTimer]);
+  }, [isTV, resetControlsTimer]);
 
   // Handle Relative Seek (+10s or -10s)
-  const handleSeekRelative = useCallback((seconds: number) => {
+  const handleSeekRelative = useCallback((seconds: number, fromRemote = false) => {
     const video = videoRef.current;
     if (!video) return;
 
@@ -317,22 +323,24 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
     setCurrentTime(newTime);
     onProgress?.(newTime, video.duration || 0, video.paused);
 
-    // Accumulate consecutive seeks if triggered within 800ms
-    seekAccumulatorRef.current = (seekAccumulatorRef.current === 0 || (seconds > 0 && seekAccumulatorRef.current < 0) || (seconds < 0 && seekAccumulatorRef.current > 0))
-      ? seconds
-      : seekAccumulatorRef.current + seconds;
-    setSeekDeltaTotal(seekAccumulatorRef.current);
-    setSeekFeedback(seekAccumulatorRef.current > 0 ? 'fwd' : 'rwd');
+    if (isTV && fromRemote) {
+      // Accumulate consecutive seeks if triggered within 800ms
+      seekAccumulatorRef.current = (seekAccumulatorRef.current === 0 || (seconds > 0 && seekAccumulatorRef.current < 0) || (seconds < 0 && seekAccumulatorRef.current > 0))
+        ? seconds
+        : seekAccumulatorRef.current + seconds;
+      setSeekDeltaTotal(seekAccumulatorRef.current);
+      setSeekFeedback(seekAccumulatorRef.current > 0 ? 'fwd' : 'rwd');
 
-    if (seekFeedbackTimerRef.current) clearTimeout(seekFeedbackTimerRef.current);
-    seekFeedbackTimerRef.current = setTimeout(() => {
-      setSeekFeedback(null);
-      seekAccumulatorRef.current = 0;
-      setSeekDeltaTotal(0);
-    }, 800);
+      if (seekFeedbackTimerRef.current) clearTimeout(seekFeedbackTimerRef.current);
+      seekFeedbackTimerRef.current = setTimeout(() => {
+        setSeekFeedback(null);
+        seekAccumulatorRef.current = 0;
+        setSeekDeltaTotal(0);
+      }, 800);
+    }
 
     resetControlsTimer();
-  }, [onProgress, resetControlsTimer]);
+  }, [isTV, onProgress, resetControlsTimer]);
 
   // Handle toggling controls visibility with timer reset
   const handleToggleControls = useCallback(() => {
@@ -467,7 +475,7 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
       if (isPlayPauseKey || isSelectKey) {
         e.preventDefault();
         e.stopPropagation();
-        handleTogglePlay();
+        handleTogglePlay(true);
         return;
       }
 
@@ -485,7 +493,7 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
       if (isFastForwardKey) {
         e.preventDefault();
         e.stopPropagation();
-        handleSeekRelative(10);
+        handleSeekRelative(10, true);
         return;
       }
 
@@ -503,7 +511,7 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
       if (isRewindKey) {
         e.preventDefault();
         e.stopPropagation();
-        handleSeekRelative(-10);
+        handleSeekRelative(-10, true);
         return;
       }
 
@@ -538,20 +546,15 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
 
     // 1. Native Android & TV Remote Toggle Play/Pause
     const handleTogglePlayPauseEvent = () => {
-      handleTogglePlay();
+      handleTogglePlay(true);
     };
 
-    // 2. Pause Player (When modals or dialogs open)
+    // 2. Pause Player (When modals or dialogs open - silent pause, no HUD feedback)
     const handlePausePlayerEvent = () => {
       const video = videoRef.current;
       if (video && !video.paused) {
         video.pause();
         setIsPlaying(false);
-        setPlayFeedback('pause');
-        if (playFeedbackTimerRef.current) clearTimeout(playFeedbackTimerRef.current);
-        playFeedbackTimerRef.current = setTimeout(() => {
-          setPlayFeedback(null);
-        }, 700);
       }
     };
 
@@ -569,7 +572,7 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
         setCurrentTime(clamped);
         onProgress?.(clamped, maxDur, video.paused);
       } else if (delta !== 0) {
-        handleSeekRelative(delta);
+        handleSeekRelative(delta, true);
       }
       resetControlsTimer();
     };
@@ -586,11 +589,11 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
       if (!keyCode) return;
 
       if (keyCode === 85 || keyCode === 126 || keyCode === 127 || keyCode === 179) {
-        handleTogglePlay();
+        handleTogglePlay(true);
       } else if (keyCode === 90 || keyCode === 228 || keyCode === 272) {
-        handleSeekRelative(10);
+        handleSeekRelative(10, true);
       } else if (keyCode === 89 || keyCode === 227 || keyCode === 273) {
-        handleSeekRelative(-10);
+        handleSeekRelative(-10, true);
       }
     };
 
@@ -800,9 +803,9 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
       )}
 
       {/* ========================================================================= */}
-      {/* FLOATING HUD FEEDBACK (PLAY, PAUSE, SEEK +10s / -10s ON TV & DESKTOP)     */}
+      {/* FLOATING HUD FEEDBACK (PLAY, PAUSE, SEEK +10s / -10s ONLY ON TV VIA REMOTE) */}
       {/* ========================================================================= */}
-      {(playFeedback || seekFeedback) && !isInitialLoading && (
+      {isTV && (playFeedback || seekFeedback) && !isInitialLoading && (
         <div className="absolute inset-0 z-30 flex items-center justify-center pointer-events-none transition-all duration-200">
           {seekFeedback === 'fwd' && (
             <div className="flex items-center gap-3.5 px-6 py-3.5 rounded-2xl bg-black/85 backdrop-blur-md border border-white/20 shadow-[0_0_50px_rgba(0,0,0,0.9)] text-white animate-scale-up">
@@ -844,7 +847,7 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
       {/* ========================================================================= */}
       <div
         className={`absolute inset-0 z-20 flex flex-col justify-between transition-opacity duration-300 pointer-events-none ${
-          (showControls || isBuffering || seekFeedback) && !isInitialLoading ? 'opacity-100' : 'opacity-0'
+          (showControls || isBuffering || (isTV && seekFeedback)) && !isInitialLoading ? 'opacity-100' : 'opacity-0'
         }`}
       >
         {/* Center Action Controls: Rewind 10s, Loading/Play/Pause, Forward 10s */}
@@ -859,14 +862,14 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
             title="Rewind 10s"
             aria-label="Rewind 10 seconds"
             className={`relative p-2 text-white bg-transparent border-0 transition-all duration-200 flex items-center justify-center ${
-              seekFeedback === 'rwd'
+              isTV && seekFeedback === 'rwd'
                 ? 'opacity-100 scale-125 -rotate-12'
                 : 'opacity-70 hover:opacity-100 active:scale-90'
             }`}
           >
             <RotateCcw className="w-10 h-10 sm:w-12 sm:h-12" />
             <span className="absolute text-[11px] sm:text-xs font-black">
-              {seekFeedback === 'rwd' ? '-10s' : '10'}
+              {isTV && seekFeedback === 'rwd' ? '-10s' : '10'}
             </span>
           </button>
 
@@ -901,14 +904,14 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
             title="Forward 10s"
             aria-label="Forward 10 seconds"
             className={`relative p-2 text-white bg-transparent border-0 transition-all duration-200 flex items-center justify-center ${
-              seekFeedback === 'fwd'
+              isTV && seekFeedback === 'fwd'
                 ? 'opacity-100 scale-125 rotate-12'
                 : 'opacity-70 hover:opacity-100 active:scale-90'
             }`}
           >
             <RotateCw className="w-10 h-10 sm:w-12 sm:h-12" />
             <span className="absolute text-[11px] sm:text-xs font-black">
-              {seekFeedback === 'fwd' ? '+10s' : '10'}
+              {isTV && seekFeedback === 'fwd' ? '+10s' : '10'}
             </span>
           </button>
         </div>
@@ -956,7 +959,7 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
               {/* Play/Pause Mini Toggle */}
               <button
                 type="button"
-                onClick={handleTogglePlay}
+                onClick={() => handleTogglePlay()}
                 className="p-1 hover:text-hbo-cyan transition active:scale-95"
                 title={isPlaying ? 'Pause' : 'Play'}
                 aria-label={isPlaying ? 'Pause' : 'Play'}
