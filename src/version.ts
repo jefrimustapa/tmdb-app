@@ -2,12 +2,13 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20260919-0343';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-add-provider-te.20260919-0343';
+export const APP_BUILD_NUMBER = '20260919-0349';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-add-provider-te.20260919-0349';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
 export const APP_BRANCH = 'feat-add-provider-te';
-export const APP_CHANGELOG = `* fix(player): remove cyan feedback ripple popup on seek and double-tap
+export const APP_CHANGELOG = `* feat(player): unify buffering spinner and seek status directly inside center controls
+* fix(player): remove cyan feedback ripple popup on seek and double-tap
 * style(player): adjust center control icons to 30% transparency (opacity-70)
 * style(player): make center control buttons fully transparent without background shapes or drop shadows
 * fix(player): resolve touch-click race condition causing controls to instantly hide on tap
@@ -20,5 +21,4 @@ export const APP_CHANGELOG = `* fix(player): remove cyan feedback ripple popup o
 * feat(telegram): add multi-tier caching (central db on server + memory cache in app)
 * feat(telegram): point msm32 getter to production render service with https proxy support
 * feat: add msm-getter microservice and Dockerfile for cloud deployment
-* refactor(providers): restructure provider categories and preferences for ASEAN and regional content (#112)
-* feat(settings): TV active category border, mobile sub-drawers hierarchy, scroll lock & General tab rename (#111)`;
+* refactor(providers): restructure provider categories and preferences for ASEAN and regional content (#112)`;

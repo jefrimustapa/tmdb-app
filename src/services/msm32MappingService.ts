@@ -110,8 +110,17 @@ class Msm32MappingService {
 
       const data = await res.json();
       if (data.success && data.streamUrl) {
+        let finalStreamUrl = data.streamUrl;
+        const settings = await dbService.getSettings();
+        const chunkSize = settings?.msm32ChunkSize || 524288;
+        try {
+          const u = new URL(finalStreamUrl);
+          u.searchParams.set('chunkSize', String(chunkSize));
+          finalStreamUrl = u.toString();
+        } catch {}
+
         const resolved: Msm32ResolveResult = {
-          streamUrl: data.streamUrl,
+          streamUrl: finalStreamUrl,
           filename: data.filename,
           size: data.size,
           cached: data.cached,

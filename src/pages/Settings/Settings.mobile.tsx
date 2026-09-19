@@ -1391,6 +1391,45 @@ export const Settings: React.FC = () => {
                 )}
               </div>
 
+              {/* Telegram Stream Chunk Buffer Size */}
+              <div className="space-y-1.5 pt-1">
+                <div className="flex items-center justify-between">
+                  <label className="text-[11px] font-semibold text-gray-300 block">
+                    Stream Chunk Slice Buffer:
+                  </label>
+                  <span className="text-[10px] text-sky-400 font-mono font-bold">
+                    {((settings.msm32ChunkSize || 524288) / 1024).toFixed(0)} KB
+                  </span>
+                </div>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {[
+                    { label: '256 KB', desc: 'Fastest Seek', val: 262144 },
+                    { label: '512 KB', desc: 'Balanced (Rec)', val: 524288 },
+                    { label: '1 MB', desc: 'High Bitrate', val: 1048576 },
+                  ].map((chunkOpt) => {
+                    const isCurrent = (settings.msm32ChunkSize || 524288) === chunkOpt.val;
+                    return (
+                      <button
+                        key={chunkOpt.val}
+                        type="button"
+                        onClick={() => handleUpdate({ msm32ChunkSize: chunkOpt.val })}
+                        className={`p-2 rounded-lg border text-center transition-all ${
+                          isCurrent
+                            ? 'bg-sky-500/20 border-sky-400 text-sky-300 font-bold shadow-sm'
+                            : 'bg-white/5 border-white/10 text-gray-400 hover:text-white'
+                        }`}
+                      >
+                        <div className="text-xs">{chunkOpt.label}</div>
+                        <div className="text-[9px] opacity-70">{chunkOpt.desc}</div>
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="text-[10px] text-gray-500">
+                  Smaller chunks (256 KB) start playback and seek faster; larger chunks (1 MB) provide higher throughput for fiber connections.
+                </p>
+              </div>
+
               {/* Supported Countries of Origin */}
               <div className="space-y-1.5 pt-1">
                 <span className="text-[11px] font-semibold text-gray-300 block">

@@ -3446,7 +3446,7 @@ export const Settings: React.FC = () => {
                             document.getElementById('drawer-input-msm32-url')?.focus();
                           } else if (e.key === 'ArrowDown') {
                             e.preventDefault();
-                            document.getElementById('drawer-country-MY')?.focus();
+                            document.getElementById('drawer-chunk-524288')?.focus();
                           }
                         }}
                         onClick={async () => {
@@ -3487,6 +3487,63 @@ export const Settings: React.FC = () => {
                       )}
                     </div>
 
+                    {/* Stream Chunk Slice Buffer Size */}
+                    <div className="bg-black/40 border border-hbo-border rounded-xl p-4 space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <span className="text-xs font-bold text-white block mb-0.5">Stream Chunk Slice Buffer</span>
+                          <p className="text-[11px] text-gray-400">Smaller chunks start playback & seeks faster; larger chunks yield higher throughput.</p>
+                        </div>
+                        <span className="text-xs text-sky-400 font-mono font-bold px-2 py-0.5 rounded bg-sky-500/10 border border-sky-400/20">
+                          {((settings.msm32ChunkSize || 524288) / 1024).toFixed(0)} KB
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-2 pt-1">
+                        {[
+                          { label: '256 KB', desc: 'Fastest Seek', val: 262144 },
+                          { label: '512 KB', desc: 'Balanced (Rec)', val: 524288 },
+                          { label: '1 MB', desc: 'High Bitrate', val: 1048576 },
+                        ].map((chunkOpt, idx) => {
+                          const isCurrent = (settings.msm32ChunkSize || 524288) === chunkOpt.val;
+                          return (
+                            <button
+                              key={chunkOpt.val}
+                              id={`drawer-chunk-${chunkOpt.val}`}
+                              data-telegram-drawer-item="true"
+                              type="button"
+                              onKeyDown={(e) => {
+                                if (e.key === 'ArrowUp') {
+                                  e.preventDefault();
+                                  document.getElementById('drawer-btn-msm32-test')?.focus();
+                                } else if (e.key === 'ArrowDown') {
+                                  e.preventDefault();
+                                  document.getElementById('drawer-country-MY')?.focus();
+                                } else if (e.key === 'ArrowLeft' && idx > 0) {
+                                  e.preventDefault();
+                                  const prevVal = [262144, 524288, 1048576][idx - 1];
+                                  document.getElementById(`drawer-chunk-${prevVal}`)?.focus();
+                                } else if (e.key === 'ArrowRight' && idx < 2) {
+                                  e.preventDefault();
+                                  const nextVal = [262144, 524288, 1048576][idx + 1];
+                                  document.getElementById(`drawer-chunk-${nextVal}`)?.focus();
+                                }
+                              }}
+                              onClick={() => handleUpdate({ msm32ChunkSize: chunkOpt.val })}
+                              className={`p-2.5 rounded-xl border text-center transition-all tv-focus-target ${
+                                isCurrent
+                                  ? 'bg-sky-500/20 border-sky-400 text-sky-300 font-bold shadow-sm ring-1 ring-sky-400'
+                                  : 'bg-white/5 border-white/10 text-gray-300 hover:text-white'
+                              }`}
+                            >
+                              <div className="text-xs">{chunkOpt.label}</div>
+                              <div className="text-[10px] opacity-70">{chunkOpt.desc}</div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
                     {/* Country Origin Filter Grid */}
                     <div className="bg-black/40 border border-hbo-border rounded-xl p-4 space-y-2.5">
                       <div>
@@ -3506,7 +3563,7 @@ export const Settings: React.FC = () => {
                               onKeyDown={(e) => {
                                 if (e.key === 'ArrowUp' && idx < 2) {
                                   e.preventDefault();
-                                  document.getElementById('drawer-btn-msm32-test')?.focus();
+                                  document.getElementById('drawer-chunk-524288')?.focus();
                                 }
                               }}
                               onClick={() => {

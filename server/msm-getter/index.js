@@ -898,6 +898,11 @@ app.get('/stream/:docId', async (req, res) => {
       return res.end();
     }
 
+    // Parse user-specified chunk size from query parameter (e.g. ?chunkSize=262144)
+    const parsedChunk = parseInt(req.query.chunkSize, 10);
+    const validChunkSizes = [131072, 262144, 524288, 1048576]; // 128KB, 256KB, 512KB, 1MB
+    const downloadChunkSize = validChunkSizes.includes(parsedChunk) ? parsedChunk : 512 * 1024;
+
     if (!rangeHeader) {
       res.writeHead(200, {
         'Content-Length': fileSize,
@@ -908,7 +913,7 @@ app.get('/stream/:docId', async (req, res) => {
 
       const iter = client.iterDownload({
         file: targetMedia,
-        requestSize: 512 * 1024,
+        requestSize: downloadChunkSize,
       });
 
       for await (const chunk of iter) {
@@ -937,7 +942,6 @@ app.get('/stream/:docId', async (req, res) => {
 
       let offset = bigInt(start);
       let bytesLeft = chunkSize;
-      const downloadChunkSize = 512 * 1024;
       let aborted = false;
 
       req.on('close', () => { aborted = true; });

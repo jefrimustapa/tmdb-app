@@ -79,6 +79,7 @@ export const DEFAULT_SETTINGS: UserSettings = {
   enabledTelegramProviders: ['telegram-msm32'],
   telegramProviderCountries: { 'telegram-msm32': ['MY', 'ID', 'SG'] },
   msm32GetterUrl: 'https://msm-getter.onrender.com',
+  msm32ChunkSize: 524288,
   directStreamMode: false,
   directStreamApiUrl: 'https://tmdb-api-yfbu.onrender.com',
   torboxApiKey: 'fd12d8fe-2429-43eb-bcb3-1a3d2dfeb5f9',
