@@ -203,6 +203,25 @@ export const Settings: React.FC = () => {
     }
   }, [activeCategory]);
 
+  // Auto-ping MSM Getter microservice whenever the user enters the Telegram provider drawer
+  useEffect(() => {
+    if (showTelegramDrawer) {
+      setTestingMsm32(true);
+      setMsm32TestResult(null);
+      const url = settings?.msm32GetterUrl;
+      msm32Service.testConnection(url)
+        .then((res) => {
+          setMsm32TestResult(res);
+        })
+        .catch((err: any) => {
+          setMsm32TestResult({ ok: false, error: err?.message || 'Connection failed' });
+        })
+        .finally(() => {
+          setTestingMsm32(false);
+        });
+    }
+  }, [showTelegramDrawer, settings?.msm32GetterUrl]);
+
   useEffect(() => {
     try {
       (window as any).AndroidBridge?.setDropdownOpen?.(isAnyModalOpen);
@@ -3427,7 +3446,9 @@ export const Settings: React.FC = () => {
                           document.getElementById('drawer-telegram-toggle')?.focus();
                         } else if (e.key === 'ArrowDown') {
                           e.preventDefault();
-                          document.getElementById('drawer-input-msm32-url')?.focus();
+                          const target = document.getElementById('drawer-btn-msm32-test');
+                          target?.focus();
+                          target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
                         }
                       }}
                       onClick={() => {
@@ -3454,33 +3475,16 @@ export const Settings: React.FC = () => {
                       </div>
                     </button>
 
-                    {/* MSM Getter Server URL & Tester */}
+                    {/* MSM Getter Microservice Status Card & Manual Re-ping */}
                     <div className="bg-black/40 border border-hbo-border rounded-xl p-4 space-y-3">
-                      <div>
-                        <span className="text-xs font-bold text-white block mb-1">MSM Getter Microservice URL</span>
-                        <p className="text-[11px] text-gray-400 mb-2">Backend address for resolving bot documents into stream chunks.</p>
-                        <input
-                          id="drawer-input-msm32-url"
-                          data-telegram-drawer-item="true"
-                          type="text"
-                          placeholder="https://msm-getter.onrender.com"
-                          value={settings.msm32GetterUrl || ''}
-                          onKeyDown={(e) => {
-                            if (e.key === 'ArrowUp') {
-                              e.preventDefault();
-                              const target = document.getElementById('drawer-msm32-toggle');
-                              target?.focus();
-                              target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-                            } else if (e.key === 'ArrowDown') {
-                              e.preventDefault();
-                              const target = document.getElementById('drawer-btn-msm32-test');
-                              target?.focus();
-                              target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-                            }
-                          }}
-                          onChange={(e) => handleUpdate({ msm32GetterUrl: e.target.value })}
-                          className="w-full bg-black/60 border border-gray-700 focus:border-sky-400 text-white px-3.5 py-2.5 rounded-lg text-xs font-mono outline-none tv-focus-target"
-                        />
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <span className="text-xs font-bold text-white block mb-0.5">MSM Getter Microservice</span>
+                          <p className="text-[11px] text-gray-400">Stream resolver backend for Telegram MTProto documents.</p>
+                        </div>
+                        <span className="text-[10px] text-sky-400 font-mono font-bold bg-sky-500/10 px-2 py-0.5 rounded border border-sky-400/20">
+                          msm-getter.onrender.com
+                        </span>
                       </div>
 
                       <button
@@ -3491,7 +3495,7 @@ export const Settings: React.FC = () => {
                         onKeyDown={(e) => {
                           if (e.key === 'ArrowUp') {
                             e.preventDefault();
-                            const target = document.getElementById('drawer-input-msm32-url');
+                            const target = document.getElementById('drawer-msm32-toggle');
                             target?.focus();
                             target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
                           } else if (e.key === 'ArrowDown') {
@@ -3516,10 +3520,10 @@ export const Settings: React.FC = () => {
                         className="w-full py-2.5 rounded-xl bg-sky-500 hover:bg-sky-400 text-black font-bold text-xs flex items-center justify-center gap-2 transition-all tv-focus-target"
                       >
                         <RefreshCw className={`w-3.5 h-3.5 ${testingMsm32 ? 'animate-spin' : ''}`} />
-                        <span>Test Microservice Connection</span>
+                        <span>{testingMsm32 ? 'Pinging Server (Waking Up)...' : 'Re-ping Microservice Server'}</span>
                       </button>
 
-                      {msm32TestResult && (
+                      {msm32TestResult ? (
                         <div className={`p-2.5 rounded-lg text-xs flex items-center gap-2 border ${
                           msm32TestResult.ok
                             ? 'bg-emerald-950/40 text-emerald-300 border-emerald-500/40'
@@ -3533,8 +3537,13 @@ export const Settings: React.FC = () => {
                           <span className="truncate">
                             {msm32TestResult.ok
                               ? `Online! Status: ${msm32TestResult.status || 'running'} • MTProto: ${msm32TestResult.isConnected ? 'Connected' : 'Standby'}`
-                              : `Failed: ${msm32TestResult.error}`}
+                              : `Failed / Waking Up: ${msm32TestResult.error}`}
                           </span>
+                        </div>
+                      ) : testingMsm32 && (
+                        <div className="p-2.5 rounded-lg text-xs flex items-center gap-2 border bg-sky-950/40 text-sky-300 border-sky-500/40">
+                          <RefreshCw className="w-4 h-4 text-sky-400 flex-shrink-0 animate-spin" />
+                          <span className="truncate">Pinging server... Please wait if waking up from sleep.</span>
                         </div>
                       )}
                     </div>

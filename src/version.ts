@@ -2,12 +2,13 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20260919-0522';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-add-provider-te.20260919-0522';
+export const APP_BUILD_NUMBER = '20260919-0548';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-add-provider-te.20260919-0548';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
 export const APP_BRANCH = 'feat-add-provider-te';
-export const APP_CHANGELOG = `* chore: bump build version
+export const APP_CHANGELOG = `* fix(tv): move telegram chunk buffer & origin filters to subdrawers with full dpad navigation
+* chore: bump build version
 * fix(player): always autostart custom direct player unmuted with full volume
 * fix(player): skip Telegram MSM when title origin does not match filter and try next engine
 * fix(player): enforce country origin filters on Telegram MSM provider for Anime and non-matching titles
@@ -20,5 +21,4 @@ export const APP_CHANGELOG = `* chore: bump build version
 * feat(settings): add configurable Telegram stream chunk slice buffer size (256KB, 512KB, 1MB)
 * feat(player): unify buffering spinner and seek status directly inside center controls
 * fix(player): remove cyan feedback ripple popup on seek and double-tap
-* style(player): adjust center control icons to 30% transparency (opacity-70)
-* style(player): make center control buttons fully transparent without background shapes or drop shadows`;
+* style(player): adjust center control icons to 30% transparency (opacity-70)`;

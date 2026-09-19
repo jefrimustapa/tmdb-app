@@ -84,7 +84,7 @@ export const Watch: React.FC = () => {
               defaultProvider = s.topAnimeProviders?.[0] || 'megaplay-anime';
             } else if (koreanFlag) {
               defaultProvider = s.topKoreanProviders?.[0] || 'kisskh-kdrama';
-            } else if (hasTelegram && isTelegramMatching && (!hasEmbed || aseanFlag)) {
+            } else if (hasTelegram && isTelegramMatching) {
               defaultProvider = 'telegram-msm32';
             } else if (aseanFlag) {
               defaultProvider = s.topAseanProviders?.[0] || (s as any).topAsianProviders?.[0] || 'vidlink';
