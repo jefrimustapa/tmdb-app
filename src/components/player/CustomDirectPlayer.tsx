@@ -86,7 +86,6 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
   const [showControls, setShowControls] = useState(true);
   const [isDraggingScrubber, setIsDraggingScrubber] = useState(false);
   const [scrubPreviewTime, setScrubPreviewTime] = useState<number | null>(null);
-  const [doubleTapFeedback, setDoubleTapFeedback] = useState<'rwd' | 'fwd' | null>(null);
 
   const hasSeekedInitialRef = useRef(false);
 
@@ -253,10 +252,6 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
     video.currentTime = newTime;
     setCurrentTime(newTime);
     onProgress?.(newTime, video.duration || 0, video.paused);
-
-    // Trigger feedback animation
-    setDoubleTapFeedback(seconds > 0 ? 'fwd' : 'rwd');
-    setTimeout(() => setDoubleTapFeedback(null), 600);
 
     resetControlsTimer();
   }, [onProgress, resetControlsTimer]);
@@ -591,21 +586,7 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
         </div>
       )}
 
-      {/* ========================================================================= */}
-      {/* DOUBLE-TAP SEEK FEEDBACK RIPPLES (+10s / -10s)                           */}
-      {/* ========================================================================= */}
-      {doubleTapFeedback === 'rwd' && (
-        <div className="absolute left-10 top-1/2 -translate-y-1/2 z-25 flex flex-col items-center justify-center p-4 rounded-full bg-black/70 border border-white/20 text-white animate-fade-in pointer-events-none shadow-2xl">
-          <RotateCcw className="w-8 h-8 text-hbo-cyan animate-spin" />
-          <span className="text-xs font-black mt-1 text-hbo-cyan">-10s</span>
-        </div>
-      )}
-      {doubleTapFeedback === 'fwd' && (
-        <div className="absolute right-10 top-1/2 -translate-y-1/2 z-25 flex flex-col items-center justify-center p-4 rounded-full bg-black/70 border border-white/20 text-white animate-fade-in pointer-events-none shadow-2xl">
-          <RotateCw className="w-8 h-8 text-hbo-cyan animate-spin" />
-          <span className="text-xs font-black mt-1 text-hbo-cyan">+10s</span>
-        </div>
-      )}
+
 
       {/* ========================================================================= */}
       {/* HTML5 CUSTOM CONTROLS OVERLAY (PLAY, FWD, RWD, SCRUBBER, THEME MATCHED)   */}

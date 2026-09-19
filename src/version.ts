@@ -2,12 +2,13 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20260919-0336';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-add-provider-te.20260919-0336';
+export const APP_BUILD_NUMBER = '20260919-0340';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-add-provider-te.20260919-0340';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
 export const APP_BRANCH = 'feat-add-provider-te';
-export const APP_CHANGELOG = `* style(player): make center control buttons fully transparent without background shapes or drop shadows
+export const APP_CHANGELOG = `* style(player): adjust center control icons to 30% transparency (opacity-70)
+* style(player): make center control buttons fully transparent without background shapes or drop shadows
 * fix(player): resolve touch-click race condition causing controls to instantly hide on tap
 * feat: streamline CustomDirectPlayer with solid controls, remove top bar, and 3s auto-hide
 * style(player): replace wordy loading messages with clean Buffering...
@@ -20,5 +21,4 @@ export const APP_CHANGELOG = `* style(player): make center control buttons fully
 * feat: add msm-getter microservice and Dockerfile for cloud deployment
 * refactor(providers): restructure provider categories and preferences for ASEAN and regional content (#112)
 * feat(settings): TV active category border, mobile sub-drawers hierarchy, scroll lock & General tab rename (#111)
-* fix(tv): eliminate delay on remote back navigation and land focus on TV navbar Home icon (#110)
-* fix(tv): eliminate navigation lag on TV navbar during Home data load (#109)`;
+* fix(tv): eliminate delay on remote back navigation and land focus on TV navbar Home icon (#110)`;
