@@ -86,6 +86,7 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
   const [showControls, setShowControls] = useState(true);
   const [isDraggingScrubber, setIsDraggingScrubber] = useState(false);
   const [scrubPreviewTime, setScrubPreviewTime] = useState<number | null>(null);
+  const [seekFeedback, setSeekFeedback] = useState<'rwd' | 'fwd' | null>(null);
 
   const hasSeekedInitialRef = useRef(false);
 
@@ -252,6 +253,10 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
     video.currentTime = newTime;
     setCurrentTime(newTime);
     onProgress?.(newTime, video.duration || 0, video.paused);
+
+    // Provide visual status feedback directly on the center control
+    setSeekFeedback(seconds > 0 ? 'fwd' : 'rwd');
+    setTimeout(() => setSeekFeedback(null), 500);
 
     resetControlsTimer();
   }, [onProgress, resetControlsTimer]);
@@ -511,12 +516,9 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
               </div>
             )}
 
-            {/* Glowing Spinner */}
-            <div className="relative mb-3">
-              <div className="w-14 h-14 border-4 border-hbo-purple/30 border-t-hbo-cyan border-r-hbo-purple rounded-full animate-spin shadow-hbo-glow" />
-              <div className="absolute inset-0 flex items-center justify-center">
-                <Sparkles className="w-5 h-5 text-hbo-cyan animate-pulse" />
-              </div>
+            {/* Clean White Spinner */}
+            <div className="relative mb-3 flex items-center justify-center">
+              <Loader2 className="w-12 h-12 text-white/80 animate-spin" />
             </div>
 
             {/* Title & Info */}
@@ -578,27 +580,16 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
       )}
 
       {/* ========================================================================= */}
-      {/* MID-STREAM BUFFERING SPINNER                                              */}
-      {/* ========================================================================= */}
-      {isBuffering && !isInitialLoading && (
-        <div className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none bg-black/40 backdrop-blur-sm animate-fade-in">
-          <div className="w-16 h-16 border-4 border-white/20 border-t-hbo-cyan rounded-full animate-spin shadow-hbo-glow" />
-        </div>
-      )}
-
-
-
-      {/* ========================================================================= */}
       {/* HTML5 CUSTOM CONTROLS OVERLAY (PLAY, FWD, RWD, SCRUBBER, THEME MATCHED)   */}
       {/* ========================================================================= */}
       <div
         className={`absolute inset-0 z-20 flex flex-col justify-end p-4 sm:p-6 transition-opacity duration-300 pointer-events-none ${
-          showControls && !isInitialLoading ? 'opacity-100' : 'opacity-0'
+          (showControls || isBuffering || seekFeedback) && !isInitialLoading ? 'opacity-100' : 'opacity-0'
         }`}
       >
-        {/* Center Action Controls: Rewind 10s, Play/Pause, Forward 10s (30% Transparent / 70% Opacity, No Background, No Shadow) */}
+        {/* Center Action Controls: Rewind 10s, Loading/Play/Pause, Forward 10s */}
         <div className="flex items-center justify-center gap-10 sm:gap-14 my-auto pointer-events-auto">
-          {/* Rewind 10s Button - 30% Transparent */}
+          {/* Rewind 10s Button - Visual Seek Feedback on Center Control */}
           <button
             type="button"
             onClick={(e) => {
@@ -607,33 +598,40 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
             }}
             title="Rewind 10s"
             aria-label="Rewind 10 seconds"
-            className="relative p-2 text-white opacity-70 hover:opacity-100 active:scale-90 transition-all flex items-center justify-center bg-transparent border-0"
+            className={`relative p-2 text-white bg-transparent border-0 transition-all duration-200 flex items-center justify-center ${
+              seekFeedback === 'rwd'
+                ? 'opacity-100 scale-125 -rotate-12'
+                : 'opacity-70 hover:opacity-100 active:scale-90'
+            }`}
           >
             <RotateCcw className="w-10 h-10 sm:w-12 sm:h-12" />
             <span className="absolute text-[11px] sm:text-xs font-black">
-              10
+              {seekFeedback === 'rwd' ? '-10s' : '10'}
             </span>
           </button>
 
-          {/* Main Play / Pause Button - 30% Transparent */}
+          {/* Main Play / Pause / Loading Spinner Button */}
           <button
             type="button"
             onClick={(e) => {
               e.stopPropagation();
+              if (isBuffering) return;
               handleTogglePlay();
             }}
-            title={isPlaying ? 'Pause' : 'Play'}
-            aria-label={isPlaying ? 'Pause' : 'Play'}
+            title={isBuffering ? 'Buffering...' : isPlaying ? 'Pause' : 'Play'}
+            aria-label={isBuffering ? 'Buffering...' : isPlaying ? 'Pause' : 'Play'}
             className="p-3 text-white opacity-70 hover:opacity-100 active:scale-90 transition-all flex items-center justify-center bg-transparent border-0"
           >
-            {isPlaying ? (
+            {isBuffering ? (
+              <Loader2 className="w-14 h-14 sm:w-16 sm:h-16 animate-spin text-white opacity-90" />
+            ) : isPlaying ? (
               <Pause className="w-14 h-14 sm:w-16 sm:h-16 fill-current" />
             ) : (
               <Play className="w-14 h-14 sm:w-16 sm:h-16 fill-current translate-x-1" />
             )}
           </button>
 
-          {/* Forward 10s Button - 30% Transparent */}
+          {/* Forward 10s Button - Visual Seek Feedback on Center Control */}
           <button
             type="button"
             onClick={(e) => {
@@ -642,11 +640,15 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
             }}
             title="Forward 10s"
             aria-label="Forward 10 seconds"
-            className="relative p-2 text-white opacity-70 hover:opacity-100 active:scale-90 transition-all flex items-center justify-center bg-transparent border-0"
+            className={`relative p-2 text-white bg-transparent border-0 transition-all duration-200 flex items-center justify-center ${
+              seekFeedback === 'fwd'
+                ? 'opacity-100 scale-125 rotate-12'
+                : 'opacity-70 hover:opacity-100 active:scale-90'
+            }`}
           >
             <RotateCw className="w-10 h-10 sm:w-12 sm:h-12" />
             <span className="absolute text-[11px] sm:text-xs font-black">
-              10
+              {seekFeedback === 'fwd' ? '+10s' : '10'}
             </span>
           </button>
         </div>
