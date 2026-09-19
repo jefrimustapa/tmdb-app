@@ -40,6 +40,7 @@ import {
   Download,
   Upload,
   HardDrive,
+  Globe,
   Save,
   Send,
 } from 'lucide-react';
@@ -162,6 +163,8 @@ export const Settings: React.FC = () => {
   const [showEnginesDrawer, setShowEnginesDrawer] = useState(false);
   const [showTorboxDrawer, setShowTorboxDrawer] = useState(false);
   const [showTelegramDrawer, setShowTelegramDrawer] = useState(false);
+  const [showTelegramChunkDrawer, setShowTelegramChunkDrawer] = useState(false);
+  const [showTelegramCountryDrawer, setShowTelegramCountryDrawer] = useState(false);
   const [showDirectExtractorDrawer, setShowDirectExtractorDrawer] = useState(false);
   const [showEmbedResolverDrawer, setShowEmbedResolverDrawer] = useState(false);
   const [showEmbedTimeoutDrawer, setShowEmbedTimeoutDrawer] = useState(false);
@@ -178,7 +181,7 @@ export const Settings: React.FC = () => {
   const { detectedPlatform, activeLayout } = useDevice();
 
   const isPickerModalOpen = pickerModalSlot !== null;
-  const isAnyModalOpen = isPickerModalOpen || showMaturityDrawer || showTriggerDrawer || showAutoplayDrawer || showAutoplayTriggerDrawer || showAutoplayTimeoutDrawer || showEnginesDrawer || showTorboxDrawer || showTelegramDrawer || showDirectExtractorDrawer || showEmbedResolverDrawer || showEmbedTimeoutDrawer || showEmbedRetryDrawer || activePriorityDrawer !== null || showTickerDrawer || showHeaderTimeoutDrawer || showPerfHudDrawer || showBackupDrawer;
+  const isAnyModalOpen = isPickerModalOpen || showMaturityDrawer || showTriggerDrawer || showAutoplayDrawer || showAutoplayTriggerDrawer || showAutoplayTimeoutDrawer || showEnginesDrawer || showTorboxDrawer || showTelegramDrawer || showTelegramChunkDrawer || showTelegramCountryDrawer || showDirectExtractorDrawer || showEmbedResolverDrawer || showEmbedTimeoutDrawer || showEmbedRetryDrawer || activePriorityDrawer !== null || showTickerDrawer || showHeaderTimeoutDrawer || showPerfHudDrawer || showBackupDrawer;
 
   // Viewport scroll helpers for TV remote navigation (snaps to absolute top / bottom)
   const scrollToPanelTop = () => {
@@ -286,6 +289,24 @@ export const Settings: React.FC = () => {
           defaultEl.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
         }
       }, 50);
+    } else if (showTelegramChunkDrawer) {
+      setTimeout(() => {
+        const selectedEl = document.querySelector<HTMLElement>('[data-telegram-chunk-drawer-item][data-telegram-chunk-selected="true"]') ||
+                           document.querySelector<HTMLElement>('[data-telegram-chunk-drawer-item]');
+        if (selectedEl) {
+          selectedEl.focus();
+          selectedEl.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        }
+      }, 50);
+    } else if (showTelegramCountryDrawer) {
+      setTimeout(() => {
+        const defaultEl = document.getElementById('drawer-telegram-country-MY') ||
+                          document.querySelector<HTMLElement>('[data-telegram-country-drawer-item]');
+        if (defaultEl) {
+          defaultEl.focus();
+          defaultEl.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        }
+      }, 50);
     } else if (showDirectExtractorDrawer) {
       setTimeout(() => {
         const defaultEl = document.getElementById('drawer-extractor-toggle') ||
@@ -375,7 +396,7 @@ export const Settings: React.FC = () => {
         (window as any).AndroidBridge?.setDropdownOpen?.(false);
       } catch {}
     };
-  }, [pickerModalSlot, isPickerModalOpen, showMaturityDrawer, showTriggerDrawer, showAutoplayDrawer, showAutoplayTriggerDrawer, showAutoplayTimeoutDrawer, showEnginesDrawer, showTorboxDrawer, showTelegramDrawer, showDirectExtractorDrawer, showEmbedResolverDrawer, showEmbedTimeoutDrawer, activePriorityDrawer, showTickerDrawer, showHeaderTimeoutDrawer, showPerfHudDrawer, showBackupDrawer, isAnyModalOpen]);
+  }, [pickerModalSlot, isPickerModalOpen, showMaturityDrawer, showTriggerDrawer, showAutoplayDrawer, showAutoplayTriggerDrawer, showAutoplayTimeoutDrawer, showEnginesDrawer, showTorboxDrawer, showTelegramDrawer, showTelegramChunkDrawer, showTelegramCountryDrawer, showDirectExtractorDrawer, showEmbedResolverDrawer, showEmbedTimeoutDrawer, activePriorityDrawer, showTickerDrawer, showHeaderTimeoutDrawer, showPerfHudDrawer, showBackupDrawer, isAnyModalOpen]);
 
   // Handle remote Back button, tmdb_close_dropdowns, and Escape dismissal for modals / drawers
   useEffect(() => {
@@ -408,6 +429,23 @@ export const Settings: React.FC = () => {
         }, 50);
         return;
       }
+      // Level 3 Drawers inside Telegram: Return to Telegram Drawer
+      if (showTelegramChunkDrawer) {
+        setShowTelegramChunkDrawer(false);
+        setShowTelegramDrawer(true);
+        setTimeout(() => {
+          document.getElementById('drawer-telegram-sub-chunk')?.focus();
+        }, 50);
+        return;
+      }
+      if (showTelegramCountryDrawer) {
+        setShowTelegramCountryDrawer(false);
+        setShowTelegramDrawer(true);
+        setTimeout(() => {
+          document.getElementById('drawer-telegram-sub-country')?.focus();
+        }, 50);
+        return;
+      }
       // Level 2 Drawers: Return to Level 1 Autoplay Drawer
       if (showAutoplayTriggerDrawer) {
         setShowAutoplayTriggerDrawer(false);
@@ -428,6 +466,9 @@ export const Settings: React.FC = () => {
       if (showTelegramDrawer) {
         setShowTelegramDrawer(false);
         setShowEnginesDrawer(true);
+        setTimeout(() => {
+          document.getElementById('drawer-engine-item-telegram')?.focus();
+        }, 50);
         return;
       }
       if (showDirectExtractorDrawer) {
@@ -539,6 +580,9 @@ export const Settings: React.FC = () => {
     showAutoplayTimeoutDrawer,
     showEnginesDrawer,
     showTorboxDrawer,
+    showTelegramDrawer,
+    showTelegramChunkDrawer,
+    showTelegramCountryDrawer,
     showDirectExtractorDrawer,
     showEmbedResolverDrawer,
     showEmbedTimeoutDrawer,
@@ -3424,14 +3468,18 @@ export const Settings: React.FC = () => {
                           onKeyDown={(e) => {
                             if (e.key === 'ArrowUp') {
                               e.preventDefault();
-                              document.getElementById('drawer-msm32-toggle')?.focus();
+                              const target = document.getElementById('drawer-msm32-toggle');
+                              target?.focus();
+                              target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
                             } else if (e.key === 'ArrowDown') {
                               e.preventDefault();
-                              document.getElementById('drawer-btn-msm32-test')?.focus();
+                              const target = document.getElementById('drawer-btn-msm32-test');
+                              target?.focus();
+                              target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
                             }
                           }}
                           onChange={(e) => handleUpdate({ msm32GetterUrl: e.target.value })}
-                          className="w-full bg-black/60 border border-gray-700 focus:border-sky-400 text-white px-3.5 py-2.5 rounded-lg text-xs font-mono outline-none"
+                          className="w-full bg-black/60 border border-gray-700 focus:border-sky-400 text-white px-3.5 py-2.5 rounded-lg text-xs font-mono outline-none tv-focus-target"
                         />
                       </div>
 
@@ -3443,10 +3491,14 @@ export const Settings: React.FC = () => {
                         onKeyDown={(e) => {
                           if (e.key === 'ArrowUp') {
                             e.preventDefault();
-                            document.getElementById('drawer-input-msm32-url')?.focus();
+                            const target = document.getElementById('drawer-input-msm32-url');
+                            target?.focus();
+                            target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
                           } else if (e.key === 'ArrowDown') {
                             e.preventDefault();
-                            document.getElementById('drawer-chunk-524288')?.focus();
+                            const target = document.getElementById('drawer-telegram-sub-chunk');
+                            target?.focus();
+                            target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
                           }
                         }}
                         onClick={async () => {
@@ -3487,116 +3539,299 @@ export const Settings: React.FC = () => {
                       )}
                     </div>
 
-                    {/* Stream Chunk Slice Buffer Size */}
-                    <div className="bg-black/40 border border-hbo-border rounded-xl p-4 space-y-2.5">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <span className="text-xs font-bold text-white block mb-0.5">Stream Chunk Slice Buffer</span>
-                          <p className="text-[11px] text-gray-400">Smaller chunks start playback & seeks faster; larger chunks yield higher throughput.</p>
+                    {/* Sub-Drawer Hub Item 1: Stream Chunk Slice Buffer */}
+                    <div className="bg-black/40 border border-hbo-border rounded-xl p-3.5 flex items-center justify-between">
+                      <div className="min-w-0 pr-2">
+                        <div className="font-bold text-xs text-white flex items-center gap-1.5 mb-0.5">
+                          <HardDrive className="w-3.5 h-3.5 text-sky-400" />
+                          <span>Stream Chunk Slice Buffer</span>
                         </div>
-                        <span className="text-xs text-sky-400 font-mono font-bold px-2 py-0.5 rounded bg-sky-500/10 border border-sky-400/20">
+                        <p className="text-[10px] text-gray-400">Configure seek latency and throughput slice size.</p>
+                      </div>
+                      <button
+                        id="drawer-telegram-sub-chunk"
+                        data-telegram-drawer-item="true"
+                        type="button"
+                        onKeyDown={(e) => {
+                          if (e.key === 'ArrowUp') {
+                            e.preventDefault();
+                            const target = document.getElementById('drawer-btn-msm32-test');
+                            target?.focus();
+                            target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                          } else if (e.key === 'ArrowDown') {
+                            e.preventDefault();
+                            const target = document.getElementById('drawer-telegram-sub-country');
+                            target?.focus();
+                            target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                          }
+                        }}
+                        onClick={() => {
+                          setShowTelegramDrawer(false);
+                          setShowTelegramChunkDrawer(true);
+                        }}
+                        className="px-3 py-1.5 rounded-lg border text-xs font-bold transition-all tv-focus-target flex items-center gap-1.5 border-hbo-border bg-hbo-dark/80 hover:bg-hbo-hover text-white flex-shrink-0"
+                      >
+                        <span className="text-sky-400 font-mono">
                           {((settings.msm32ChunkSize || 524288) / 1024).toFixed(0)} KB
                         </span>
-                      </div>
-
-                      <div className="grid grid-cols-3 gap-2 pt-1">
-                        {[
-                          { label: '256 KB', desc: 'Fastest Seek', val: 262144 },
-                          { label: '512 KB', desc: 'Balanced (Rec)', val: 524288 },
-                          { label: '1 MB', desc: 'High Bitrate', val: 1048576 },
-                        ].map((chunkOpt, idx) => {
-                          const isCurrent = (settings.msm32ChunkSize || 524288) === chunkOpt.val;
-                          return (
-                            <button
-                              key={chunkOpt.val}
-                              id={`drawer-chunk-${chunkOpt.val}`}
-                              data-telegram-drawer-item="true"
-                              type="button"
-                              onKeyDown={(e) => {
-                                if (e.key === 'ArrowUp') {
-                                  e.preventDefault();
-                                  document.getElementById('drawer-btn-msm32-test')?.focus();
-                                } else if (e.key === 'ArrowDown') {
-                                  e.preventDefault();
-                                  document.getElementById('drawer-country-MY')?.focus();
-                                } else if (e.key === 'ArrowLeft' && idx > 0) {
-                                  e.preventDefault();
-                                  const prevVal = [262144, 524288, 1048576][idx - 1];
-                                  document.getElementById(`drawer-chunk-${prevVal}`)?.focus();
-                                } else if (e.key === 'ArrowRight' && idx < 2) {
-                                  e.preventDefault();
-                                  const nextVal = [262144, 524288, 1048576][idx + 1];
-                                  document.getElementById(`drawer-chunk-${nextVal}`)?.focus();
-                                }
-                              }}
-                              onClick={() => handleUpdate({ msm32ChunkSize: chunkOpt.val })}
-                              className={`p-2.5 rounded-xl border text-center transition-all tv-focus-target ${
-                                isCurrent
-                                  ? 'bg-sky-500/20 border-sky-400 text-sky-300 font-bold shadow-sm ring-1 ring-sky-400'
-                                  : 'bg-white/5 border-white/10 text-gray-300 hover:text-white'
-                              }`}
-                            >
-                              <div className="text-xs">{chunkOpt.label}</div>
-                              <div className="text-[10px] opacity-70">{chunkOpt.desc}</div>
-                            </button>
-                          );
-                        })}
-                      </div>
+                        <ChevronRight className="w-3.5 h-3.5 text-gray-400" />
+                      </button>
                     </div>
 
-                    {/* Country Origin Filter Grid */}
-                    <div className="bg-black/40 border border-hbo-border rounded-xl p-4 space-y-2.5">
-                      <div>
-                        <span className="text-xs font-bold text-white block mb-0.5">MSM32 Active Country Origin Filters</span>
-                        <p className="text-[11px] text-gray-400">Provider only triggers when title matches selected origin countries.</p>
+                    {/* Sub-Drawer Hub Item 2: Active Country Origin Filters */}
+                    <div className="bg-black/40 border border-hbo-border rounded-xl p-3.5 flex items-center justify-between">
+                      <div className="min-w-0 pr-2">
+                        <div className="font-bold text-xs text-white flex items-center gap-1.5 mb-0.5">
+                          <Globe className="w-3.5 h-3.5 text-sky-400" />
+                          <span>Country Origin Filters</span>
+                        </div>
+                        <p className="text-[10px] text-gray-400">Trigger provider based on title origin countries.</p>
                       </div>
-
-                      <div className="grid grid-cols-2 gap-2 pt-1">
-                        {availableCodes.map((code, idx) => {
-                          const isSelected = currentCountries.includes(code);
-                          return (
-                            <button
-                              key={code}
-                              id={`drawer-country-${code}`}
-                              data-telegram-drawer-item="true"
-                              type="button"
-                              onKeyDown={(e) => {
-                                if (e.key === 'ArrowUp' && idx < 2) {
-                                  e.preventDefault();
-                                  document.getElementById('drawer-chunk-524288')?.focus();
-                                }
-                              }}
-                              onClick={() => {
-                                let updated: OriginCountryCode[];
-                                if (isSelected) {
-                                  if (currentCountries.length === 1) return;
-                                  updated = currentCountries.filter(c => c !== code);
-                                } else {
-                                  updated = [...currentCountries, code];
-                                }
-                                const existingMap = settings.telegramProviderCountries || {};
-                                handleUpdate({
-                                  telegramProviderCountries: {
-                                    ...existingMap,
-                                    'telegram-msm32': updated
-                                  }
-                                });
-                              }}
-                              className={`p-2.5 rounded-xl border text-xs font-bold transition-all tv-focus-target flex items-center justify-between ${
-                                isSelected
-                                  ? 'bg-sky-500/25 border-sky-400 text-sky-200 shadow-sm'
-                                  : 'bg-black/40 border-white/10 text-gray-400 hover:border-white/20'
-                              }`}
-                            >
-                              <span className="truncate">{ORIGIN_COUNTRY_LABELS[code]}</span>
-                              {isSelected && <Check className="w-3.5 h-3.5 text-sky-400 flex-shrink-0 stroke-[2.5]" />}
-                            </button>
-                          );
-                        })}
-                      </div>
+                      <button
+                        id="drawer-telegram-sub-country"
+                        data-telegram-drawer-item="true"
+                        type="button"
+                        onKeyDown={(e) => {
+                          if (e.key === 'ArrowUp') {
+                            e.preventDefault();
+                            const target = document.getElementById('drawer-telegram-sub-chunk');
+                            target?.focus();
+                            target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                          }
+                        }}
+                        onClick={() => {
+                          setShowTelegramDrawer(false);
+                          setShowTelegramCountryDrawer(true);
+                        }}
+                        className="px-3 py-1.5 rounded-lg border text-xs font-bold transition-all tv-focus-target flex items-center gap-1.5 border-hbo-border bg-hbo-dark/80 hover:bg-hbo-hover text-white flex-shrink-0"
+                      >
+                        <span className="text-sky-400 font-mono">
+                          {currentCountries.length} active
+                        </span>
+                        <ChevronRight className="w-3.5 h-3.5 text-gray-400" />
+                      </button>
                     </div>
                   </>
                 );
+              })()}
+            </div>
+
+            {/* Drawer Footer Hint */}
+            <div className="p-4 border-t border-hbo-border/50 bg-black/40 flex items-center justify-center text-xs text-gray-400 select-none">
+              <span>Press <strong className="text-white font-semibold">Back</strong> to return</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* Android TV Telegram Stream Chunk Buffer Right Drawer (Level 3)            */}
+      {/* ========================================================================= */}
+      {showTelegramChunkDrawer && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          data-drawer-container="true"
+          className="fixed inset-0 z-[9999] flex justify-end bg-black/80 backdrop-blur-md animate-fade-in"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowTelegramChunkDrawer(false);
+              setShowTelegramDrawer(true);
+            }
+          }}
+        >
+          {/* Left Side Parent Path Context */}
+          <div className="flex-1 hidden md:flex flex-col justify-center pl-16 pr-8 pointer-events-none select-none">
+            <div className="flex items-center gap-2 text-xs font-bold text-gray-400 tracking-wider uppercase mb-2">
+              <span className="text-gray-400">Settings</span>
+              <ChevronRight className="w-3.5 h-3.5 text-gray-500" />
+              <span className="text-gray-400">Playback &amp; Streaming</span>
+              <ChevronRight className="w-3.5 h-3.5 text-gray-500" />
+              <span className="text-gray-400">Stream Engines</span>
+              <ChevronRight className="w-3.5 h-3.5 text-gray-500" />
+              <span className="text-hbo-cyan font-semibold">Telegram Provider</span>
+            </div>
+            <h1 className="text-3xl font-extrabold text-white tracking-tight mb-2">Stream Chunk Buffer</h1>
+            <p className="text-sm text-gray-400 max-w-md leading-relaxed">
+              Configure in-memory chunk slice buffer size for Telegram MTProto video streaming.
+            </p>
+          </div>
+
+          <div className="w-full max-w-md h-full bg-hbo-card/95 border-l border-hbo-border/80 shadow-2xl flex flex-col justify-between animate-slide-in-right overflow-hidden">
+            {/* Drawer Body: Single Column Options */}
+            <div className="flex-1 overflow-y-auto px-6 py-6 space-y-3 font-sans">
+              {(() => {
+                const chunkOptions = [
+                  { val: 262144, label: '256 KB', desc: 'Fastest seek & instant startup • Recommended for low latency or mobile hotspot.' },
+                  { val: 524288, label: '512 KB (Default & Recommended)', desc: 'Optimum balance between seek response time and stable network throughput.' },
+                  { val: 1048576, label: '1 MB', desc: 'High throughput • Best for high-bitrate 1080p/4K on high-speed fiber broadband.' },
+                ];
+                const currentVal = settings.msm32ChunkSize || 524288;
+
+                return chunkOptions.map((opt, idx) => {
+                  const isSelected = currentVal === opt.val;
+                  return (
+                    <button
+                      key={opt.val}
+                      id={`drawer-telegram-chunk-${opt.val}`}
+                      data-telegram-chunk-drawer-item="true"
+                      data-telegram-chunk-selected={isSelected ? 'true' : 'false'}
+                      type="button"
+                      onKeyDown={(e) => {
+                        if (e.key === 'ArrowUp' && idx > 0) {
+                          e.preventDefault();
+                          const target = document.getElementById(`drawer-telegram-chunk-${chunkOptions[idx - 1].val}`);
+                          target?.focus();
+                          target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                        } else if (e.key === 'ArrowDown' && idx < chunkOptions.length - 1) {
+                          e.preventDefault();
+                          const target = document.getElementById(`drawer-telegram-chunk-${chunkOptions[idx + 1].val}`);
+                          target?.focus();
+                          target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                        }
+                      }}
+                      onClick={() => {
+                        handleUpdate({ msm32ChunkSize: opt.val });
+                        setShowTelegramChunkDrawer(false);
+                        setShowTelegramDrawer(true);
+                      }}
+                      className={`w-full p-4 rounded-xl border text-left transition-all tv-focus-target flex items-center justify-between gap-3 ${
+                        isSelected
+                          ? 'bg-sky-950/40 border-sky-400 text-white shadow-hbo-glow ring-1 ring-sky-400/40'
+                          : 'bg-black/30 border-hbo-border hover:border-gray-600 text-gray-400'
+                      }`}
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-bold text-sm text-white">{opt.label}</span>
+                          <span className="text-[10px] text-sky-400 font-mono font-bold bg-sky-500/10 px-1.5 py-0.5 rounded border border-sky-400/20">
+                            {(opt.val / 1024).toFixed(0)} KB
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-gray-400 leading-snug">{opt.desc}</p>
+                      </div>
+                      <div className={`w-6 h-6 rounded-full border flex items-center justify-center flex-shrink-0 ${
+                        isSelected ? 'bg-sky-500 border-sky-400 text-black' : 'border-gray-600 bg-black/40 text-transparent'
+                      }`}>
+                        <Check className="w-3.5 h-3.5 stroke-[3]" />
+                      </div>
+                    </button>
+                  );
+                });
+              })()}
+            </div>
+
+            {/* Drawer Footer Hint */}
+            <div className="p-4 border-t border-hbo-border/50 bg-black/40 flex items-center justify-center text-xs text-gray-400 select-none">
+              <span>Press <strong className="text-white font-semibold">Back</strong> to return</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* Android TV Telegram Country Origin Filters Right Drawer (Level 3)          */}
+      {/* ========================================================================= */}
+      {showTelegramCountryDrawer && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          data-drawer-container="true"
+          className="fixed inset-0 z-[9999] flex justify-end bg-black/80 backdrop-blur-md animate-fade-in"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowTelegramCountryDrawer(false);
+              setShowTelegramDrawer(true);
+            }
+          }}
+        >
+          {/* Left Side Parent Path Context */}
+          <div className="flex-1 hidden md:flex flex-col justify-center pl-16 pr-8 pointer-events-none select-none">
+            <div className="flex items-center gap-2 text-xs font-bold text-gray-400 tracking-wider uppercase mb-2">
+              <span className="text-gray-400">Settings</span>
+              <ChevronRight className="w-3.5 h-3.5 text-gray-500" />
+              <span className="text-gray-400">Playback &amp; Streaming</span>
+              <ChevronRight className="w-3.5 h-3.5 text-gray-500" />
+              <span className="text-gray-400">Stream Engines</span>
+              <ChevronRight className="w-3.5 h-3.5 text-gray-500" />
+              <span className="text-hbo-cyan font-semibold">Telegram Provider</span>
+            </div>
+            <h1 className="text-3xl font-extrabold text-white tracking-tight mb-2">Country Origin Filters</h1>
+            <p className="text-sm text-gray-400 max-w-md leading-relaxed">
+              Select which content origin countries trigger Telegram MSM32 provider resolution.
+            </p>
+          </div>
+
+          <div className="w-full max-w-md h-full bg-hbo-card/95 border-l border-hbo-border/80 shadow-2xl flex flex-col justify-between animate-slide-in-right overflow-hidden">
+            {/* Drawer Body: Single Column Options */}
+            <div className="flex-1 overflow-y-auto px-6 py-6 space-y-2.5 font-sans">
+              <p className="text-xs text-gray-400 mb-2 leading-relaxed">
+                Telegram MSM32 specializes in Southeast Asian releases. Select the content origin countries where MSM32 should probe for matching streams:
+              </p>
+              {(() => {
+                const currentCountries: OriginCountryCode[] =
+                  (settings.telegramProviderCountries && settings.telegramProviderCountries['telegram-msm32']) ||
+                  ['MY', 'ID', 'SG'];
+                const availableCodes: OriginCountryCode[] = ['MY', 'ID', 'SG', 'TH', 'KR', 'JP', 'GLOBAL'];
+
+                return availableCodes.map((code, idx) => {
+                  const isSelected = currentCountries.includes(code);
+                  return (
+                    <button
+                      key={code}
+                      id={`drawer-telegram-country-${code}`}
+                      data-telegram-country-drawer-item="true"
+                      data-telegram-country-selected={isSelected ? 'true' : 'false'}
+                      type="button"
+                      onKeyDown={(e) => {
+                        if (e.key === 'ArrowUp' && idx > 0) {
+                          e.preventDefault();
+                          const target = document.getElementById(`drawer-telegram-country-${availableCodes[idx - 1]}`);
+                          target?.focus();
+                          target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                        } else if (e.key === 'ArrowDown' && idx < availableCodes.length - 1) {
+                          e.preventDefault();
+                          const target = document.getElementById(`drawer-telegram-country-${availableCodes[idx + 1]}`);
+                          target?.focus();
+                          target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                        }
+                      }}
+                      onClick={() => {
+                        let updated: OriginCountryCode[];
+                        if (isSelected) {
+                          if (currentCountries.length === 1) return;
+                          updated = currentCountries.filter(c => c !== code);
+                        } else {
+                          updated = [...currentCountries, code];
+                        }
+                        const existingMap = settings.telegramProviderCountries || {};
+                        handleUpdate({
+                          telegramProviderCountries: {
+                            ...existingMap,
+                            'telegram-msm32': updated
+                          }
+                        });
+                      }}
+                      className={`w-full p-3.5 rounded-xl border text-left transition-all tv-focus-target flex items-center justify-between gap-3 ${
+                        isSelected
+                          ? 'bg-sky-950/40 border-sky-400 text-white shadow-sm'
+                          : 'bg-black/30 border-hbo-border hover:border-gray-600 text-gray-400'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className={`w-5 h-5 rounded border flex items-center justify-center flex-shrink-0 ${
+                          isSelected ? 'bg-sky-500 border-sky-400' : 'border-gray-600 bg-black/40'
+                        }`}>
+                          {isSelected && <Check className="w-3.5 h-3.5 text-black stroke-[3]" />}
+                        </div>
+                        <span className="font-bold text-xs text-white truncate">{ORIGIN_COUNTRY_LABELS[code]}</span>
+                      </div>
+                      <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-white/5 border border-white/10 text-gray-300 flex-shrink-0">
+                        {code}
+                      </span>
+                    </button>
+                  );
+                });
               })()}
             </div>
 

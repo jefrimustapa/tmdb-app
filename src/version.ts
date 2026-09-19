@@ -2,12 +2,14 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20260919-0459';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-add-provider-te.20260919-0459';
+export const APP_BUILD_NUMBER = '20260919-0522';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-add-provider-te.20260919-0522';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
 export const APP_BRANCH = 'feat-add-provider-te';
-export const APP_CHANGELOG = `* fix(player): skip Telegram MSM when title origin does not match filter and try next engine
+export const APP_CHANGELOG = `* chore: bump build version
+* fix(player): always autostart custom direct player unmuted with full volume
+* fix(player): skip Telegram MSM when title origin does not match filter and try next engine
 * fix(player): enforce country origin filters on Telegram MSM provider for Anime and non-matching titles
 * feat(settings): move stream chunk and country filters to dedicated sub-drawers
 * feat(settings): separate stream engine settings into dedicated sub-drawers
@@ -19,6 +21,4 @@ export const APP_CHANGELOG = `* fix(player): skip Telegram MSM when title origin
 * feat(player): unify buffering spinner and seek status directly inside center controls
 * fix(player): remove cyan feedback ripple popup on seek and double-tap
 * style(player): adjust center control icons to 30% transparency (opacity-70)
-* style(player): make center control buttons fully transparent without background shapes or drop shadows
-* fix(player): resolve touch-click race condition causing controls to instantly hide on tap
-* feat: streamline CustomDirectPlayer with solid controls, remove top bar, and 3s auto-hide`;
+* style(player): make center control buttons fully transparent without background shapes or drop shadows`;
