@@ -20,6 +20,9 @@ dist-ssr
 !.env.example
 *.tsbuildinfo
 *.code-workspace
+server/**/.env
+server/**/*.session*
+
 
 # Editor directories and files
 .vscode/*

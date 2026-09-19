@@ -883,6 +883,12 @@ public class MainActivity extends BridgeActivity {
             // Handle alert, confirm, and multi-window popups
             webView.setWebChromeClient(new WebChromeClient() {
                 @Override
+                public android.graphics.Bitmap getDefaultVideoPoster() {
+                    // Eradicate default Android distorted black circle/grey box placeholder
+                    return android.graphics.Bitmap.createBitmap(1, 1, android.graphics.Bitmap.Config.ARGB_8888);
+                }
+
+                @Override
                 public boolean onCreateWindow(WebView view, boolean isDialog, boolean isUserGesture, Message resultMsg) {
                     // Drop all popup requests from third-party players
                     return false;

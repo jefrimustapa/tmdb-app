@@ -7,7 +7,8 @@ import { WatchSettingsModal, type WatchSettingsTab } from '../../components/play
 
 import { searchSubtitles, fetchAndParseSubtitle, type SubtitleTrack, type SubtitleCue } from '../../services/subtitleService';
 import { dbService } from '../../services/db';
-import { getProviderById } from '../../services/streamProviders';
+import type { StreamResolverType } from '../../types/db';
+import { getProviderById, extractMediaOriginCountries, isProviderMatchingMedia } from '../../services/streamProviders';
 import { isAnimeMedia } from '../../services/animeMappingService';
 import { isAseanMedia, isKoreanMedia } from '../../services/lariMappingService';
 import { ArrowLeft, SkipForward, SkipBack, Cast, Tv, X, Settings } from 'lucide-react';
@@ -30,11 +31,12 @@ export const Watch: React.FC = () => {
   const tmdbId = parseInt(id || '0', 10);
   const mediaType = (type === 'tv' ? 'tv' : 'movie') as 'movie' | 'tv';
 
-  const [enabledResolvers, setEnabledResolvers] = useState<('embed' | 'private_extractor' | 'torbox')[]>(['embed']);
+  const [enabledResolvers, setEnabledResolvers] = useState<StreamResolverType[]>(['embed']);
 
   const isKorean = useMemo(() => isKoreanMedia(details), [details]);
   const isAnime = useMemo(() => isAnimeMedia(details), [details]);
   const isAsean = useMemo(() => isAseanMedia(details), [details]);
+  const mediaOrigins = useMemo(() => extractMediaOriginCountries(details, isAnime, isKorean, isAsean), [details, isAnime, isKorean, isAsean]);
 
   // Parallelized initial load: TMDB details, TV season details, and DB settings all fetched together
   useEffect(() => {
@@ -61,17 +63,46 @@ export const Watch: React.FC = () => {
         if (fetchedSeason) setSeasonDetails(fetchedSeason);
 
         if (s) {
+          const activeResolvers = s.enabledResolvers && s.enabledResolvers.length > 0 ? s.enabledResolvers : ['embed'];
+          const hasEmbed = activeResolvers.includes('embed');
+          const hasTelegram = activeResolvers.includes('telegram');
+
           if (!userSelectedProvider) {
             const koreanFlag = isKoreanMedia(fetchedDetails);
             const animeFlag = isAnimeMedia(fetchedDetails);
             const aseanFlag = isAseanMedia(fetchedDetails);
-            const defaultProvider = koreanFlag
-              ? (s.topKoreanProviders?.[0] || 'kisskh-kdrama')
-              : aseanFlag
-              ? (s.topAseanProviders?.[0] || (s as any).topAsianProviders?.[0] || 'vidlink')
-              : animeFlag
-              ? (s.topAnimeProviders?.[0] || 'megaplay-anime')
-              : (s.topProviders?.[0] || s.preferredProvider || 'vidlink');
+            const mediaOrigins = extractMediaOriginCountries(fetchedDetails, animeFlag, koreanFlag, aseanFlag);
+            const isTelegramMatching = isProviderMatchingMedia(
+              getProviderById('telegram-msm32'),
+              mediaOrigins,
+              s.telegramProviderCountries,
+              s.enabledTelegramProviders
+            );
+
+            const priorityList = s.enginePriority || ['torbox', 'telegram', 'embed', 'private_extractor'];
+            const telegramRank = priorityList.indexOf('telegram');
+            const embedRank = priorityList.indexOf('embed');
+            const prefersTelegramOverEmbed = telegramRank !== -1 && (embedRank === -1 || telegramRank < embedRank);
+
+            let defaultProvider = 'vidlink';
+            if (prefersTelegramOverEmbed && hasTelegram && isTelegramMatching) {
+              defaultProvider = 'telegram-msm32';
+            } else if (animeFlag) {
+              defaultProvider = s.topAnimeProviders?.[0] || 'megaplay-anime';
+            } else if (koreanFlag) {
+              defaultProvider = s.topKoreanProviders?.[0] || 'kisskh-kdrama';
+            } else if (!prefersTelegramOverEmbed && hasTelegram && isTelegramMatching && !hasEmbed) {
+              defaultProvider = 'telegram-msm32';
+            } else if (aseanFlag) {
+              defaultProvider = s.topAseanProviders?.[0] || (s as any).topAsianProviders?.[0] || 'vidlink';
+            } else {
+              const topPick = s.topProviders?.[0] || s.preferredProvider || 'vidlink';
+              if (topPick === 'telegram-msm32' && !isTelegramMatching) {
+                defaultProvider = s.topProviders?.find(p => p !== 'telegram-msm32') || 'vidlink';
+              } else {
+                defaultProvider = topPick;
+              }
+            }
             setProviderId(defaultProvider);
           }
           if (s.enabledResolvers && s.enabledResolvers.length > 0) {
@@ -97,6 +128,7 @@ export const Watch: React.FC = () => {
 
   const [isProbing, setIsProbing] = useState(false);
   const [serverIndex, setServerIndex] = useState(1);
+  const [totalServers, setTotalServers] = useState(1);
   const [headerVisible, setHeaderVisible] = useState(true);
   const [headerTimeoutSeconds, setHeaderTimeoutSeconds] = useState(5);
   const [isPortrait, setIsPortrait] = useState(() => window.innerHeight > window.innerWidth);
@@ -678,15 +710,20 @@ export const Watch: React.FC = () => {
             isAnime={isAnime}
             isAsean={isAsean}
             isKorean={isKorean}
+            details={details}
+            originCountries={mediaOrigins}
             releaseYear={releaseYear}
             originalTitle={details.original_title || details.original_name}
             onProviderChange={(p) => {
               setUserSelectedProvider(true);
               setProviderId(p.id);
             }}
-            onProbingStatusChange={(probing, idx) => {
+            onProbingStatusChange={(probing, idx, total) => {
               setIsProbing(probing);
               setServerIndex(idx);
+              if (typeof total === 'number' && total > 0) {
+                setTotalServers(total);
+              }
             }}
             nextEpisodeInfo={nextEpisodeInfo}
             onNextEpisode={handleNextEpisode}
@@ -715,9 +752,13 @@ export const Watch: React.FC = () => {
         }}
         isProbing={isProbing}
         serverIndex={serverIndex}
+        totalServers={totalServers}
         isAnime={isAnime}
         isAsean={isAsean}
         isKorean={isKorean}
+        details={details}
+        originCountries={mediaOrigins}
+        enabledResolvers={enabledResolvers}
       />
 
       {/* Cast Selection Modal */}

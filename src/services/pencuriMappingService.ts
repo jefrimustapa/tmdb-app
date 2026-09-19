@@ -171,12 +171,11 @@ async function searchPencuri(
   const pathType = isTv ? 'tvshows' : 'movies';
 
   // --- Strategy 1: Direct URL from title slug (no search, no latency) ---
-  const titlesToTry = [
-    title,
-    cleanTitleForSearch(title),
-    originalTitle,
-    originalTitle ? cleanTitleForSearch(originalTitle) : null,
-  ].filter((t): t is string => Boolean(t && t.trim().length > 1));
+  const hasDiffOriginal = Boolean(originalTitle && originalTitle.trim().toLowerCase() !== title.trim().toLowerCase());
+  const titlesToTry = (hasDiffOriginal
+    ? [originalTitle, cleanTitleForSearch(originalTitle!), title, cleanTitleForSearch(title)]
+    : [title, cleanTitleForSearch(title), originalTitle, originalTitle ? cleanTitleForSearch(originalTitle) : null]
+  ).filter((t): t is string => Boolean(t && t.trim().length > 1));
 
   const seenSlugs = new Set<string>();
   for (const t of titlesToTry) {
@@ -199,8 +198,9 @@ async function searchPencuri(
   }
 
   // --- Strategy 2: Search fallback (slower, may timeout) ---
-  const queries = [title.trim(), cleanTitleForSearch(title)];
-  if (originalTitle) queries.push(originalTitle.trim());
+  const queries = hasDiffOriginal
+    ? [originalTitle!.trim(), cleanTitleForSearch(originalTitle!), title.trim(), cleanTitleForSearch(title)]
+    : [title.trim(), cleanTitleForSearch(title), ...(originalTitle ? [originalTitle.trim()] : [])];
   const uniqueQueries = [...new Set(queries)].filter(q => q.length > 1);
 
   for (const q of uniqueQueries) {

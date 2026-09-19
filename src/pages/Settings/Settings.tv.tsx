@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { dbService } from '../../services/db';
-import type { UserSettings } from '../../types/db';
-import { STREAM_PROVIDERS, CATEGORY_BADGE_CONFIG } from '../../services/streamProviders';
+import type { UserSettings, StreamResolverType } from '../../types/db';
+import { STREAM_PROVIDERS, CATEGORY_BADGE_CONFIG, ORIGIN_COUNTRY_LABELS } from '../../services/streamProviders';
+import type { OriginCountryCode } from '../../types/stream';
+import { msm32Service, type Msm32HealthResult } from '../../services/msm32MappingService';
 import { useDevice } from '../../hooks/useDevice';
 import { Logo } from '../../components/common/Logo';
 import { APP_VERSION, APP_BUILD_NUMBER, APP_VERSION_FULL, APP_BUILD_CHANNEL, APP_CHANGELOG } from '../../version';
@@ -38,7 +40,9 @@ import {
   Download,
   Upload,
   HardDrive,
-  Save
+  Globe,
+  Save,
+  Send,
 } from 'lucide-react';
 
 type TVCategory = 'playback' | 'display' | 'controls' | 'content' | 'system';
@@ -157,7 +161,11 @@ export const Settings: React.FC = () => {
   const [showAutoplayTriggerDrawer, setShowAutoplayTriggerDrawer] = useState(false);
   const [showAutoplayTimeoutDrawer, setShowAutoplayTimeoutDrawer] = useState(false);
   const [showEnginesDrawer, setShowEnginesDrawer] = useState(false);
+  const [showEnginePriorityDrawer, setShowEnginePriorityDrawer] = useState(false);
   const [showTorboxDrawer, setShowTorboxDrawer] = useState(false);
+  const [showTelegramDrawer, setShowTelegramDrawer] = useState(false);
+  const [showTelegramChunkDrawer, setShowTelegramChunkDrawer] = useState(false);
+  const [showTelegramCountryDrawer, setShowTelegramCountryDrawer] = useState(false);
   const [showDirectExtractorDrawer, setShowDirectExtractorDrawer] = useState(false);
   const [showEmbedResolverDrawer, setShowEmbedResolverDrawer] = useState(false);
   const [showEmbedTimeoutDrawer, setShowEmbedTimeoutDrawer] = useState(false);
@@ -167,12 +175,14 @@ export const Settings: React.FC = () => {
   const [showHeaderTimeoutDrawer, setShowHeaderTimeoutDrawer] = useState(false);
   const [showPerfHudDrawer, setShowPerfHudDrawer] = useState(false);
   const [showBackupDrawer, setShowBackupDrawer] = useState(false);
+  const [testingMsm32, setTestingMsm32] = useState(false);
+  const [msm32TestResult, setMsm32TestResult] = useState<Msm32HealthResult | null>(null);
   const clickCountRef = useRef(0);
   const clickTimerRef = useRef<NodeJS.Timeout | null>(null);
   const { detectedPlatform, activeLayout } = useDevice();
 
   const isPickerModalOpen = pickerModalSlot !== null;
-  const isAnyModalOpen = isPickerModalOpen || showMaturityDrawer || showTriggerDrawer || showAutoplayDrawer || showAutoplayTriggerDrawer || showAutoplayTimeoutDrawer || showEnginesDrawer || showTorboxDrawer || showDirectExtractorDrawer || showEmbedResolverDrawer || showEmbedTimeoutDrawer || showEmbedRetryDrawer || activePriorityDrawer !== null || showTickerDrawer || showHeaderTimeoutDrawer || showPerfHudDrawer || showBackupDrawer;
+  const isAnyModalOpen = isPickerModalOpen || showMaturityDrawer || showTriggerDrawer || showAutoplayDrawer || showAutoplayTriggerDrawer || showAutoplayTimeoutDrawer || showEnginesDrawer || showEnginePriorityDrawer || showTorboxDrawer || showTelegramDrawer || showTelegramChunkDrawer || showTelegramCountryDrawer || showDirectExtractorDrawer || showEmbedResolverDrawer || showEmbedTimeoutDrawer || showEmbedRetryDrawer || activePriorityDrawer !== null || showTickerDrawer || showHeaderTimeoutDrawer || showPerfHudDrawer || showBackupDrawer;
 
   // Viewport scroll helpers for TV remote navigation (snaps to absolute top / bottom)
   const scrollToPanelTop = () => {
@@ -193,6 +203,25 @@ export const Settings: React.FC = () => {
       contentPanelRef.current.scrollTo({ top: 0, behavior: 'instant' as any });
     }
   }, [activeCategory]);
+
+  // Auto-ping MSM Getter microservice whenever the user enters the Telegram provider drawer
+  useEffect(() => {
+    if (showTelegramDrawer) {
+      setTestingMsm32(true);
+      setMsm32TestResult(null);
+      const url = settings?.msm32GetterUrl;
+      msm32Service.testConnection(url)
+        .then((res) => {
+          setMsm32TestResult(res);
+        })
+        .catch((err: any) => {
+          setMsm32TestResult({ ok: false, error: err?.message || 'Connection failed' });
+        })
+        .finally(() => {
+          setTestingMsm32(false);
+        });
+    }
+  }, [showTelegramDrawer, settings?.msm32GetterUrl]);
 
   useEffect(() => {
     try {
@@ -255,8 +284,19 @@ export const Settings: React.FC = () => {
       }, 50);
     } else if (showEnginesDrawer) {
       setTimeout(() => {
-        const defaultEl = document.getElementById('drawer-engine-item-torbox') ||
+        const defaultEl = document.getElementById('drawer-engine-item-priority') ||
+                          document.getElementById('drawer-engine-item-torbox') ||
                           document.querySelector<HTMLElement>('[data-engine-drawer-item="true"]');
+        if (defaultEl) {
+          defaultEl.focus();
+          defaultEl.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        }
+      }, 50);
+    } else if (showEnginePriorityDrawer) {
+      setTimeout(() => {
+        const defaultEl = document.getElementById('drawer-prio-down-0') ||
+                          document.getElementById('drawer-prio-up-0') ||
+                          document.querySelector<HTMLElement>('[data-engine-prio-item="true"]');
         if (defaultEl) {
           defaultEl.focus();
           defaultEl.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
@@ -271,10 +311,46 @@ export const Settings: React.FC = () => {
           defaultEl.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
         }
       }, 50);
+    } else if (showTelegramDrawer) {
+      setTimeout(() => {
+        const defaultEl = document.getElementById('drawer-telegram-toggle') ||
+                          document.querySelector<HTMLElement>('[data-telegram-drawer-item="true"]');
+        if (defaultEl) {
+          defaultEl.focus();
+          defaultEl.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        }
+      }, 50);
+    } else if (showTelegramChunkDrawer) {
+      setTimeout(() => {
+        const selectedEl = document.querySelector<HTMLElement>('[data-telegram-chunk-drawer-item][data-telegram-chunk-selected="true"]') ||
+                           document.querySelector<HTMLElement>('[data-telegram-chunk-drawer-item]');
+        if (selectedEl) {
+          selectedEl.focus();
+          selectedEl.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        }
+      }, 50);
+    } else if (showTelegramCountryDrawer) {
+      setTimeout(() => {
+        const defaultEl = document.getElementById('drawer-telegram-country-MY') ||
+                          document.querySelector<HTMLElement>('[data-telegram-country-drawer-item]');
+        if (defaultEl) {
+          defaultEl.focus();
+          defaultEl.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        }
+      }, 50);
     } else if (showDirectExtractorDrawer) {
       setTimeout(() => {
         const defaultEl = document.getElementById('drawer-extractor-toggle') ||
                           document.querySelector<HTMLElement>('[data-extractor-drawer-item="true"]');
+        if (defaultEl) {
+          defaultEl.focus();
+          defaultEl.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        }
+      }, 50);
+    } else if (showEmbedResolverDrawer) {
+      setTimeout(() => {
+        const defaultEl = document.getElementById('drawer-embed-toggle') ||
+                          document.querySelector<HTMLElement>('[data-embed-drawer-item="true"]');
         if (defaultEl) {
           defaultEl.focus();
           defaultEl.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
@@ -360,7 +436,7 @@ export const Settings: React.FC = () => {
         (window as any).AndroidBridge?.setDropdownOpen?.(false);
       } catch {}
     };
-  }, [pickerModalSlot, isPickerModalOpen, showMaturityDrawer, showTriggerDrawer, showAutoplayDrawer, showAutoplayTriggerDrawer, showAutoplayTimeoutDrawer, showEnginesDrawer, showTorboxDrawer, showDirectExtractorDrawer, showEmbedResolverDrawer, showEmbedTimeoutDrawer, activePriorityDrawer, showTickerDrawer, showHeaderTimeoutDrawer, showPerfHudDrawer, showBackupDrawer, isAnyModalOpen]);
+  }, [pickerModalSlot, isPickerModalOpen, showMaturityDrawer, showTriggerDrawer, showAutoplayDrawer, showAutoplayTriggerDrawer, showAutoplayTimeoutDrawer, showEnginesDrawer, showTorboxDrawer, showTelegramDrawer, showTelegramChunkDrawer, showTelegramCountryDrawer, showDirectExtractorDrawer, showEmbedResolverDrawer, showEmbedTimeoutDrawer, activePriorityDrawer, showTickerDrawer, showHeaderTimeoutDrawer, showPerfHudDrawer, showBackupDrawer, isAnyModalOpen]);
 
   // Handle remote Back button, tmdb_close_dropdowns, and Escape dismissal for modals / drawers
   useEffect(() => {
@@ -393,6 +469,23 @@ export const Settings: React.FC = () => {
         }, 50);
         return;
       }
+      // Level 3 Drawers inside Telegram: Return to Telegram Drawer
+      if (showTelegramChunkDrawer) {
+        setShowTelegramChunkDrawer(false);
+        setShowTelegramDrawer(true);
+        setTimeout(() => {
+          document.getElementById('drawer-telegram-sub-chunk')?.focus();
+        }, 50);
+        return;
+      }
+      if (showTelegramCountryDrawer) {
+        setShowTelegramCountryDrawer(false);
+        setShowTelegramDrawer(true);
+        setTimeout(() => {
+          document.getElementById('drawer-telegram-sub-country')?.focus();
+        }, 50);
+        return;
+      }
       // Level 2 Drawers: Return to Level 1 Autoplay Drawer
       if (showAutoplayTriggerDrawer) {
         setShowAutoplayTriggerDrawer(false);
@@ -405,9 +498,25 @@ export const Settings: React.FC = () => {
         return;
       }
       // Level 2 Drawers: Return to Level 1 Engines Drawer
+      if (showEnginePriorityDrawer) {
+        setShowEnginePriorityDrawer(false);
+        setShowEnginesDrawer(true);
+        setTimeout(() => {
+          document.getElementById('drawer-engine-item-priority')?.focus();
+        }, 50);
+        return;
+      }
       if (showTorboxDrawer) {
         setShowTorboxDrawer(false);
         setShowEnginesDrawer(true);
+        return;
+      }
+      if (showTelegramDrawer) {
+        setShowTelegramDrawer(false);
+        setShowEnginesDrawer(true);
+        setTimeout(() => {
+          document.getElementById('drawer-engine-item-telegram')?.focus();
+        }, 50);
         return;
       }
       if (showDirectExtractorDrawer) {
@@ -518,7 +627,11 @@ export const Settings: React.FC = () => {
     showAutoplayTriggerDrawer,
     showAutoplayTimeoutDrawer,
     showEnginesDrawer,
+    showEnginePriorityDrawer,
     showTorboxDrawer,
+    showTelegramDrawer,
+    showTelegramChunkDrawer,
+    showTelegramCountryDrawer,
     showDirectExtractorDrawer,
     showEmbedResolverDrawer,
     showEmbedTimeoutDrawer,
@@ -1388,7 +1501,7 @@ export const Settings: React.FC = () => {
                           <span className="text-hbo-cyan font-bold">{count} Active {count === 1 ? 'Engine' : 'Engines'}</span>
                           <span className="text-gray-500">•</span>
                           <span className="text-gray-300 font-medium text-[11px]">
-                            {enabled.map(k => k === 'torbox' ? 'TorBox' : k === 'private_extractor' ? 'Direct Extractor' : 'Embed').join(', ')}
+                            {enabled.map(k => k === 'torbox' ? 'TorBox' : k === 'telegram' ? 'Telegram' : k === 'private_extractor' ? 'Direct Extractor' : 'Embed').join(', ')}
                           </span>
                         </div>
                       </div>
@@ -3077,20 +3190,65 @@ export const Settings: React.FC = () => {
                   ? settings.enabledResolvers
                   : ['embed'];
                 const isTorboxEnabled = currentEnabled.includes('torbox');
+                const isTelegramEnabled = currentEnabled.includes('telegram');
                 const isExtractorEnabled = currentEnabled.includes('private_extractor');
                 const isEmbedEnabled = currentEnabled.includes('embed');
 
+                const priorityOrder: StreamResolverType[] = (settings.enginePriority && settings.enginePriority.length > 0)
+                  ? settings.enginePriority
+                  : ['torbox', 'telegram', 'embed', 'private_extractor'];
+
                 return (
                   <>
+                    {/* Item 0: Engine Priority Order Reordering Hub */}
+                    <button
+                      id="drawer-engine-item-priority"
+                      data-engine-drawer-item="true"
+                      type="button"
+                      onKeyDown={(e) => {
+                        if (e.key === 'ArrowDown') {
+                          e.preventDefault();
+                          document.getElementById('drawer-engine-item-torbox')?.focus();
+                        }
+                      }}
+                      onClick={() => {
+                        setShowEnginesDrawer(false);
+                        setShowEnginePriorityDrawer(true);
+                      }}
+                      className="w-full p-4 rounded-2xl border text-left transition-all tv-focus-target flex items-center justify-between gap-3 bg-gradient-to-r from-amber-500/20 via-orange-500/15 to-transparent border-amber-500/50 hover:border-amber-400 shadow-lg ring-1 ring-amber-500/30"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-bold text-sm text-white truncate">Engine Priority Order</span>
+                          <span className="text-[9px] px-2 py-0.5 rounded font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                            Resolution Sequence
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-gray-300 mb-1.5 leading-snug">Sort priority order for stream extraction &amp; failover.</p>
+                        <div className="flex items-center gap-1.5 text-xs font-semibold text-amber-300/90 overflow-x-hidden truncate">
+                          {priorityOrder.map((eng, idx) => (
+                            <span key={eng} className="flex items-center gap-1">
+                              {idx > 0 && <span className="text-gray-500 font-mono text-[10px]">→</span>}
+                              <span className="capitalize">{eng === 'private_extractor' ? 'Direct' : eng}</span>
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                      <ChevronRight className="w-5 h-5 text-amber-400 stroke-[2.2] flex-shrink-0" />
+                    </button>
+
                     {/* Item 1: TorBox Debrid Stream Engine */}
                     <button
                       id="drawer-engine-item-torbox"
                       data-engine-drawer-item="true"
                       type="button"
                       onKeyDown={(e) => {
-                        if (e.key === 'ArrowDown') {
+                        if (e.key === 'ArrowUp') {
                           e.preventDefault();
-                          document.getElementById('drawer-engine-item-extractor')?.focus();
+                          document.getElementById('drawer-engine-item-priority')?.focus();
+                        } else if (e.key === 'ArrowDown') {
+                          e.preventDefault();
+                          document.getElementById('drawer-engine-item-telegram')?.focus();
                         }
                       }}
                       onClick={() => {
@@ -3124,7 +3282,52 @@ export const Settings: React.FC = () => {
                       <ChevronRight className="w-5 h-5 text-gray-400 stroke-[2.2] flex-shrink-0" />
                     </button>
 
-                    {/* Item 2: Direct Extractor Stream Engine */}
+                    {/* Item 2: Telegram Provider Stream Engine */}
+                    <button
+                      id="drawer-engine-item-telegram"
+                      data-engine-drawer-item="true"
+                      type="button"
+                      onKeyDown={(e) => {
+                        if (e.key === 'ArrowUp') {
+                          e.preventDefault();
+                          document.getElementById('drawer-engine-item-torbox')?.focus();
+                        } else if (e.key === 'ArrowDown') {
+                          e.preventDefault();
+                          document.getElementById('drawer-engine-item-extractor')?.focus();
+                        }
+                      }}
+                      onClick={() => {
+                        setShowEnginesDrawer(false);
+                        setShowTelegramDrawer(true);
+                      }}
+                      className="w-full p-4 rounded-2xl border text-left transition-all tv-focus-target flex items-center justify-between gap-3 bg-hbo-dark/60 border-hbo-border hover:bg-hbo-hover hover:border-white/20"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-bold text-sm text-white truncate">Telegram Provider</span>
+                          <span className="text-[9px] px-2 py-0.5 rounded font-mono font-bold bg-sky-500/20 text-sky-300 border border-sky-500/40">
+                            Direct MTProto
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-gray-400 mb-1.5 leading-snug">Direct in-app video streaming from Telegram bots (MovieSubMalay / @msm32bot).</p>
+                        <div className="flex items-center gap-2 text-xs font-semibold">
+                          {isTelegramEnabled ? (
+                            <span className="text-sky-400 flex items-center gap-1">
+                              <span className="w-1.5 h-1.5 rounded-full bg-sky-400" />
+                              Enabled (MovieSubMalay Active)
+                            </span>
+                          ) : (
+                            <span className="text-gray-500 flex items-center gap-1">
+                              <span className="w-1.5 h-1.5 rounded-full bg-gray-600" />
+                              Disabled
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <ChevronRight className="w-5 h-5 text-gray-400 stroke-[2.2] flex-shrink-0" />
+                    </button>
+
+                    {/* Item 3: Direct Extractor Stream Engine */}
                     <button
                       id="drawer-engine-item-extractor"
                       data-engine-drawer-item="true"
@@ -3132,7 +3335,7 @@ export const Settings: React.FC = () => {
                       onKeyDown={(e) => {
                         if (e.key === 'ArrowUp') {
                           e.preventDefault();
-                          document.getElementById('drawer-engine-item-torbox')?.focus();
+                          document.getElementById('drawer-engine-item-telegram')?.focus();
                         } else if (e.key === 'ArrowDown') {
                           e.preventDefault();
                           document.getElementById('drawer-engine-item-embed')?.focus();
@@ -3169,7 +3372,7 @@ export const Settings: React.FC = () => {
                       <ChevronRight className="w-5 h-5 text-gray-400 stroke-[2.2] flex-shrink-0" />
                     </button>
 
-                    {/* Item 3: Embed Resolver Stream Engine */}
+                    {/* Item 4: Embed Resolver Stream Engine */}
                     <button
                       id="drawer-engine-item-embed"
                       data-engine-drawer-item="true"
@@ -3195,16 +3398,761 @@ export const Settings: React.FC = () => {
                         </div>
                         <p className="text-[11px] text-gray-400 mb-1.5 leading-snug">Multi-server fallback embeds with customizable timeout &amp; priority servers.</p>
                         <div className="flex items-center gap-2 text-xs font-semibold">
-                          <span className="text-emerald-400 flex items-center gap-1">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                            Always Active • {(settings.streamResolverTimeout ?? 0) === 0 ? 'Unlimited' : `${settings.streamResolverTimeout}s`} Timeout
-                          </span>
+                          {isEmbedEnabled ? (
+                            <span className="text-emerald-400 flex items-center gap-1">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                              Enabled • {(settings.streamResolverTimeout ?? 0) === 0 ? 'Unlimited' : `${settings.streamResolverTimeout}s`} Timeout
+                            </span>
+                          ) : (
+                            <span className="text-gray-500 flex items-center gap-1">
+                              <span className="w-1.5 h-1.5 rounded-full bg-gray-600" />
+                              Disabled
+                            </span>
+                          )}
                         </div>
                       </div>
                       <ChevronRight className="w-5 h-5 text-gray-400 stroke-[2.2] flex-shrink-0" />
                     </button>
                   </>
                 );
+              })()}
+            </div>
+
+            {/* Drawer Footer Hint */}
+            <div className="p-4 border-t border-hbo-border/50 bg-black/40 flex items-center justify-center text-xs text-gray-400 select-none">
+              <span>Press <strong className="text-white font-semibold">Back</strong> to return</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* Android TV Engine Priority Order Right Drawer (Level 2)                   */}
+      {/* ========================================================================= */}
+      {showEnginePriorityDrawer && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          data-drawer-container="true"
+          className="fixed inset-0 z-[9999] flex justify-end bg-black/80 backdrop-blur-md animate-fade-in"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowEnginePriorityDrawer(false);
+              setShowEnginesDrawer(true);
+              setTimeout(() => {
+                document.getElementById('drawer-engine-item-priority')?.focus();
+              }, 50);
+            }
+          }}
+        >
+          {/* Left Side Parent Path Context */}
+          <div className="flex-1 hidden md:flex flex-col justify-center pl-16 pr-8 pointer-events-none select-none">
+            <div className="flex items-center gap-2 text-xs font-bold text-gray-400 tracking-wider uppercase mb-2">
+              <span className="text-gray-400">Settings</span>
+              <ChevronRight className="w-3.5 h-3.5 text-gray-500" />
+              <span className="text-gray-400">Playback &amp; Streaming</span>
+              <ChevronRight className="w-3.5 h-3.5 text-gray-500" />
+              <span className="text-gray-400">Stream Engines</span>
+              <ChevronRight className="w-3.5 h-3.5 text-gray-500" />
+              <span className="text-amber-400 font-semibold">Priority Order</span>
+            </div>
+            <h1 className="text-3xl font-extrabold text-white tracking-tight mb-2">Engine Priority Order</h1>
+            <p className="text-sm text-gray-400 max-w-md leading-relaxed">
+              Rearrange the sequence in which stream engines attempt video resolution. When an engine fails or is unavailable, the player cascade moves to the next engine.
+            </p>
+          </div>
+
+          <div className="w-full max-w-md h-full bg-hbo-card/95 border-l border-hbo-border/80 shadow-2xl flex flex-col justify-between animate-slide-in-right overflow-hidden">
+            {/* Drawer Body: 4 Engine Reordering Cards */}
+            <div className="flex-1 overflow-y-auto px-6 py-6 space-y-3 font-sans">
+              <div className="flex items-center justify-between pb-1">
+                <span className="text-xs font-bold text-gray-300">Resolution Sequence</span>
+                <span className="text-[10px] px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 font-bold border border-amber-500/40">
+                  4 Engines
+                </span>
+              </div>
+
+              {(() => {
+                const currentPriority: StreamResolverType[] = (settings.enginePriority && settings.enginePriority.length > 0)
+                  ? settings.enginePriority
+                  : ['torbox', 'telegram', 'embed', 'private_extractor'];
+
+                const currentEnabled = settings.enabledResolvers && settings.enabledResolvers.length > 0
+                  ? settings.enabledResolvers
+                  : ['embed'];
+
+                const engineMeta: Record<StreamResolverType, { title: string; tag: string; desc: string; tagClass: string }> = {
+                  torbox: {
+                    title: 'TorBox Debrid',
+                    tag: '4K Ultra HD',
+                    desc: 'Direct HTTPS 4K HDR & 1080p BluRay cloud streams via TorBox CDN.',
+                    tagClass: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40',
+                  },
+                  telegram: {
+                    title: 'Telegram Provider',
+                    tag: 'Direct MTProto',
+                    desc: 'Direct in-app video streaming from Telegram bots (MovieSubMalay / @msm32bot).',
+                    tagClass: 'bg-sky-500/20 text-sky-300 border-sky-500/40',
+                  },
+                  embed: {
+                    title: 'Embed Resolver',
+                    tag: 'Multi-Mirror',
+                    desc: 'Standard multi-server iframe embeds (VidLink, MoviesAPI) with ad sandboxing.',
+                    tagClass: 'bg-hbo-cyan/20 text-hbo-cyan border-hbo-cyan/40',
+                  },
+                  private_extractor: {
+                    title: 'Direct Extractor',
+                    tag: 'Consumet API',
+                    desc: 'Direct HLS .m3u8 streams resolved via private backend API.',
+                    tagClass: 'bg-hbo-purple/30 text-hbo-purple-light border-hbo-purple/40',
+                  },
+                };
+
+                const rankLabels = [
+                  { badge: '#1 Primary', class: 'bg-amber-500/20 text-amber-300 border-amber-500/40' },
+                  { badge: '#2 Secondary', class: 'bg-sky-500/20 text-sky-300 border-sky-500/40' },
+                  { badge: '#3 Third Choice', class: 'bg-purple-500/20 text-purple-300 border-purple-500/40' },
+                  { badge: '#4 Fallback', class: 'bg-gray-700/40 text-gray-300 border-gray-600/40' },
+                ];
+
+                return currentPriority.map((engineKey, idx) => {
+                  const meta = engineMeta[engineKey];
+                  const rank = rankLabels[idx] || { badge: `#${idx + 1}`, class: 'bg-gray-800 text-gray-400' };
+                  const isEnabled = currentEnabled.includes(engineKey);
+
+                  const moveUp = () => {
+                    if (idx <= 0) return;
+                    const updated = [...currentPriority];
+                    const temp = updated[idx];
+                    updated[idx] = updated[idx - 1];
+                    updated[idx - 1] = temp;
+                    handleUpdate({ enginePriority: updated });
+                    setTimeout(() => {
+                      document.getElementById(`drawer-prio-up-${idx - 1}`)?.focus();
+                    }, 50);
+                  };
+
+                  const moveDown = () => {
+                    if (idx >= currentPriority.length - 1) return;
+                    const updated = [...currentPriority];
+                    const temp = updated[idx];
+                    updated[idx] = updated[idx + 1];
+                    updated[idx + 1] = temp;
+                    handleUpdate({ enginePriority: updated });
+                    setTimeout(() => {
+                      document.getElementById(`drawer-prio-down-${idx + 1}`)?.focus();
+                    }, 50);
+                  };
+
+                  return (
+                    <div
+                      key={engineKey}
+                      id={`drawer-engine-prio-card-${idx}`}
+                      data-engine-prio-item="true"
+                      className="p-3.5 rounded-2xl border bg-hbo-dark/60 border-hbo-border flex items-center justify-between gap-3 transition-all"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className={`text-[10px] px-2 py-0.5 rounded font-mono font-bold border ${rank.class}`}>
+                            {rank.badge}
+                          </span>
+                          <span className="font-bold text-sm text-white truncate">{meta?.title || engineKey}</span>
+                          <span className={`text-[9px] px-1.5 py-0.5 rounded font-mono font-bold border ${meta?.tagClass || 'bg-gray-800 text-gray-400'}`}>
+                            {meta?.tag || ''}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-gray-400 leading-snug mb-1 truncate">{meta?.desc || ''}</p>
+                        <div className="flex items-center gap-1.5 text-[11px]">
+                          {isEnabled ? (
+                            <span className="text-emerald-400 flex items-center gap-1 font-semibold">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                              Active in Streams
+                            </span>
+                          ) : (
+                            <span className="text-gray-500 flex items-center gap-1">
+                              <span className="w-1.5 h-1.5 rounded-full bg-gray-600" />
+                              Disabled in Settings
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Reorder Action Buttons (Move Up / Move Down) with TV D-Pad navigation */}
+                      <div className="flex items-center gap-1.5 flex-shrink-0">
+                        <button
+                          id={`drawer-prio-up-${idx}`}
+                          data-engine-prio-btn="true"
+                          type="button"
+                          disabled={idx === 0}
+                          onKeyDown={(e) => {
+                            if (e.key === 'ArrowRight') {
+                              e.preventDefault();
+                              document.getElementById(`drawer-prio-down-${idx}`)?.focus();
+                            } else if (e.key === 'ArrowUp') {
+                              e.preventDefault();
+                              if (idx > 0) {
+                                document.getElementById(`drawer-prio-up-${idx - 1}`)?.focus();
+                              }
+                            } else if (e.key === 'ArrowDown') {
+                              e.preventDefault();
+                              if (idx < currentPriority.length - 1) {
+                                document.getElementById(`drawer-prio-up-${idx + 1}`)?.focus();
+                              }
+                            }
+                          }}
+                          onClick={moveUp}
+                          className={`w-9 h-9 rounded-xl border flex items-center justify-center transition-all tv-focus-target ${
+                            idx === 0
+                              ? 'opacity-25 border-white/5 bg-white/5 text-gray-600 cursor-not-allowed'
+                              : 'bg-hbo-dark border-hbo-border hover:border-amber-400 hover:bg-amber-500/20 text-amber-300'
+                          }`}
+                          title="Move Up"
+                        >
+                          <span className="font-bold text-sm">▲</span>
+                        </button>
+
+                        <button
+                          id={`drawer-prio-down-${idx}`}
+                          data-engine-prio-btn="true"
+                          type="button"
+                          disabled={idx === currentPriority.length - 1}
+                          onKeyDown={(e) => {
+                            if (e.key === 'ArrowLeft') {
+                              e.preventDefault();
+                              document.getElementById(`drawer-prio-up-${idx}`)?.focus();
+                            } else if (e.key === 'ArrowUp') {
+                              e.preventDefault();
+                              if (idx > 0) {
+                                document.getElementById(`drawer-prio-down-${idx - 1}`)?.focus();
+                              }
+                            } else if (e.key === 'ArrowDown') {
+                              e.preventDefault();
+                              if (idx < currentPriority.length - 1) {
+                                document.getElementById(`drawer-prio-down-${idx + 1}`)?.focus();
+                              }
+                            }
+                          }}
+                          onClick={moveDown}
+                          className={`w-9 h-9 rounded-xl border flex items-center justify-center transition-all tv-focus-target ${
+                            idx === currentPriority.length - 1
+                              ? 'opacity-25 border-white/5 bg-white/5 text-gray-600 cursor-not-allowed'
+                              : 'bg-hbo-dark border-hbo-border hover:border-amber-400 hover:bg-amber-500/20 text-amber-300'
+                          }`}
+                          title="Move Down"
+                        >
+                          <span className="font-bold text-sm">▼</span>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                });
+              })()}
+            </div>
+
+            {/* Drawer Footer Hint */}
+            <div className="p-4 border-t border-hbo-border/50 bg-black/40 flex items-center justify-center text-xs text-gray-400 select-none">
+              <span>Press <strong className="text-white font-semibold">Back</strong> to return</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* Android TV Telegram Provider Right Drawer (Level 2)                       */}
+      {/* ========================================================================= */}
+      {showTelegramDrawer && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          data-drawer-container="true"
+          className="fixed inset-0 z-[9999] flex justify-end bg-black/80 backdrop-blur-md animate-fade-in"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowTelegramDrawer(false);
+              setShowEnginesDrawer(true);
+            }
+          }}
+        >
+          {/* Left Side Parent Path Context */}
+          <div className="flex-1 hidden md:flex flex-col justify-center pl-16 pr-8 pointer-events-none select-none">
+            <div className="flex items-center gap-2 text-xs font-bold text-gray-400 tracking-wider uppercase mb-2">
+              <span className="text-gray-400">Settings</span>
+              <ChevronRight className="w-3.5 h-3.5 text-gray-500" />
+              <span className="text-gray-400">Playback &amp; Streaming</span>
+              <ChevronRight className="w-3.5 h-3.5 text-gray-500" />
+              <span className="text-hbo-cyan font-semibold">Stream Engines</span>
+            </div>
+            <h1 className="text-3xl font-extrabold text-white tracking-tight mb-2">Telegram Provider</h1>
+            <p className="text-sm text-gray-400 max-w-md leading-relaxed">
+              Direct MTProto video streaming from Telegram channels and bots (e.g. MovieSubMalay) into the player without saving files to disk.
+            </p>
+          </div>
+
+          <div className="w-full max-w-md h-full bg-hbo-card/95 border-l border-hbo-border/80 shadow-2xl flex flex-col justify-between animate-slide-in-right overflow-hidden">
+            {/* Drawer Body */}
+            <div className="flex-1 overflow-y-auto px-6 py-6 space-y-4 font-sans">
+              {(() => {
+                const currentEnabled = settings.enabledResolvers && settings.enabledResolvers.length > 0
+                  ? settings.enabledResolvers
+                  : ['embed'];
+                const isTelegramEnabled = currentEnabled.includes('telegram');
+                const enabledTg = settings.enabledTelegramProviders || ['telegram-msm32'];
+                const isMsmEnabled = enabledTg.includes('telegram-msm32');
+                const currentCountries: OriginCountryCode[] =
+                  (settings.telegramProviderCountries && settings.telegramProviderCountries['telegram-msm32']) ||
+                  ['MY', 'ID', 'SG'];
+                const availableCodes: OriginCountryCode[] = ['MY', 'ID', 'SG', 'TH', 'KR', 'JP', 'GLOBAL'];
+
+                return (
+                  <>
+                    {/* Enable / Disable Telegram Engine Toggle */}
+                    <button
+                      id="drawer-telegram-toggle"
+                      data-telegram-drawer-item="true"
+                      type="button"
+                      onKeyDown={(e) => {
+                        if (e.key === 'ArrowDown') {
+                          e.preventDefault();
+                          document.getElementById('drawer-msm32-toggle')?.focus();
+                        }
+                      }}
+                      onClick={() => {
+                        let updated: ('embed' | 'private_extractor' | 'torbox' | 'telegram')[];
+                        if (isTelegramEnabled) {
+                          if (currentEnabled.length === 1) return;
+                          updated = currentEnabled.filter(r => r !== 'telegram') as any;
+                        } else {
+                          updated = [...currentEnabled, 'telegram'] as any;
+                        }
+                        handleUpdate({
+                          enabledResolvers: updated,
+                          streamResolver: updated[0] || 'embed'
+                        });
+                      }}
+                      className={`w-full p-4 rounded-xl border text-left transition-all tv-focus-target flex items-center justify-between ${
+                        isTelegramEnabled
+                          ? 'bg-sky-950/40 border-sky-400 text-white shadow-hbo-glow ring-1 ring-sky-400/40'
+                          : 'bg-black/30 border-hbo-border hover:border-gray-600 text-gray-400'
+                      }`}
+                    >
+                      <div className="min-w-0 pr-3">
+                        <div className="font-bold text-sm text-white mb-0.5">Enable Telegram Engine</div>
+                        <p className="text-[11px] text-gray-400">Enables in-memory chunk streaming from Telegram MTProto.</p>
+                      </div>
+                      <div className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 ${
+                        isTelegramEnabled ? 'bg-sky-500/20 text-sky-300 border border-sky-500/40' : 'bg-white/5 text-gray-400 border border-white/10'
+                      }`}>
+                        {isTelegramEnabled ? <Check className="w-3.5 h-3.5 stroke-[2.5]" /> : <X className="w-3.5 h-3.5 stroke-[2.5]" />}
+                        <span>{isTelegramEnabled ? 'Enabled' : 'Disabled'}</span>
+                      </div>
+                    </button>
+
+                    {/* MSM32 Sub-provider Switch */}
+                    <button
+                      id="drawer-msm32-toggle"
+                      data-telegram-drawer-item="true"
+                      type="button"
+                      onKeyDown={(e) => {
+                        if (e.key === 'ArrowUp') {
+                          e.preventDefault();
+                          document.getElementById('drawer-telegram-toggle')?.focus();
+                        } else if (e.key === 'ArrowDown') {
+                          e.preventDefault();
+                          const target = document.getElementById('drawer-btn-msm32-test');
+                          target?.focus();
+                          target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                        }
+                      }}
+                      onClick={() => {
+                        const updated = isMsmEnabled
+                          ? enabledTg.filter(id => id !== 'telegram-msm32')
+                          : [...enabledTg, 'telegram-msm32'];
+                        handleUpdate({ enabledTelegramProviders: updated });
+                      }}
+                      className={`w-full p-4 rounded-xl border text-left transition-all tv-focus-target flex items-center justify-between ${
+                        isMsmEnabled
+                          ? 'bg-sky-950/30 border-sky-500/60 text-white'
+                          : 'bg-black/30 border-hbo-border text-gray-400'
+                      }`}
+                    >
+                      <div className="min-w-0 pr-3">
+                        <div className="font-bold text-sm text-white mb-0.5">MovieSubMalay (@msm32bot)</div>
+                        <p className="text-[11px] text-gray-400">Stream direct Malay & Asian cinema releases.</p>
+                      </div>
+                      <div className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 ${
+                        isMsmEnabled ? 'bg-sky-500/20 text-sky-300 border border-sky-500/40' : 'bg-white/5 text-gray-400 border border-white/10'
+                      }`}>
+                        {isMsmEnabled ? <Check className="w-3.5 h-3.5 stroke-[2.5]" /> : <X className="w-3.5 h-3.5 stroke-[2.5]" />}
+                        <span>{isMsmEnabled ? 'Active' : 'Disabled'}</span>
+                      </div>
+                    </button>
+
+                    {/* MSM Getter Microservice Status Card & Manual Re-ping */}
+                    <div className="bg-black/40 border border-hbo-border rounded-xl p-4 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <span className="text-xs font-bold text-white block mb-0.5">MSM Getter Microservice</span>
+                          <p className="text-[11px] text-gray-400">Stream resolver backend for Telegram MTProto documents.</p>
+                        </div>
+                        <span className="text-[10px] text-sky-400 font-mono font-bold bg-sky-500/10 px-2 py-0.5 rounded border border-sky-400/20">
+                          msm-getter.onrender.com
+                        </span>
+                      </div>
+
+                      <button
+                        id="drawer-btn-msm32-test"
+                        data-telegram-drawer-item="true"
+                        type="button"
+                        disabled={testingMsm32}
+                        onKeyDown={(e) => {
+                          if (e.key === 'ArrowUp') {
+                            e.preventDefault();
+                            const target = document.getElementById('drawer-msm32-toggle');
+                            target?.focus();
+                            target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                          } else if (e.key === 'ArrowDown') {
+                            e.preventDefault();
+                            const target = document.getElementById('drawer-telegram-sub-chunk');
+                            target?.focus();
+                            target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                          }
+                        }}
+                        onClick={async () => {
+                          setTestingMsm32(true);
+                          setMsm32TestResult(null);
+                          try {
+                            const res = await msm32Service.testConnection(settings.msm32GetterUrl);
+                            setMsm32TestResult(res);
+                          } catch (err: any) {
+                            setMsm32TestResult({ ok: false, error: err?.message || 'Connection failed' });
+                          } finally {
+                            setTestingMsm32(false);
+                          }
+                        }}
+                        className="w-full py-2.5 rounded-xl bg-sky-500 hover:bg-sky-400 text-black font-bold text-xs flex items-center justify-center gap-2 transition-all tv-focus-target"
+                      >
+                        <RefreshCw className={`w-3.5 h-3.5 ${testingMsm32 ? 'animate-spin' : ''}`} />
+                        <span>{testingMsm32 ? 'Pinging Server (Waking Up)...' : 'Re-ping Microservice Server'}</span>
+                      </button>
+
+                      {msm32TestResult ? (
+                        <div className={`p-2.5 rounded-lg text-xs flex items-center gap-2 border ${
+                          msm32TestResult.ok
+                            ? 'bg-emerald-950/40 text-emerald-300 border-emerald-500/40'
+                            : 'bg-rose-950/40 text-rose-300 border-rose-500/40'
+                        }`}>
+                          {msm32TestResult.ok ? (
+                            <Check className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                          ) : (
+                            <AlertCircle className="w-4 h-4 text-rose-400 flex-shrink-0" />
+                          )}
+                          <span className="truncate">
+                            {msm32TestResult.ok
+                              ? `Online! Status: ${msm32TestResult.status || 'running'} • MTProto: ${msm32TestResult.isConnected ? 'Connected' : 'Standby'}`
+                              : `Failed / Waking Up: ${msm32TestResult.error}`}
+                          </span>
+                        </div>
+                      ) : testingMsm32 && (
+                        <div className="p-2.5 rounded-lg text-xs flex items-center gap-2 border bg-sky-950/40 text-sky-300 border-sky-500/40">
+                          <RefreshCw className="w-4 h-4 text-sky-400 flex-shrink-0 animate-spin" />
+                          <span className="truncate">Pinging server... Please wait if waking up from sleep.</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Sub-Drawer Hub Item 1: Stream Chunk Slice Buffer */}
+                    <div className="bg-black/40 border border-hbo-border rounded-xl p-3.5 flex items-center justify-between">
+                      <div className="min-w-0 pr-2">
+                        <div className="font-bold text-xs text-white flex items-center gap-1.5 mb-0.5">
+                          <HardDrive className="w-3.5 h-3.5 text-sky-400" />
+                          <span>Stream Chunk Slice Buffer</span>
+                        </div>
+                        <p className="text-[10px] text-gray-400">Configure seek latency and throughput slice size.</p>
+                      </div>
+                      <button
+                        id="drawer-telegram-sub-chunk"
+                        data-telegram-drawer-item="true"
+                        type="button"
+                        onKeyDown={(e) => {
+                          if (e.key === 'ArrowUp') {
+                            e.preventDefault();
+                            const target = document.getElementById('drawer-btn-msm32-test');
+                            target?.focus();
+                            target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                          } else if (e.key === 'ArrowDown') {
+                            e.preventDefault();
+                            const target = document.getElementById('drawer-telegram-sub-country');
+                            target?.focus();
+                            target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                          }
+                        }}
+                        onClick={() => {
+                          setShowTelegramDrawer(false);
+                          setShowTelegramChunkDrawer(true);
+                        }}
+                        className="px-3 py-1.5 rounded-lg border text-xs font-bold transition-all tv-focus-target flex items-center gap-1.5 border-hbo-border bg-hbo-dark/80 hover:bg-hbo-hover text-white flex-shrink-0"
+                      >
+                        <span className="text-sky-400 font-mono">
+                          {((settings.msm32ChunkSize || 524288) / 1024).toFixed(0)} KB
+                        </span>
+                        <ChevronRight className="w-3.5 h-3.5 text-gray-400" />
+                      </button>
+                    </div>
+
+                    {/* Sub-Drawer Hub Item 2: Active Country Origin Filters */}
+                    <div className="bg-black/40 border border-hbo-border rounded-xl p-3.5 flex items-center justify-between">
+                      <div className="min-w-0 pr-2">
+                        <div className="font-bold text-xs text-white flex items-center gap-1.5 mb-0.5">
+                          <Globe className="w-3.5 h-3.5 text-sky-400" />
+                          <span>Country Origin Filters</span>
+                        </div>
+                        <p className="text-[10px] text-gray-400">Trigger provider based on title origin countries.</p>
+                      </div>
+                      <button
+                        id="drawer-telegram-sub-country"
+                        data-telegram-drawer-item="true"
+                        type="button"
+                        onKeyDown={(e) => {
+                          if (e.key === 'ArrowUp') {
+                            e.preventDefault();
+                            const target = document.getElementById('drawer-telegram-sub-chunk');
+                            target?.focus();
+                            target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                          }
+                        }}
+                        onClick={() => {
+                          setShowTelegramDrawer(false);
+                          setShowTelegramCountryDrawer(true);
+                        }}
+                        className="px-3 py-1.5 rounded-lg border text-xs font-bold transition-all tv-focus-target flex items-center gap-1.5 border-hbo-border bg-hbo-dark/80 hover:bg-hbo-hover text-white flex-shrink-0"
+                      >
+                        <span className="text-sky-400 font-mono">
+                          {currentCountries.length} active
+                        </span>
+                        <ChevronRight className="w-3.5 h-3.5 text-gray-400" />
+                      </button>
+                    </div>
+                  </>
+                );
+              })()}
+            </div>
+
+            {/* Drawer Footer Hint */}
+            <div className="p-4 border-t border-hbo-border/50 bg-black/40 flex items-center justify-center text-xs text-gray-400 select-none">
+              <span>Press <strong className="text-white font-semibold">Back</strong> to return</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* Android TV Telegram Stream Chunk Buffer Right Drawer (Level 3)            */}
+      {/* ========================================================================= */}
+      {showTelegramChunkDrawer && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          data-drawer-container="true"
+          className="fixed inset-0 z-[9999] flex justify-end bg-black/80 backdrop-blur-md animate-fade-in"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowTelegramChunkDrawer(false);
+              setShowTelegramDrawer(true);
+            }
+          }}
+        >
+          {/* Left Side Parent Path Context */}
+          <div className="flex-1 hidden md:flex flex-col justify-center pl-16 pr-8 pointer-events-none select-none">
+            <div className="flex items-center gap-2 text-xs font-bold text-gray-400 tracking-wider uppercase mb-2">
+              <span className="text-gray-400">Settings</span>
+              <ChevronRight className="w-3.5 h-3.5 text-gray-500" />
+              <span className="text-gray-400">Playback &amp; Streaming</span>
+              <ChevronRight className="w-3.5 h-3.5 text-gray-500" />
+              <span className="text-gray-400">Stream Engines</span>
+              <ChevronRight className="w-3.5 h-3.5 text-gray-500" />
+              <span className="text-hbo-cyan font-semibold">Telegram Provider</span>
+            </div>
+            <h1 className="text-3xl font-extrabold text-white tracking-tight mb-2">Stream Chunk Buffer</h1>
+            <p className="text-sm text-gray-400 max-w-md leading-relaxed">
+              Configure in-memory chunk slice buffer size for Telegram MTProto video streaming.
+            </p>
+          </div>
+
+          <div className="w-full max-w-md h-full bg-hbo-card/95 border-l border-hbo-border/80 shadow-2xl flex flex-col justify-between animate-slide-in-right overflow-hidden">
+            {/* Drawer Body: Single Column Options */}
+            <div className="flex-1 overflow-y-auto px-6 py-6 space-y-3 font-sans">
+              {(() => {
+                const chunkOptions = [
+                  { val: 262144, label: '256 KB', desc: 'Fastest seek & instant startup • Recommended for low latency or mobile hotspot.' },
+                  { val: 524288, label: '512 KB (Default & Recommended)', desc: 'Optimum balance between seek response time and stable network throughput.' },
+                  { val: 1048576, label: '1 MB', desc: 'High throughput • Best for high-bitrate 1080p/4K on high-speed fiber broadband.' },
+                ];
+                const currentVal = settings.msm32ChunkSize || 524288;
+
+                return chunkOptions.map((opt, idx) => {
+                  const isSelected = currentVal === opt.val;
+                  return (
+                    <button
+                      key={opt.val}
+                      id={`drawer-telegram-chunk-${opt.val}`}
+                      data-telegram-chunk-drawer-item="true"
+                      data-telegram-chunk-selected={isSelected ? 'true' : 'false'}
+                      type="button"
+                      onKeyDown={(e) => {
+                        if (e.key === 'ArrowUp' && idx > 0) {
+                          e.preventDefault();
+                          const target = document.getElementById(`drawer-telegram-chunk-${chunkOptions[idx - 1].val}`);
+                          target?.focus();
+                          target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                        } else if (e.key === 'ArrowDown' && idx < chunkOptions.length - 1) {
+                          e.preventDefault();
+                          const target = document.getElementById(`drawer-telegram-chunk-${chunkOptions[idx + 1].val}`);
+                          target?.focus();
+                          target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                        }
+                      }}
+                      onClick={() => {
+                        handleUpdate({ msm32ChunkSize: opt.val });
+                        setShowTelegramChunkDrawer(false);
+                        setShowTelegramDrawer(true);
+                      }}
+                      className={`w-full p-4 rounded-xl border text-left transition-all tv-focus-target flex items-center justify-between gap-3 ${
+                        isSelected
+                          ? 'bg-sky-950/40 border-sky-400 text-white shadow-hbo-glow ring-1 ring-sky-400/40'
+                          : 'bg-black/30 border-hbo-border hover:border-gray-600 text-gray-400'
+                      }`}
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-bold text-sm text-white">{opt.label}</span>
+                          <span className="text-[10px] text-sky-400 font-mono font-bold bg-sky-500/10 px-1.5 py-0.5 rounded border border-sky-400/20">
+                            {(opt.val / 1024).toFixed(0)} KB
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-gray-400 leading-snug">{opt.desc}</p>
+                      </div>
+                      <div className={`w-6 h-6 rounded-full border flex items-center justify-center flex-shrink-0 ${
+                        isSelected ? 'bg-sky-500 border-sky-400 text-black' : 'border-gray-600 bg-black/40 text-transparent'
+                      }`}>
+                        <Check className="w-3.5 h-3.5 stroke-[3]" />
+                      </div>
+                    </button>
+                  );
+                });
+              })()}
+            </div>
+
+            {/* Drawer Footer Hint */}
+            <div className="p-4 border-t border-hbo-border/50 bg-black/40 flex items-center justify-center text-xs text-gray-400 select-none">
+              <span>Press <strong className="text-white font-semibold">Back</strong> to return</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* Android TV Telegram Country Origin Filters Right Drawer (Level 3)          */}
+      {/* ========================================================================= */}
+      {showTelegramCountryDrawer && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          data-drawer-container="true"
+          className="fixed inset-0 z-[9999] flex justify-end bg-black/80 backdrop-blur-md animate-fade-in"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowTelegramCountryDrawer(false);
+              setShowTelegramDrawer(true);
+            }
+          }}
+        >
+          {/* Left Side Parent Path Context */}
+          <div className="flex-1 hidden md:flex flex-col justify-center pl-16 pr-8 pointer-events-none select-none">
+            <div className="flex items-center gap-2 text-xs font-bold text-gray-400 tracking-wider uppercase mb-2">
+              <span className="text-gray-400">Settings</span>
+              <ChevronRight className="w-3.5 h-3.5 text-gray-500" />
+              <span className="text-gray-400">Playback &amp; Streaming</span>
+              <ChevronRight className="w-3.5 h-3.5 text-gray-500" />
+              <span className="text-gray-400">Stream Engines</span>
+              <ChevronRight className="w-3.5 h-3.5 text-gray-500" />
+              <span className="text-hbo-cyan font-semibold">Telegram Provider</span>
+            </div>
+            <h1 className="text-3xl font-extrabold text-white tracking-tight mb-2">Country Origin Filters</h1>
+            <p className="text-sm text-gray-400 max-w-md leading-relaxed">
+              Select which content origin countries trigger Telegram MSM32 provider resolution.
+            </p>
+          </div>
+
+          <div className="w-full max-w-md h-full bg-hbo-card/95 border-l border-hbo-border/80 shadow-2xl flex flex-col justify-between animate-slide-in-right overflow-hidden">
+            {/* Drawer Body: Single Column Options */}
+            <div className="flex-1 overflow-y-auto px-6 py-6 space-y-2.5 font-sans">
+              <p className="text-xs text-gray-400 mb-2 leading-relaxed">
+                Telegram MSM32 specializes in Southeast Asian releases. Select the content origin countries where MSM32 should probe for matching streams:
+              </p>
+              {(() => {
+                const currentCountries: OriginCountryCode[] =
+                  (settings.telegramProviderCountries && settings.telegramProviderCountries['telegram-msm32']) ||
+                  ['MY', 'ID', 'SG'];
+                const availableCodes: OriginCountryCode[] = ['MY', 'ID', 'SG', 'TH', 'KR', 'JP', 'US', 'GLOBAL'];
+
+                return availableCodes.map((code, idx) => {
+                  const isSelected = currentCountries.includes(code);
+                  return (
+                    <button
+                      key={code}
+                      id={`drawer-telegram-country-${code}`}
+                      data-telegram-country-drawer-item="true"
+                      data-telegram-country-selected={isSelected ? 'true' : 'false'}
+                      type="button"
+                      onKeyDown={(e) => {
+                        if (e.key === 'ArrowUp' && idx > 0) {
+                          e.preventDefault();
+                          const target = document.getElementById(`drawer-telegram-country-${availableCodes[idx - 1]}`);
+                          target?.focus();
+                          target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                        } else if (e.key === 'ArrowDown' && idx < availableCodes.length - 1) {
+                          e.preventDefault();
+                          const target = document.getElementById(`drawer-telegram-country-${availableCodes[idx + 1]}`);
+                          target?.focus();
+                          target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                        }
+                      }}
+                      onClick={() => {
+                        let updated: OriginCountryCode[];
+                        if (isSelected) {
+                          if (currentCountries.length === 1) return;
+                          updated = currentCountries.filter(c => c !== code);
+                        } else {
+                          updated = [...currentCountries, code];
+                        }
+                        const existingMap = settings.telegramProviderCountries || {};
+                        handleUpdate({
+                          telegramProviderCountries: {
+                            ...existingMap,
+                            'telegram-msm32': updated
+                          }
+                        });
+                      }}
+                      className={`w-full p-3.5 rounded-xl border text-left transition-all tv-focus-target flex items-center justify-between gap-3 ${
+                        isSelected
+                          ? 'bg-sky-950/40 border-sky-400 text-white shadow-sm'
+                          : 'bg-black/30 border-hbo-border hover:border-gray-600 text-gray-400'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className={`w-5 h-5 rounded border flex items-center justify-center flex-shrink-0 ${
+                          isSelected ? 'bg-sky-500 border-sky-400' : 'border-gray-600 bg-black/40'
+                        }`}>
+                          {isSelected && <Check className="w-3.5 h-3.5 text-black stroke-[3]" />}
+                        </div>
+                        <span className="font-bold text-xs text-white truncate">{ORIGIN_COUNTRY_LABELS[code]}</span>
+                      </div>
+                      <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-white/5 border border-white/10 text-gray-300 flex-shrink-0">
+                        {code}
+                      </span>
+                    </button>
+                  );
+                });
               })()}
             </div>
 
@@ -3469,6 +4417,48 @@ export const Settings: React.FC = () => {
 
                 return (
                   <>
+                    {/* Item 0: Enable / Disable Embed Resolver Toggle */}
+                    <button
+                      id="drawer-embed-toggle"
+                      data-embed-drawer-item="true"
+                      type="button"
+                      onKeyDown={(e) => {
+                        if (e.key === 'ArrowDown') {
+                          e.preventDefault();
+                          document.getElementById('drawer-embed-sub-timeout')?.focus();
+                        }
+                      }}
+                      onClick={() => {
+                        let updated: StreamResolverType[];
+                        if (isEmbedEnabled) {
+                          if (currentEnabled.length === 1) return; // Must have at least one resolver enabled
+                          updated = currentEnabled.filter(r => r !== 'embed') as StreamResolverType[];
+                        } else {
+                          updated = [...currentEnabled, 'embed'] as StreamResolverType[];
+                        }
+                        handleUpdate({
+                          enabledResolvers: updated,
+                          streamResolver: updated[0] || 'embed'
+                        });
+                      }}
+                      className={`w-full p-4 rounded-xl border text-left transition-all tv-focus-target flex items-center justify-between ${
+                        isEmbedEnabled
+                          ? 'bg-hbo-purple/30 border-hbo-cyan text-white shadow-hbo-glow ring-1 ring-hbo-cyan/40'
+                          : 'bg-black/30 border-hbo-border hover:border-gray-600 text-gray-400'
+                      }`}
+                    >
+                      <div className="min-w-0 pr-3">
+                        <div className="font-bold text-sm text-white mb-0.5">Enable Embed Resolver</div>
+                        <p className="text-[11px] text-gray-400">Stream via web player iframe embeds (VidLink, MoviesAPI, etc.).</p>
+                      </div>
+                      <div className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 ${
+                        isEmbedEnabled ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40' : 'bg-white/5 text-gray-400 border border-white/10'
+                      }`}>
+                        {isEmbedEnabled ? <Check className="w-3.5 h-3.5 stroke-[2.5]" /> : <X className="w-3.5 h-3.5 stroke-[2.5]" />}
+                        <span>{isEmbedEnabled ? 'Enabled' : 'Disabled'}</span>
+                      </div>
+                    </button>
+
                     {/* Item 1: Stream Resolver Timeout Hub Button */}
                     <div className="bg-black/40 border border-hbo-border rounded-xl p-3.5 flex items-center justify-between">
                       <div className="min-w-0 pr-2">
@@ -3483,7 +4473,10 @@ export const Settings: React.FC = () => {
                         data-embed-drawer-item="true"
                         type="button"
                         onKeyDown={(e) => {
-                          if (e.key === 'ArrowDown') {
+                          if (e.key === 'ArrowUp') {
+                            e.preventDefault();
+                            document.getElementById('drawer-embed-toggle')?.focus();
+                          } else if (e.key === 'ArrowDown') {
                             e.preventDefault();
                             const target = document.getElementById('drawer-embed-sub-retries');
                             target?.focus();
@@ -3620,7 +4613,7 @@ export const Settings: React.FC = () => {
                                 document.getElementById('drawer-embed-priority-general')?.focus();
                               } else if (e.key === 'ArrowDown') {
                                 e.preventDefault();
-                                document.getElementById('drawer-embed-priority-asian')?.focus();
+                                document.getElementById('drawer-embed-priority-asean')?.focus();
                               }
                             }}
                             onClick={() => {

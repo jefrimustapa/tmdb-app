@@ -1,0 +1,20 @@
+# Dependencies
+node_modules/
+
+# Environment secrets
+.env
+.env.*
+*.session*
+
+# Logs & temp media
+*.log
+*.mp4
+*.html
+scripts.txt
+test-*.js
+inspect_*.js
+debug-*
+
+# OS files
+.DS_Store
+Thumbs.db

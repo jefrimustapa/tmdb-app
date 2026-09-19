@@ -11,11 +11,17 @@ import {
   RotateCcw,
   AlertCircle,
   Loader2,
-  ShieldCheck
+  ShieldCheck,
+  Send,
+  Zap,
+  Globe,
+  Sparkles
 } from 'lucide-react';
 import { SubtitleTrack } from '../../services/subtitleService';
-import { STREAM_PROVIDERS, getOrderedProviders, CATEGORY_BADGE_CONFIG } from '../../services/streamProviders';
-import type { StreamProvider } from '../../types/stream';
+import { STREAM_PROVIDERS, getOrderedProviders, getProvidersByEngine, getProviderById, CATEGORY_BADGE_CONFIG, ORIGIN_COUNTRY_LABELS, extractMediaOriginCountries, isProviderMatchingMedia } from '../../services/streamProviders';
+import type { StreamProvider, StreamEngineType, OriginCountryCode } from '../../types/stream';
+import type { StreamResolverType } from '../../types/db';
+import { dbService } from '../../services/db';
 
 export type WatchSettingsTab = 'subtitles' | 'servers' | 'server';
 
@@ -33,6 +39,7 @@ interface WatchSettingsModalProps {
   // Provider / Server Props
   currentProviderId: string;
   onSelectProvider: (provider: StreamProvider) => void;
+  enabledResolvers?: StreamResolverType[];
   isProbing?: boolean;
   serverIndex?: number;
   totalServers?: number;
@@ -40,9 +47,13 @@ interface WatchSettingsModalProps {
   isAsean?: boolean;
   isAsian?: boolean; // Backward compatibility alias
   isKorean?: boolean;
+  originCountries?: OriginCountryCode[];
+  details?: any;
 }
 
 export const WatchSettingsModal: React.FC<WatchSettingsModalProps> = ({
+  originCountries,
+  details,
   isOpen,
   onClose,
   defaultTab = 'subtitles',
@@ -54,6 +65,7 @@ export const WatchSettingsModal: React.FC<WatchSettingsModalProps> = ({
   isLoadingSubtitles = false,
   currentProviderId,
   onSelectProvider,
+  enabledResolvers,
   isProbing = false,
   serverIndex = 1,
   totalServers = STREAM_PROVIDERS.length,
@@ -67,18 +79,66 @@ export const WatchSettingsModal: React.FC<WatchSettingsModalProps> = ({
   const modalRef = useRef<HTMLDivElement>(null);
   const activeAsean = isAsean || isAsian;
 
+  const hasEmbed = !enabledResolvers || enabledResolvers.includes('embed');
+  const hasTelegram = Boolean(enabledResolvers && enabledResolvers.includes('telegram'));
+
+  const [tgCountries, setTgCountries] = useState<Record<string, OriginCountryCode[]> | undefined>();
+  const [tgEnabledList, setTgEnabledList] = useState<string[] | undefined>();
+
+  useEffect(() => {
+    if (isOpen) {
+      dbService.getSettings().then((s) => {
+        if (s?.telegramProviderCountries) setTgCountries(s.telegramProviderCountries);
+        if (s?.enabledTelegramProviders) setTgEnabledList(s.enabledTelegramProviders);
+      });
+    }
+  }, [isOpen]);
+
+  // 1. Direct Stream Providers (Telegram / Native Player filtered by origin matching)
+  const directProviders = React.useMemo(() => {
+    if (!hasTelegram) return [];
+    const mediaOrigins = (originCountries && originCountries.length > 0)
+      ? originCountries
+      : extractMediaOriginCountries(details, isAnime, isKorean, activeAsean);
+    return getProvidersByEngine('telegram').filter((p) =>
+      isProviderMatchingMedia(p, mediaOrigins, tgCountries, tgEnabledList)
+    );
+  }, [hasTelegram, originCountries, details, isAnime, isKorean, activeAsean, tgCountries, tgEnabledList]);
+
+  // 2. Embed Stream Providers (Web Iframe Mirrors)
+  const embedProviders = React.useMemo(() => {
+    if (!hasEmbed) return [];
+    if (isKorean) return getOrderedProviders(undefined, false, false, true).filter(p => (p.engine || 'embed') === 'embed');
+    if (activeAsean) return getOrderedProviders(undefined, false, true, false).filter(p => (p.engine || 'embed') === 'embed');
+    if (isAnime) return getOrderedProviders(undefined, true, false, false).filter(p => (p.engine || 'embed') === 'embed');
+    return getProvidersByEngine('embed');
+  }, [hasEmbed, isKorean, activeAsean, isAnime]);
+
+  // Combined available providers (Direct first, then Embed)
+  const allAvailableProviders = React.useMemo(() => {
+    return [...directProviders, ...embedProviders];
+  }, [directProviders, embedProviders]);
+
+  const [serverFilter, setServerFilter] = useState<'all' | 'direct' | 'embed'>('all');
+
   useEffect(() => {
     if (isOpen) {
       setActiveTab(defaultTab);
+      if (!hasEmbed && hasTelegram) {
+        setServerFilter('direct');
+      } else if (hasEmbed && !hasTelegram) {
+        setServerFilter('embed');
+      } else {
+        setServerFilter('all');
+      }
     }
-  }, [isOpen, defaultTab]);
+  }, [isOpen, defaultTab, hasEmbed, hasTelegram]);
 
-  const displayProviders = React.useMemo(() => {
-    if (isKorean) return getOrderedProviders(undefined, false, false, true);
-    if (activeAsean) return getOrderedProviders(undefined, false, true, false);
-    if (isAnime) return getOrderedProviders(undefined, true, false, false);
-    return STREAM_PROVIDERS;
-  }, [isAnime, activeAsean, isKorean]);
+  const effectiveTotalServers = allAvailableProviders.length;
+  const currentProviderIndex = allAvailableProviders.findIndex(p => p.id === currentProviderId);
+  const effectiveServerIndex = currentProviderIndex >= 0
+    ? currentProviderIndex + 1
+    : (serverIndex <= effectiveTotalServers ? serverIndex : 1);
 
   useEffect(() => {
     if (!isOpen) {
@@ -408,7 +468,7 @@ export const WatchSettingsModal: React.FC<WatchSettingsModalProps> = ({
             <Server className="w-4 h-4" />
             <span>Server</span>
             <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/10 text-gray-400 font-mono">
-              {serverIndex}/{totalServers}
+              {effectiveServerIndex}/{effectiveTotalServers}
             </span>
           </button>
         </div>
@@ -628,70 +688,251 @@ export const WatchSettingsModal: React.FC<WatchSettingsModalProps> = ({
         {/* TAB 2: STREAM SERVERS */}
         {activeTab === 'server' && (
           <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-2 overscroll-contain min-h-0">
-            {displayProviders.map((p, idx) => {
-              const isSelected = p.id === currentProviderId;
-
-              return (
+            {/* Filter segmented tabs if both direct and embed engines are available */}
+            {hasEmbed && hasTelegram && (
+              <div className="flex items-center gap-1.5 mb-3 p-1 rounded-xl bg-white/5 border border-white/10 flex-shrink-0">
                 <button
-                  key={p.id}
                   type="button"
                   tabIndex={0}
-                  data-selected-item={isSelected ? 'true' : undefined}
-                  data-list-item="true"
-                  onClick={() => {
-                    onSelectProvider(p);
-                    onClose();
-                  }}
-                  className={`w-full flex items-center justify-between p-3 rounded-xl text-left border transition cursor-pointer tv-focus-target focus:outline-none focus:border-hbo-cyan focus:ring-2 focus:ring-hbo-cyan ${
-                    isSelected
-                      ? 'bg-hbo-purple/25 border-hbo-cyan/50 text-white shadow-hbo-glow'
-                      : 'bg-white/5 hover:bg-white/10 border-white/5 text-gray-300'
+                  onClick={() => setServerFilter('all')}
+                  className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-lg text-xs font-bold transition tv-focus-target focus:outline-none focus:ring-2 focus:ring-hbo-cyan cursor-pointer ${
+                    serverFilter === 'all'
+                      ? 'bg-white/20 text-white shadow-md'
+                      : 'text-gray-400 hover:text-white'
                   }`}
                 >
-                  <div className="flex items-center gap-3 min-w-0 flex-1">
-                    <div
-                      className={`w-4 h-4 rounded-full border flex items-center justify-center flex-shrink-0 ${
-                        isSelected ? 'border-hbo-cyan bg-hbo-cyan' : 'border-gray-500'
+                  <span>All</span>
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/10 text-gray-300 font-mono">{allAvailableProviders.length}</span>
+                </button>
+                <button
+                  type="button"
+                  tabIndex={0}
+                  onClick={() => setServerFilter('direct')}
+                  className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-lg text-xs font-bold transition tv-focus-target focus:outline-none focus:ring-2 focus:ring-hbo-cyan cursor-pointer ${
+                    serverFilter === 'direct'
+                      ? 'bg-hbo-cyan/25 text-hbo-cyan border border-hbo-cyan/40 shadow-md'
+                      : 'text-gray-400 hover:text-white'
+                  }`}
+                >
+                  <Zap className="w-3.5 h-3.5" />
+                  <span>Direct</span>
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-hbo-cyan/20 text-hbo-cyan font-mono">{directProviders.length}</span>
+                </button>
+                <button
+                  type="button"
+                  tabIndex={0}
+                  onClick={() => setServerFilter('embed')}
+                  className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-lg text-xs font-bold transition tv-focus-target focus:outline-none focus:ring-2 focus:ring-hbo-cyan cursor-pointer ${
+                    serverFilter === 'embed'
+                      ? 'bg-purple-600 text-white shadow-md'
+                      : 'text-gray-400 hover:text-white'
+                  }`}
+                >
+                  <Globe className="w-3.5 h-3.5" />
+                  <span>Embed</span>
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-200 font-mono">{embedProviders.length}</span>
+                </button>
+              </div>
+            )}
+
+            {/* Informative notification if only Direct is enabled */}
+            {!hasEmbed && hasTelegram && (
+              <div className="flex items-center gap-2 mb-2.5 px-3 py-2 rounded-xl bg-hbo-cyan/10 border border-hbo-cyan/25 text-xs text-hbo-cyan font-medium">
+                <Zap className="w-4 h-4 flex-shrink-0" />
+                <span>Direct Stream Mode • Web embed mirrors disabled in Settings</span>
+              </div>
+            )}
+
+            {/* Informative notification if only Embed is enabled */}
+            {hasEmbed && !hasTelegram && (
+              <div className="flex items-center gap-2 mb-2.5 px-3 py-2 rounded-xl bg-purple-500/10 border border-purple-500/25 text-xs text-purple-300 font-medium">
+                <Globe className="w-4 h-4 flex-shrink-0" />
+                <span>Embed Mirrors Mode • Direct stream engine disabled in Settings</span>
+              </div>
+            )}
+
+            {/* Empty State */}
+            {allAvailableProviders.length === 0 && (
+              <div className="flex flex-col items-center justify-center py-8 text-center px-4 text-gray-400 space-y-2">
+                <AlertCircle className="w-6 h-6 text-gray-500" />
+                <p className="text-sm font-medium text-gray-300">No servers available</p>
+                <p className="text-xs text-gray-500 max-w-xs">
+                  All stream resolvers are disabled. Enable Embed or Telegram in Settings.
+                </p>
+              </div>
+            )}
+
+            {/* DIRECT STREAM SERVERS SECTION */}
+            {(serverFilter === 'all' || serverFilter === 'direct') && directProviders.length > 0 && (
+              <div className="space-y-2 mb-3">
+                <div className="flex items-center justify-between px-1.5 pt-1 pb-1 text-xs font-bold text-hbo-cyan uppercase tracking-wider">
+                  <div className="flex items-center gap-1.5">
+                    <Zap className="w-3.5 h-3.5" />
+                    <span>Direct Stream Servers ({directProviders.length})</span>
+                  </div>
+                  <span className="text-[10px] text-gray-400 font-normal normal-case">In-app player • custom controls</span>
+                </div>
+
+                {directProviders.map((p, idx) => {
+                  const isSelected = p.id === currentProviderId;
+                  return (
+                    <button
+                      key={p.id}
+                      type="button"
+                      tabIndex={0}
+                      data-selected-item={isSelected ? 'true' : undefined}
+                      data-list-item="true"
+                      onClick={() => {
+                        onSelectProvider(p);
+                        onClose();
+                      }}
+                      className={`w-full flex items-center justify-between p-3 rounded-xl text-left border transition cursor-pointer tv-focus-target focus:outline-none focus:border-hbo-cyan focus:ring-2 focus:ring-hbo-cyan ${
+                        isSelected
+                          ? 'bg-hbo-cyan/15 border-hbo-cyan/60 text-white shadow-hbo-glow'
+                          : 'bg-white/5 hover:bg-white/10 border-white/5 text-gray-300'
                       }`}
                     >
-                      {isSelected && <Check className="w-3 h-3 text-black stroke-[3]" />}
-                    </div>
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
+                        <div
+                          className={`w-4 h-4 rounded-full border flex items-center justify-center flex-shrink-0 ${
+                            isSelected ? 'border-hbo-cyan bg-hbo-cyan' : 'border-gray-500'
+                          }`}
+                        >
+                          {isSelected && <Check className="w-3 h-3 text-black stroke-[3]" />}
+                        </div>
 
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-semibold text-sm text-white truncate">{p.name}</span>
-                        <div className="flex items-center gap-1 flex-wrap">
-                          {p.categories.map((cat) => {
-                            const conf = CATEGORY_BADGE_CONFIG[cat];
-                            if (!conf) return null;
-                            return (
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-semibold text-sm text-white truncate">{p.name}</span>
+                            <span className="text-[9px] px-1.5 py-0.5 rounded font-black tracking-wide bg-hbo-cyan/20 text-hbo-cyan border border-hbo-cyan/40 flex-shrink-0">
+                              DIRECT ⚡
+                            </span>
+                            {p.countries && p.countries.length > 0 && p.countries.map(c => (
                               <span
-                                key={cat}
-                                className={`text-[9px] px-1.5 py-0.5 rounded font-bold whitespace-nowrap border ${conf.className}`}
+                                key={c}
+                                className="text-[9px] px-1.5 py-0.5 rounded font-bold whitespace-nowrap bg-sky-500/20 text-sky-300 border border-sky-500/40"
                               >
-                                {conf.label}
+                                {ORIGIN_COUNTRY_LABELS[c] || c}
                               </span>
-                            );
-                          })}
+                            ))}
+                            {p.categories.map((cat) => {
+                              const conf = CATEGORY_BADGE_CONFIG[cat];
+                              if (!conf) return null;
+                              return (
+                                <span
+                                  key={cat}
+                                  className={`text-[9px] px-1.5 py-0.5 rounded font-bold whitespace-nowrap border ${conf.className}`}
+                                >
+                                  {conf.label}
+                                </span>
+                              );
+                            })}
+                          </div>
+                          <div className="flex items-center gap-2 mt-0.5 text-xs text-gray-400">
+                            <span className="text-hbo-cyan font-semibold">Server #{idx + 1}</span>
+                            <span>•</span>
+                            <span className="truncate">{p.tagline || 'Direct in-app stream'}</span>
+                          </div>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2 mt-0.5 text-xs text-gray-400">
-                        <span>Server #{idx + 1}</span>
-                        <span>•</span>
-                        <span className="truncate">{p.tagline || 'Mirror'}</span>
-                      </div>
-                    </div>
-                  </div>
 
-                  {isSelected && isProbing && (
-                    <div className="flex items-center gap-1.5 text-xs text-hbo-cyan animate-pulse flex-shrink-0">
-                      <span className="w-2 h-2 rounded-full bg-hbo-cyan" />
-                      <span>Active</span>
-                    </div>
-                  )}
-                </button>
-              );
-            })}
+                      {isSelected && isProbing && (
+                        <div className="flex items-center gap-1.5 text-xs text-hbo-cyan animate-pulse flex-shrink-0 ml-2">
+                          <span className="w-2 h-2 rounded-full bg-hbo-cyan" />
+                          <span>Active</span>
+                        </div>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* EMBED STREAM SERVERS SECTION */}
+            {(serverFilter === 'all' || serverFilter === 'embed') && embedProviders.length > 0 && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between px-1.5 pt-2 pb-1 text-xs font-bold text-purple-300 uppercase tracking-wider">
+                  <div className="flex items-center gap-1.5">
+                    <Globe className="w-3.5 h-3.5" />
+                    <span>Embed Stream Servers ({embedProviders.length})</span>
+                  </div>
+                  <span className="text-[10px] text-gray-400 font-normal normal-case">Web iframe mirrors</span>
+                </div>
+
+                {embedProviders.map((p, idx) => {
+                  const isSelected = p.id === currentProviderId;
+                  return (
+                    <button
+                      key={p.id}
+                      type="button"
+                      tabIndex={0}
+                      data-selected-item={isSelected ? 'true' : undefined}
+                      data-list-item="true"
+                      onClick={() => {
+                        onSelectProvider(p);
+                        onClose();
+                      }}
+                      className={`w-full flex items-center justify-between p-3 rounded-xl text-left border transition cursor-pointer tv-focus-target focus:outline-none focus:border-hbo-cyan focus:ring-2 focus:ring-hbo-cyan ${
+                        isSelected
+                          ? 'bg-hbo-purple/25 border-hbo-cyan/50 text-white shadow-hbo-glow'
+                          : 'bg-white/5 hover:bg-white/10 border-white/5 text-gray-300'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
+                        <div
+                          className={`w-4 h-4 rounded-full border flex items-center justify-center flex-shrink-0 ${
+                            isSelected ? 'border-hbo-cyan bg-hbo-cyan' : 'border-gray-500'
+                          }`}
+                        >
+                          {isSelected && <Check className="w-3 h-3 text-black stroke-[3]" />}
+                        </div>
+
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-semibold text-sm text-white truncate">{p.name}</span>
+                            <span className="text-[9px] px-1.5 py-0.5 rounded font-bold tracking-wide bg-purple-500/20 text-purple-300 border border-purple-500/40 flex-shrink-0">
+                              EMBED 🌐
+                            </span>
+                            {p.countries && p.countries.length > 0 && p.countries.map(c => (
+                              <span
+                                key={c}
+                                className="text-[9px] px-1.5 py-0.5 rounded font-bold whitespace-nowrap bg-sky-500/20 text-sky-300 border border-sky-500/40"
+                              >
+                                {ORIGIN_COUNTRY_LABELS[c] || c}
+                              </span>
+                            ))}
+                            {p.categories.map((cat) => {
+                              const conf = CATEGORY_BADGE_CONFIG[cat];
+                              if (!conf) return null;
+                              return (
+                                <span
+                                  key={cat}
+                                  className={`text-[9px] px-1.5 py-0.5 rounded font-bold whitespace-nowrap border ${conf.className}`}
+                                >
+                                  {conf.label}
+                                </span>
+                              );
+                            })}
+                          </div>
+                          <div className="flex items-center gap-2 mt-0.5 text-xs text-gray-400">
+                            <span>Server #{directProviders.length + idx + 1}</span>
+                            <span>•</span>
+                            <span className="truncate">{p.tagline || 'Mirror'}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {isSelected && isProbing && (
+                        <div className="flex items-center gap-1.5 text-xs text-hbo-cyan animate-pulse flex-shrink-0 ml-2">
+                          <span className="w-2 h-2 rounded-full bg-hbo-cyan" />
+                          <span>Active</span>
+                        </div>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
       </div>

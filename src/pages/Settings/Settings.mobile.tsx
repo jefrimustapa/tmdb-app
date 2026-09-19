@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { dbService } from '../../services/db';
-import type { UserSettings } from '../../types/db';
-import { STREAM_PROVIDERS, CATEGORY_BADGE_CONFIG } from '../../services/streamProviders';
+import type { UserSettings, StreamResolverType } from '../../types/db';
+import { STREAM_PROVIDERS, CATEGORY_BADGE_CONFIG, ORIGIN_COUNTRY_LABELS } from '../../services/streamProviders';
+import type { OriginCountryCode } from '../../types/stream';
+import { msm32Service, type Msm32HealthResult } from '../../services/msm32MappingService';
 import { useDevice } from '../../hooks/useDevice';
 import { Logo } from '../../components/common/Logo';
 import { APP_VERSION, APP_BUILD_NUMBER, APP_VERSION_FULL, APP_BUILD_CHANNEL, APP_CHANGELOG } from '../../version';
@@ -37,6 +39,7 @@ import {
   HardDrive,
   Save,
   SlidersHorizontal,
+  Send,
 } from 'lucide-react';
 
 type MobileCategory = 'playback' | 'display' | 'content' | 'system';
@@ -168,6 +171,13 @@ export const Settings: React.FC = () => {
     | 'autoplayTimeout'
     | 'ticker'
     | 'resolvers'
+    | 'engine-priority'
+    | 'engine-telegram'
+    | 'telegram-chunk'
+    | 'telegram-country'
+    | 'engine-torbox'
+    | 'engine-embed'
+    | 'engine-extractor'
     | 'priorityPicker'
     | 'adblock'
     | 'headerTimeout'
@@ -187,6 +197,22 @@ export const Settings: React.FC = () => {
     label: string;
     currentId: string;
   } | null>(null);
+
+  const [testingMsm32, setTestingMsm32] = useState(false);
+  const [msm32TestResult, setMsm32TestResult] = useState<Msm32HealthResult | null>(null);
+
+  // Auto-ping MSM Getter microservice whenever the user enters the Telegram drawer
+  useEffect(() => {
+    if (activeDrawer === 'engine-telegram') {
+      setTestingMsm32(true);
+      setMsm32TestResult(null);
+      const url = settings?.msm32GetterUrl;
+      msm32Service.testConnection(url)
+        .then((res) => setMsm32TestResult(res))
+        .catch((err: any) => setMsm32TestResult({ ok: false, error: err?.message || 'Connection failed' }))
+        .finally(() => setTestingMsm32(false));
+    }
+  }, [activeDrawer, settings?.msm32GetterUrl]);
 
   const filterSentinelRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -1212,55 +1238,72 @@ export const Settings: React.FC = () => {
         categoryLabel="Playback & Stream"
       >
         <div className="space-y-4">
-          {/* Multi-select Engines */}
-          <div className="space-y-2">
-            <span className="text-xs font-semibold text-gray-300 block mb-1">Active Resolver Engines</span>
-            {[
-              {
-                id: 'torbox' as const,
-                title: 'TorBox Debrid',
-                tag: '4K Ultra HD',
-                desc: 'Direct HTTPS 4K HDR & 1080p BluRay cloud streams via TorBox CDN.'
-              },
-              {
-                id: 'private_extractor' as const,
-                title: 'Private Extractor',
-                tag: 'Consumet API',
-                desc: 'Direct HLS .m3u8 streams resolved via private backend API.'
-              },
-              {
-                id: 'embed' as const,
-                title: 'Embed Resolver',
-                tag: 'Multi-Mirror',
-                desc: 'Standard multi-server iframe embeds (VidLink, MoviesAPI) with ad sandboxing.'
-              }
-            ].map((resOption) => {
-              const currentEnabled = settings.enabledResolvers && settings.enabledResolvers.length > 0
-                ? settings.enabledResolvers
-                : ['embed'];
-              const isEnabled = currentEnabled.includes(resOption.id);
+          {/* Priority Order Subdrawer Button */}
+          {(() => {
+            const currentPriority = (settings.enginePriority && settings.enginePriority.length > 0)
+              ? settings.enginePriority
+              : ['torbox', 'telegram', 'embed', 'private_extractor'];
+            return (
+              <div className="rounded-xl border border-amber-500/40 bg-gradient-to-r from-amber-500/15 via-orange-500/10 to-transparent p-3.5">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-xs sm:text-sm text-white">Engine Priority Order</span>
+                    <span className="text-[10px] px-2 py-0.5 rounded font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                      Sequence
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setActiveDrawer('engine-priority')}
+                    className="px-3 py-1.5 rounded-lg bg-amber-500/20 border border-amber-500/40 hover:bg-amber-500/30 text-amber-300 text-xs font-bold transition-all flex items-center gap-1"
+                  >
+                    <span>Sort Order</span>
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+                <p className="text-[11px] text-gray-300 mt-1.5 leading-relaxed">
+                  Sort priority order for stream extraction &amp; failover.
+                </p>
+                <div className="flex items-center gap-1.5 text-xs font-semibold text-amber-300/90 overflow-x-hidden truncate mt-2">
+                  {currentPriority.map((eng, idx) => (
+                    <span key={eng} className="flex items-center gap-1">
+                      {idx > 0 && <span className="text-gray-500 font-mono text-[10px]">→</span>}
+                      <span className="capitalize">{eng === 'private_extractor' ? 'Direct' : eng}</span>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
 
-              return (
+          {/* Engine Cards — each has toggle + Configure sub-drawer */}
+          {[
+            { id: 'torbox'            as const, title: 'TorBox Debrid',     tag: '4K Ultra HD',    desc: 'Direct HTTPS 4K HDR & 1080p BluRay cloud streams via TorBox CDN.',                              subDrawer: 'engine-torbox'    as const },
+            { id: 'telegram'          as const, title: 'Telegram Provider',  tag: 'Direct MTProto', desc: 'Direct in-app video streaming from Telegram bots (MovieSubMalay / @msm32bot).',                subDrawer: 'engine-telegram'  as const },
+            { id: 'private_extractor' as const, title: 'Private Extractor',  tag: 'Consumet API',   desc: 'Direct HLS .m3u8 streams resolved via private backend API.',                                   subDrawer: 'engine-extractor' as const },
+            { id: 'embed'             as const, title: 'Embed Resolver',     tag: 'Multi-Mirror',   desc: 'Standard multi-server iframe embeds (VidLink, MoviesAPI) with ad sandboxing.',                 subDrawer: 'engine-embed'     as const },
+          ].map((resOption) => {
+            const currentEnabled = settings.enabledResolvers && settings.enabledResolvers.length > 0
+              ? settings.enabledResolvers : ['embed'];
+            const isEnabled = currentEnabled.includes(resOption.id as any);
+            return (
+              <div
+                key={resOption.id}
+                className={`rounded-xl border transition-all ${isEnabled ? 'bg-hbo-purple/20 border-hbo-cyan/60' : 'bg-black/30 border-hbo-border opacity-60'}`}
+              >
                 <button
-                  key={resOption.id}
+                  type="button"
+                  className="w-full p-3.5 text-left"
                   onClick={() => {
-                    let updated: ('embed' | 'private_extractor' | 'torbox')[];
+                    let updated: ('embed' | 'private_extractor' | 'torbox' | 'telegram')[];
                     if (isEnabled) {
                       if (currentEnabled.length === 1) return;
-                      updated = currentEnabled.filter(r => r !== resOption.id) as ('embed' | 'private_extractor' | 'torbox')[];
+                      updated = currentEnabled.filter(r => r !== resOption.id) as ('embed' | 'private_extractor' | 'torbox' | 'telegram')[];
                     } else {
-                      updated = [...currentEnabled, resOption.id] as ('embed' | 'private_extractor' | 'torbox')[];
+                      updated = [...currentEnabled, resOption.id] as ('embed' | 'private_extractor' | 'torbox' | 'telegram')[];
                     }
-                    handleUpdate({
-                      enabledResolvers: updated,
-                      streamResolver: updated[0] || 'embed'
-                    });
+                    handleUpdate({ enabledResolvers: updated, streamResolver: updated[0] || 'embed' });
                   }}
-                  className={`w-full p-3.5 rounded-xl border text-left transition-all flex flex-col justify-between ${
-                    isEnabled
-                      ? 'bg-hbo-purple/30 border-hbo-cyan text-white shadow-hbo-glow'
-                      : 'bg-black/30 border-hbo-border text-gray-500 opacity-60'
-                  }`}
                 >
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2 min-w-0">
@@ -1269,147 +1312,623 @@ export const Settings: React.FC = () => {
                       </div>
                       <span className="font-bold text-xs sm:text-sm text-white truncate">{resOption.title}</span>
                     </div>
-                    <span className={`text-[10px] px-2 py-0.5 rounded font-mono font-bold flex-shrink-0 ${
-                      isEnabled ? 'bg-hbo-cyan/20 text-hbo-cyan border border-hbo-cyan/40' : 'bg-gray-800 text-gray-500'
-                    }`}>
+                    <span className={`text-[10px] px-2 py-0.5 rounded font-mono font-bold flex-shrink-0 border ${isEnabled ? 'bg-hbo-cyan/20 text-hbo-cyan border-hbo-cyan/40' : 'bg-gray-800 text-gray-500 border-transparent'}`}>
                       {resOption.tag}
                     </span>
                   </div>
-                  <p className="text-[11px] text-gray-300 mt-2 leading-relaxed">{resOption.desc}</p>
+                  <p className="text-[11px] text-gray-400 mt-1.5 leading-relaxed">{resOption.desc}</p>
+                </button>
+                <div className="px-3.5 pb-3">
+                  <button
+                    type="button"
+                    onClick={() => setActiveDrawer(resOption.subDrawer)}
+                    className="w-full flex items-center justify-between px-3 py-2 rounded-lg bg-white/5 border border-white/10 hover:border-hbo-cyan/50 hover:bg-white/10 transition-all"
+                  >
+                    <span className="text-[11px] font-semibold text-gray-300">Configure</span>
+                    <ChevronRight className="w-3.5 h-3.5 text-gray-400" />
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </SettingsDrawer>
+
+      {/* 3a-Priority. Sub-Drawer: Engine Priority Order Settings */}
+      <SettingsDrawer
+        isOpen={activeDrawer === 'engine-priority'}
+        onClose={() => setActiveDrawer(null)}
+        onBack={() => setActiveDrawer('resolvers')}
+        title="Engine Priority Order"
+        subtitle="Sort priority order for stream extraction & failover sequence."
+        categoryLabel="Stream Engines > Priority"
+      >
+        <div className="space-y-3">
+          {(() => {
+            const currentPriority: StreamResolverType[] = (settings.enginePriority && settings.enginePriority.length > 0)
+              ? settings.enginePriority
+              : ['torbox', 'telegram', 'embed', 'private_extractor'];
+
+            const currentEnabled = settings.enabledResolvers && settings.enabledResolvers.length > 0
+              ? settings.enabledResolvers
+              : ['embed'];
+
+            const engineMeta: Record<StreamResolverType, { title: string; tag: string; desc: string; tagClass: string }> = {
+              torbox: {
+                title: 'TorBox Debrid',
+                tag: '4K Ultra HD',
+                desc: 'Direct HTTPS 4K HDR & 1080p BluRay cloud streams via TorBox CDN.',
+                tagClass: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40',
+              },
+              telegram: {
+                title: 'Telegram Provider',
+                tag: 'Direct MTProto',
+                desc: 'Direct in-app video streaming from Telegram bots (MovieSubMalay / @msm32bot).',
+                tagClass: 'bg-sky-500/20 text-sky-300 border-sky-500/40',
+              },
+              embed: {
+                title: 'Embed Resolver',
+                tag: 'Multi-Mirror',
+                desc: 'Standard multi-server iframe embeds (VidLink, MoviesAPI) with ad sandboxing.',
+                tagClass: 'bg-hbo-cyan/20 text-hbo-cyan border-hbo-cyan/40',
+              },
+              private_extractor: {
+                title: 'Direct Extractor',
+                tag: 'Consumet API',
+                desc: 'Direct HLS .m3u8 streams resolved via private backend API.',
+                tagClass: 'bg-hbo-purple/30 text-hbo-purple-light border-hbo-purple/40',
+              },
+            };
+
+            const rankLabels = [
+              { badge: '#1 Primary', class: 'bg-amber-500/20 text-amber-300 border-amber-500/40' },
+              { badge: '#2 Secondary', class: 'bg-sky-500/20 text-sky-300 border-sky-500/40' },
+              { badge: '#3 Third Choice', class: 'bg-purple-500/20 text-purple-300 border-purple-500/40' },
+              { badge: '#4 Fallback', class: 'bg-gray-700/40 text-gray-300 border-gray-600/40' },
+            ];
+
+            return currentPriority.map((engineKey, idx) => {
+              const meta = engineMeta[engineKey];
+              const rank = rankLabels[idx] || { badge: `#${idx + 1}`, class: 'bg-gray-800 text-gray-400' };
+              const isEnabled = currentEnabled.includes(engineKey);
+
+              const moveUp = () => {
+                if (idx <= 0) return;
+                const updated = [...currentPriority];
+                const temp = updated[idx];
+                updated[idx] = updated[idx - 1];
+                updated[idx - 1] = temp;
+                handleUpdate({ enginePriority: updated });
+              };
+
+              const moveDown = () => {
+                if (idx >= currentPriority.length - 1) return;
+                const updated = [...currentPriority];
+                const temp = updated[idx];
+                updated[idx] = updated[idx + 1];
+                updated[idx + 1] = temp;
+                handleUpdate({ enginePriority: updated });
+              };
+
+              return (
+                <div
+                  key={engineKey}
+                  className="p-3.5 rounded-xl border bg-black/40 border-hbo-border flex items-center justify-between gap-3"
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className={`text-[10px] px-2 py-0.5 rounded font-mono font-bold border ${rank.class}`}>
+                        {rank.badge}
+                      </span>
+                      <span className="font-bold text-xs sm:text-sm text-white truncate">{meta?.title || engineKey}</span>
+                      <span className={`text-[9px] px-1.5 py-0.5 rounded font-mono font-bold border ${meta?.tagClass || 'bg-gray-800 text-gray-400'}`}>
+                        {meta?.tag || ''}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-gray-400 leading-snug mb-1">{meta?.desc || ''}</p>
+                    <div className="flex items-center gap-1.5 text-[11px]">
+                      {isEnabled ? (
+                        <span className="text-emerald-400 flex items-center gap-1 font-semibold">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                          Active
+                        </span>
+                      ) : (
+                        <span className="text-gray-500 flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-gray-600" />
+                          Disabled
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-1.5 flex-shrink-0">
+                    <button
+                      type="button"
+                      disabled={idx === 0}
+                      onClick={moveUp}
+                      className={`w-9 h-9 rounded-lg border flex items-center justify-center transition-all ${
+                        idx === 0
+                          ? 'opacity-25 border-white/5 bg-white/5 text-gray-600 cursor-not-allowed'
+                          : 'bg-white/5 border-white/10 hover:border-amber-400 hover:bg-amber-500/20 text-amber-300'
+                      }`}
+                      title="Move Up"
+                    >
+                      <span className="font-bold text-sm">▲</span>
+                    </button>
+                    <button
+                      type="button"
+                      disabled={idx === currentPriority.length - 1}
+                      onClick={moveDown}
+                      className={`w-9 h-9 rounded-lg border flex items-center justify-center transition-all ${
+                        idx === currentPriority.length - 1
+                          ? 'opacity-25 border-white/5 bg-white/5 text-gray-600 cursor-not-allowed'
+                          : 'bg-white/5 border-white/10 hover:border-amber-400 hover:bg-amber-500/20 text-amber-300'
+                      }`}
+                      title="Move Down"
+                    >
+                      <span className="font-bold text-sm">▼</span>
+                    </button>
+                  </div>
+                </div>
+              );
+            });
+          })()}
+        </div>
+      </SettingsDrawer>
+
+      {/* 3a-TG. Sub-Drawer: Telegram Engine Settings */}
+      <SettingsDrawer
+        isOpen={activeDrawer === 'engine-telegram'}
+        onClose={() => setActiveDrawer(null)}
+        onBack={() => setActiveDrawer('resolvers')}
+        title="Telegram Provider"
+        subtitle="Configure MSM Getter microservice and sub-provider settings."
+        categoryLabel="Stream Engines > Telegram"
+      >
+        <div className="space-y-4">
+          <div className="p-3.5 rounded-xl bg-sky-950/20 border border-sky-500/40 text-xs text-gray-300 space-y-3">
+            <div className="flex items-center justify-between">
+              <p className="font-bold text-sky-400 flex items-center gap-1.5">
+                <Send className="w-3.5 h-3.5 text-sky-400" />
+                <span>MovieSubMalay (@msm32bot)</span>
+              </p>
+              <span className="text-[10px] bg-sky-500/20 text-sky-300 px-2 py-0.5 rounded border border-sky-500/40 font-bold">Zero-Disk Stream</span>
+            </div>
+            <div className="flex items-center justify-between py-1 border-b border-white/5">
+              <div>
+                <span className="font-semibold text-white block text-xs">Enable @msm32bot</span>
+                <span className="text-[10px] text-gray-400">Stream direct Malay & Asian releases in custom player</span>
+              </div>
+              {(() => {
+                const enabledTg = settings.enabledTelegramProviders || ['telegram-msm32'];
+                const isMsmEnabled = enabledTg.includes('telegram-msm32');
+                return (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const updated = isMsmEnabled ? enabledTg.filter(id => id !== 'telegram-msm32') : [...enabledTg, 'telegram-msm32'];
+                      handleUpdate({ enabledTelegramProviders: updated });
+                    }}
+                    className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all flex items-center gap-1 border ${isMsmEnabled ? 'bg-sky-500/20 text-sky-300 border-sky-500/40' : 'bg-white/5 text-gray-400 border-white/10'}`}
+                  >
+                    {isMsmEnabled ? <Check className="w-3 h-3 stroke-[2.5]" /> : <X className="w-3 h-3 stroke-[2.5]" />}
+                    <span>{isMsmEnabled ? 'Active' : 'Disabled'}</span>
+                  </button>
+                );
+              })()}
+            </div>
+          </div>
+
+          <div className="p-3.5 rounded-xl bg-white/5 border border-white/10 space-y-2.5">
+            <div className="flex items-center justify-between">
+              <div>
+                <span className="text-xs font-semibold text-white block">MSM Getter Microservice</span>
+                <span className="text-[10px] text-gray-400">Stream resolver backend for Telegram MTProto documents</span>
+              </div>
+              <span className="text-[10px] text-sky-400 font-mono font-bold bg-sky-500/10 px-2 py-0.5 rounded border border-sky-400/20">
+                msm-getter.onrender.com
+              </span>
+            </div>
+
+            <button
+              type="button"
+              disabled={testingMsm32}
+              onClick={async () => {
+                setTestingMsm32(true);
+                setMsm32TestResult(null);
+                try {
+                  const res = await msm32Service.testConnection(settings.msm32GetterUrl);
+                  setMsm32TestResult(res);
+                } catch (err: any) {
+                  setMsm32TestResult({ ok: false, error: err?.message || 'Connection failed' });
+                } finally {
+                  setTestingMsm32(false);
+                }
+              }}
+              className="w-full py-2 rounded-lg bg-sky-500 hover:bg-sky-400 text-black font-bold text-xs flex items-center justify-center gap-1.5 transition-colors disabled:opacity-50"
+            >
+              <RefreshCw className={`w-3 h-3 ${testingMsm32 ? 'animate-spin' : ''}`} />
+              <span>{testingMsm32 ? 'Pinging Server (Waking Up)...' : 'Re-ping Server'}</span>
+            </button>
+
+            {msm32TestResult ? (
+              <div className={`p-2 rounded-lg text-[11px] flex items-center gap-1.5 border ${msm32TestResult.ok ? 'bg-emerald-950/40 text-emerald-300 border-emerald-500/40' : 'bg-rose-950/40 text-rose-300 border-rose-500/40'}`}>
+                {msm32TestResult.ok ? <Check className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" /> : <AlertCircle className="w-3.5 h-3.5 text-rose-400 flex-shrink-0" />}
+                <span className="truncate">
+                  {msm32TestResult.ok
+                    ? `Connected! Status: ${msm32TestResult.status || 'online'} • MTProto: ${msm32TestResult.isConnected ? 'Ready' : 'Standby'}`
+                    : `Error / Waking Up: ${msm32TestResult.error}`}
+                </span>
+              </div>
+            ) : testingMsm32 && (
+              <div className="p-2 rounded-lg text-[11px] flex items-center gap-1.5 border bg-sky-950/40 text-sky-300 border-sky-500/40">
+                <RefreshCw className="w-3.5 h-3.5 text-sky-400 flex-shrink-0 animate-spin" />
+                <span className="truncate">Pinging server... Please wait if waking up from sleep.</span>
+              </div>
+            )}
+          </div>
+
+          {/* Navigation to Stream Chunk Sub-Drawer */}
+          <button
+            type="button"
+            onClick={() => setActiveDrawer('telegram-chunk')}
+            className="w-full flex items-center justify-between p-3.5 rounded-xl bg-white/5 border border-white/10 hover:border-sky-400/50 hover:bg-white/10 transition-all text-left"
+          >
+            <div className="space-y-0.5">
+              <span className="text-xs font-semibold text-white block">Stream Chunk Slice Buffer</span>
+              <span className="text-[11px] text-gray-400">Configure seek latency and throughput slice size</span>
+            </div>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <span className="text-[10px] text-sky-400 font-mono font-bold bg-sky-500/10 px-2 py-0.5 rounded border border-sky-400/20">
+                {((settings.msm32ChunkSize || 524288) / 1024).toFixed(0)} KB
+              </span>
+              <ChevronRight className="w-4 h-4 text-gray-400" />
+            </div>
+          </button>
+
+          {/* Navigation to Origin Country Filter Sub-Drawer */}
+          <button
+            type="button"
+            onClick={() => setActiveDrawer('telegram-country')}
+            className="w-full flex items-center justify-between p-3.5 rounded-xl bg-white/5 border border-white/10 hover:border-sky-400/50 hover:bg-white/10 transition-all text-left"
+          >
+            <div className="space-y-0.5">
+              <span className="text-xs font-semibold text-white block">Active Country Origin Filters</span>
+              <span className="text-[11px] text-gray-400">Trigger provider based on title origin countries</span>
+            </div>
+            <div className="flex items-center gap-1.5 flex-shrink-0">
+              {(() => {
+                const currentCountries: OriginCountryCode[] =
+                  (settings.telegramProviderCountries && settings.telegramProviderCountries['telegram-msm32']) || ['MY', 'ID', 'SG'];
+                return (
+                  <span className="text-[10px] text-sky-400 font-mono font-bold bg-sky-500/10 px-2 py-0.5 rounded border border-sky-400/20">
+                    {currentCountries.length} active
+                  </span>
+                );
+              })()}
+              <ChevronRight className="w-4 h-4 text-gray-400" />
+            </div>
+          </button>
+        </div>
+      </SettingsDrawer>
+
+      {/* 3a-TG-CHUNK. Sub-Drawer: Stream Chunk Slice Buffer */}
+      <SettingsDrawer
+        isOpen={activeDrawer === 'telegram-chunk'}
+        onClose={() => setActiveDrawer(null)}
+        onBack={() => setActiveDrawer('engine-telegram')}
+        title="Stream Chunk Buffer"
+        subtitle="Configure buffer chunk slice size for Telegram streaming."
+        categoryLabel="Telegram > Buffer Size"
+      >
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-gray-300 block">Current Chunk Size:</span>
+            <span className="text-xs text-sky-400 font-mono font-bold">
+              {((settings.msm32ChunkSize || 524288) / 1024).toFixed(0)} KB
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 gap-2">
+            {[
+              { label: '256 KB', desc: 'Fastest Seek • Recommended for Mobile/Cellular data connections', val: 262144 },
+              { label: '512 KB', desc: 'Balanced (Default) • Optimum balance between start latency & throughput', val: 524288 },
+              { label: '1 MB', desc: 'High Bitrate • Best for fast Wi-Fi and high-speed fiber broadband', val: 1048576 }
+            ].map((c) => {
+              const isCurrent = (settings.msm32ChunkSize || 524288) === c.val;
+              return (
+                <button
+                  key={c.val}
+                  type="button"
+                  onClick={() => handleUpdate({ msm32ChunkSize: c.val })}
+                  className={`p-3.5 rounded-xl border text-left transition-all flex items-center justify-between ${
+                    isCurrent
+                      ? 'bg-sky-500/20 border-sky-400 text-white shadow-sm'
+                      : 'bg-white/5 border-white/10 text-gray-400 hover:text-white hover:bg-white/10'
+                  }`}
+                >
+                  <div>
+                    <div className={`text-xs font-bold ${isCurrent ? 'text-sky-300' : 'text-white'}`}>{c.label}</div>
+                    <div className="text-[10px] text-gray-400 mt-0.5">{c.desc}</div>
+                  </div>
+                  {isCurrent && <Check className="w-4 h-4 text-sky-400 stroke-[3] flex-shrink-0" />}
                 </button>
               );
             })}
           </div>
+          <p className="text-[11px] text-gray-500 leading-relaxed">
+            Smaller chunks start playback and seek faster by downloading smaller initial byte ranges; larger chunks yield higher sustained throughput.
+          </p>
+        </div>
+      </SettingsDrawer>
 
-          {/* TorBox Key Field */}
-          {(settings.enabledResolvers || []).includes('torbox') && (
-            <div className="p-3.5 rounded-xl bg-emerald-950/20 border border-emerald-500/40 text-xs text-gray-300 space-y-2">
-              <p className="font-bold text-emerald-400 flex items-center gap-1.5">
-                <Radio className="w-3.5 h-3.5 text-emerald-400" />
-                <span>TorBox API Key</span>
-              </p>
-              <input
-                type="password"
-                placeholder="Paste your TorBox API Key here..."
-                value={settings.torboxApiKey || ''}
-                onChange={(e) => handleUpdate({ torboxApiKey: e.target.value })}
-                className="w-full bg-black/60 border border-gray-700 focus:border-emerald-400 text-white px-3 py-2 rounded-lg text-xs font-mono outline-none"
-              />
-            </div>
-          )}
+      {/* 3a-TG-COUNTRY. Sub-Drawer: MSM32 Country Origin Filters */}
+      <SettingsDrawer
+        isOpen={activeDrawer === 'telegram-country'}
+        onClose={() => setActiveDrawer(null)}
+        onBack={() => setActiveDrawer('engine-telegram')}
+        title="Country Origin Filters"
+        subtitle="Select which origin countries trigger Telegram provider resolution."
+        categoryLabel="Telegram > Origin Filters"
+      >
+        <div className="space-y-4">
+          <p className="text-[11px] text-gray-400 leading-relaxed">
+            Telegram MSM32 specializes in Southeast Asian releases. Select the content origin countries where MSM32 should probe for matching streams:
+          </p>
 
-          {/* Priority Servers Tabs */}
-          <div className="pt-3 border-t border-white/5 space-y-3">
-            <span className="text-xs font-semibold text-gray-300 block">Embed Failover Priority Servers</span>
-            <div className="flex items-center gap-1.5 p-1 bg-black/40 border border-white/10 rounded-xl">
-              {(['general', 'anime', 'asean', 'korean'] as const).map((tab) => (
-                <button
-                  key={tab}
-                  type="button"
-                  onClick={() => setPriorityCategoryTab(tab)}
-                  className={`flex-1 py-1 px-1.5 rounded-lg text-[11px] font-bold capitalize transition-all ${
-                    priorityCategoryTab === tab
-                      ? 'bg-hbo-purple text-white shadow-md'
-                      : 'text-gray-400 hover:text-white'
-                  }`}
-                >
-                  {tab === 'general' ? 'General' : tab === 'asean' ? 'ASEAN' : tab}
-                </button>
-              ))}
-            </div>
-
-            <div className="space-y-2.5">
-              {(priorityCategoryTab === 'korean'
-                ? [
-                    { index: 0, label: 'Korean #1 (Primary)', badgeClass: 'bg-rose-500/20 text-rose-300 border-rose-500/40', defaultId: 'kisskh-kdrama' },
-                    { index: 1, label: 'Korean #2 (Failover 1)', badgeClass: 'bg-hbo-purple/30 text-hbo-purple-light border-hbo-purple/40', defaultId: 'cinesrc' },
-                    { index: 2, label: 'Korean #3 (Failover 2)', badgeClass: 'bg-hbo-cyan/20 text-hbo-cyan border-hbo-cyan/40', defaultId: 'moviesapi' }
-                  ]
-                : priorityCategoryTab === 'asean'
-                ? [
-                    { index: 0, label: 'Asean #1 (Primary)', badgeClass: 'bg-amber-500/20 text-amber-300 border-amber-500/40', defaultId: 'pencurimovie-my' },
-                    { index: 1, label: 'Asean #2 (Failover 1)', badgeClass: 'bg-hbo-purple/30 text-hbo-purple-light border-hbo-purple/40', defaultId: 'vidlink' },
-                    { index: 2, label: 'Asean #3 (Failover 2)', badgeClass: 'bg-hbo-cyan/20 text-hbo-cyan border-hbo-cyan/40', defaultId: '111movies' }
-                  ]
-                : priorityCategoryTab === 'anime'
-                ? [
-                    { index: 0, label: 'Anime #1 (Primary)', badgeClass: 'bg-pink-500/20 text-pink-300 border-pink-500/40', defaultId: 'megaplay-anime' },
-                    { index: 1, label: 'Anime #2 (Failover 1)', badgeClass: 'bg-hbo-purple/30 text-hbo-purple-light border-hbo-purple/40', defaultId: 'cinesrc' },
-                    { index: 2, label: 'Anime #3 (Failover 2)', badgeClass: 'bg-hbo-cyan/20 text-hbo-cyan border-hbo-cyan/40', defaultId: 'moviesapi' }
-                  ]
-                : [
-                    { index: 0, label: '#1 Priority (Primary)', badgeClass: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40', defaultId: 'vidlink' },
-                    { index: 1, label: '#2 Priority (Failover 1)', badgeClass: 'bg-hbo-purple/30 text-hbo-purple-light border-hbo-purple/40', defaultId: 'moviesapi' },
-                    { index: 2, label: '#3 Priority (Failover 2)', badgeClass: 'bg-hbo-cyan/20 text-hbo-cyan border-hbo-cyan/40', defaultId: 'cinesrc' }
-                  ]
-              ).map(({ index, label, badgeClass, defaultId }) => {
-                const isKoreanTab = priorityCategoryTab === 'korean';
-                const isAseanTab = priorityCategoryTab === 'asean';
-                const isAnimeTab = priorityCategoryTab === 'anime';
-                const currentTop = isKoreanTab
-                  ? (settings.topKoreanProviders && settings.topKoreanProviders.length >= 3
-                      ? settings.topKoreanProviders
-                      : ['kisskh-kdrama', 'cinesrc', 'moviesapi'])
-                  : isAseanTab
-                  ? ((settings.topAseanProviders || (settings as any).topAsianProviders) && (settings.topAseanProviders || (settings as any).topAsianProviders).length >= 3
-                      ? (settings.topAseanProviders || (settings as any).topAsianProviders)
-                      : ['pencurimovie-my', 'vidlink', '111movies'])
-                  : isAnimeTab
-                  ? (settings.topAnimeProviders && settings.topAnimeProviders.length >= 3
-                      ? settings.topAnimeProviders
-                      : ['megaplay-anime', 'cinesrc', 'moviesapi'])
-                  : (settings.topProviders && settings.topProviders.length >= 3
-                      ? settings.topProviders
-                      : ['vidlink', 'moviesapi', 'cinesrc']);
-                const selectedId = currentTop[index] || defaultId;
-                const selectedObj = STREAM_PROVIDERS.find(p => p.id === selectedId) || STREAM_PROVIDERS[0];
-
-                return (
-                  <div key={`${priorityCategoryTab}-${index}`} className="bg-hbo-dark/70 border border-hbo-border/90 rounded-xl p-3 space-y-2 relative">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${badgeClass} flex-shrink-0`}>
-                        {label}
-                      </span>
-                      <div className="flex items-center gap-1 flex-wrap justify-end">
-                        {selectedObj.categories.map((cat) => {
-                          const config = CATEGORY_BADGE_CONFIG[cat];
-                          if (!config) return null;
-                          return (
-                            <span
-                              key={cat}
-                              className={`text-[9px] px-1.5 py-0.5 rounded font-bold border ${config.className}`}
-                            >
-                              {config.label}
-                            </span>
-                          );
-                        })}
-                      </div>
-                    </div>
-
+          {(() => {
+            const currentCountries: OriginCountryCode[] =
+              (settings.telegramProviderCountries && settings.telegramProviderCountries['telegram-msm32']) || ['MY', 'ID', 'SG'];
+            const availableCodes: OriginCountryCode[] = ['MY', 'ID', 'SG', 'TH', 'KR', 'JP', 'US', 'GLOBAL'];
+            return (
+              <div className="space-y-2">
+                {availableCodes.map((code) => {
+                  const isSelected = currentCountries.includes(code);
+                  return (
                     <button
+                      key={code}
                       type="button"
                       onClick={() => {
-                        setPriorityPickerSlot({
-                          tab: priorityCategoryTab,
-                          index,
-                          label,
-                          currentId: selectedId,
+                        let updated: OriginCountryCode[];
+                        if (isSelected) {
+                          if (currentCountries.length === 1) return;
+                          updated = currentCountries.filter(c => c !== code);
+                        } else {
+                          updated = [...currentCountries, code];
+                        }
+                        handleUpdate({
+                          telegramProviderCountries: {
+                            ...(settings.telegramProviderCountries || {}),
+                            'telegram-msm32': updated
+                          }
                         });
-                        setActiveDrawer('priorityPicker');
                       }}
-                      className="w-full flex items-center justify-between bg-hbo-card/90 border border-hbo-border text-white text-xs font-bold rounded-xl px-3 py-2.5 hover:border-hbo-cyan transition-all"
+                      className={`w-full p-3 rounded-xl border text-left transition-all flex items-center justify-between ${
+                        isSelected
+                          ? 'bg-sky-500/20 border-sky-400 text-white'
+                          : 'bg-white/5 border-white/10 text-gray-400 hover:text-white'
+                      }`}
                     >
-                      <span className="truncate pr-2">{selectedObj.name}</span>
-                      <ChevronRight className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+                      <div className="flex items-center gap-2.5">
+                        <div className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 ${
+                          isSelected ? 'bg-sky-500 border-sky-500' : 'border-gray-600 bg-black/40'
+                        }`}>
+                          {isSelected && <Check className="w-3 h-3 text-black stroke-[3]" />}
+                        </div>
+                        <span className="text-xs font-bold text-white">{ORIGIN_COUNTRY_LABELS[code]}</span>
+                      </div>
+                      <span className="text-[10px] font-mono text-gray-400 uppercase">{code}</span>
                     </button>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
+        </div>
+      </SettingsDrawer>
+
+      {/* 3a-TB. Sub-Drawer: TorBox Engine Settings */}
+      <SettingsDrawer
+        isOpen={activeDrawer === 'engine-torbox'}
+        onClose={() => setActiveDrawer(null)}
+        onBack={() => setActiveDrawer('resolvers')}
+        title="TorBox Debrid"
+        subtitle="Configure your TorBox API key for 4K HDR cloud streams."
+        categoryLabel="Stream Engines > TorBox"
+      >
+        <div className="space-y-4">
+          <div className="p-3.5 rounded-xl bg-emerald-950/20 border border-emerald-500/40 text-xs text-gray-300 space-y-2">
+            <p className="font-bold text-emerald-400 flex items-center gap-1.5">
+              <Radio className="w-3.5 h-3.5 text-emerald-400" />
+              <span>TorBox API Key</span>
+            </p>
+            <input
+              type="password"
+              placeholder="Paste your TorBox API Key here..."
+              value={settings.torboxApiKey || ''}
+              onChange={(e) => handleUpdate({ torboxApiKey: e.target.value })}
+              className="w-full bg-black/60 border border-gray-700 focus:border-emerald-400 text-white px-3 py-2 rounded-lg text-xs font-mono outline-none"
+            />
+            <p className="text-[10px] text-gray-500">Get your API key from torbox.app. Enables 4K HDR & BluRay direct streams.</p>
           </div>
         </div>
       </SettingsDrawer>
 
+      {/* 3a-EX. Sub-Drawer: Private Extractor Engine Settings */}
+      <SettingsDrawer
+        isOpen={activeDrawer === 'engine-extractor'}
+        onClose={() => setActiveDrawer(null)}
+        onBack={() => setActiveDrawer('resolvers')}
+        title="Private Extractor"
+        subtitle="Direct HLS streams via private backend Consumet API."
+        categoryLabel="Stream Engines > Extractor"
+      >
+        <div className="space-y-4">
+          <div className="p-3.5 rounded-xl bg-violet-950/20 border border-violet-500/40 text-xs text-gray-300">
+            <p className="font-bold text-violet-400 flex items-center gap-1.5 mb-2">
+              <Zap className="w-3.5 h-3.5 text-violet-400" />
+              <span>Private Extractor</span>
+            </p>
+            <p className="text-[11px] text-gray-400 leading-relaxed">
+              Resolves direct HLS .m3u8 streams via a private Consumet API backend. No additional configuration required — streams are automatically resolved when this engine is enabled.
+            </p>
+          </div>
+        </div>
+      </SettingsDrawer>
+
+      {/* 3a-EM. Sub-Drawer: Embed Resolver Settings */}
+      <SettingsDrawer
+        isOpen={activeDrawer === 'engine-embed'}
+        onClose={() => setActiveDrawer(null)}
+        onBack={() => setActiveDrawer('resolvers')}
+        title="Embed Resolver"
+        subtitle="Configure failover priority servers, connection timeout & retries."
+        categoryLabel="Stream Engines > Embed"
+      >
+        <div className="space-y-4">
+          {/* Timeout & Retries Config */}
+          <div className="space-y-3 pb-3 border-b border-white/10">
+            {/* Stream Resolver Timeout */}
+            <div className="bg-black/30 border border-hbo-border rounded-xl p-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-xs font-semibold text-white block">Resolver Timeout</span>
+                  <span className="text-[10px] text-gray-400">Max wait time before auto-failover</span>
+                </div>
+                <span className="text-xs font-bold text-hbo-cyan">
+                  {(settings.streamResolverTimeout ?? 0) === 0 ? 'Unlimited' : `${settings.streamResolverTimeout}s`}
+                </span>
+              </div>
+              <div className="grid grid-cols-3 gap-1.5 pt-1">
+                {[
+                  { seconds: 0, label: 'Unlimited' },
+                  { seconds: 10, label: '10s' },
+                  { seconds: 15, label: '15s' },
+                  { seconds: 20, label: '20s' },
+                  { seconds: 25, label: '25s' },
+                  { seconds: 30, label: '30s' },
+                ].map((opt) => {
+                  const isSelected = (settings.streamResolverTimeout ?? 0) === opt.seconds;
+                  return (
+                    <button
+                      key={opt.seconds}
+                      type="button"
+                      onClick={() => handleUpdate({ streamResolverTimeout: opt.seconds })}
+                      className={`py-1.5 px-2 rounded-lg text-xs font-bold transition-all border ${
+                        isSelected
+                          ? 'bg-hbo-cyan/20 border-hbo-cyan text-hbo-cyan shadow-sm'
+                          : 'bg-white/5 border-white/10 text-gray-400 hover:text-white'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Stream Resolver Retries */}
+            <div className="bg-black/30 border border-hbo-border rounded-xl p-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-xs font-semibold text-white block">Resolver Retries</span>
+                  <span className="text-[10px] text-gray-400">Retry count on failure before failover</span>
+                </div>
+                <span className="text-xs font-bold text-hbo-cyan">
+                  {(settings.streamResolverRetries ?? 1) === 0 ? 'No Retry' : `${settings.streamResolverRetries ?? 1}× Attempts`}
+                </span>
+              </div>
+              <div className="grid grid-cols-4 gap-1.5 pt-1">
+                {[
+                  { retries: 0, label: '0×' },
+                  { retries: 1, label: '1×' },
+                  { retries: 2, label: '2×' },
+                  { retries: 3, label: '3×' },
+                ].map((opt) => {
+                  const isSelected = (settings.streamResolverRetries ?? 1) === opt.retries;
+                  return (
+                    <button
+                      key={opt.retries}
+                      type="button"
+                      onClick={() => handleUpdate({ streamResolverRetries: opt.retries })}
+                      className={`py-1.5 px-2 rounded-lg text-xs font-bold transition-all border ${
+                        isSelected
+                          ? 'bg-hbo-cyan/20 border-hbo-cyan text-hbo-cyan shadow-sm'
+                          : 'bg-white/5 border-white/10 text-gray-400 hover:text-white'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          <span className="text-xs font-semibold text-gray-300 block">Embed Failover Priority Servers</span>
+          <div className="flex items-center gap-1.5 p-1 bg-black/40 border border-white/10 rounded-xl">
+            {(['general', 'anime', 'asean', 'korean'] as const).map((tab) => (
+              <button key={tab} type="button" onClick={() => setPriorityCategoryTab(tab)}
+                className={`flex-1 py-1 px-1.5 rounded-lg text-[11px] font-bold capitalize transition-all ${priorityCategoryTab === tab ? 'bg-hbo-purple text-white shadow-md' : 'text-gray-400 hover:text-white'}`}>
+                {tab === 'general' ? 'General' : tab === 'asean' ? 'ASEAN' : tab}
+              </button>
+            ))}
+          </div>
+          <div className="space-y-2.5">
+            {(priorityCategoryTab === 'korean'
+              ? [{ index: 0, label: 'Korean #1 (Primary)',    badgeClass: 'bg-rose-500/20 text-rose-300 border-rose-500/40',            defaultId: 'kisskh-kdrama' },
+                 { index: 1, label: 'Korean #2 (Failover 1)', badgeClass: 'bg-hbo-purple/30 text-hbo-purple-light border-hbo-purple/40', defaultId: 'cinesrc' },
+                 { index: 2, label: 'Korean #3 (Failover 2)', badgeClass: 'bg-hbo-cyan/20 text-hbo-cyan border-hbo-cyan/40',            defaultId: 'moviesapi' }]
+              : priorityCategoryTab === 'asean'
+              ? [{ index: 0, label: 'Asean #1 (Primary)',    badgeClass: 'bg-amber-500/20 text-amber-300 border-amber-500/40',          defaultId: 'pencurimovie-my' },
+                 { index: 1, label: 'Asean #2 (Failover 1)', badgeClass: 'bg-hbo-purple/30 text-hbo-purple-light border-hbo-purple/40', defaultId: 'vidlink' },
+                 { index: 2, label: 'Asean #3 (Failover 2)', badgeClass: 'bg-hbo-cyan/20 text-hbo-cyan border-hbo-cyan/40',            defaultId: '111movies' }]
+              : priorityCategoryTab === 'anime'
+              ? [{ index: 0, label: 'Anime #1 (Primary)',    badgeClass: 'bg-pink-500/20 text-pink-300 border-pink-500/40',             defaultId: 'megaplay-anime' },
+                 { index: 1, label: 'Anime #2 (Failover 1)', badgeClass: 'bg-hbo-purple/30 text-hbo-purple-light border-hbo-purple/40', defaultId: 'cinesrc' },
+                 { index: 2, label: 'Anime #3 (Failover 2)', badgeClass: 'bg-hbo-cyan/20 text-hbo-cyan border-hbo-cyan/40',            defaultId: 'moviesapi' }]
+              : [{ index: 0, label: '#1 Priority (Primary)',    badgeClass: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40',  defaultId: 'vidlink' },
+                 { index: 1, label: '#2 Priority (Failover 1)', badgeClass: 'bg-hbo-purple/30 text-hbo-purple-light border-hbo-purple/40', defaultId: 'moviesapi' },
+                 { index: 2, label: '#3 Priority (Failover 2)', badgeClass: 'bg-hbo-cyan/20 text-hbo-cyan border-hbo-cyan/40',          defaultId: 'cinesrc' }]
+            ).map(({ index, label, badgeClass, defaultId }) => {
+              const isKoreanTab = priorityCategoryTab === 'korean';
+              const isAseanTab  = priorityCategoryTab === 'asean';
+              const isAnimeTab  = priorityCategoryTab === 'anime';
+              const currentTop = isKoreanTab
+                ? (settings.topKoreanProviders && settings.topKoreanProviders.length >= 3 ? settings.topKoreanProviders : ['kisskh-kdrama', 'cinesrc', 'moviesapi'])
+                : isAseanTab
+                ? ((settings.topAseanProviders || (settings as any).topAsianProviders) && (settings.topAseanProviders || (settings as any).topAsianProviders).length >= 3 ? (settings.topAseanProviders || (settings as any).topAsianProviders) : ['pencurimovie-my', 'vidlink', '111movies'])
+                : isAnimeTab
+                ? (settings.topAnimeProviders && settings.topAnimeProviders.length >= 3 ? settings.topAnimeProviders : ['megaplay-anime', 'cinesrc', 'moviesapi'])
+                : (settings.topProviders && settings.topProviders.length >= 3 ? settings.topProviders : ['vidlink', 'moviesapi', 'cinesrc']);
+              const selectedId  = currentTop[index] || defaultId;
+              const selectedObj = STREAM_PROVIDERS.find(p => p.id === selectedId) || STREAM_PROVIDERS[0];
+              return (
+                <div key={`${priorityCategoryTab}-${index}`} className="bg-hbo-dark/70 border border-hbo-border/90 rounded-xl p-3 space-y-2 relative">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${badgeClass} flex-shrink-0`}>{label}</span>
+                    <div className="flex items-center gap-1 flex-wrap justify-end">
+                      {selectedObj.categories.map((cat) => {
+                        const config = CATEGORY_BADGE_CONFIG[cat];
+                        if (!config) return null;
+                        return <span key={cat} className={`text-[9px] px-1.5 py-0.5 rounded font-bold border ${config.className}`}>{config.label}</span>;
+                      })}
+                    </div>
+                  </div>
+                  <button type="button"
+                    onClick={() => { setPriorityPickerSlot({ tab: priorityCategoryTab, index, label, currentId: selectedId }); setActiveDrawer('priorityPicker'); }}
+                    className="w-full flex items-center justify-between bg-hbo-card/90 border border-hbo-border text-white text-xs font-bold rounded-xl px-3 py-2.5 hover:border-hbo-cyan transition-all">
+                    <span className="truncate pr-2">{selectedObj.name}</span>
+                    <ChevronRight className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </SettingsDrawer>
+
+      {/* 3a. Level 2 Sub-Drawer: Stream Provider Selection */}
       {/* 3a. Level 2 Sub-Drawer: Stream Provider Selection */}
       <SettingsDrawer
         isOpen={activeDrawer === 'priorityPicker'}

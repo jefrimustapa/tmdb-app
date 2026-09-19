@@ -1,4 +1,4 @@
-import type { StreamProvider, StreamProviderCategory } from '../types/stream';
+import type { StreamProvider, StreamProviderCategory, StreamEngineType, OriginCountryCode } from '../types/stream';
 
 export const CATEGORY_BADGE_CONFIG: Record<
   StreamProviderCategory,
@@ -292,15 +292,122 @@ export const STREAM_PROVIDERS: StreamProvider[] = [
     id: 'dramacool-kdrama',
     name: 'Dramacool (K-Drama)',
     tagline: 'Extensive Korean & Asian drama catalog with English subtitles via Dramacool MY',
+    engine: 'embed',
+    countries: ['KR', 'CN', 'JP', 'GLOBAL'],
     categories: ['korean', 'asean'],
+    getMovieUrl: () => '',
+    getTVUrl: () => ''
+  },
+  {
+    id: 'telegram-msm32',
+    name: 'MovieSubMalay (MSM32)',
+    tagline: 'Direct Telegram stream resolver for Malay & Southeast Asian cinema',
+    engine: 'telegram',
+    countries: ['MY', 'ID', 'SG'],
+    categories: ['malaysian', 'asean'],
     getMovieUrl: () => '',
     getTVUrl: () => ''
   }
 ];
 
+export const ORIGIN_COUNTRY_LABELS: Record<OriginCountryCode, string> = {
+  MY: 'Malaysia 🇲🇾',
+  ID: 'Indonesia 🇮🇩',
+  KR: 'South Korea 🇰🇷',
+  JP: 'Japan 🇯🇵',
+  US: 'United States 🇺🇸',
+  GB: 'United Kingdom 🇬🇧',
+  TH: 'Thailand 🇹🇭',
+  PH: 'Philippines 🇵🇭',
+  SG: 'Singapore 🇸🇬',
+  CN: 'China 🇨🇳',
+  GLOBAL: 'Global / Other 🌐',
+};
+
 export function getProviderById(id: string): StreamProvider {
   return STREAM_PROVIDERS.find(p => p.id === id) || STREAM_PROVIDERS[0];
 }
+
+export function getProvidersByEngine(
+  engine: StreamEngineType = 'embed',
+  providers: StreamProvider[] = STREAM_PROVIDERS
+): StreamProvider[] {
+  return providers.filter(p => (p.engine || 'embed') === engine);
+}
+
+export function getEffectiveCountries(
+  provider: StreamProvider,
+  customCountries?: Record<string, OriginCountryCode[]>
+): OriginCountryCode[] {
+  if (customCountries && customCountries[provider.id]) {
+    return customCountries[provider.id];
+  }
+  return provider.countries || ['GLOBAL'];
+}
+
+export function extractMediaOriginCountries(
+  media?: any,
+  isAnime?: boolean,
+  isKorean?: boolean,
+  isAsean?: boolean
+): OriginCountryCode[] {
+  const result = new Set<OriginCountryCode>();
+  if (isAnime) result.add('JP');
+  if (isKorean) result.add('KR');
+
+  if (media) {
+    if (Array.isArray(media.origin_country)) {
+      media.origin_country.forEach((c: string) => {
+        if (c) result.add(c.toUpperCase() as OriginCountryCode);
+      });
+    }
+    if (Array.isArray(media.production_countries)) {
+      media.production_countries.forEach((pc: any) => {
+        if (pc?.iso_3166_1) result.add(pc.iso_3166_1.toUpperCase() as OriginCountryCode);
+      });
+    }
+    const lang = (media.original_language || '').toLowerCase();
+    if (lang === 'ja') result.add('JP');
+    if (lang === 'ko') result.add('KR');
+    if (lang === 'ms') result.add('MY');
+    if (lang === 'id') result.add('ID');
+    if (lang === 'th') result.add('TH');
+    if (lang === 'tl') result.add('PH');
+    if (lang === 'zh') result.add('CN');
+  }
+
+  return Array.from(result);
+}
+
+export function isProviderMatchingMedia(
+  provider: StreamProvider,
+  mediaOriginCountries: OriginCountryCode[],
+  customCountries?: Record<string, OriginCountryCode[]>,
+  enabledTelegramProviders?: string[]
+): boolean {
+  if (provider.engine === 'telegram') {
+    const enabledTg = enabledTelegramProviders || ['telegram-msm32'];
+    if (!enabledTg.includes(provider.id)) return false;
+
+    const effective = getEffectiveCountries(provider, customCountries);
+    if (effective.includes('GLOBAL')) return true;
+    if (!mediaOriginCountries || mediaOriginCountries.length === 0) return false;
+    return mediaOriginCountries.some(c => effective.includes(c));
+  }
+  return true;
+}
+
+export function isProviderMatchingOrigin(
+  provider: StreamProvider,
+  originCountry?: string,
+  customCountries?: Record<string, OriginCountryCode[]>
+): boolean {
+  if (!originCountry) return true;
+  const effective = getEffectiveCountries(provider, customCountries);
+  if (effective.includes('GLOBAL')) return true;
+  return effective.includes(originCountry.toUpperCase() as OriginCountryCode);
+}
+
 
 export function getOrderedProviders(
   topProviders?: string[],
