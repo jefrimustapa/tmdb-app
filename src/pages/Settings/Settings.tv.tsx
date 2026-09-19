@@ -4093,7 +4093,7 @@ export const Settings: React.FC = () => {
                 const currentCountries: OriginCountryCode[] =
                   (settings.telegramProviderCountries && settings.telegramProviderCountries['telegram-msm32']) ||
                   ['MY', 'ID', 'SG'];
-                const availableCodes: OriginCountryCode[] = ['MY', 'ID', 'SG', 'TH', 'KR', 'JP', 'GLOBAL'];
+                const availableCodes: OriginCountryCode[] = ['MY', 'ID', 'SG', 'TH', 'KR', 'JP', 'US', 'GLOBAL'];
 
                 return availableCodes.map((code, idx) => {
                   const isSelected = currentCountries.includes(code);

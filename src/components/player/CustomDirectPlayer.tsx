@@ -145,6 +145,24 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
     onErrorRef.current = onError;
   }, [onError]);
 
+  // Cleanup on unmount to completely stop background playback/buffering
+  useEffect(() => {
+    return () => {
+      const video = videoRef.current;
+      if (video) {
+        try {
+          video.pause();
+          video.removeAttribute('src');
+          video.load();
+        } catch {}
+      }
+      if (hlsRef.current) {
+        hlsRef.current.destroy();
+        hlsRef.current = null;
+      }
+    };
+  }, []);
+
   // Video Source Attachment (HLS or Native MP4/MKV)
   useEffect(() => {
     const video = videoRef.current;
@@ -203,6 +221,7 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
       return () => {
         hls.destroy();
         hlsRef.current = null;
+        attachedSrcRef.current = null;
       };
     } else {
       // Direct stream URL (MP4 / MKV from MSM32)
@@ -211,14 +230,24 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
       setIsMuted(false);
       video.src = src;
 
+      let isCancelled = false;
+
       const triggerUnmutedPlay = () => {
+        if (isCancelled) return;
         video.muted = false;
         video.volume = 1;
         setIsMuted(false);
         video.play().then(() => {
+          if (isCancelled) {
+            try {
+              video.pause();
+            } catch {}
+            return;
+          }
           setIsPlaying(true);
           isPlayingRef.current = true;
         }).catch((err) => {
+          if (isCancelled) return;
           console.warn('[CustomDirectPlayer] Autoplay blocked, waiting for user tap:', err);
           setIsPlaying(false);
           isPlayingRef.current = false;
@@ -232,6 +261,18 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
         video.addEventListener('loadeddata', triggerUnmutedPlay, { once: true });
         video.addEventListener('canplay', triggerUnmutedPlay, { once: true });
       }
+
+      return () => {
+        isCancelled = true;
+        attachedSrcRef.current = null;
+        video.removeEventListener('loadeddata', triggerUnmutedPlay);
+        video.removeEventListener('canplay', triggerUnmutedPlay);
+        try {
+          video.pause();
+          video.removeAttribute('src');
+          video.load();
+        } catch {}
+      };
     }
   }, [src]);
 

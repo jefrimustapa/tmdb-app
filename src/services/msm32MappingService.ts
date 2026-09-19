@@ -75,8 +75,14 @@ class Msm32MappingService {
     title: string,
     year?: number | string,
     season?: number,
-    episode?: number
+    episode?: number,
+    signal?: AbortSignal
   ): Promise<Msm32ResolveResult | null> {
+    if (signal?.aborted) {
+      console.log(`[MSM32] Resolution aborted prior to request for "${title}"`);
+      return null;
+    }
+
     // 1. Check local client cache first (0ms, 0 network requests)
     const clientKey = `${(title || '').toLowerCase().trim()}_${year || ''}_${season || ''}_${episode || ''}`;
     const localHit = this.clientCache.get(clientKey);
@@ -86,11 +92,22 @@ class Msm32MappingService {
     }
 
     const baseUrl = await this.getBaseUrl();
-    try {
-      const controller = new AbortController();
-      // Allow up to 35 seconds to accommodate cold starts on free containers
-      const timer = setTimeout(() => controller.abort(), 35000);
+    if (signal?.aborted) return null;
 
+    const controller = new AbortController();
+    // Allow up to 35 seconds to accommodate cold starts on free containers
+    const timer = setTimeout(() => controller.abort(), 35000);
+
+    const onExternalAbort = () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+
+    if (signal) {
+      signal.addEventListener('abort', onExternalAbort, { once: true });
+    }
+
+    try {
       const params = new URLSearchParams({ title });
       if (year) params.append('year', String(year));
       if (typeof season === 'number' && !isNaN(season)) params.append('season', String(season));
@@ -102,6 +119,9 @@ class Msm32MappingService {
         headers: { 'Accept': 'application/json' },
       });
       clearTimeout(timer);
+      if (signal) signal.removeEventListener('abort', onExternalAbort);
+
+      if (signal?.aborted) return null;
 
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));
@@ -110,6 +130,8 @@ class Msm32MappingService {
       }
 
       const data = await res.json();
+      if (signal?.aborted) return null;
+
       if (data.success && data.streamUrl) {
         let finalStreamUrl = data.streamUrl;
         const settings = await dbService.getSettings();
@@ -133,8 +155,15 @@ class Msm32MappingService {
 
       return null;
     } catch (err: any) {
+      if (signal?.aborted || err?.name === 'AbortError') {
+        console.log(`[MSM32] Stream resolution cancelled for "${title}"`);
+        return null;
+      }
       console.error('[MSM32] Resolution request failed:', err);
       return null;
+    } finally {
+      clearTimeout(timer);
+      if (signal) signal.removeEventListener('abort', onExternalAbort);
     }
   }
 }

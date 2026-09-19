@@ -312,6 +312,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   // Priority Stream Resolution: TorBox -> Private Extractor -> Embed Resolver
   useEffect(() => {
     let isMounted = true;
+    const abortController = new AbortController();
     if (!tmdbId) {
       setIsExtracting(false);
       return;
@@ -354,8 +355,11 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             title,
             releaseYear,
             mediaType === 'tv' ? season : undefined,
-            mediaType === 'tv' ? episode : undefined
+            mediaType === 'tv' ? episode : undefined,
+            abortController.signal
           );
+
+          if (!isMounted || abortController.signal.aborted) return;
 
           if (msmRes && msmRes.streamUrl) {
             console.log('[Resolver] ✅ Playing via Telegram Direct Stream:', msmRes.streamUrl);
@@ -675,9 +679,10 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
               title,
               releaseYear,
               mediaType === 'tv' ? season : undefined,
-              mediaType === 'tv' ? episode : undefined
+              mediaType === 'tv' ? episode : undefined,
+              abortController.signal
             );
-            if (!isMounted) return;
+            if (!isMounted || abortController.signal.aborted) return;
             if (msmRes && msmRes.streamUrl) {
               console.log('[Resolver] ✅ Playing via Telegram Direct Stream:', msmRes.streamUrl);
               setResolvingStatus('Connected to Telegram Stream');
@@ -710,7 +715,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         }
       }
 
-      if (!isMounted) return;
+      if (!isMounted || abortController.signal.aborted) return;
 
       // Final fallback to Embed Resolver ONLY if explicitly enabled
       if (enabledResolvers.includes('embed')) {
@@ -735,6 +740,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
     return () => {
       isMounted = false;
+      abortController.abort();
     };
   }, [enabledResolvers, tmdbId, title, mediaType, season, episode, directStreamApiUrl, torboxApiKey, activeAsean, providerId, releaseYear, originalTitle, topAnimeProviders, topAseanProviders]);
 
