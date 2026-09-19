@@ -19,7 +19,10 @@ export interface Msm32HealthResult {
 class Msm32MappingService {
   private async getBaseUrl(): Promise<string> {
     const settings = await dbService.getSettings();
-    const url = settings?.msm32GetterUrl || 'http://localhost:3033';
+    let url = settings?.msm32GetterUrl?.trim();
+    if (!url || url === 'http://localhost:3033') {
+      url = 'https://msm-getter.onrender.com';
+    }
     return url.replace(/\/+$/, '');
   }
 
@@ -27,7 +30,11 @@ class Msm32MappingService {
    * Test connectivity to the MSM Getter microservice (/health)
    */
   async testConnection(customUrl?: string): Promise<Msm32HealthResult> {
-    const baseUrl = customUrl ? customUrl.replace(/\/+$/, '') : await this.getBaseUrl();
+    let target = customUrl?.trim();
+    if (!target || target === 'http://localhost:3033') {
+      target = await this.getBaseUrl();
+    }
+    const baseUrl = target.replace(/\/+$/, '');
     try {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), 6000);

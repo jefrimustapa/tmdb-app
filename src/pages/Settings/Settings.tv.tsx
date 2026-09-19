@@ -3419,7 +3419,7 @@ export const Settings: React.FC = () => {
                           id="drawer-input-msm32-url"
                           data-telegram-drawer-item="true"
                           type="text"
-                          placeholder="http://localhost:3033"
+                          placeholder="https://msm-getter.onrender.com"
                           value={settings.msm32GetterUrl || ''}
                           onKeyDown={(e) => {
                             if (e.key === 'ArrowUp') {

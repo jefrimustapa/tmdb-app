@@ -1345,7 +1345,7 @@ export const Settings: React.FC = () => {
                 <div className="flex items-center gap-2">
                   <input
                     type="text"
-                    placeholder="http://localhost:3033"
+                    placeholder="https://msm-getter.onrender.com"
                     value={settings.msm32GetterUrl || ''}
                     onChange={(e) => handleUpdate({ msm32GetterUrl: e.target.value })}
                     className="flex-1 bg-black/60 border border-gray-700 focus:border-sky-400 text-white px-3 py-2 rounded-lg text-xs font-mono outline-none"

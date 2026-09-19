@@ -2,12 +2,13 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20260918-1818';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-add-provider-te.20260918-1818';
+export const APP_BUILD_NUMBER = '20260919-0013';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-add-provider-te.20260919-0013';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
 export const APP_BRANCH = 'feat-add-provider-te';
-export const APP_CHANGELOG = `* refactor(providers): restructure provider categories and preferences for ASEAN and regional content (#112)
+export const APP_CHANGELOG = `* feat: add msm-getter microservice and Dockerfile for cloud deployment
+* refactor(providers): restructure provider categories and preferences for ASEAN and regional content (#112)
 * feat(settings): TV active category border, mobile sub-drawers hierarchy, scroll lock & General tab rename (#111)
 * fix(tv): eliminate delay on remote back navigation and land focus on TV navbar Home icon (#110)
 * fix(tv): eliminate navigation lag on TV navbar during Home data load (#109)
@@ -20,5 +21,4 @@ export const APP_CHANGELOG = `* refactor(providers): restructure provider catego
 * perf(tv): improve Home screen initial loading time and rail batching (#101)
 * fix: handle unsupported and malformed subtitles, optimize video playback CPU usage, and refine virtual cursor click (#100)
 * feat: implement custom subtitle service with OpenSubtitles v3 and bright67 engine (#99)
-* feat(tablet): set 4 cols portrait and 6 cols landscape on movies, series, myspace, and search; remove search clear button scale animation (#98)
-* refactor: scope CineSrc landscape menu CSS to phones and round navbar container in perf mode (#97)`;
+* feat(tablet): set 4 cols portrait and 6 cols landscape on movies, series, myspace, and search; remove search clear button scale animation (#98)`;

@@ -97,7 +97,7 @@ export interface UserSettings {
   torboxApiKey?: string; // TorBox API Key (for 4K HDR & 1080p cloud streams)
   enabledTelegramProviders?: string[]; // e.g. ['telegram-msm32']
   telegramProviderCountries?: Record<string, OriginCountryCode[]>; // e.g. { 'telegram-msm32': ['MY', 'ID', 'SG'] }
-  msm32GetterUrl?: string; // e.g. 'http://localhost:3033'
+  msm32GetterUrl?: string; // e.g. 'https://msm-getter.onrender.com'
   directStreamMode?: boolean; // Legacy fallback flag
   streamHeaderTimeout: number; // in seconds, e.g. 3, 5, 8, or 0 for always visible
   streamResolverTimeout?: number; // Provider stream resolution timeout in seconds (3-15s, default 5s)

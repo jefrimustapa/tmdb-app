@@ -15,6 +15,7 @@ const __dirname = path.dirname(__filename);
 dotenv.config({ path: path.join(__dirname, '.env') });
 
 const app = express();
+app.set('trust proxy', true);
 app.use(cors());
 app.use(express.json());
 
@@ -91,7 +92,7 @@ app.get('/api/resolve', async (req, res) => {
     const cached = streamCache.get(cacheKey);
     console.log(`[RESOLVE] Cache HIT for "${cacheKey}" -> Doc ID: ${cached.docId}`);
     const host = req.get('host');
-    const protocol = req.protocol;
+    const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'https';
     return res.json({
       success: true,
       cached: true,
@@ -375,7 +376,7 @@ app.get('/api/resolve', async (req, res) => {
     });
 
     const host = req.get('host');
-    const protocol = req.protocol;
+    const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'https';
 
     console.log(`[RESOLVE] Successfully resolved "${queryTitle}" -> Doc ID: ${docIdStr} (${filename})`);
     return res.json({
