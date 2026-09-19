@@ -619,22 +619,39 @@ app.get('/api/resolve', async (req, res) => {
             `s${sPadded}e${epPadded}`,
             `s${sNum}e${epPadded}`,
             `s${sPadded}e${eNum}`,
-            `e${epPadded}`,
+            `ep${epPadded}`,
+            `ep ${epPadded}`,
+            `ep ${eNum}`,
             `episod ${eNum}`,
             `episod ${epPadded}`,
-            `ep${epPadded}`,
-            `ep ${eNum}`,
+            `episode ${eNum}`,
+            `episode ${epPadded}`,
+            `e${epPadded}`,
           ];
           const hasTarget = epKeywords.some(kw => normFn.includes(kw));
           if (!hasTarget) {
             matchesEpisode = false;
           } else {
-            const otherEpMatch = normFn.match(/\b(s\d+e(\d+)|e(\d+)|episod\s*(\d+))\b/);
+            const otherEpMatch = normFn.match(/\b(s\d+e(\d+)|e(\d+)|ep\s*(\d+)|episod\s*(\d+)|episode\s*(\d+))\b/);
             if (otherEpMatch) {
-              const foundNum = parseInt(otherEpMatch[2] || otherEpMatch[3] || otherEpMatch[4], 10);
+              const foundNum = parseInt(otherEpMatch[2] || otherEpMatch[3] || otherEpMatch[4] || otherEpMatch[5] || otherEpMatch[6], 10);
               if (!isNaN(foundNum) && foundNum !== eNum) {
                 matchesEpisode = false;
               }
+            }
+          }
+
+          // Season validation: prevent Season 1 files matching Season 2+, and vice-versa
+          if (sNum > 1) {
+            const hasSeason1 = normFn.match(/\b(s0?1|season\s*1|musim\s*1)\b/);
+            const hasTargetSeason = normFn.match(new RegExp(`\\b(s0?${sNum}|season\\s*${sNum}|musim\\s*${sNum})\\b`));
+            if (hasSeason1 && !hasTargetSeason) {
+              matchesEpisode = false;
+            }
+          } else if (sNum === 1) {
+            const hasHigherSeason = normFn.match(/\b(s0?[2-9]|season\s*[2-9]|musim\s*[2-9])\b/);
+            if (hasHigherSeason) {
+              matchesEpisode = false;
             }
           }
         }
@@ -682,12 +699,29 @@ app.get('/api/resolve', async (req, res) => {
     }
 
     // Prepare prioritized search queries
+    // For series: specific episode tags first to get clean 1-page results without pagination clutter
     const searchQueries = [];
     if (isTv) {
-      searchQueries.push(`${title} S${sPadded}E${epPadded}`);
-      searchQueries.push(`${title} E${epPadded}`);
-      searchQueries.push(`${title} Episod ${eNum}`);
-      searchQueries.push(title);
+      if (sNum > 1) {
+        searchQueries.push(`${title} Season ${sNum}`);
+        searchQueries.push(`${title} S${sNum}E${epPadded}`);
+        searchQueries.push(`${title} S${sPadded}E${epPadded}`);
+        searchQueries.push(`${title} S${sNum}`);
+        searchQueries.push(`${title} S${sPadded}`);
+        searchQueries.push(`${title} EP${epPadded}`);
+        searchQueries.push(`${title} Musim ${sNum}`);
+        searchQueries.push(title);
+      } else {
+        // Season 1 or single-season series: specific episode queries first
+        searchQueries.push(`${title} EP${epPadded}`);
+        searchQueries.push(`${title} Episod ${eNum}`);
+        searchQueries.push(`${title} Episod ${epPadded}`);
+        searchQueries.push(`${title} S01E${epPadded}`);
+        searchQueries.push(`${title} E${epPadded}`);
+        searchQueries.push(`${title} Season 1`);
+        searchQueries.push(title);
+        if (year) searchQueries.push(`${title} ${year}`);
+      }
     } else {
       if (year) searchQueries.push(`${title} ${year}`);
       searchQueries.push(title);
@@ -699,10 +733,119 @@ app.get('/api/resolve', async (req, res) => {
     let chosenFilename = null;
     let sentMsgId = 0;
 
+    // Helper: Score a candidate download button
+    function scoreButton(btn, msg) {
+      if (btn.className !== 'KeyboardButtonUrlAuth' || !btn.url) return -999;
+      const btnText = (btn.text || '').toLowerCase();
+      const normBtnText = normalizeTitle(btnText);
+      const msgText = (msg.message || '').toLowerCase();
+      const normMsgText = normalizeTitle(msgText);
+      const combinedNorm = `${normMsgText} ${normBtnText}`;
+
+      let score = 0;
+
+      if (isTv) {
+        const epKeywords = [
+          `s${sPadded}e${epPadded}`,
+          `s${sNum}e${epPadded}`,
+          `s${sPadded}e${eNum}`,
+          `ep${epPadded}`,
+          `ep ${epPadded}`,
+          `ep ${eNum}`,
+          `episod ${eNum}`,
+          `episod ${epPadded}`,
+          `episode ${eNum}`,
+          `episode ${epPadded}`,
+          `e${epPadded}`,
+        ];
+        const hasTargetEp = epKeywords.some(kw => normBtnText.includes(kw));
+
+        if (hasTargetEp) {
+          score += 100;
+        } else {
+          const otherEpMatch = normBtnText.match(/\b(s\d+e(\d+)|e(\d+)|ep\s*(\d+)|episod\s*(\d+)|episode\s*(\d+))\b/);
+          if (otherEpMatch) {
+            const foundNum = parseInt(otherEpMatch[2] || otherEpMatch[3] || otherEpMatch[4] || otherEpMatch[5] || otherEpMatch[6], 10);
+            if (!isNaN(foundNum) && foundNum !== eNum) {
+              score -= 500;
+            }
+          } else {
+            score -= 150;
+          }
+        }
+
+        // Strict Season validation across button and parent message
+        if (sNum > 1) {
+          const hasSeason1 = combinedNorm.match(/\b(s0?1|season\s*1|musim\s*1)\b/);
+          const hasTargetSeason = combinedNorm.match(new RegExp(`\\b(s0?${sNum}|season\\s*${sNum}|musim\\s*${sNum})\\b`));
+          if (hasSeason1 && !hasTargetSeason) {
+            score -= 500;
+          } else if (hasTargetSeason) {
+            score += 80;
+          }
+        } else if (sNum === 1) {
+          const hasHigherSeason = combinedNorm.match(/\b(s0?[2-9]|season\s*[2-9]|musim\s*[2-9])\b/);
+          if (hasHigherSeason) {
+            score -= 500;
+          }
+        }
+      }
+
+      // Title relevance check: award bonus if title tokens appear in message caption or button
+      if (titleTokens.length > 0) {
+        const matchingTokens = titleTokens.filter(t => combinedNorm.includes(t));
+        if (matchingTokens.length > 0) {
+          score += Math.min(60, matchingTokens.length * 20);
+        } else {
+          score -= 300;
+        }
+      }
+
+      // Quality preference
+      if (targetQuality <= 720) {
+        if (btnText.includes('720p') || btnText.includes('720')) score += 50;
+        else if (btnText.includes('540p') || btnText.includes('480p') || btnText.includes('360p')) score += 30;
+        else if (btnText.includes('1080p') || btnText.includes('1080')) score += 5;
+        else if (btnText.includes('2160p') || btnText.includes('4k')) score -= 50;
+      } else {
+        if (btnText.includes('1080p') || btnText.includes('1080')) score += 50;
+        else if (btnText.includes('720p') || btnText.includes('720')) score += 30;
+      }
+      if (btnText.includes('malaysub') || btnText.includes('msm')) score += 5;
+
+      return score;
+    }
+
+    // Helper: Find pagination "Next" button in replyMarkup
+    function findNextPageButton(replyMarkup) {
+      if (!replyMarkup?.rows) return null;
+      for (const row of replyMarkup.rows) {
+        for (const btn of row.buttons) {
+          if (btn.className === 'KeyboardButtonCallback' && btn.data) {
+            const txt = (btn.text || '').toLowerCase();
+            if (
+              txt.includes('next') ||
+              txt.includes('➡️') ||
+              txt.includes('➡') ||
+              txt.includes('seterusnya') ||
+              txt.includes('>>') ||
+              txt.includes('>') ||
+              /page\s*\d+/i.test(txt)
+            ) {
+              return btn;
+            }
+          }
+        }
+      }
+      return null;
+    }
+
     for (const sq of searchQueries) {
       console.log(`[RESOLVE] Querying @msm32bot with: "${sq}"...`);
       const sentMsg = await client.sendMessage('msm32bot', { message: sq });
       sentMsgId = sentMsg.id;
+
+      let noResults = false;
 
       for (let i = 0; i < 5; i++) {
         await new Promise(r => setTimeout(r, 1500));
@@ -710,62 +853,75 @@ app.get('/api/resolve', async (req, res) => {
         const candidates = [];
 
         for (const m of msgs) {
-          if (m.id > sentMsgId && m.replyMarkup?.rows) {
-            for (const row of m.replyMarkup.rows) {
-              for (const btn of row.buttons) {
-                if (btn.className === 'KeyboardButtonUrlAuth' && btn.url) {
-                  const btnText = (btn.text || '').toLowerCase();
-                  const normBtnText = normalizeTitle(btnText);
-                  let score = 0;
+          if (m.id > sentMsgId) {
+            const textLower = (m.message || '').toLowerCase();
+            if (
+              (!m.replyMarkup || !m.replyMarkup.rows || m.replyMarkup.rows.length === 0) &&
+              (textLower.includes('tiada carian') || textLower.includes('tidak dijumpai') || textLower.includes('tiada hasil') || textLower.includes('no result'))
+            ) {
+              console.log(`[RESOLVE] Bot returned no results for "${sq}", advancing immediately.`);
+              noResults = true;
+              break;
+            }
 
-                  if (isTv) {
-                    const epKeywords = [
-                      `s${sPadded}e${epPadded}`,
-                      `s${sNum}e${epPadded}`,
-                      `e${epPadded}`,
-                      `episod ${eNum}`,
-                      `episod ${epPadded}`,
-                      `ep${epPadded}`,
-                      `ep ${eNum}`,
-                    ];
-                    const hasTargetEp = epKeywords.some(kw => normBtnText.includes(kw));
+            if (m.replyMarkup?.rows) {
+              let currentMsg = m;
+              let pageCount = 0;
+              const MAX_PAGES = 3;
 
-                    if (hasTargetEp) {
-                      score += 100;
-                    } else {
-                      const otherEpMatch = normBtnText.match(/\b(s\d+e(\d+)|e(\d+)|episod\s*(\d+))\b/);
-                      if (otherEpMatch) {
-                        const foundNum = parseInt(otherEpMatch[2] || otherEpMatch[3] || otherEpMatch[4], 10);
-                        if (!isNaN(foundNum) && foundNum !== eNum) {
-                          score -= 500;
-                        }
+              while (currentMsg && pageCount < MAX_PAGES) {
+                pageCount++;
+                if (currentMsg.replyMarkup?.rows) {
+                  for (const row of currentMsg.replyMarkup.rows) {
+                    for (const btn of row.buttons) {
+                      const score = scoreButton(btn, currentMsg);
+                      if (score > -999) {
+                        candidates.push({
+                          msgId: currentMsg.id,
+                          buttonId: btn.buttonId,
+                          url: btn.url,
+                          text: btn.text,
+                          score,
+                        });
                       }
                     }
                   }
+                }
 
-                  if (targetQuality <= 720) {
-                    if (btnText.includes('720p') || btnText.includes('720')) score += 50;
-                    else if (btnText.includes('540p') || btnText.includes('480p') || btnText.includes('360p')) score += 30;
-                    else if (btnText.includes('1080p') || btnText.includes('1080')) score += 5;
-                    else if (btnText.includes('2160p') || btnText.includes('4k')) score -= 50;
-                  } else {
-                    if (btnText.includes('1080p') || btnText.includes('1080')) score += 50;
-                    else if (btnText.includes('720p') || btnText.includes('720')) score += 30;
+                // Check if we already found an acceptable episode match (score >= 50)
+                const hasGoodMatch = candidates.some(c => c.score >= 50);
+                if (hasGoodMatch || pageCount >= MAX_PAGES) break;
+
+                // Otherwise, check for pagination button to traverse to next page
+                const nextBtn = findNextPageButton(currentMsg.replyMarkup);
+                if (nextBtn) {
+                  console.log(`[RESOLVE] Navigating to page ${pageCount + 1} for "${sq}" via callback...`);
+                  try {
+                    await client.invoke(new Api.messages.GetBotCallbackAnswer({
+                      peer: 'msm32bot',
+                      msgId: currentMsg.id,
+                      data: nextBtn.data,
+                    }));
+                    await new Promise(r => setTimeout(r, 1200));
+                    const refreshed = await client.getMessages('msm32bot', { ids: [currentMsg.id] });
+                    if (refreshed && refreshed[0]) {
+                      currentMsg = refreshed[0];
+                    } else {
+                      break;
+                    }
+                  } catch (pErr) {
+                    console.warn('[RESOLVE] Pagination callback failed:', pErr.message);
+                    break;
                   }
-                  if (btnText.includes('malaysub') || btnText.includes('msm')) score += 5;
-
-                  candidates.push({
-                    msgId: m.id,
-                    buttonId: btn.buttonId,
-                    url: btn.url,
-                    text: btn.text,
-                    score,
-                  });
+                } else {
+                  break;
                 }
               }
             }
           }
         }
+
+        if (noResults) break;
 
         const valid = candidates.filter(c => c.score >= 0).sort((a, b) => b.score - a.score);
         if (valid.length > 0) {
