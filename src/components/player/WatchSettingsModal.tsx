@@ -86,6 +86,8 @@ export const WatchSettingsModal: React.FC<WatchSettingsModalProps> = ({
   const [activeDrawer, setActiveDrawer] = useState<'none' | 'fontsize' | 'delay'>('none');
   const modalRef = useRef<HTMLDivElement>(null);
   const drawerRef = useRef<HTMLDivElement>(null);
+  const activeDrawerRef = useRef(activeDrawer);
+  activeDrawerRef.current = activeDrawer;
   const activeAsean = isAsean || isAsian;
 
   const checkLandscape = useCallback(() => {
@@ -138,16 +140,26 @@ export const WatchSettingsModal: React.FC<WatchSettingsModalProps> = ({
   // Pull focus to first interactive element when drawer opens
   useEffect(() => {
     if (activeDrawer !== 'none') {
-      const timer = setTimeout(() => {
+      const focusDrawer = () => {
         if (drawerRef.current) {
-          const firstItem = drawerRef.current.querySelector<HTMLElement>('[data-subdrawer-item="true"]');
+          const current = document.activeElement as HTMLElement | null;
+          if (current && drawerRef.current.contains(current)) return;
+          const firstItem = drawerRef.current.querySelector<HTMLElement>(
+            '#subdrawer-back-btn, [data-subdrawer-item="true"]'
+          );
           if (firstItem) {
             firstItem.focus();
             firstItem.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
           }
         }
-      }, 50);
-      return () => clearTimeout(timer);
+      };
+      focusDrawer();
+      const timer = setTimeout(focusDrawer, 50);
+      const timer2 = setTimeout(focusDrawer, 150);
+      return () => {
+        clearTimeout(timer);
+        clearTimeout(timer2);
+      };
     }
   }, [activeDrawer]);
 
@@ -212,6 +224,7 @@ export const WatchSettingsModal: React.FC<WatchSettingsModalProps> = ({
     ? currentProviderIndex + 1
     : (serverIndex <= effectiveTotalServers ? serverIndex : 1);
 
+  // 1. Initial Modal Open Lifecycle & Initial Focus Pull
   useEffect(() => {
     if (!isOpen) {
       try {
@@ -231,6 +244,80 @@ export const WatchSettingsModal: React.FC<WatchSettingsModalProps> = ({
       (window as any).AndroidBridge?.setDropdownOpen?.(false);
     } catch (e) {}
 
+    // Reliable focus pull into modal from iframe / background on initial open
+    const focusActiveModalElement = () => {
+      // If a subdrawer is active, NEVER touch modal elements!
+      if (activeDrawerRef.current !== 'none') {
+        const drawerEl = drawerRef.current;
+        if (drawerEl) {
+          const current = document.activeElement as HTMLElement | null;
+          if (current && drawerEl.contains(current)) return;
+          const firstDrawerItem = drawerEl.querySelector<HTMLElement>(
+            '#subdrawer-back-btn, [data-subdrawer-item="true"]'
+          );
+          if (firstDrawerItem) {
+            firstDrawerItem.focus();
+            firstDrawerItem.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+          }
+        }
+        return;
+      }
+
+      // Forcefully release focus from any embed iframe
+      try {
+        window.focus();
+        document.querySelectorAll('iframe').forEach((f) => {
+          try {
+            f.blur();
+            if (f.contentWindow) f.contentWindow.blur();
+          } catch (e) {}
+        });
+      } catch (e) {}
+
+      const modalEl = modalRef.current || document.querySelector<HTMLElement>('[role="dialog"]');
+      if (modalEl) {
+        const current = document.activeElement as HTMLElement | null;
+        if (current && !modalEl.contains(current)) {
+          current.blur();
+        }
+        // If already inside modal and not on modal root, keep current focus
+        if (current && modalEl.contains(current) && current !== modalEl) {
+          return;
+        }
+        const selected = modalEl.querySelector<HTMLElement>(
+          '[data-selected-item="true"], [data-selected-track="true"], button[role="tab"][aria-selected="true"]'
+        );
+        if (selected) {
+          selected.focus();
+          selected.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        } else {
+          const firstFocusable = modalEl.querySelector<HTMLElement>('button:not([disabled])');
+          if (firstFocusable) firstFocusable.focus();
+        }
+      }
+    };
+
+    // Pull focus on multiple animation frames to ensure DOM is ready and iframe cannot steal it back
+    focusActiveModalElement();
+    const t1 = setTimeout(focusActiveModalElement, 50);
+    const t2 = setTimeout(focusActiveModalElement, 150);
+    const t3 = setTimeout(focusActiveModalElement, 300);
+
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+      clearTimeout(t3);
+      try {
+        (window as any).AndroidBridge?.setModalOpen?.(false);
+      } catch (e) {}
+      window.dispatchEvent(new CustomEvent('tmdb_resume_player'));
+    };
+  }, [isOpen]);
+
+  // 2. D-pad and Keyboard Navigation Listener
+  useEffect(() => {
+    if (!isOpen) return;
+
     const handleKeyDown = (e: KeyboardEvent) => {
       // If a subdrawer is currently open, handle D-pad navigation exclusively within it
       if (activeDrawer !== 'none') {
@@ -243,6 +330,13 @@ export const WatchSettingsModal: React.FC<WatchSettingsModalProps> = ({
             const prevBtn = document.getElementById(prevBtnId);
             if (prevBtn) prevBtn.focus();
           }, 40);
+          return;
+        }
+
+        // Trap Tab key so focus cannot cycle to modal background tabs
+        if (e.key === 'Tab') {
+          e.preventDefault();
+          e.stopPropagation();
           return;
         }
 
@@ -280,7 +374,7 @@ export const WatchSettingsModal: React.FC<WatchSettingsModalProps> = ({
         const currentSubEl = document.activeElement as HTMLElement | null;
         let curR = -1;
         let curC = -1;
-        if (currentSubEl) {
+        if (currentSubEl && drawerRef.current.contains(currentSubEl)) {
           for (let r = 0; r < subRows.length; r++) {
             const c = subRows[r].indexOf(currentSubEl);
             if (c !== -1) {
@@ -291,16 +385,23 @@ export const WatchSettingsModal: React.FC<WatchSettingsModalProps> = ({
           }
         }
 
+        // Focus trap: If focus somehow escaped the subdrawer, any arrow key immediately anchors it back
+        if (curR === -1 && (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
+          e.preventDefault();
+          e.stopPropagation();
+          const target = drawerRef.current.querySelector<HTMLElement>(
+            '#subdrawer-back-btn, [data-subdrawer-item="true"]'
+          );
+          if (target) {
+            target.focus();
+            target.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+          }
+          return;
+        }
+
         if (e.key === 'ArrowDown') {
           e.preventDefault();
           e.stopPropagation();
-          if (curR === -1) {
-            if (subRows.length > 0 && subRows[0].length > 0) {
-              subRows[0][0].focus();
-              subRows[0][0].scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-            }
-            return;
-          }
           if (curR < subRows.length - 1) {
             const nextRow = subRows[curR + 1];
             const target = nextRow[Math.min(curC >= 0 ? curC : 0, nextRow.length - 1)];
@@ -313,13 +414,6 @@ export const WatchSettingsModal: React.FC<WatchSettingsModalProps> = ({
         if (e.key === 'ArrowUp') {
           e.preventDefault();
           e.stopPropagation();
-          if (curR === -1) {
-            if (subRows.length > 0 && subRows[0].length > 0) {
-              subRows[0][0].focus();
-              subRows[0][0].scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-            }
-            return;
-          }
           if (curR > 0) {
             const prevRow = subRows[curR - 1];
             const target = prevRow[Math.min(curC >= 0 ? curC : 0, prevRow.length - 1)];
@@ -348,16 +442,6 @@ export const WatchSettingsModal: React.FC<WatchSettingsModalProps> = ({
             e.stopPropagation();
             subRows[curR][curC - 1].focus();
             subRows[curR][curC - 1].scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-          } else if (isLandscape && curC === 0) {
-            // In landscape right-side drawer, pressing left at leftmost edge closes drawer and focuses trigger button
-            e.preventDefault();
-            e.stopPropagation();
-            const prevBtnId = activeDrawer === 'fontsize' ? 'drawer-btn-fontsize' : 'drawer-btn-delay';
-            setActiveDrawer('none');
-            setTimeout(() => {
-              const prevBtn = document.getElementById(prevBtnId);
-              if (prevBtn) prevBtn.focus();
-            }, 40);
           }
           return;
         }
@@ -459,23 +543,28 @@ export const WatchSettingsModal: React.FC<WatchSettingsModalProps> = ({
           const targetEl = prevRow[targetCol];
           targetEl.focus();
           targetEl.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-        } else if (currentRowIdx === 0) {
-          // From top tab switcher, ArrowUp moves to close button
-          if (closeBtn) closeBtn.focus();
+        } else if (currentRowIdx === 0 && closeBtn) {
+          // Move from tab row up to close button
+          closeBtn.focus();
         }
         return;
       }
 
-      if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
         const delta = e.key === 'ArrowRight' ? 1 : -1;
 
+        // If focus is outside modal or on a single item, jump to active tab
         if (currentRowIdx === -1) {
           const activeTabEl = tabs.find((t) => t.getAttribute('aria-selected') === 'true') || (rows[0] && rows[0][0]) || closeBtn;
-          activeTabEl?.focus();
-          return;
+          if (activeTabEl && activeTabEl !== currentEl) {
+            e.preventDefault();
+            e.stopPropagation();
+            activeTabEl.focus();
+            return;
+          }
         }
 
-        // If on tab buttons, switch active tab with left/right
+        // On Tab row, toggle tabs between Subtitles and Server
         const tabSub = document.getElementById('settings-tab-subtitles');
         const tabSrv = document.getElementById('settings-tab-server');
 
@@ -514,58 +603,9 @@ export const WatchSettingsModal: React.FC<WatchSettingsModalProps> = ({
     window.addEventListener('keydown', handleKeyDown, true);
     window.addEventListener('tmdb_close_dialog', handleCloseDialog);
 
-    // Reliable focus pull into modal from iframe / background
-    const focusActiveModalElement = () => {
-      // Forcefully release focus from any embed iframe
-      try {
-        window.focus();
-        document.querySelectorAll('iframe').forEach((f) => {
-          try {
-            f.blur();
-            if (f.contentWindow) f.contentWindow.blur();
-          } catch (e) {}
-        });
-      } catch (e) {}
-
-      const modalEl = modalRef.current || document.querySelector<HTMLElement>('[role="dialog"]');
-      if (modalEl) {
-        const current = document.activeElement as HTMLElement | null;
-        if (current && !modalEl.contains(current)) {
-          current.blur();
-        }
-        // If already inside modal and not on modal root, keep current focus
-        if (current && modalEl.contains(current) && current !== modalEl) {
-          return;
-        }
-        const selected = modalEl.querySelector<HTMLElement>(
-          '[data-selected-item="true"], [data-selected-track="true"], button[role="tab"][aria-selected="true"]'
-        );
-        if (selected) {
-          selected.focus();
-          selected.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-        } else {
-          const firstFocusable = modalEl.querySelector<HTMLElement>('button:not([disabled])');
-          if (firstFocusable) firstFocusable.focus();
-        }
-      }
-    };
-
-    // Pull focus on multiple animation frames to ensure DOM is ready and iframe cannot steal it back
-    focusActiveModalElement();
-    const t1 = setTimeout(focusActiveModalElement, 50);
-    const t2 = setTimeout(focusActiveModalElement, 150);
-    const t3 = setTimeout(focusActiveModalElement, 300);
-
     return () => {
       window.removeEventListener('keydown', handleKeyDown, true);
       window.removeEventListener('tmdb_close_dialog', handleCloseDialog);
-      clearTimeout(t1);
-      clearTimeout(t2);
-      clearTimeout(t3);
-      try {
-        (window as any).AndroidBridge?.setModalOpen?.(false);
-      } catch (e) {}
-      window.dispatchEvent(new CustomEvent('tmdb_resume_player'));
     };
   }, [isOpen, activeTab, onClose, activeDrawer, isLandscape]);
 
@@ -1148,7 +1188,7 @@ export const WatchSettingsModal: React.FC<WatchSettingsModalProps> = ({
           <>
             {/* Backdrop blur to dim the parent modal */}
             <div
-              className="absolute inset-0 bg-black/60 backdrop-blur-[2px] z-20 animate-fade-in"
+              className="absolute inset-0 bg-black/80 backdrop-blur-[2px] z-20 animate-fade-in"
               onClick={() => {
                 const prevBtnId = activeDrawer === 'fontsize' ? 'drawer-btn-fontsize' : 'drawer-btn-delay';
                 setActiveDrawer('none');
@@ -1164,10 +1204,10 @@ export const WatchSettingsModal: React.FC<WatchSettingsModalProps> = ({
                 isLandscape
                   ? 'inset-y-0 right-0 w-full sm:w-80 md:w-96 border-l animate-slide-in-right'
                   : 'inset-x-0 bottom-0 max-h-[85%] border-t rounded-t-2xl animate-slide-up'
-              } bg-zinc-950/98 border-white/10 shadow-2xl z-30 flex flex-col overflow-hidden select-none`}
+              } bg-zinc-950 border-white/10 shadow-2xl z-30 flex flex-col overflow-hidden select-none`}
             >
               {/* Drawer Header */}
-              <div className="flex items-center justify-between px-4 py-2.5 sm:px-5 sm:py-3 border-b border-white/10 bg-black/40 flex-shrink-0">
+              <div className="flex items-center justify-between px-4 py-2.5 sm:px-5 sm:py-3 border-b border-white/10 bg-zinc-900 flex-shrink-0">
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
@@ -1249,7 +1289,12 @@ export const WatchSettingsModal: React.FC<WatchSettingsModalProps> = ({
                             type="button"
                             tabIndex={0}
                             data-subdrawer-item="true"
-                            onClick={() => onAdjustFontSize(100)}
+                            onClick={(e) => {
+                              const btn = e.currentTarget;
+                              const target = (btn.nextElementSibling || btn.previousElementSibling || document.getElementById('subdrawer-back-btn')) as HTMLElement | null;
+                              if (target) target.focus();
+                              onAdjustFontSize(100);
+                            }}
                             className="py-2 px-3 rounded-xl bg-white/10 hover:bg-white/20 active:scale-95 text-hbo-cyan font-semibold flex items-center justify-center gap-1 text-xs transition tv-focus-target focus:outline-none focus:ring-2 focus:ring-hbo-cyan cursor-pointer"
                             title="Reset to 100%"
                           >
@@ -1353,7 +1398,12 @@ export const WatchSettingsModal: React.FC<WatchSettingsModalProps> = ({
                             type="button"
                             tabIndex={0}
                             data-subdrawer-item="true"
-                            onClick={() => onAdjustSync(0)}
+                            onClick={(e) => {
+                              const btn = e.currentTarget;
+                              const target = (btn.nextElementSibling || btn.previousElementSibling || document.getElementById('subdrawer-back-btn')) as HTMLElement | null;
+                              if (target) target.focus();
+                              onAdjustSync(0);
+                            }}
                             className="py-2 px-3 rounded-xl bg-white/10 hover:bg-white/20 active:scale-95 text-hbo-cyan font-semibold flex items-center justify-center gap-1 text-xs transition tv-focus-target focus:outline-none focus:ring-2 focus:ring-hbo-cyan cursor-pointer"
                             title="Reset to 0s"
                           >
