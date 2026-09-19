@@ -7,7 +7,7 @@ import { dbService } from '../../services/db';
 import type { StreamResolverType } from '../../types/db';
 import { Logo } from '../common/Logo';
 import { tmdbImages, TMDB_FALLBACK_BACKDROP } from '../../services/tmdb';
-import { resolveAnimeMalId } from '../../services/animeMappingService';
+import { resolveAnimeMapping, type ResolvedAnimeMapping } from '../../services/animeMappingService';
 import { resolveLari21Stream } from '../../services/lariMappingService';
 import { resolvePencuriStream, clearPencuriCache } from '../../services/pencuriMappingService';
 import { resolveKisskhStream } from '../../services/kisskhMappingService';
@@ -714,23 +714,30 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   }, [enabledResolvers, tmdbId, title, mediaType, season, episode, activeAsean, providerId, releaseYear, originalTitle, topAnimeProviders, topAseanProviders, isUserSelected]);
 
   const [resumeTimestamp, setResumeTimestamp] = useState<number>(initialTimestamp || 0);
-  const [resolvedMalId, setResolvedMalId] = useState<number | null>(null);
+  const [resolvedAnimeMapping, setResolvedAnimeMapping] = useState<ResolvedAnimeMapping | null>(null);
 
-  // Attempt resolving MAL ID for anime providers or anime titles
+  // Attempt resolving MAL ID and episode mapping for anime providers or anime titles
   useEffect(() => {
     let isCancelled = false;
     if (!title || !title.trim()) return;
 
-    resolveAnimeMalId(title).then((id) => {
-      if (!isCancelled && id) {
-        setResolvedMalId(id);
+    resolveAnimeMapping({
+      title,
+      season,
+      episode,
+      year: releaseYear,
+      tmdbId,
+      originalTitle
+    }).then((mapping) => {
+      if (!isCancelled && mapping) {
+        setResolvedAnimeMapping(mapping);
       }
     }).catch(() => {});
 
     return () => {
       isCancelled = true;
     };
-  }, [title]);
+  }, [title, season, episode, releaseYear, tmdbId, originalTitle]);
 
   const [resolvedLari21Url, setResolvedLari21Url] = useState<string | null>(null);
   const [resolvedPencuriUrl, setResolvedPencuriUrl] = useState<string | null>(null);
@@ -778,14 +785,19 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       return '';
     }
     // For anime providers with resolved MAL ID, use getAnimeUrl for both TV episodes and Movies/OVAs
-    if (provider.categories.includes('anime') && provider.getAnimeUrl && resolvedMalId) {
-      return provider.getAnimeUrl(resolvedMalId, season, episode, 'sub');
+    if (provider.categories.includes('anime') && provider.getAnimeUrl && resolvedAnimeMapping) {
+      return provider.getAnimeUrl(
+        resolvedAnimeMapping.malId,
+        resolvedAnimeMapping.season || season,
+        resolvedAnimeMapping.episode,
+        'sub'
+      );
     }
     // For standard titles or general movie/TV providers, use TMDB ID
     return mediaType === 'movie'
       ? provider.getMovieUrl(tmdbId)
       : provider.getTVUrl(tmdbId, season, episode);
-  }, [provider, resolvedDramacoolUrl, resolvedKisskhUrl, resolvedLari21Url, resolvedPencuriUrl, resolvedMsm32Url, resolvedMalId, mediaType, tmdbId, season, episode]);
+  }, [provider, resolvedDramacoolUrl, resolvedKisskhUrl, resolvedLari21Url, resolvedPencuriUrl, resolvedMsm32Url, resolvedAnimeMapping, mediaType, tmdbId, season, episode]);
 
   const streamUrl = useMemo(() => {
     if (!baseStreamUrl) return '';
@@ -899,6 +911,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         backdropPath,
         stillPath,
         voteAverage,
+        releaseDate: releaseYear ? String(releaseYear) : undefined,
         season: mediaType === 'tv' ? season : undefined,
         episode: mediaType === 'tv' ? episode : undefined,
         episodeTitle: mediaType === 'tv' ? episodeTitle : undefined,
@@ -907,7 +920,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         progressPercent
       }).catch(() => {});
     }
-  }, [tmdbId, mediaType, title, posterPath, backdropPath, stillPath, voteAverage, season, episode, episodeTitle, episodeRuntimeMinutes]);
+  }, [tmdbId, mediaType, title, posterPath, backdropPath, stillPath, voteAverage, releaseYear, season, episode, episodeTitle, episodeRuntimeMinutes]);
 
   // Clean up media decoders and save progress on TRUE component unmount only
   useEffect(() => {
@@ -926,6 +939,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           backdropPath,
           stillPath,
           voteAverage,
+          releaseDate: releaseYear ? String(releaseYear) : undefined,
           season: mediaType === 'tv' ? season : undefined,
           episode: mediaType === 'tv' ? episode : undefined,
           episodeTitle: mediaType === 'tv' ? episodeTitle : undefined,
@@ -1491,6 +1505,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         backdropPath,
         stillPath,
         voteAverage,
+        releaseDate: releaseYear ? String(releaseYear) : undefined,
         season: mediaType === 'tv' ? season : undefined,
         episode: mediaType === 'tv' ? episode : undefined,
         episodeTitle: mediaType === 'tv' ? episodeTitle : undefined,
@@ -1500,7 +1515,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       });
     };
     initProgress();
-  }, [tmdbId, mediaType, season, episode, voteAverage, posterPath, backdropPath, stillPath, episodeTitle, episodeRuntimeMinutes, initialTimestamp]);
+  }, [tmdbId, mediaType, season, episode, voteAverage, posterPath, backdropPath, stillPath, episodeTitle, episodeRuntimeMinutes, initialTimestamp, releaseYear]);
 
   const activeTopProviders = useMemo(() => {
     if (isKorean) return topKoreanProviders;
