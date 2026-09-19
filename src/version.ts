@@ -2,12 +2,17 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20260919-0422';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-add-provider-te.20260919-0422';
+export const APP_BUILD_NUMBER = '20260919-0459';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-add-provider-te.20260919-0459';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
 export const APP_BRANCH = 'feat-add-provider-te';
-export const APP_CHANGELOG = `* fix: remove bottom bar background — fully transparent
+export const APP_CHANGELOG = `* fix(player): skip Telegram MSM when title origin does not match filter and try next engine
+* fix(player): enforce country origin filters on Telegram MSM provider for Anime and non-matching titles
+* feat(settings): move stream chunk and country filters to dedicated sub-drawers
+* feat(settings): separate stream engine settings into dedicated sub-drawers
+* fix: hardcode maxQuality=720 in MSM getter resolve request
+* fix: remove bottom bar background — fully transparent
 * fix: end-to-end bottom bar + server count fix + embed/direct server separation
 * feat(player): convert bottom glass bar to docked drawer style
 * feat(settings): add configurable Telegram stream chunk slice buffer size (256KB, 512KB, 1MB)
@@ -16,9 +21,4 @@ export const APP_CHANGELOG = `* fix: remove bottom bar background — fully tran
 * style(player): adjust center control icons to 30% transparency (opacity-70)
 * style(player): make center control buttons fully transparent without background shapes or drop shadows
 * fix(player): resolve touch-click race condition causing controls to instantly hide on tap
-* feat: streamline CustomDirectPlayer with solid controls, remove top bar, and 3s auto-hide
-* style(player): replace wordy loading messages with clean Buffering...
-* fix(player): eliminate native Android video poster and fix < 1s source reload loop
-* fix(player): add immediate play triggers, metadata dismiss, and watchdog timeout for direct streams
-* feat(player): add custom HTML5 player with themed controls, 10s skip buttons, and cinematic loading screen for direct streams
-* fix(msm-getter): define missing rangeHeader in /stream/:docId`;
+* feat: streamline CustomDirectPlayer with solid controls, remove top bar, and 3s auto-hide`;
