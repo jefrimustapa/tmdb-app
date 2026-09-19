@@ -1506,48 +1506,6 @@ export const Settings: React.FC = () => {
               </button>
             );
           })()}
-
-          {/* Navigation to Stream Chunk Sub-Drawer */}
-          <button
-            type="button"
-            onClick={() => setActiveDrawer('telegram-chunk')}
-            className="w-full flex items-center justify-between p-3.5 rounded-xl bg-white/5 border border-white/10 hover:border-sky-400/50 hover:bg-white/10 transition-all text-left"
-          >
-            <div className="space-y-0.5">
-              <span className="text-xs font-semibold text-white block">Stream Chunk Slice Buffer</span>
-              <span className="text-[11px] text-gray-400">Configure seek latency and throughput slice size</span>
-            </div>
-            <div className="flex items-center gap-2 flex-shrink-0">
-              <span className="text-[10px] text-sky-400 font-mono font-bold bg-sky-500/10 px-2 py-0.5 rounded border border-sky-400/20">
-                {((settings.msm32ChunkSize || 524288) / 1024).toFixed(0)} KB
-              </span>
-              <ChevronRight className="w-4 h-4 text-gray-400" />
-            </div>
-          </button>
-
-          {/* Navigation to Origin Country Filter Sub-Drawer */}
-          <button
-            type="button"
-            onClick={() => setActiveDrawer('telegram-country')}
-            className="w-full flex items-center justify-between p-3.5 rounded-xl bg-white/5 border border-white/10 hover:border-sky-400/50 hover:bg-white/10 transition-all text-left"
-          >
-            <div className="space-y-0.5">
-              <span className="text-xs font-semibold text-white block">Active Country Origin Filters</span>
-              <span className="text-[11px] text-gray-400">Trigger provider based on title origin countries</span>
-            </div>
-            <div className="flex items-center gap-1.5 flex-shrink-0">
-              {(() => {
-                const currentCountries: OriginCountryCode[] =
-                  (settings.telegramProviderCountries && settings.telegramProviderCountries['telegram-msm32']) || ['MY', 'ID', 'SG'];
-                return (
-                  <span className="text-[10px] text-sky-400 font-mono font-bold bg-sky-500/10 px-2 py-0.5 rounded border border-sky-400/20">
-                    {currentCountries.length} active
-                  </span>
-                );
-              })()}
-              <ChevronRight className="w-4 h-4 text-gray-400" />
-            </div>
-          </button>
         </div>
       </SettingsDrawer>
 
@@ -1721,6 +1679,48 @@ export const Settings: React.FC = () => {
             )}
           </div>
 
+          {/* Navigation to Stream Chunk Sub-Drawer */}
+          <button
+            type="button"
+            onClick={() => setActiveDrawer('telegram-chunk')}
+            className="w-full flex items-center justify-between p-3.5 rounded-xl bg-white/5 border border-white/10 hover:border-sky-400/50 hover:bg-white/10 transition-all text-left"
+          >
+            <div className="space-y-0.5">
+              <span className="text-xs font-semibold text-white block">Stream Chunk Slice Buffer</span>
+              <span className="text-[11px] text-gray-400">Configure seek latency and throughput slice size</span>
+            </div>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <span className="text-[10px] text-sky-400 font-mono font-bold bg-sky-500/10 px-2 py-0.5 rounded border border-sky-400/20">
+                {((settings.msm32ChunkSize || 524288) / 1024).toFixed(0)} KB
+              </span>
+              <ChevronRight className="w-4 h-4 text-gray-400" />
+            </div>
+          </button>
+
+          {/* Navigation to Origin Country Filter Sub-Drawer */}
+          <button
+            type="button"
+            onClick={() => setActiveDrawer('telegram-country')}
+            className="w-full flex items-center justify-between p-3.5 rounded-xl bg-white/5 border border-white/10 hover:border-sky-400/50 hover:bg-white/10 transition-all text-left"
+          >
+            <div className="space-y-0.5">
+              <span className="text-xs font-semibold text-white block">Active Country Origin Filters</span>
+              <span className="text-[11px] text-gray-400">Trigger provider based on title origin countries</span>
+            </div>
+            <div className="flex items-center gap-1.5 flex-shrink-0">
+              {(() => {
+                const currentCountries: OriginCountryCode[] =
+                  (settings.telegramProviderCountries && settings.telegramProviderCountries['telegram-msm32']) || ['MY', 'ID', 'SG'];
+                return (
+                  <span className="text-[10px] text-sky-400 font-mono font-bold bg-sky-500/10 px-2 py-0.5 rounded border border-sky-400/20">
+                    {currentCountries.length} active
+                  </span>
+                );
+              })()}
+              <ChevronRight className="w-4 h-4 text-gray-400" />
+            </div>
+          </button>
+
           <p className="text-[11px] text-gray-400 leading-relaxed">
             The MSM Getter microservice executes queries against the Telegram bot <span className="text-sky-300 font-mono">@msm32bot</span>, resolving file documents and generating chunked HTTP byte-range streams directly into the custom player.
           </p>
@@ -1731,10 +1731,10 @@ export const Settings: React.FC = () => {
       <SettingsDrawer
         isOpen={activeDrawer === 'telegram-chunk'}
         onClose={() => setActiveDrawer(null)}
-        onBack={() => setActiveDrawer('engine-telegram')}
+        onBack={() => setActiveDrawer('telegram-msm32')}
         title="Stream Chunk Buffer"
         subtitle="Configure buffer chunk slice size for Telegram streaming."
-        categoryLabel="Telegram > Buffer Size"
+        categoryLabel="Telegram > MSM32bot > Buffer Size"
       >
         <div className="space-y-4">
           <div className="flex items-center justify-between">
@@ -1758,15 +1758,19 @@ export const Settings: React.FC = () => {
                   onClick={() => handleUpdate({ msm32ChunkSize: c.val })}
                   className={`p-3.5 rounded-xl border text-left transition-all flex items-center justify-between ${
                     isCurrent
-                      ? 'bg-sky-500/20 border-sky-400 text-white shadow-sm'
-                      : 'bg-white/5 border-white/10 text-gray-400 hover:text-white hover:bg-white/10'
+                      ? 'bg-sky-500/20 border-sky-400 text-white'
+                      : 'bg-white/5 border-white/10 text-gray-400 hover:text-white'
                   }`}
                 >
-                  <div>
-                    <div className={`text-xs font-bold ${isCurrent ? 'text-sky-300' : 'text-white'}`}>{c.label}</div>
-                    <div className="text-[10px] text-gray-400 mt-0.5">{c.desc}</div>
+                  <div className="space-y-0.5 pr-2">
+                    <span className="text-xs font-bold block text-white">{c.label}</span>
+                    <span className="text-[11px] text-gray-400 block leading-snug">{c.desc}</span>
                   </div>
-                  {isCurrent && <Check className="w-4 h-4 text-sky-400 stroke-[3] flex-shrink-0" />}
+                  <div className={`w-5 h-5 rounded-full border flex items-center justify-center flex-shrink-0 ${
+                    isCurrent ? 'bg-sky-500 border-sky-400 text-black' : 'border-gray-600 bg-black/40 text-transparent'
+                  }`}>
+                    <Check className="w-3 h-3 stroke-[3]" />
+                  </div>
                 </button>
               );
             })}
@@ -1781,10 +1785,10 @@ export const Settings: React.FC = () => {
       <SettingsDrawer
         isOpen={activeDrawer === 'telegram-country'}
         onClose={() => setActiveDrawer(null)}
-        onBack={() => setActiveDrawer('engine-telegram')}
+        onBack={() => setActiveDrawer('telegram-msm32')}
         title="Country Origin Filters"
         subtitle="Select which origin countries trigger Telegram provider resolution."
-        categoryLabel="Telegram > Origin Filters"
+        categoryLabel="Telegram > MSM32bot > Origin Filters"
       >
         <div className="space-y-4">
           <p className="text-[11px] text-gray-400 leading-relaxed">

@@ -91,10 +91,12 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
   const [seekFeedback, setSeekFeedback] = useState<'rwd' | 'fwd' | null>(null);
   const [seekDeltaTotal, setSeekDeltaTotal] = useState<number>(0);
   const [playFeedback, setPlayFeedback] = useState<'play' | 'pause' | null>(null);
+  const [remoteHudFeedback, setRemoteHudFeedback] = useState<{ type: 'play' | 'pause' | 'fwd' | 'rwd'; delta?: number } | null>(null);
 
   const seekFeedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const seekAccumulatorRef = useRef<number>(0);
   const playFeedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const remoteHudTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const hasSeekedInitialRef = useRef(false);
 
@@ -295,20 +297,23 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
       video.play().catch(console.warn);
       setIsPlaying(true);
       if (isTV && fromRemote) {
-        setPlayFeedback('play');
+        if (remoteHudTimerRef.current) clearTimeout(remoteHudTimerRef.current);
+        setRemoteHudFeedback({ type: 'play' });
+        remoteHudTimerRef.current = setTimeout(() => {
+          setRemoteHudFeedback(null);
+        }, 700);
       }
     } else {
       video.pause();
       setIsPlaying(false);
       if (isTV && fromRemote) {
-        setPlayFeedback('pause');
+        if (remoteHudTimerRef.current) clearTimeout(remoteHudTimerRef.current);
+        setRemoteHudFeedback({ type: 'pause' });
+        remoteHudTimerRef.current = setTimeout(() => {
+          setRemoteHudFeedback(null);
+        }, 700);
       }
     }
-
-    if (playFeedbackTimerRef.current) clearTimeout(playFeedbackTimerRef.current);
-    playFeedbackTimerRef.current = setTimeout(() => {
-      setPlayFeedback(null);
-    }, 700);
 
     resetControlsTimer();
   }, [isTV, resetControlsTimer]);
@@ -323,19 +328,29 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
     setCurrentTime(newTime);
     onProgress?.(newTime, video.duration || 0, video.paused);
 
-    if (isTV && fromRemote) {
-      // Accumulate consecutive seeks if triggered within 800ms
-      seekAccumulatorRef.current = (seekAccumulatorRef.current === 0 || (seconds > 0 && seekAccumulatorRef.current < 0) || (seconds < 0 && seekAccumulatorRef.current > 0))
-        ? seconds
-        : seekAccumulatorRef.current + seconds;
-      setSeekDeltaTotal(seekAccumulatorRef.current);
-      setSeekFeedback(seekAccumulatorRef.current > 0 ? 'fwd' : 'rwd');
+    // Accumulate consecutive seeks if triggered within 800ms for central button animation (All devices)
+    seekAccumulatorRef.current = (seekAccumulatorRef.current === 0 || (seconds > 0 && seekAccumulatorRef.current < 0) || (seconds < 0 && seekAccumulatorRef.current > 0))
+      ? seconds
+      : seekAccumulatorRef.current + seconds;
+    setSeekDeltaTotal(seekAccumulatorRef.current);
+    setSeekFeedback(seekAccumulatorRef.current > 0 ? 'fwd' : 'rwd');
 
-      if (seekFeedbackTimerRef.current) clearTimeout(seekFeedbackTimerRef.current);
-      seekFeedbackTimerRef.current = setTimeout(() => {
-        setSeekFeedback(null);
-        seekAccumulatorRef.current = 0;
-        setSeekDeltaTotal(0);
+    if (seekFeedbackTimerRef.current) clearTimeout(seekFeedbackTimerRef.current);
+    seekFeedbackTimerRef.current = setTimeout(() => {
+      setSeekFeedback(null);
+      seekAccumulatorRef.current = 0;
+      setSeekDeltaTotal(0);
+    }, 800);
+
+    // Floating HUD Notification (Play, Pause, +/-10s in center) ONLY on TV when using remote
+    if (isTV && fromRemote) {
+      if (remoteHudTimerRef.current) clearTimeout(remoteHudTimerRef.current);
+      setRemoteHudFeedback({
+        type: seconds > 0 ? 'fwd' : 'rwd',
+        delta: seekAccumulatorRef.current,
+      });
+      remoteHudTimerRef.current = setTimeout(() => {
+        setRemoteHudFeedback(null);
       }, 800);
     }
 
@@ -805,25 +820,25 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
       {/* ========================================================================= */}
       {/* FLOATING HUD FEEDBACK (PLAY, PAUSE, SEEK +10s / -10s ONLY ON TV VIA REMOTE) */}
       {/* ========================================================================= */}
-      {isTV && (playFeedback || seekFeedback) && !isInitialLoading && (
+      {isTV && remoteHudFeedback && !isInitialLoading && (
         <div className="absolute inset-0 z-30 flex items-center justify-center pointer-events-none transition-all duration-200">
-          {seekFeedback === 'fwd' && (
+          {remoteHudFeedback.type === 'fwd' && (
             <div className="flex items-center gap-3.5 px-6 py-3.5 rounded-2xl bg-black/85 backdrop-blur-md border border-white/20 shadow-[0_0_50px_rgba(0,0,0,0.9)] text-white animate-scale-up">
               <RotateCw className="w-8 h-8 text-hbo-cyan animate-pulse" />
               <span className="text-2xl font-black font-display tracking-wide">
-                +{Math.abs(seekDeltaTotal || 10)}s
+                +{Math.abs(remoteHudFeedback.delta || 10)}s
               </span>
             </div>
           )}
-          {seekFeedback === 'rwd' && (
+          {remoteHudFeedback.type === 'rwd' && (
             <div className="flex items-center gap-3.5 px-6 py-3.5 rounded-2xl bg-black/85 backdrop-blur-md border border-white/20 shadow-[0_0_50px_rgba(0,0,0,0.9)] text-white animate-scale-up">
               <RotateCcw className="w-8 h-8 text-hbo-cyan animate-pulse" />
               <span className="text-2xl font-black font-display tracking-wide">
-                -{Math.abs(seekDeltaTotal || 10)}s
+                -{Math.abs(remoteHudFeedback.delta || 10)}s
               </span>
             </div>
           )}
-          {!seekFeedback && playFeedback === 'play' && (
+          {remoteHudFeedback.type === 'play' && (
             <div className="flex items-center gap-3.5 px-6 py-3.5 rounded-2xl bg-black/85 backdrop-blur-md border border-white/20 shadow-[0_0_50px_rgba(0,0,0,0.9)] text-white animate-scale-up">
               <Play className="w-8 h-8 fill-current text-emerald-400" />
               <span className="text-xl font-black font-display tracking-wide uppercase">
@@ -831,7 +846,7 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
               </span>
             </div>
           )}
-          {!seekFeedback && playFeedback === 'pause' && (
+          {remoteHudFeedback.type === 'pause' && (
             <div className="flex items-center gap-3.5 px-6 py-3.5 rounded-2xl bg-black/85 backdrop-blur-md border border-white/20 shadow-[0_0_50px_rgba(0,0,0,0.9)] text-white animate-scale-up">
               <Pause className="w-8 h-8 fill-current text-amber-400" />
               <span className="text-xl font-black font-display tracking-wide uppercase">
@@ -847,7 +862,7 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
       {/* ========================================================================= */}
       <div
         className={`absolute inset-0 z-20 flex flex-col justify-between transition-opacity duration-300 pointer-events-none ${
-          (showControls || isBuffering || (isTV && seekFeedback)) && !isInitialLoading ? 'opacity-100' : 'opacity-0'
+          (showControls || isBuffering || seekFeedback) && !isInitialLoading ? 'opacity-100' : 'opacity-0'
         }`}
       >
         {/* Center Action Controls: Rewind 10s, Loading/Play/Pause, Forward 10s */}
@@ -862,14 +877,14 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
             title="Rewind 10s"
             aria-label="Rewind 10 seconds"
             className={`relative p-2 text-white bg-transparent border-0 transition-all duration-200 flex items-center justify-center ${
-              isTV && seekFeedback === 'rwd'
+              seekFeedback === 'rwd'
                 ? 'opacity-100 scale-125 -rotate-12'
                 : 'opacity-70 hover:opacity-100 active:scale-90'
             }`}
           >
             <RotateCcw className="w-10 h-10 sm:w-12 sm:h-12" />
             <span className="absolute text-[11px] sm:text-xs font-black">
-              {isTV && seekFeedback === 'rwd' ? '-10s' : '10'}
+              {seekFeedback === 'rwd' ? '-10s' : '10'}
             </span>
           </button>
 
@@ -904,14 +919,14 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
             title="Forward 10s"
             aria-label="Forward 10 seconds"
             className={`relative p-2 text-white bg-transparent border-0 transition-all duration-200 flex items-center justify-center ${
-              isTV && seekFeedback === 'fwd'
+              seekFeedback === 'fwd'
                 ? 'opacity-100 scale-125 rotate-12'
                 : 'opacity-70 hover:opacity-100 active:scale-90'
             }`}
           >
             <RotateCw className="w-10 h-10 sm:w-12 sm:h-12" />
             <span className="absolute text-[11px] sm:text-xs font-black">
-              {isTV && seekFeedback === 'fwd' ? '+10s' : '10'}
+              {seekFeedback === 'fwd' ? '+10s' : '10'}
             </span>
           </button>
         </div>

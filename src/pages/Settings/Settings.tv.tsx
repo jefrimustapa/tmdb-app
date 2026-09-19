@@ -479,17 +479,17 @@ export const Settings: React.FC = () => {
       }
       if (showTelegramChunkDrawer) {
         setShowTelegramChunkDrawer(false);
-        setShowTelegramDrawer(true);
+        setShowTelegramMsmDrawer(true);
         setTimeout(() => {
-          document.getElementById('drawer-telegram-sub-chunk')?.focus();
+          document.getElementById('drawer-msm32-sub-chunk')?.focus();
         }, 50);
         return;
       }
       if (showTelegramCountryDrawer) {
         setShowTelegramCountryDrawer(false);
-        setShowTelegramDrawer(true);
+        setShowTelegramMsmDrawer(true);
         setTimeout(() => {
-          document.getElementById('drawer-telegram-sub-country')?.focus();
+          document.getElementById('drawer-msm32-sub-country')?.focus();
         }, 50);
         return;
       }
@@ -3645,11 +3645,6 @@ export const Settings: React.FC = () => {
                         if (e.key === 'ArrowUp') {
                           e.preventDefault();
                           document.getElementById('drawer-telegram-toggle')?.focus();
-                        } else if (e.key === 'ArrowDown') {
-                          e.preventDefault();
-                          const target = document.getElementById('drawer-telegram-sub-chunk');
-                          target?.focus();
-                          target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
                         }
                       }}
                       onClick={() => {
@@ -3664,7 +3659,7 @@ export const Settings: React.FC = () => {
                           <span>MovieSubMalay (@msm32bot)</span>
                         </div>
                         <p className="text-[11px] text-gray-400">
-                          Configure microservice URL (Render / Local PC), server ping, and bot stream settings.
+                          Configure microservice URL (Render / Local PC), server ping, chunk slice buffer, and bot settings.
                         </p>
                       </div>
                       <div className="flex items-center gap-2 flex-shrink-0">
@@ -3677,79 +3672,6 @@ export const Settings: React.FC = () => {
                         <ChevronRight className="w-4 h-4 text-gray-400" />
                       </div>
                     </button>
-
-                    {/* Sub-Drawer Hub Item 1: Stream Chunk Slice Buffer */}
-                    <div className="bg-black/40 border border-hbo-border rounded-xl p-3.5 flex items-center justify-between">
-                      <div className="min-w-0 pr-2">
-                        <div className="font-bold text-xs text-white flex items-center gap-1.5 mb-0.5">
-                          <HardDrive className="w-3.5 h-3.5 text-sky-400" />
-                          <span>Stream Chunk Slice Buffer</span>
-                        </div>
-                        <p className="text-[10px] text-gray-400">Configure seek latency and throughput slice size.</p>
-                      </div>
-                      <button
-                        id="drawer-telegram-sub-chunk"
-                        data-telegram-drawer-item="true"
-                        type="button"
-                        onKeyDown={(e) => {
-                          if (e.key === 'ArrowUp') {
-                            e.preventDefault();
-                            const target = document.getElementById('drawer-msm32-sub');
-                            target?.focus();
-                            target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-                          } else if (e.key === 'ArrowDown') {
-                            e.preventDefault();
-                            const target = document.getElementById('drawer-telegram-sub-country');
-                            target?.focus();
-                            target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-                          }
-                        }}
-                        onClick={() => {
-                          setShowTelegramDrawer(false);
-                          setShowTelegramChunkDrawer(true);
-                        }}
-                        className="px-3 py-1.5 rounded-lg border text-xs font-bold transition-all tv-focus-target flex items-center gap-1.5 border-hbo-border bg-hbo-dark/80 hover:bg-hbo-hover text-white flex-shrink-0"
-                      >
-                        <span className="text-sky-400 font-mono">
-                          {((settings.msm32ChunkSize || 524288) / 1024).toFixed(0)} KB
-                        </span>
-                        <ChevronRight className="w-3.5 h-3.5 text-gray-400" />
-                      </button>
-                    </div>
-
-                    {/* Sub-Drawer Hub Item 2: Active Country Origin Filters */}
-                    <div className="bg-black/40 border border-hbo-border rounded-xl p-3.5 flex items-center justify-between">
-                      <div className="min-w-0 pr-2">
-                        <div className="font-bold text-xs text-white flex items-center gap-1.5 mb-0.5">
-                          <Globe className="w-3.5 h-3.5 text-sky-400" />
-                          <span>Country Origin Filters</span>
-                        </div>
-                        <p className="text-[10px] text-gray-400">Trigger provider based on title origin countries.</p>
-                      </div>
-                      <button
-                        id="drawer-telegram-sub-country"
-                        data-telegram-drawer-item="true"
-                        type="button"
-                        onKeyDown={(e) => {
-                          if (e.key === 'ArrowUp') {
-                            e.preventDefault();
-                            const target = document.getElementById('drawer-telegram-sub-chunk');
-                            target?.focus();
-                            target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-                          }
-                        }}
-                        onClick={() => {
-                          setShowTelegramDrawer(false);
-                          setShowTelegramCountryDrawer(true);
-                        }}
-                        className="px-3 py-1.5 rounded-lg border text-xs font-bold transition-all tv-focus-target flex items-center gap-1.5 border-hbo-border bg-hbo-dark/80 hover:bg-hbo-hover text-white flex-shrink-0"
-                      >
-                        <span className="text-sky-400 font-mono">
-                          {currentCountries.length} active
-                        </span>
-                        <ChevronRight className="w-3.5 h-3.5 text-gray-400" />
-                      </button>
-                    </div>
                   </>
                 );
               })()}
@@ -3775,7 +3697,7 @@ export const Settings: React.FC = () => {
           onClick={(e) => {
             if (e.target === e.currentTarget) {
               setShowTelegramChunkDrawer(false);
-              setShowTelegramDrawer(true);
+              setShowTelegramMsmDrawer(true);
             }
           }}
         >
@@ -3788,7 +3710,9 @@ export const Settings: React.FC = () => {
               <ChevronRight className="w-3.5 h-3.5 text-gray-500" />
               <span className="text-gray-400">Stream Engines</span>
               <ChevronRight className="w-3.5 h-3.5 text-gray-500" />
-              <span className="text-hbo-cyan font-semibold">Telegram Provider</span>
+              <span className="text-gray-400">Telegram</span>
+              <ChevronRight className="w-3.5 h-3.5 text-gray-500" />
+              <span className="text-hbo-cyan font-semibold">MSM32bot</span>
             </div>
             <h1 className="text-3xl font-extrabold text-white tracking-tight mb-2">Stream Chunk Buffer</h1>
             <p className="text-sm text-gray-400 max-w-md leading-relaxed">
@@ -3832,7 +3756,10 @@ export const Settings: React.FC = () => {
                       onClick={() => {
                         handleUpdate({ msm32ChunkSize: opt.val });
                         setShowTelegramChunkDrawer(false);
-                        setShowTelegramDrawer(true);
+                        setShowTelegramMsmDrawer(true);
+                        setTimeout(() => {
+                          document.getElementById('drawer-msm32-sub-chunk')?.focus();
+                        }, 50);
                       }}
                       className={`w-full p-4 rounded-xl border text-left transition-all tv-focus-target flex items-center justify-between gap-3 ${
                         isSelected
@@ -3880,7 +3807,7 @@ export const Settings: React.FC = () => {
           onClick={(e) => {
             if (e.target === e.currentTarget) {
               setShowTelegramCountryDrawer(false);
-              setShowTelegramDrawer(true);
+              setShowTelegramMsmDrawer(true);
             }
           }}
         >
@@ -3893,7 +3820,9 @@ export const Settings: React.FC = () => {
               <ChevronRight className="w-3.5 h-3.5 text-gray-500" />
               <span className="text-gray-400">Stream Engines</span>
               <ChevronRight className="w-3.5 h-3.5 text-gray-500" />
-              <span className="text-hbo-cyan font-semibold">Telegram Provider</span>
+              <span className="text-gray-400">Telegram</span>
+              <ChevronRight className="w-3.5 h-3.5 text-gray-500" />
+              <span className="text-hbo-cyan font-semibold">MSM32bot</span>
             </div>
             <h1 className="text-3xl font-extrabold text-white tracking-tight mb-2">Country Origin Filters</h1>
             <p className="text-sm text-gray-400 max-w-md leading-relaxed">
@@ -4228,6 +4157,11 @@ export const Settings: React.FC = () => {
                           if (e.key === 'ArrowUp') {
                             e.preventDefault();
                             document.getElementById('drawer-msm-url-input')?.focus();
+                          } else if (e.key === 'ArrowDown') {
+                            e.preventDefault();
+                            const target = document.getElementById('drawer-msm32-sub-chunk');
+                            target?.focus();
+                            target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
                           }
                         }}
                         onClick={async () => {
@@ -4271,6 +4205,79 @@ export const Settings: React.FC = () => {
                           <span className="truncate">Pinging server... Please wait if waking up from sleep.</span>
                         </div>
                       )}
+                    </div>
+
+                    {/* Sub-Drawer Item: Stream Chunk Slice Buffer */}
+                    <div className="bg-black/40 border border-hbo-border rounded-xl p-3.5 flex items-center justify-between">
+                      <div className="min-w-0 pr-2">
+                        <div className="font-bold text-xs text-white flex items-center gap-1.5 mb-0.5">
+                          <HardDrive className="w-3.5 h-3.5 text-sky-400" />
+                          <span>Stream Chunk Slice Buffer</span>
+                        </div>
+                        <p className="text-[10px] text-gray-400">Configure seek latency and throughput slice size.</p>
+                      </div>
+                      <button
+                        id="drawer-msm32-sub-chunk"
+                        data-telegram-msm-drawer-item="true"
+                        type="button"
+                        onKeyDown={(e) => {
+                          if (e.key === 'ArrowUp') {
+                            e.preventDefault();
+                            const target = document.getElementById('drawer-btn-msm32-test');
+                            target?.focus();
+                            target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                          } else if (e.key === 'ArrowDown') {
+                            e.preventDefault();
+                            const target = document.getElementById('drawer-msm32-sub-country');
+                            target?.focus();
+                            target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                          }
+                        }}
+                        onClick={() => {
+                          setShowTelegramMsmDrawer(false);
+                          setShowTelegramChunkDrawer(true);
+                        }}
+                        className="px-3 py-1.5 rounded-lg border text-xs font-bold transition-all tv-focus-target flex items-center gap-1.5 border-hbo-border bg-hbo-dark/80 hover:bg-hbo-hover text-white flex-shrink-0"
+                      >
+                        <span className="text-sky-400 font-mono">
+                          {((settings.msm32ChunkSize || 524288) / 1024).toFixed(0)} KB
+                        </span>
+                        <ChevronRight className="w-3.5 h-3.5 text-gray-400" />
+                      </button>
+                    </div>
+
+                    {/* Sub-Drawer Item: Active Country Origin Filters */}
+                    <div className="bg-black/40 border border-hbo-border rounded-xl p-3.5 flex items-center justify-between">
+                      <div className="min-w-0 pr-2">
+                        <div className="font-bold text-xs text-white flex items-center gap-1.5 mb-0.5">
+                          <Globe className="w-3.5 h-3.5 text-sky-400" />
+                          <span>Country Origin Filters</span>
+                        </div>
+                        <p className="text-[10px] text-gray-400">Trigger provider based on title origin countries.</p>
+                      </div>
+                      <button
+                        id="drawer-msm32-sub-country"
+                        data-telegram-msm-drawer-item="true"
+                        type="button"
+                        onKeyDown={(e) => {
+                          if (e.key === 'ArrowUp') {
+                            e.preventDefault();
+                            const target = document.getElementById('drawer-msm32-sub-chunk');
+                            target?.focus();
+                            target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                          }
+                        }}
+                        onClick={() => {
+                          setShowTelegramMsmDrawer(false);
+                          setShowTelegramCountryDrawer(true);
+                        }}
+                        className="px-3 py-1.5 rounded-lg border text-xs font-bold transition-all tv-focus-target flex items-center gap-1.5 border-hbo-border bg-hbo-dark/80 hover:bg-hbo-hover text-white flex-shrink-0"
+                      >
+                        <span className="text-sky-400 font-mono">
+                          {((settings.telegramProviderCountries && settings.telegramProviderCountries['telegram-msm32']) || ['MY', 'ID', 'SG']).length} active
+                        </span>
+                        <ChevronRight className="w-3.5 h-3.5 text-gray-400" />
+                      </button>
                     </div>
                   </>
                 );
