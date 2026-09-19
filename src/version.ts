@@ -2,12 +2,12 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20260919-1224';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-tv-custom-playe.20260919-1224';
+export const APP_BUILD_NUMBER = '20260919-1453';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-improve-telegra.20260919-1453';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
-export const APP_BRANCH = 'feat-tv-custom-playe';
-export const APP_CHANGELOG = `* feat(tv): support play, pause, seek with remote control and OSD feedback in custom player
+export const APP_BRANCH = 'feat-improve-telegra';
+export const APP_CHANGELOG = `* feat(tv): support play, pause, seek with remote control and OSD feedback in custom player (#117)
 * feat: remove torbox and private extractor engines, sync active server indicator to watch header (#116)
 * fix: prioritize original titles in pencuri candidate scoring and regional drama queries (#115)
 * feat: add debug-search endpoint in server/msm-getter

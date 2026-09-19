@@ -356,12 +356,25 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
           const cleanOrig = originalTitle?.trim();
           const cleanTitle = title.trim();
-          const hasDiffOriginal = Boolean(cleanOrig && cleanOrig.toLowerCase() !== cleanTitle.toLowerCase());
-          const telegramSearchTitles: string[] = isSoutheastAsian && hasDiffOriginal && cleanOrig
-            ? [cleanOrig, cleanTitle]
-            : hasDiffOriginal && cleanOrig
-            ? [cleanTitle, cleanOrig]
-            : [cleanTitle];
+          // Malaysian/Indonesian Telegram channels only index English or romanized Latin titles.
+          // Exclude Asian script titles (Hangul, Hanzi, Kanji, Hiragana, Katakana, Thai, Arabic, Cyrillic) from Telegram search.
+          const isOrigLatin = Boolean(
+            cleanOrig &&
+            /[a-zA-Z0-9]/.test(cleanOrig) &&
+            !/[\u3000-\u303f\u3040-\u309f\u30a0-\u30ff\uff00-\uff9f\u4e00-\u9faf\u3400-\u4dbf\uac00-\ud7af\u0e00-\u0e7f\u0600-\u06ff\u0400-\u04ff]/.test(cleanOrig)
+          );
+          const hasDiffOriginal = Boolean(isOrigLatin && cleanOrig && cleanOrig.toLowerCase() !== cleanTitle.toLowerCase());
+          const candidateSet = new Set<string>();
+          if (isSoutheastAsian && hasDiffOriginal && cleanOrig) candidateSet.add(cleanOrig);
+          candidateSet.add(cleanTitle);
+          if (hasDiffOriginal && cleanOrig) candidateSet.add(cleanOrig);
+          if (/[:\-–—]/.test(cleanTitle)) {
+            const prefix = cleanTitle.split(/[:\-–—]/)[0].trim();
+            if (prefix.length >= 3 && prefix.toLowerCase() !== cleanTitle.toLowerCase()) candidateSet.add(prefix);
+            const stripped = cleanTitle.replace(/[:\-–—]/g, ' ').replace(/\s+/g, ' ').trim();
+            if (stripped.toLowerCase() !== cleanTitle.toLowerCase()) candidateSet.add(stripped);
+          }
+          const telegramSearchTitles: string[] = Array.from(candidateSet);
 
           let msmRes: Msm32ResolveResult | null = null;
           for (const searchTitle of telegramSearchTitles) {
@@ -674,12 +687,25 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
             const cleanOrig = originalTitle?.trim();
             const cleanTitle = title.trim();
-            const hasDiffOriginal = Boolean(cleanOrig && cleanOrig.toLowerCase() !== cleanTitle.toLowerCase());
-            const telegramSearchTitles: string[] = isSoutheastAsian && hasDiffOriginal && cleanOrig
-              ? [cleanOrig, cleanTitle]
-              : hasDiffOriginal && cleanOrig
-              ? [cleanTitle, cleanOrig]
-              : [cleanTitle];
+            // Malaysian/Indonesian Telegram channels only index English or romanized Latin titles.
+            // Exclude Asian script titles (Hangul, Hanzi, Kanji, Hiragana, Katakana, Thai, Arabic, Cyrillic) from Telegram search.
+            const isOrigLatin = Boolean(
+              cleanOrig &&
+              /[a-zA-Z0-9]/.test(cleanOrig) &&
+              !/[\u3000-\u303f\u3040-\u309f\u30a0-\u30ff\uff00-\uff9f\u4e00-\u9faf\u3400-\u4dbf\uac00-\ud7af\u0e00-\u0e7f\u0600-\u06ff\u0400-\u04ff]/.test(cleanOrig)
+            );
+            const hasDiffOriginal = Boolean(isOrigLatin && cleanOrig && cleanOrig.toLowerCase() !== cleanTitle.toLowerCase());
+            const candidateSet = new Set<string>();
+            if (isSoutheastAsian && hasDiffOriginal && cleanOrig) candidateSet.add(cleanOrig);
+            candidateSet.add(cleanTitle);
+            if (hasDiffOriginal && cleanOrig) candidateSet.add(cleanOrig);
+            if (/[:\-–—]/.test(cleanTitle)) {
+              const prefix = cleanTitle.split(/[:\-–—]/)[0].trim();
+              if (prefix.length >= 3 && prefix.toLowerCase() !== cleanTitle.toLowerCase()) candidateSet.add(prefix);
+              const stripped = cleanTitle.replace(/[:\-–—]/g, ' ').replace(/\s+/g, ' ').trim();
+              if (stripped.toLowerCase() !== cleanTitle.toLowerCase()) candidateSet.add(stripped);
+            }
+            const telegramSearchTitles: string[] = Array.from(candidateSet);
 
             let msmRes: Msm32ResolveResult | null = null;
             for (const searchTitle of telegramSearchTitles) {
