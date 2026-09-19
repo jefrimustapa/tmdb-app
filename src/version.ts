@@ -2,12 +2,13 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20260919-0326';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-add-provider-te.20260919-0326';
+export const APP_BUILD_NUMBER = '20260919-0333';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-add-provider-te.20260919-0333';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
 export const APP_BRANCH = 'feat-add-provider-te';
-export const APP_CHANGELOG = `* feat: streamline CustomDirectPlayer with solid controls, remove top bar, and 3s auto-hide
+export const APP_CHANGELOG = `* fix(player): resolve touch-click race condition causing controls to instantly hide on tap
+* feat: streamline CustomDirectPlayer with solid controls, remove top bar, and 3s auto-hide
 * style(player): replace wordy loading messages with clean Buffering...
 * fix(player): eliminate native Android video poster and fix < 1s source reload loop
 * fix(player): add immediate play triggers, metadata dismiss, and watchdog timeout for direct streams
@@ -20,5 +21,4 @@ export const APP_CHANGELOG = `* feat: streamline CustomDirectPlayer with solid c
 * feat(settings): TV active category border, mobile sub-drawers hierarchy, scroll lock & General tab rename (#111)
 * fix(tv): eliminate delay on remote back navigation and land focus on TV navbar Home icon (#110)
 * fix(tv): eliminate navigation lag on TV navbar during Home data load (#109)
-* fix(device): prioritize native AndroidBridge over spoofed user-agent for accurate phone detection (#108)
-* fix(tv): shield modal dpad navigation and lock iframe focus on watch page (#107)`;
+* fix(device): prioritize native AndroidBridge over spoofed user-agent for accurate phone detection (#108)`;
