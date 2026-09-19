@@ -2,12 +2,13 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20260919-1453';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-improve-telegra.20260919-1453';
+export const APP_BUILD_NUMBER = '20260919-1513';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-improve-telegra.20260919-1513';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
 export const APP_BRANCH = 'feat-improve-telegra';
-export const APP_CHANGELOG = `* feat(tv): support play, pause, seek with remote control and OSD feedback in custom player (#117)
+export const APP_CHANGELOG = `* feat(telegram-msm): improve series episode search and pagination handling
+* feat(tv): support play, pause, seek with remote control and OSD feedback in custom player (#117)
 * feat: remove torbox and private extractor engines, sync active server indicator to watch header (#116)
 * fix: prioritize original titles in pencuri candidate scoring and regional drama queries (#115)
 * feat: add debug-search endpoint in server/msm-getter
@@ -20,5 +21,4 @@ export const APP_CHANGELOG = `* feat(tv): support play, pause, seek with remote 
 * fix(device): prioritize native AndroidBridge over spoofed user-agent for accurate phone detection (#108)
 * fix(tv): shield modal dpad navigation and lock iframe focus on watch page (#107)
 * feat(ui): auto-resize media cards across movie, series, library, and search grids (#106)
-* fix(device): improve platform detection accuracy for desktop web and touchscreen laptops (#105)
-* feat: add PencuriMovie provider, resolver retry settings, and network resilience (#104)`;
+* fix(device): improve platform detection accuracy for desktop web and touchscreen laptops (#105)`;
