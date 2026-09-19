@@ -615,9 +615,9 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
           showControls && !isInitialLoading ? 'opacity-100' : 'opacity-0'
         }`}
       >
-        {/* Center Action Controls: Rewind 10s, Play/Pause, Forward 10s (Fully Transparent, No Background, No Shadow) */}
+        {/* Center Action Controls: Rewind 10s, Play/Pause, Forward 10s (30% Transparent / 70% Opacity, No Background, No Shadow) */}
         <div className="flex items-center justify-center gap-10 sm:gap-14 my-auto pointer-events-auto">
-          {/* Rewind 10s Button - Transparent */}
+          {/* Rewind 10s Button - 30% Transparent */}
           <button
             type="button"
             onClick={(e) => {
@@ -626,7 +626,7 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
             }}
             title="Rewind 10s"
             aria-label="Rewind 10 seconds"
-            className="relative p-2 text-white/90 hover:text-white active:scale-90 transition-transform flex items-center justify-center bg-transparent border-0"
+            className="relative p-2 text-white opacity-70 hover:opacity-100 active:scale-90 transition-all flex items-center justify-center bg-transparent border-0"
           >
             <RotateCcw className="w-10 h-10 sm:w-12 sm:h-12" />
             <span className="absolute text-[11px] sm:text-xs font-black">
@@ -634,7 +634,7 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
             </span>
           </button>
 
-          {/* Main Play / Pause Button - Transparent */}
+          {/* Main Play / Pause Button - 30% Transparent */}
           <button
             type="button"
             onClick={(e) => {
@@ -643,7 +643,7 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
             }}
             title={isPlaying ? 'Pause' : 'Play'}
             aria-label={isPlaying ? 'Pause' : 'Play'}
-            className="p-3 text-white hover:text-white/80 active:scale-90 transition-transform flex items-center justify-center bg-transparent border-0"
+            className="p-3 text-white opacity-70 hover:opacity-100 active:scale-90 transition-all flex items-center justify-center bg-transparent border-0"
           >
             {isPlaying ? (
               <Pause className="w-14 h-14 sm:w-16 sm:h-16 fill-current" />
@@ -652,7 +652,7 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
             )}
           </button>
 
-          {/* Forward 10s Button - Transparent */}
+          {/* Forward 10s Button - 30% Transparent */}
           <button
             type="button"
             onClick={(e) => {
@@ -661,7 +661,7 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
             }}
             title="Forward 10s"
             aria-label="Forward 10 seconds"
-            className="relative p-2 text-white/90 hover:text-white active:scale-90 transition-transform flex items-center justify-center bg-transparent border-0"
+            className="relative p-2 text-white opacity-70 hover:opacity-100 active:scale-90 transition-all flex items-center justify-center bg-transparent border-0"
           >
             <RotateCw className="w-10 h-10 sm:w-12 sm:h-12" />
             <span className="absolute text-[11px] sm:text-xs font-black">
