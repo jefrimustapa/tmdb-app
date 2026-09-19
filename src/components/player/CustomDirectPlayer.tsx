@@ -206,26 +206,32 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
       };
     } else {
       // Direct stream URL (MP4 / MKV from MSM32)
+      video.muted = false;
+      video.volume = 1;
+      setIsMuted(false);
       video.src = src;
-      video.load();
-      video.play().then(() => {
-        setIsPlaying(true);
-        isPlayingRef.current = true;
-      }).catch(async (err) => {
-        console.warn('[CustomDirectPlayer] Unmuted autoplay blocked by policy, attempting muted autoplay:', err);
-        try {
-          video.muted = true;
-          setIsMuted(true);
-          await video.play();
+
+      const triggerUnmutedPlay = () => {
+        video.muted = false;
+        video.volume = 1;
+        setIsMuted(false);
+        video.play().then(() => {
           setIsPlaying(true);
           isPlayingRef.current = true;
-        } catch (mutedErr) {
-          console.warn('[CustomDirectPlayer] Autoplay fully blocked, awaiting user tap:', mutedErr);
+        }).catch((err) => {
+          console.warn('[CustomDirectPlayer] Autoplay blocked, waiting for user tap:', err);
           setIsPlaying(false);
           isPlayingRef.current = false;
           setShowControls(true);
-        }
-      });
+        });
+      };
+
+      if (video.readyState >= 2) {
+        triggerUnmutedPlay();
+      } else {
+        video.addEventListener('loadeddata', triggerUnmutedPlay, { once: true });
+        video.addEventListener('canplay', triggerUnmutedPlay, { once: true });
+      }
     }
   }, [src]);
 
@@ -235,6 +241,8 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
     if (!video) return;
 
     if (video.paused) {
+      video.muted = false;
+      setIsMuted(false);
       video.play().catch(console.warn);
       setIsPlaying(true);
     } else {
