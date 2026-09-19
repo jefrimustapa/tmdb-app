@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import {
   Subtitles,
@@ -81,6 +81,46 @@ export const WatchSettingsModal: React.FC<WatchSettingsModalProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<WatchSettingsTab>(defaultTab === 'servers' ? 'server' : defaultTab);
   const [filterLang, setFilterLang] = useState<'all' | 'ms' | 'en'>('all');
+  const checkLandscape = useCallback(() => {
+    if (typeof window === 'undefined') return false;
+    const isAngleLandscape =
+      (window.screen?.orientation && window.screen.orientation.type?.includes('landscape')) ||
+      Math.abs(Number((window as any).orientation || 0)) === 90;
+    return window.innerWidth > window.innerHeight || !!isAngleLandscape;
+  }, []);
+
+  const [isLandscape, setIsLandscape] = useState(checkLandscape);
+
+  useEffect(() => {
+    let timer: NodeJS.Timeout | null = null;
+    const handleResize = (e?: any) => {
+      if (e?.type === 'tmdb_fullscreen_changed' && e.detail?.fullscreen) {
+        setIsLandscape(true);
+        return;
+      }
+      setIsLandscape(checkLandscape());
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => {
+        setIsLandscape(checkLandscape());
+      }, 150);
+    };
+
+    window.addEventListener('resize', handleResize);
+    window.addEventListener('orientationchange', handleResize);
+    window.addEventListener('tmdb_fullscreen_changed', handleResize);
+    if (window.screen?.orientation) {
+      window.screen.orientation.addEventListener('change', handleResize);
+    }
+    return () => {
+      if (timer) clearTimeout(timer);
+      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('orientationchange', handleResize);
+      window.removeEventListener('tmdb_fullscreen_changed', handleResize);
+      if (window.screen?.orientation) {
+        window.screen.orientation.removeEventListener('change', handleResize);
+      }
+    };
+  }, [checkLandscape]);
   const modalRef = useRef<HTMLDivElement>(null);
   const activeAsean = isAsean || isAsian;
 
@@ -581,7 +621,9 @@ export const WatchSettingsModal: React.FC<WatchSettingsModalProps> = ({
       <div
         ref={modalRef}
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-lg landscape:max-w-3xl sm:landscape:max-w-4xl max-h-[92vh] landscape:max-h-[94vh] flex flex-col bg-zinc-950/95 border border-white/10 rounded-2xl shadow-2xl shadow-black/90 overflow-hidden animate-scaleUp"
+        className={`w-full ${
+          isLandscape ? 'max-w-3xl sm:max-w-4xl max-h-[94vh]' : 'max-w-lg max-h-[90vh]'
+        } flex flex-col bg-zinc-950/95 border border-white/10 rounded-2xl shadow-2xl shadow-black/90 overflow-hidden animate-scaleUp`}
       >
         {/* Header: Title + Close Button */}
         <div className="flex items-center justify-between px-4 py-2 sm:px-5 sm:py-2.5 border-b border-white/10 bg-black/40 flex-shrink-0">
@@ -610,11 +652,15 @@ export const WatchSettingsModal: React.FC<WatchSettingsModalProps> = ({
         </div>
 
         {/* Main Body: Stacked in portrait, 2-Column in landscape */}
-        <div className="flex-1 flex flex-col landscape:flex-row min-h-0 overflow-hidden">
+        <div className={`flex-1 flex ${isLandscape ? 'flex-row' : 'flex-col'} min-h-0 overflow-hidden`}>
           {/* Left Column: Controls Sidebar */}
           <div
             data-modal-left-col="true"
-            className="flex flex-col flex-shrink-0 w-full landscape:w-[38%] sm:landscape:w-[35%] border-b landscape:border-b-0 landscape:border-r border-white/10 bg-black/25 landscape:bg-black/30 landscape:overflow-y-auto"
+            className={`flex flex-col flex-shrink-0 ${
+              isLandscape
+                ? 'w-[36%] border-r border-b-0 bg-black/30 overflow-y-auto'
+                : 'w-full border-b border-r-0 bg-black/25'
+            } border-white/10`}
           >
             {/* Tab Switcher (Subtitles & Server) */}
             <div className="flex items-center p-2.5 sm:p-3 gap-2 border-b border-white/10 flex-shrink-0" role="tablist">
@@ -767,7 +813,7 @@ export const WatchSettingsModal: React.FC<WatchSettingsModalProps> = ({
                 {/* Language Filter Pills */}
                 <div className="space-y-1.5">
                   <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider block">Language</span>
-                  <div className="flex landscape:flex-col gap-1.5">
+                  <div className={`flex ${isLandscape ? 'flex-col' : 'flex-row'} gap-1.5`}>
                     <button
                       type="button"
                       tabIndex={0}
@@ -824,7 +870,7 @@ export const WatchSettingsModal: React.FC<WatchSettingsModalProps> = ({
                 {hasEmbed && hasTelegram && (
                   <div className="space-y-1.5">
                     <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider block">Server Filter</span>
-                    <div className="flex landscape:flex-col gap-1.5">
+                    <div className={`flex ${isLandscape ? 'flex-col' : 'flex-row'} gap-1.5`}>
                       <button
                         type="button"
                         tabIndex={0}
