@@ -536,7 +536,51 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
       }
     };
 
-    // Custom Event listener for native Android media keycodes forwarded from MainActivity
+    // 1. Native Android & TV Remote Toggle Play/Pause
+    const handleTogglePlayPauseEvent = () => {
+      handleTogglePlay();
+    };
+
+    // 2. Pause Player (When modals or dialogs open)
+    const handlePausePlayerEvent = () => {
+      const video = videoRef.current;
+      if (video && !video.paused) {
+        video.pause();
+        setIsPlaying(false);
+        setPlayFeedback('pause');
+        if (playFeedbackTimerRef.current) clearTimeout(playFeedbackTimerRef.current);
+        playFeedbackTimerRef.current = setTimeout(() => {
+          setPlayFeedback(null);
+        }, 700);
+      }
+    };
+
+    // 3. Execute Seek (Dispatched from Watch.tv on remote D-pad Left/Right debounced seek)
+    const handleExecuteSeekEvent = (e: any) => {
+      const detail = e.detail || {};
+      const delta = typeof detail.delta === 'number' ? detail.delta : 0;
+      const video = videoRef.current;
+      if (!video) return;
+
+      if (typeof detail.targetTime === 'number') {
+        const maxDur = duration || video.duration || 0;
+        const clamped = Math.max(0, maxDur > 0 ? Math.min(maxDur - 0.5, detail.targetTime) : detail.targetTime);
+        video.currentTime = clamped;
+        setCurrentTime(clamped);
+        onProgress?.(clamped, maxDur, video.paused);
+      } else if (delta !== 0) {
+        handleSeekRelative(delta);
+      }
+      resetControlsTimer();
+    };
+
+    // 4. Show Player Controls (Dispatched on TV D-pad Down when playing)
+    const handleShowControlsEvent = () => {
+      setShowControls(true);
+      resetControlsTimer();
+    };
+
+    // 5. Custom Event listener for native Android media keycodes forwarded from MainActivity
     const handleRemoteMediaEvent = (e: any) => {
       const keyCode = e.detail?.keyCode;
       if (!keyCode) return;
@@ -551,13 +595,21 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
     };
 
     window.addEventListener('keydown', handleKeyDown, true);
+    window.addEventListener('tmdb_toggle_play_pause', handleTogglePlayPauseEvent);
+    window.addEventListener('tmdb_pause_player', handlePausePlayerEvent);
+    window.addEventListener('tmdb_execute_seek', handleExecuteSeekEvent);
+    window.addEventListener('tmdb_show_player_controls', handleShowControlsEvent);
     window.addEventListener('tmdb_remote_media_key', handleRemoteMediaEvent);
 
     return () => {
       window.removeEventListener('keydown', handleKeyDown, true);
+      window.removeEventListener('tmdb_toggle_play_pause', handleTogglePlayPauseEvent);
+      window.removeEventListener('tmdb_pause_player', handlePausePlayerEvent);
+      window.removeEventListener('tmdb_execute_seek', handleExecuteSeekEvent);
+      window.removeEventListener('tmdb_show_player_controls', handleShowControlsEvent);
       window.removeEventListener('tmdb_remote_media_key', handleRemoteMediaEvent);
     };
-  }, [handleTogglePlay, handleSeekRelative, handleToggleMute, onToggleFullscreen, resetControlsTimer, showControls]);
+  }, [handleTogglePlay, handleSeekRelative, handleToggleMute, onToggleFullscreen, resetControlsTimer, showControls, duration, onProgress]);
 
   // Image assets for backdrop
   const backdropUrl = stillPath

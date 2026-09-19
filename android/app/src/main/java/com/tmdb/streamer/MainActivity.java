@@ -2265,7 +2265,10 @@ public class MainActivity extends BridgeActivity {
                             "  if (document.querySelector('[role=\"dialog\"]')) return false;" +
                             "  var header = document.querySelector('[data-watch-header=\"true\"]');" +
                             "  var isHeaderFocused = !!window.__tmdbHeaderFocused || (header && header.contains(document.activeElement));" +
-                            "  if (!isHeaderFocused) return false;" +
+                            "  if (!isHeaderFocused) {" +
+                            "    window.dispatchEvent(new CustomEvent('tmdb_show_header_focus_back'));" +
+                            "    return true;" +
+                            "  }" +
                             "  var backBtn = document.getElementById('watch-back-btn');" +
                             "  var subBtn = document.getElementById('watch-settings-btn');" +
                             "  var trigger = document.getElementById('watch-provider-trigger');" +
@@ -2385,6 +2388,9 @@ public class MainActivity extends BridgeActivity {
                             "      if (prevBtn) { prevBtn.focus(); window.dispatchEvent(new CustomEvent('tmdb_reset_header_timer')); return true; }" +
                             "    }" +
                             "    window.dispatchEvent(new CustomEvent('tmdb_hide_header_and_focus_player'));" +
+                            "    return true;" +
+                            "  } else {" +
+                            "    window.dispatchEvent(new CustomEvent('tmdb_show_player_controls'));" +
                             "    return true;" +
                             "  }" +
                             "  return false;" +
