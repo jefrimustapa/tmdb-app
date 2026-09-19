@@ -40,6 +40,7 @@ import {
   Save,
   SlidersHorizontal,
   Send,
+  Trash2,
 } from 'lucide-react';
 
 type MobileCategory = 'playback' | 'display' | 'content' | 'system';
@@ -173,6 +174,7 @@ export const Settings: React.FC = () => {
     | 'resolvers'
     | 'engine-priority'
     | 'engine-telegram'
+    | 'telegram-msm32'
     | 'telegram-chunk'
     | 'telegram-country'
     | 'engine-embed'
@@ -198,10 +200,21 @@ export const Settings: React.FC = () => {
 
   const [testingMsm32, setTestingMsm32] = useState(false);
   const [msm32TestResult, setMsm32TestResult] = useState<Msm32HealthResult | null>(null);
+  const [msmUrlInput, setMsmUrlInput] = useState<string>('');
+  const [cacheStats, setCacheStats] = useState(() => msm32Service.getCacheStats());
+  const [cacheClearFeedback, setCacheClearFeedback] = useState<string | null>(null);
 
-  // Auto-ping MSM Getter microservice whenever the user enters the Telegram drawer
+  // Keep local msmUrlInput in sync with persisted settings
   useEffect(() => {
-    if (activeDrawer === 'engine-telegram') {
+    if (settings?.msm32GetterUrl !== undefined) {
+      setMsmUrlInput(settings.msm32GetterUrl || 'https://msm-getter.onrender.com');
+    }
+  }, [settings?.msm32GetterUrl]);
+
+  // Auto-ping MSM Getter microservice whenever the user enters the Telegram or MSM32 drawer
+  useEffect(() => {
+    if (activeDrawer === 'engine-telegram' || activeDrawer === 'telegram-msm32') {
+      setCacheStats(msm32Service.getCacheStats());
       setTestingMsm32(true);
       setMsm32TestResult(null);
       const url = settings?.msm32GetterUrl;
@@ -1244,12 +1257,7 @@ export const Settings: React.FC = () => {
             return (
               <div className="rounded-xl border border-amber-500/40 bg-gradient-to-r from-amber-500/15 via-orange-500/10 to-transparent p-3.5">
                 <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <span className="font-bold text-xs sm:text-sm text-white">Engine Priority Order</span>
-                    <span className="text-[10px] px-2 py-0.5 rounded font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40">
-                      Sequence
-                    </span>
-                  </div>
+                  <span className="font-bold text-xs sm:text-sm text-white">Engine Priority Order</span>
                   <button
                     type="button"
                     onClick={() => setActiveDrawer('engine-priority')}
@@ -1468,48 +1476,166 @@ export const Settings: React.FC = () => {
         categoryLabel="Stream Engines > Telegram"
       >
         <div className="space-y-4">
-          <div className="p-3.5 rounded-xl bg-sky-950/20 border border-sky-500/40 text-xs text-gray-300 space-y-3">
-            <div className="flex items-center justify-between">
-              <p className="font-bold text-sky-400 flex items-center gap-1.5">
-                <Send className="w-3.5 h-3.5 text-sky-400" />
-                <span>MovieSubMalay (@msm32bot)</span>
-              </p>
-              <span className="text-[10px] bg-sky-500/20 text-sky-300 px-2 py-0.5 rounded border border-sky-500/40 font-bold">Zero-Disk Stream</span>
-            </div>
-            <div className="flex items-center justify-between py-1 border-b border-white/5">
-              <div>
-                <span className="font-semibold text-white block text-xs">Enable @msm32bot</span>
-                <span className="text-[10px] text-gray-400">Stream direct Malay & Asian releases in custom player</span>
-              </div>
-              {(() => {
-                const enabledTg = settings.enabledTelegramProviders || ['telegram-msm32'];
-                const isMsmEnabled = enabledTg.includes('telegram-msm32');
-                return (
+          {/* Sub-Drawer Navigation: MovieSubMalay (@msm32bot) */}
+          {(() => {
+            const enabledTg = settings.enabledTelegramProviders || ['telegram-msm32'];
+            const isMsmEnabled = enabledTg.includes('telegram-msm32');
+            const displayUrl = (settings.msm32GetterUrl || 'https://msm-getter.onrender.com').replace(/^https?:\/\//, '');
+            return (
+              <button
+                type="button"
+                onClick={() => setActiveDrawer('telegram-msm32')}
+                className="w-full flex items-center justify-between p-3.5 rounded-xl bg-white/5 border border-white/10 hover:border-sky-400/50 hover:bg-white/10 transition-all text-left"
+              >
+                <div className="space-y-0.5 min-w-0 pr-2">
+                  <div className="flex items-center gap-1.5">
+                    <Send className="w-3.5 h-3.5 text-sky-400 flex-shrink-0" />
+                    <span className="text-xs font-semibold text-white truncate">MovieSubMalay (@msm32bot)</span>
+                  </div>
+                  <span className="text-[11px] text-gray-400 block truncate">
+                    Microservice: <span className="font-mono text-sky-300">{displayUrl}</span>
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${isMsmEnabled ? 'bg-sky-500/20 text-sky-300 border-sky-500/40' : 'bg-white/5 text-gray-400 border-white/10'}`}>
+                    {isMsmEnabled ? 'Active' : 'Disabled'}
+                  </span>
+                  <ChevronRight className="w-4 h-4 text-gray-400" />
+                </div>
+              </button>
+            );
+          })()}
+        </div>
+      </SettingsDrawer>
+
+      {/* 3a-TG-MSM. Sub-Drawer: MSM32bot Settings */}
+      <SettingsDrawer
+        isOpen={activeDrawer === 'telegram-msm32'}
+        onClose={() => setActiveDrawer(null)}
+        onBack={() => setActiveDrawer('engine-telegram')}
+        title="MSM32bot Provider"
+        subtitle="Configure MSM Getter microservice endpoint, connection, and streaming."
+        categoryLabel="Telegram > MSM32bot"
+      >
+        <div className="space-y-4">
+          {/* Provider Active Switch */}
+          {(() => {
+            const enabledTg = settings.enabledTelegramProviders || ['telegram-msm32'];
+            const isMsmEnabled = enabledTg.includes('telegram-msm32');
+            return (
+              <div className="p-3.5 rounded-xl bg-sky-950/20 border border-sky-500/40 text-xs text-gray-300 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Send className="w-4 h-4 text-sky-400" />
+                    <div>
+                      <span className="font-bold text-white block text-xs">Enable @msm32bot</span>
+                      <span className="text-[10px] text-gray-400">Probe and stream releases from MovieSubMalay bot</span>
+                    </div>
+                  </div>
                   <button
                     type="button"
                     onClick={() => {
                       const updated = isMsmEnabled ? enabledTg.filter(id => id !== 'telegram-msm32') : [...enabledTg, 'telegram-msm32'];
                       handleUpdate({ enabledTelegramProviders: updated });
                     }}
-                    className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all flex items-center gap-1 border ${isMsmEnabled ? 'bg-sky-500/20 text-sky-300 border-sky-500/40' : 'bg-white/5 text-gray-400 border-white/10'}`}
+                    className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all flex items-center gap-1.5 border ${
+                      isMsmEnabled ? 'bg-sky-500/20 text-sky-300 border-sky-500/40' : 'bg-white/5 text-gray-400 border-white/10'
+                    }`}
                   >
-                    {isMsmEnabled ? <Check className="w-3 h-3 stroke-[2.5]" /> : <X className="w-3 h-3 stroke-[2.5]" />}
+                    {isMsmEnabled ? <Check className="w-3.5 h-3.5 stroke-[2.5]" /> : <X className="w-3.5 h-3.5 stroke-[2.5]" />}
                     <span>{isMsmEnabled ? 'Active' : 'Disabled'}</span>
                   </button>
-                );
-              })()}
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Microservice Endpoint URL Configuration */}
+          <div className="p-3.5 rounded-xl bg-white/5 border border-white/10 space-y-3">
+            <div>
+              <span className="text-xs font-semibold text-white block">Microservice Endpoint URL</span>
+              <span className="text-[10px] text-gray-400">
+                Backend host running Telegram GramJS MTProto client (Render cloud or local PC)
+              </span>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={msmUrlInput}
+                  onChange={(e) => setMsmUrlInput(e.target.value)}
+                  placeholder="https://msm-getter.onrender.com"
+                  className="flex-1 bg-black/40 border border-white/15 rounded-xl px-3 py-2 text-xs text-white font-mono placeholder:text-gray-600 focus:outline-none focus:border-sky-400/80 transition-colors"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    const trimmed = msmUrlInput.trim().replace(/\/+$/, '');
+                    const finalUrl = trimmed || 'https://msm-getter.onrender.com';
+                    msm32Service.clearCache();
+                    handleUpdate({ msm32GetterUrl: finalUrl });
+                    setMsmUrlInput(finalUrl);
+                    setTestingMsm32(true);
+                    setMsm32TestResult(null);
+                    msm32Service.testConnection(finalUrl)
+                      .then((res) => setMsm32TestResult(res))
+                      .catch((err: any) => setMsm32TestResult({ ok: false, error: err?.message || 'Connection failed' }))
+                      .finally(() => setTestingMsm32(false));
+                  }}
+                  className="px-3.5 py-2 rounded-xl bg-sky-500 hover:bg-sky-400 text-black font-bold text-xs flex items-center gap-1.5 transition-colors flex-shrink-0"
+                >
+                  <Save className="w-3.5 h-3.5" />
+                  <span>Save</span>
+                </button>
+              </div>
+
+              {/* Quick Presets */}
+              <div className="flex items-center gap-2 pt-1">
+                <span className="text-[10px] text-gray-400 font-semibold flex-shrink-0">Presets:</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const renderUrl = 'https://msm-getter.onrender.com';
+                    msm32Service.clearCache();
+                    setMsmUrlInput(renderUrl);
+                    handleUpdate({ msm32GetterUrl: renderUrl });
+                  }}
+                  className={`text-[10px] px-2.5 py-1 rounded-lg border font-semibold transition-all ${
+                    (settings.msm32GetterUrl || 'https://msm-getter.onrender.com') === 'https://msm-getter.onrender.com'
+                      ? 'bg-sky-500/20 text-sky-300 border-sky-500/40'
+                      : 'bg-white/5 text-gray-400 border-white/10 hover:text-white'
+                  }`}
+                >
+                  Render Cloud (Default)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const localUrl = 'http://localhost:3033';
+                    msm32Service.clearCache();
+                    setMsmUrlInput(localUrl);
+                    handleUpdate({ msm32GetterUrl: localUrl });
+                  }}
+                  className={`text-[10px] px-2.5 py-1 rounded-lg border font-semibold transition-all ${
+                    settings.msm32GetterUrl === 'http://localhost:3033'
+                      ? 'bg-sky-500/20 text-sky-300 border-sky-500/40'
+                      : 'bg-white/5 text-gray-400 border-white/10 hover:text-white'
+                  }`}
+                >
+                  Localhost (3033)
+                </button>
+              </div>
             </div>
           </div>
 
+          {/* Microservice Health & Re-ping */}
           <div className="p-3.5 rounded-xl bg-white/5 border border-white/10 space-y-2.5">
             <div className="flex items-center justify-between">
               <div>
-                <span className="text-xs font-semibold text-white block">MSM Getter Microservice</span>
-                <span className="text-[10px] text-gray-400">Stream resolver backend for Telegram MTProto documents</span>
+                <span className="text-xs font-semibold text-white block">Microservice Connectivity</span>
+                <span className="text-[10px] text-gray-400">Test health endpoint and Telegram MTProto status</span>
               </div>
-              <span className="text-[10px] text-sky-400 font-mono font-bold bg-sky-500/10 px-2 py-0.5 rounded border border-sky-400/20">
-                msm-getter.onrender.com
-              </span>
             </div>
 
             <button
@@ -1530,11 +1656,13 @@ export const Settings: React.FC = () => {
               className="w-full py-2 rounded-lg bg-sky-500 hover:bg-sky-400 text-black font-bold text-xs flex items-center justify-center gap-1.5 transition-colors disabled:opacity-50"
             >
               <RefreshCw className={`w-3 h-3 ${testingMsm32 ? 'animate-spin' : ''}`} />
-              <span>{testingMsm32 ? 'Pinging Server (Waking Up)...' : 'Re-ping Server'}</span>
+              <span>{testingMsm32 ? 'Pinging Server (Waking Up)...' : 'Test / Re-ping Server'}</span>
             </button>
 
             {msm32TestResult ? (
-              <div className={`p-2 rounded-lg text-[11px] flex items-center gap-1.5 border ${msm32TestResult.ok ? 'bg-emerald-950/40 text-emerald-300 border-emerald-500/40' : 'bg-rose-950/40 text-rose-300 border-rose-500/40'}`}>
+              <div className={`p-2.5 rounded-lg text-[11px] flex items-center gap-1.5 border ${
+                msm32TestResult.ok ? 'bg-emerald-950/40 text-emerald-300 border-emerald-500/40' : 'bg-rose-950/40 text-rose-300 border-rose-500/40'
+              }`}>
                 {msm32TestResult.ok ? <Check className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" /> : <AlertCircle className="w-3.5 h-3.5 text-rose-400 flex-shrink-0" />}
                 <span className="truncate">
                   {msm32TestResult.ok
@@ -1543,7 +1671,7 @@ export const Settings: React.FC = () => {
                 </span>
               </div>
             ) : testingMsm32 && (
-              <div className="p-2 rounded-lg text-[11px] flex items-center gap-1.5 border bg-sky-950/40 text-sky-300 border-sky-500/40">
+              <div className="p-2.5 rounded-lg text-[11px] flex items-center gap-1.5 border bg-sky-950/40 text-sky-300 border-sky-500/40">
                 <RefreshCw className="w-3.5 h-3.5 text-sky-400 flex-shrink-0 animate-spin" />
                 <span className="truncate">Pinging server... Please wait if waking up from sleep.</span>
               </div>
@@ -1591,6 +1719,46 @@ export const Settings: React.FC = () => {
               <ChevronRight className="w-4 h-4 text-gray-400" />
             </div>
           </button>
+
+          {/* Local Stream Cache Clearing */}
+          <div className="p-3.5 rounded-xl bg-white/5 border border-white/10 space-y-2.5">
+            <div className="flex items-center justify-between">
+              <div>
+                <span className="text-xs font-semibold text-white block">Local Stream Fast Cache</span>
+                <span className="text-[10px] text-gray-400">
+                  In-app fast lookup cache for resolved &amp; failed stream attempts
+                </span>
+              </div>
+              <span className="text-[10px] text-sky-400 font-mono font-bold bg-sky-500/10 px-2 py-0.5 rounded border border-sky-400/20">
+                {cacheStats.total} {cacheStats.total === 1 ? 'entry' : 'entries'}
+              </span>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                const cleared = msm32Service.clearCache();
+                setCacheStats(msm32Service.getCacheStats());
+                setCacheClearFeedback(cleared > 0 ? `Cleared ${cleared} cached stream ${cleared > 1 ? 'items' : 'item'}` : 'Cache is already clean');
+                setTimeout(() => setCacheClearFeedback(null), 3000);
+              }}
+              className="w-full py-2 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/40 font-bold text-xs flex items-center justify-center gap-1.5 transition-all active:scale-[0.98]"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>Clear Local Cache</span>
+            </button>
+
+            {cacheClearFeedback && (
+              <div className="p-2 rounded-lg text-[11px] flex items-center gap-1.5 border bg-rose-950/40 text-rose-300 border-rose-500/40">
+                <Check className="w-3.5 h-3.5 text-rose-400 flex-shrink-0" />
+                <span>{cacheClearFeedback}</span>
+              </div>
+            )}
+          </div>
+
+          <p className="text-[11px] text-gray-400 leading-relaxed">
+            The MSM Getter microservice executes queries against the Telegram bot <span className="text-sky-300 font-mono">@msm32bot</span>, resolving file documents and generating chunked HTTP byte-range streams directly into the custom player.
+          </p>
         </div>
       </SettingsDrawer>
 
@@ -1598,10 +1766,10 @@ export const Settings: React.FC = () => {
       <SettingsDrawer
         isOpen={activeDrawer === 'telegram-chunk'}
         onClose={() => setActiveDrawer(null)}
-        onBack={() => setActiveDrawer('engine-telegram')}
+        onBack={() => setActiveDrawer('telegram-msm32')}
         title="Stream Chunk Buffer"
         subtitle="Configure buffer chunk slice size for Telegram streaming."
-        categoryLabel="Telegram > Buffer Size"
+        categoryLabel="Telegram > MSM32bot > Buffer Size"
       >
         <div className="space-y-4">
           <div className="flex items-center justify-between">
@@ -1625,15 +1793,19 @@ export const Settings: React.FC = () => {
                   onClick={() => handleUpdate({ msm32ChunkSize: c.val })}
                   className={`p-3.5 rounded-xl border text-left transition-all flex items-center justify-between ${
                     isCurrent
-                      ? 'bg-sky-500/20 border-sky-400 text-white shadow-sm'
-                      : 'bg-white/5 border-white/10 text-gray-400 hover:text-white hover:bg-white/10'
+                      ? 'bg-sky-500/20 border-sky-400 text-white'
+                      : 'bg-white/5 border-white/10 text-gray-400 hover:text-white'
                   }`}
                 >
-                  <div>
-                    <div className={`text-xs font-bold ${isCurrent ? 'text-sky-300' : 'text-white'}`}>{c.label}</div>
-                    <div className="text-[10px] text-gray-400 mt-0.5">{c.desc}</div>
+                  <div className="space-y-0.5 pr-2">
+                    <span className="text-xs font-bold block text-white">{c.label}</span>
+                    <span className="text-[11px] text-gray-400 block leading-snug">{c.desc}</span>
                   </div>
-                  {isCurrent && <Check className="w-4 h-4 text-sky-400 stroke-[3] flex-shrink-0" />}
+                  <div className={`w-5 h-5 rounded-full border flex items-center justify-center flex-shrink-0 ${
+                    isCurrent ? 'bg-sky-500 border-sky-400 text-black' : 'border-gray-600 bg-black/40 text-transparent'
+                  }`}>
+                    <Check className="w-3 h-3 stroke-[3]" />
+                  </div>
                 </button>
               );
             })}
@@ -1648,10 +1820,10 @@ export const Settings: React.FC = () => {
       <SettingsDrawer
         isOpen={activeDrawer === 'telegram-country'}
         onClose={() => setActiveDrawer(null)}
-        onBack={() => setActiveDrawer('engine-telegram')}
+        onBack={() => setActiveDrawer('telegram-msm32')}
         title="Country Origin Filters"
         subtitle="Select which origin countries trigger Telegram provider resolution."
-        categoryLabel="Telegram > Origin Filters"
+        categoryLabel="Telegram > MSM32bot > Origin Filters"
       >
         <div className="space-y-4">
           <p className="text-[11px] text-gray-400 leading-relaxed">
