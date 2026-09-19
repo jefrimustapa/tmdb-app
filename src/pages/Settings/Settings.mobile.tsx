@@ -172,6 +172,8 @@ export const Settings: React.FC = () => {
     | 'ticker'
     | 'resolvers'
     | 'engine-telegram'
+    | 'telegram-chunk'
+    | 'telegram-country'
     | 'engine-torbox'
     | 'engine-embed'
     | 'engine-extractor'
@@ -1360,53 +1362,162 @@ export const Settings: React.FC = () => {
             )}
           </div>
 
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between">
-              <label className="text-[11px] font-semibold text-gray-300 block">Stream Chunk Slice Buffer:</label>
-              <span className="text-[10px] text-sky-400 font-mono font-bold">{((settings.msm32ChunkSize || 524288) / 1024).toFixed(0)} KB</span>
+          {/* Navigation to Stream Chunk Sub-Drawer */}
+          <button
+            type="button"
+            onClick={() => setActiveDrawer('telegram-chunk')}
+            className="w-full flex items-center justify-between p-3.5 rounded-xl bg-white/5 border border-white/10 hover:border-sky-400/50 hover:bg-white/10 transition-all text-left"
+          >
+            <div className="space-y-0.5">
+              <span className="text-xs font-semibold text-white block">Stream Chunk Slice Buffer</span>
+              <span className="text-[11px] text-gray-400">Configure seek latency and throughput slice size</span>
             </div>
-            <div className="grid grid-cols-3 gap-1.5">
-              {[{ label: '256 KB', desc: 'Fastest Seek', val: 262144 }, { label: '512 KB', desc: 'Balanced (Rec)', val: 524288 }, { label: '1 MB', desc: 'High Bitrate', val: 1048576 }].map((c) => {
-                const isCurrent = (settings.msm32ChunkSize || 524288) === c.val;
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <span className="text-[10px] text-sky-400 font-mono font-bold bg-sky-500/10 px-2 py-0.5 rounded border border-sky-400/20">
+                {((settings.msm32ChunkSize || 524288) / 1024).toFixed(0)} KB
+              </span>
+              <ChevronRight className="w-4 h-4 text-gray-400" />
+            </div>
+          </button>
+
+          {/* Navigation to Origin Country Filter Sub-Drawer */}
+          <button
+            type="button"
+            onClick={() => setActiveDrawer('telegram-country')}
+            className="w-full flex items-center justify-between p-3.5 rounded-xl bg-white/5 border border-white/10 hover:border-sky-400/50 hover:bg-white/10 transition-all text-left"
+          >
+            <div className="space-y-0.5">
+              <span className="text-xs font-semibold text-white block">Active Country Origin Filters</span>
+              <span className="text-[11px] text-gray-400">Trigger provider based on title origin countries</span>
+            </div>
+            <div className="flex items-center gap-1.5 flex-shrink-0">
+              {(() => {
+                const currentCountries: OriginCountryCode[] =
+                  (settings.telegramProviderCountries && settings.telegramProviderCountries['telegram-msm32']) || ['MY', 'ID', 'SG'];
                 return (
-                  <button key={c.val} type="button" onClick={() => handleUpdate({ msm32ChunkSize: c.val })}
-                    className={`p-2 rounded-lg border text-center transition-all ${isCurrent ? 'bg-sky-500/20 border-sky-400 text-sky-300 font-bold shadow-sm' : 'bg-white/5 border-white/10 text-gray-400 hover:text-white'}`}>
-                    <div className="text-xs">{c.label}</div>
-                    <div className="text-[9px] opacity-70">{c.desc}</div>
-                  </button>
+                  <span className="text-[10px] text-sky-400 font-mono font-bold bg-sky-500/10 px-2 py-0.5 rounded border border-sky-400/20">
+                    {currentCountries.length} active
+                  </span>
                 );
-              })}
+              })()}
+              <ChevronRight className="w-4 h-4 text-gray-400" />
             </div>
-            <p className="text-[10px] text-gray-500">Smaller chunks start faster; larger chunks yield higher throughput.</p>
+          </button>
+        </div>
+      </SettingsDrawer>
+
+      {/* 3a-TG-CHUNK. Sub-Drawer: Stream Chunk Slice Buffer */}
+      <SettingsDrawer
+        isOpen={activeDrawer === 'telegram-chunk'}
+        onClose={() => setActiveDrawer(null)}
+        onBack={() => setActiveDrawer('engine-telegram')}
+        title="Stream Chunk Buffer"
+        subtitle="Configure buffer chunk slice size for Telegram streaming."
+        categoryLabel="Telegram > Buffer Size"
+      >
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-gray-300 block">Current Chunk Size:</span>
+            <span className="text-xs text-sky-400 font-mono font-bold">
+              {((settings.msm32ChunkSize || 524288) / 1024).toFixed(0)} KB
+            </span>
           </div>
 
-          <div className="space-y-1.5">
-            <span className="text-[11px] font-semibold text-gray-300 block">MSM32 Active Country Origin Filters:</span>
-            {(() => {
-              const currentCountries: OriginCountryCode[] =
-                (settings.telegramProviderCountries && settings.telegramProviderCountries['telegram-msm32']) || ['MY', 'ID', 'SG'];
-              const availableCodes: OriginCountryCode[] = ['MY', 'ID', 'SG', 'TH', 'KR', 'JP', 'GLOBAL'];
+          <div className="grid grid-cols-1 gap-2">
+            {[
+              { label: '256 KB', desc: 'Fastest Seek • Recommended for Mobile/Cellular data connections', val: 262144 },
+              { label: '512 KB', desc: 'Balanced (Default) • Optimum balance between start latency & throughput', val: 524288 },
+              { label: '1 MB', desc: 'High Bitrate • Best for fast Wi-Fi and high-speed fiber broadband', val: 1048576 }
+            ].map((c) => {
+              const isCurrent = (settings.msm32ChunkSize || 524288) === c.val;
               return (
-                <div className="flex flex-wrap gap-1.5">
-                  {availableCodes.map((code) => {
-                    const isSelected = currentCountries.includes(code);
-                    return (
-                      <button key={code} type="button"
-                        onClick={() => {
-                          let updated: OriginCountryCode[];
-                          if (isSelected) { if (currentCountries.length === 1) return; updated = currentCountries.filter(c => c !== code); }
-                          else { updated = [...currentCountries, code]; }
-                          handleUpdate({ telegramProviderCountries: { ...(settings.telegramProviderCountries || {}), 'telegram-msm32': updated } });
-                        }}
-                        className={`px-2 py-1 rounded-md text-[10px] font-bold border transition-all ${isSelected ? 'bg-sky-500/30 text-sky-200 border-sky-400' : 'bg-black/40 text-gray-400 border-white/10 hover:border-white/20'}`}>
-                        {ORIGIN_COUNTRY_LABELS[code]}
-                      </button>
-                    );
-                  })}
-                </div>
+                <button
+                  key={c.val}
+                  type="button"
+                  onClick={() => handleUpdate({ msm32ChunkSize: c.val })}
+                  className={`p-3.5 rounded-xl border text-left transition-all flex items-center justify-between ${
+                    isCurrent
+                      ? 'bg-sky-500/20 border-sky-400 text-white shadow-sm'
+                      : 'bg-white/5 border-white/10 text-gray-400 hover:text-white hover:bg-white/10'
+                  }`}
+                >
+                  <div>
+                    <div className={`text-xs font-bold ${isCurrent ? 'text-sky-300' : 'text-white'}`}>{c.label}</div>
+                    <div className="text-[10px] text-gray-400 mt-0.5">{c.desc}</div>
+                  </div>
+                  {isCurrent && <Check className="w-4 h-4 text-sky-400 stroke-[3] flex-shrink-0" />}
+                </button>
               );
-            })()}
+            })}
           </div>
+          <p className="text-[11px] text-gray-500 leading-relaxed">
+            Smaller chunks start playback and seek faster by downloading smaller initial byte ranges; larger chunks yield higher sustained throughput.
+          </p>
+        </div>
+      </SettingsDrawer>
+
+      {/* 3a-TG-COUNTRY. Sub-Drawer: MSM32 Country Origin Filters */}
+      <SettingsDrawer
+        isOpen={activeDrawer === 'telegram-country'}
+        onClose={() => setActiveDrawer(null)}
+        onBack={() => setActiveDrawer('engine-telegram')}
+        title="Country Origin Filters"
+        subtitle="Select which origin countries trigger Telegram provider resolution."
+        categoryLabel="Telegram > Origin Filters"
+      >
+        <div className="space-y-4">
+          <p className="text-[11px] text-gray-400 leading-relaxed">
+            Telegram MSM32 specializes in Southeast Asian releases. Select the content origin countries where MSM32 should probe for matching streams:
+          </p>
+
+          {(() => {
+            const currentCountries: OriginCountryCode[] =
+              (settings.telegramProviderCountries && settings.telegramProviderCountries['telegram-msm32']) || ['MY', 'ID', 'SG'];
+            const availableCodes: OriginCountryCode[] = ['MY', 'ID', 'SG', 'TH', 'KR', 'JP', 'GLOBAL'];
+            return (
+              <div className="space-y-2">
+                {availableCodes.map((code) => {
+                  const isSelected = currentCountries.includes(code);
+                  return (
+                    <button
+                      key={code}
+                      type="button"
+                      onClick={() => {
+                        let updated: OriginCountryCode[];
+                        if (isSelected) {
+                          if (currentCountries.length === 1) return;
+                          updated = currentCountries.filter(c => c !== code);
+                        } else {
+                          updated = [...currentCountries, code];
+                        }
+                        handleUpdate({
+                          telegramProviderCountries: {
+                            ...(settings.telegramProviderCountries || {}),
+                            'telegram-msm32': updated
+                          }
+                        });
+                      }}
+                      className={`w-full p-3 rounded-xl border text-left transition-all flex items-center justify-between ${
+                        isSelected
+                          ? 'bg-sky-500/20 border-sky-400 text-white'
+                          : 'bg-white/5 border-white/10 text-gray-400 hover:text-white'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <div className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 ${
+                          isSelected ? 'bg-sky-500 border-sky-500' : 'border-gray-600 bg-black/40'
+                        }`}>
+                          {isSelected && <Check className="w-3 h-3 text-black stroke-[3]" />}
+                        </div>
+                        <span className="text-xs font-bold text-white">{ORIGIN_COUNTRY_LABELS[code]}</span>
+                      </div>
+                      <span className="text-[10px] font-mono text-gray-400 uppercase">{code}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            );
+          })()}
         </div>
       </SettingsDrawer>
 
