@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { dbService } from '../../services/db';
-import type { UserSettings } from '../../types/db';
+import type { UserSettings, StreamResolverType } from '../../types/db';
 import { STREAM_PROVIDERS, CATEGORY_BADGE_CONFIG, ORIGIN_COUNTRY_LABELS } from '../../services/streamProviders';
 import type { OriginCountryCode } from '../../types/stream';
 import { msm32Service, type Msm32HealthResult } from '../../services/msm32MappingService';
@@ -171,6 +171,7 @@ export const Settings: React.FC = () => {
     | 'autoplayTimeout'
     | 'ticker'
     | 'resolvers'
+    | 'engine-priority'
     | 'engine-telegram'
     | 'telegram-chunk'
     | 'telegram-country'
@@ -1237,6 +1238,44 @@ export const Settings: React.FC = () => {
         categoryLabel="Playback & Stream"
       >
         <div className="space-y-4">
+          {/* Priority Order Subdrawer Button */}
+          {(() => {
+            const currentPriority = (settings.enginePriority && settings.enginePriority.length > 0)
+              ? settings.enginePriority
+              : ['torbox', 'telegram', 'embed', 'private_extractor'];
+            return (
+              <div className="rounded-xl border border-amber-500/40 bg-gradient-to-r from-amber-500/15 via-orange-500/10 to-transparent p-3.5">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-xs sm:text-sm text-white">Engine Priority Order</span>
+                    <span className="text-[10px] px-2 py-0.5 rounded font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                      Sequence
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setActiveDrawer('engine-priority')}
+                    className="px-3 py-1.5 rounded-lg bg-amber-500/20 border border-amber-500/40 hover:bg-amber-500/30 text-amber-300 text-xs font-bold transition-all flex items-center gap-1"
+                  >
+                    <span>Sort Order</span>
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+                <p className="text-[11px] text-gray-300 mt-1.5 leading-relaxed">
+                  Sort priority order for stream extraction &amp; failover.
+                </p>
+                <div className="flex items-center gap-1.5 text-xs font-semibold text-amber-300/90 overflow-x-hidden truncate mt-2">
+                  {currentPriority.map((eng, idx) => (
+                    <span key={eng} className="flex items-center gap-1">
+                      {idx > 0 && <span className="text-gray-500 font-mono text-[10px]">→</span>}
+                      <span className="capitalize">{eng === 'private_extractor' ? 'Direct' : eng}</span>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
+
           {/* Engine Cards — each has toggle + Configure sub-drawer */}
           {[
             { id: 'torbox'            as const, title: 'TorBox Debrid',     tag: '4K Ultra HD',    desc: 'Direct HTTPS 4K HDR & 1080p BluRay cloud streams via TorBox CDN.',                              subDrawer: 'engine-torbox'    as const },
@@ -1292,6 +1331,148 @@ export const Settings: React.FC = () => {
               </div>
             );
           })}
+        </div>
+      </SettingsDrawer>
+
+      {/* 3a-Priority. Sub-Drawer: Engine Priority Order Settings */}
+      <SettingsDrawer
+        isOpen={activeDrawer === 'engine-priority'}
+        onClose={() => setActiveDrawer(null)}
+        onBack={() => setActiveDrawer('resolvers')}
+        title="Engine Priority Order"
+        subtitle="Sort priority order for stream extraction & failover sequence."
+        categoryLabel="Stream Engines > Priority"
+      >
+        <div className="space-y-3">
+          {(() => {
+            const currentPriority: StreamResolverType[] = (settings.enginePriority && settings.enginePriority.length > 0)
+              ? settings.enginePriority
+              : ['torbox', 'telegram', 'embed', 'private_extractor'];
+
+            const currentEnabled = settings.enabledResolvers && settings.enabledResolvers.length > 0
+              ? settings.enabledResolvers
+              : ['embed'];
+
+            const engineMeta: Record<StreamResolverType, { title: string; tag: string; desc: string; tagClass: string }> = {
+              torbox: {
+                title: 'TorBox Debrid',
+                tag: '4K Ultra HD',
+                desc: 'Direct HTTPS 4K HDR & 1080p BluRay cloud streams via TorBox CDN.',
+                tagClass: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40',
+              },
+              telegram: {
+                title: 'Telegram Provider',
+                tag: 'Direct MTProto',
+                desc: 'Direct in-app video streaming from Telegram bots (MovieSubMalay / @msm32bot).',
+                tagClass: 'bg-sky-500/20 text-sky-300 border-sky-500/40',
+              },
+              embed: {
+                title: 'Embed Resolver',
+                tag: 'Multi-Mirror',
+                desc: 'Standard multi-server iframe embeds (VidLink, MoviesAPI) with ad sandboxing.',
+                tagClass: 'bg-hbo-cyan/20 text-hbo-cyan border-hbo-cyan/40',
+              },
+              private_extractor: {
+                title: 'Direct Extractor',
+                tag: 'Consumet API',
+                desc: 'Direct HLS .m3u8 streams resolved via private backend API.',
+                tagClass: 'bg-hbo-purple/30 text-hbo-purple-light border-hbo-purple/40',
+              },
+            };
+
+            const rankLabels = [
+              { badge: '#1 Primary', class: 'bg-amber-500/20 text-amber-300 border-amber-500/40' },
+              { badge: '#2 Secondary', class: 'bg-sky-500/20 text-sky-300 border-sky-500/40' },
+              { badge: '#3 Third Choice', class: 'bg-purple-500/20 text-purple-300 border-purple-500/40' },
+              { badge: '#4 Fallback', class: 'bg-gray-700/40 text-gray-300 border-gray-600/40' },
+            ];
+
+            return currentPriority.map((engineKey, idx) => {
+              const meta = engineMeta[engineKey];
+              const rank = rankLabels[idx] || { badge: `#${idx + 1}`, class: 'bg-gray-800 text-gray-400' };
+              const isEnabled = currentEnabled.includes(engineKey);
+
+              const moveUp = () => {
+                if (idx <= 0) return;
+                const updated = [...currentPriority];
+                const temp = updated[idx];
+                updated[idx] = updated[idx - 1];
+                updated[idx - 1] = temp;
+                handleUpdate({ enginePriority: updated });
+              };
+
+              const moveDown = () => {
+                if (idx >= currentPriority.length - 1) return;
+                const updated = [...currentPriority];
+                const temp = updated[idx];
+                updated[idx] = updated[idx + 1];
+                updated[idx + 1] = temp;
+                handleUpdate({ enginePriority: updated });
+              };
+
+              return (
+                <div
+                  key={engineKey}
+                  className="p-3.5 rounded-xl border bg-black/40 border-hbo-border flex items-center justify-between gap-3"
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className={`text-[10px] px-2 py-0.5 rounded font-mono font-bold border ${rank.class}`}>
+                        {rank.badge}
+                      </span>
+                      <span className="font-bold text-xs sm:text-sm text-white truncate">{meta?.title || engineKey}</span>
+                      <span className={`text-[9px] px-1.5 py-0.5 rounded font-mono font-bold border ${meta?.tagClass || 'bg-gray-800 text-gray-400'}`}>
+                        {meta?.tag || ''}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-gray-400 leading-snug mb-1">{meta?.desc || ''}</p>
+                    <div className="flex items-center gap-1.5 text-[11px]">
+                      {isEnabled ? (
+                        <span className="text-emerald-400 flex items-center gap-1 font-semibold">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                          Active
+                        </span>
+                      ) : (
+                        <span className="text-gray-500 flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-gray-600" />
+                          Disabled
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-1.5 flex-shrink-0">
+                    <button
+                      type="button"
+                      disabled={idx === 0}
+                      onClick={moveUp}
+                      className={`w-9 h-9 rounded-lg border flex items-center justify-center transition-all ${
+                        idx === 0
+                          ? 'opacity-25 border-white/5 bg-white/5 text-gray-600 cursor-not-allowed'
+                          : 'bg-white/5 border-white/10 hover:border-amber-400 hover:bg-amber-500/20 text-amber-300'
+                      }`}
+                      title="Move Up"
+                    >
+                      <span className="font-bold text-sm">▲</span>
+                    </button>
+                    <button
+                      type="button"
+                      disabled={idx === currentPriority.length - 1}
+                      onClick={moveDown}
+                      className={`w-9 h-9 rounded-lg border flex items-center justify-center transition-all ${
+                        idx === currentPriority.length - 1
+                          ? 'opacity-25 border-white/5 bg-white/5 text-gray-600 cursor-not-allowed'
+                          : 'bg-white/5 border-white/10 hover:border-amber-400 hover:bg-amber-500/20 text-amber-300'
+                      }`}
+                      title="Move Down"
+                    >
+                      <span className="font-bold text-sm">▼</span>
+                    </button>
+                  </div>
+                </div>
+              );
+            });
+          })()}
         </div>
       </SettingsDrawer>
 
@@ -1601,10 +1782,89 @@ export const Settings: React.FC = () => {
         onClose={() => setActiveDrawer(null)}
         onBack={() => setActiveDrawer('resolvers')}
         title="Embed Resolver"
-        subtitle="Configure failover priority servers for each content category."
+        subtitle="Configure failover priority servers, connection timeout & retries."
         categoryLabel="Stream Engines > Embed"
       >
-        <div className="space-y-3">
+        <div className="space-y-4">
+          {/* Timeout & Retries Config */}
+          <div className="space-y-3 pb-3 border-b border-white/10">
+            {/* Stream Resolver Timeout */}
+            <div className="bg-black/30 border border-hbo-border rounded-xl p-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-xs font-semibold text-white block">Resolver Timeout</span>
+                  <span className="text-[10px] text-gray-400">Max wait time before auto-failover</span>
+                </div>
+                <span className="text-xs font-bold text-hbo-cyan">
+                  {(settings.streamResolverTimeout ?? 0) === 0 ? 'Unlimited' : `${settings.streamResolverTimeout}s`}
+                </span>
+              </div>
+              <div className="grid grid-cols-3 gap-1.5 pt-1">
+                {[
+                  { seconds: 0, label: 'Unlimited' },
+                  { seconds: 10, label: '10s' },
+                  { seconds: 15, label: '15s' },
+                  { seconds: 20, label: '20s' },
+                  { seconds: 25, label: '25s' },
+                  { seconds: 30, label: '30s' },
+                ].map((opt) => {
+                  const isSelected = (settings.streamResolverTimeout ?? 0) === opt.seconds;
+                  return (
+                    <button
+                      key={opt.seconds}
+                      type="button"
+                      onClick={() => handleUpdate({ streamResolverTimeout: opt.seconds })}
+                      className={`py-1.5 px-2 rounded-lg text-xs font-bold transition-all border ${
+                        isSelected
+                          ? 'bg-hbo-cyan/20 border-hbo-cyan text-hbo-cyan shadow-sm'
+                          : 'bg-white/5 border-white/10 text-gray-400 hover:text-white'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Stream Resolver Retries */}
+            <div className="bg-black/30 border border-hbo-border rounded-xl p-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-xs font-semibold text-white block">Resolver Retries</span>
+                  <span className="text-[10px] text-gray-400">Retry count on failure before failover</span>
+                </div>
+                <span className="text-xs font-bold text-hbo-cyan">
+                  {(settings.streamResolverRetries ?? 1) === 0 ? 'No Retry' : `${settings.streamResolverRetries ?? 1}× Attempts`}
+                </span>
+              </div>
+              <div className="grid grid-cols-4 gap-1.5 pt-1">
+                {[
+                  { retries: 0, label: '0×' },
+                  { retries: 1, label: '1×' },
+                  { retries: 2, label: '2×' },
+                  { retries: 3, label: '3×' },
+                ].map((opt) => {
+                  const isSelected = (settings.streamResolverRetries ?? 1) === opt.retries;
+                  return (
+                    <button
+                      key={opt.retries}
+                      type="button"
+                      onClick={() => handleUpdate({ streamResolverRetries: opt.retries })}
+                      className={`py-1.5 px-2 rounded-lg text-xs font-bold transition-all border ${
+                        isSelected
+                          ? 'bg-hbo-cyan/20 border-hbo-cyan text-hbo-cyan shadow-sm'
+                          : 'bg-white/5 border-white/10 text-gray-400 hover:text-white'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
           <span className="text-xs font-semibold text-gray-300 block">Embed Failover Priority Servers</span>
           <div className="flex items-center gap-1.5 p-1 bg-black/40 border border-white/10 rounded-xl">
             {(['general', 'anime', 'asean', 'korean'] as const).map((tab) => (

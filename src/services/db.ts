@@ -76,6 +76,7 @@ export const DEFAULT_SETTINGS: UserSettings = {
   maturityLevel: 'all',
   streamResolver: 'embed',
   enabledResolvers: ['embed'],
+  enginePriority: ['torbox', 'telegram', 'embed', 'private_extractor'],
   enabledTelegramProviders: ['telegram-msm32'],
   telegramProviderCountries: { 'telegram-msm32': ['MY', 'ID', 'SG'] },
   msm32GetterUrl: 'https://msm-getter.onrender.com',
@@ -368,6 +369,10 @@ export const dbService = {
     }
     if (!settings.enabledResolvers || settings.enabledResolvers.length === 0) {
       settings.enabledResolvers = ['embed'];
+      await db.settings.put(settings);
+    }
+    if (!settings.enginePriority || settings.enginePriority.length === 0) {
+      settings.enginePriority = ['torbox', 'telegram', 'embed', 'private_extractor'];
       await db.settings.put(settings);
     }
     if (settings.performanceMode === undefined) {

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { dbService } from '../../services/db';
-import type { UserSettings } from '../../types/db';
+import type { UserSettings, StreamResolverType } from '../../types/db';
 import { STREAM_PROVIDERS, CATEGORY_BADGE_CONFIG, ORIGIN_COUNTRY_LABELS } from '../../services/streamProviders';
 import type { OriginCountryCode } from '../../types/stream';
 import { msm32Service, type Msm32HealthResult } from '../../services/msm32MappingService';
@@ -161,6 +161,7 @@ export const Settings: React.FC = () => {
   const [showAutoplayTriggerDrawer, setShowAutoplayTriggerDrawer] = useState(false);
   const [showAutoplayTimeoutDrawer, setShowAutoplayTimeoutDrawer] = useState(false);
   const [showEnginesDrawer, setShowEnginesDrawer] = useState(false);
+  const [showEnginePriorityDrawer, setShowEnginePriorityDrawer] = useState(false);
   const [showTorboxDrawer, setShowTorboxDrawer] = useState(false);
   const [showTelegramDrawer, setShowTelegramDrawer] = useState(false);
   const [showTelegramChunkDrawer, setShowTelegramChunkDrawer] = useState(false);
@@ -181,7 +182,7 @@ export const Settings: React.FC = () => {
   const { detectedPlatform, activeLayout } = useDevice();
 
   const isPickerModalOpen = pickerModalSlot !== null;
-  const isAnyModalOpen = isPickerModalOpen || showMaturityDrawer || showTriggerDrawer || showAutoplayDrawer || showAutoplayTriggerDrawer || showAutoplayTimeoutDrawer || showEnginesDrawer || showTorboxDrawer || showTelegramDrawer || showTelegramChunkDrawer || showTelegramCountryDrawer || showDirectExtractorDrawer || showEmbedResolverDrawer || showEmbedTimeoutDrawer || showEmbedRetryDrawer || activePriorityDrawer !== null || showTickerDrawer || showHeaderTimeoutDrawer || showPerfHudDrawer || showBackupDrawer;
+  const isAnyModalOpen = isPickerModalOpen || showMaturityDrawer || showTriggerDrawer || showAutoplayDrawer || showAutoplayTriggerDrawer || showAutoplayTimeoutDrawer || showEnginesDrawer || showEnginePriorityDrawer || showTorboxDrawer || showTelegramDrawer || showTelegramChunkDrawer || showTelegramCountryDrawer || showDirectExtractorDrawer || showEmbedResolverDrawer || showEmbedTimeoutDrawer || showEmbedRetryDrawer || activePriorityDrawer !== null || showTickerDrawer || showHeaderTimeoutDrawer || showPerfHudDrawer || showBackupDrawer;
 
   // Viewport scroll helpers for TV remote navigation (snaps to absolute top / bottom)
   const scrollToPanelTop = () => {
@@ -283,8 +284,19 @@ export const Settings: React.FC = () => {
       }, 50);
     } else if (showEnginesDrawer) {
       setTimeout(() => {
-        const defaultEl = document.getElementById('drawer-engine-item-torbox') ||
+        const defaultEl = document.getElementById('drawer-engine-item-priority') ||
+                          document.getElementById('drawer-engine-item-torbox') ||
                           document.querySelector<HTMLElement>('[data-engine-drawer-item="true"]');
+        if (defaultEl) {
+          defaultEl.focus();
+          defaultEl.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        }
+      }, 50);
+    } else if (showEnginePriorityDrawer) {
+      setTimeout(() => {
+        const defaultEl = document.getElementById('drawer-prio-down-0') ||
+                          document.getElementById('drawer-prio-up-0') ||
+                          document.querySelector<HTMLElement>('[data-engine-prio-item="true"]');
         if (defaultEl) {
           defaultEl.focus();
           defaultEl.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
@@ -330,6 +342,15 @@ export const Settings: React.FC = () => {
       setTimeout(() => {
         const defaultEl = document.getElementById('drawer-extractor-toggle') ||
                           document.querySelector<HTMLElement>('[data-extractor-drawer-item="true"]');
+        if (defaultEl) {
+          defaultEl.focus();
+          defaultEl.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        }
+      }, 50);
+    } else if (showEmbedResolverDrawer) {
+      setTimeout(() => {
+        const defaultEl = document.getElementById('drawer-embed-toggle') ||
+                          document.querySelector<HTMLElement>('[data-embed-drawer-item="true"]');
         if (defaultEl) {
           defaultEl.focus();
           defaultEl.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
@@ -477,6 +498,14 @@ export const Settings: React.FC = () => {
         return;
       }
       // Level 2 Drawers: Return to Level 1 Engines Drawer
+      if (showEnginePriorityDrawer) {
+        setShowEnginePriorityDrawer(false);
+        setShowEnginesDrawer(true);
+        setTimeout(() => {
+          document.getElementById('drawer-engine-item-priority')?.focus();
+        }, 50);
+        return;
+      }
       if (showTorboxDrawer) {
         setShowTorboxDrawer(false);
         setShowEnginesDrawer(true);
@@ -598,6 +627,7 @@ export const Settings: React.FC = () => {
     showAutoplayTriggerDrawer,
     showAutoplayTimeoutDrawer,
     showEnginesDrawer,
+    showEnginePriorityDrawer,
     showTorboxDrawer,
     showTelegramDrawer,
     showTelegramChunkDrawer,
@@ -3164,15 +3194,59 @@ export const Settings: React.FC = () => {
                 const isExtractorEnabled = currentEnabled.includes('private_extractor');
                 const isEmbedEnabled = currentEnabled.includes('embed');
 
+                const priorityOrder: StreamResolverType[] = (settings.enginePriority && settings.enginePriority.length > 0)
+                  ? settings.enginePriority
+                  : ['torbox', 'telegram', 'embed', 'private_extractor'];
+
                 return (
                   <>
+                    {/* Item 0: Engine Priority Order Reordering Hub */}
+                    <button
+                      id="drawer-engine-item-priority"
+                      data-engine-drawer-item="true"
+                      type="button"
+                      onKeyDown={(e) => {
+                        if (e.key === 'ArrowDown') {
+                          e.preventDefault();
+                          document.getElementById('drawer-engine-item-torbox')?.focus();
+                        }
+                      }}
+                      onClick={() => {
+                        setShowEnginesDrawer(false);
+                        setShowEnginePriorityDrawer(true);
+                      }}
+                      className="w-full p-4 rounded-2xl border text-left transition-all tv-focus-target flex items-center justify-between gap-3 bg-gradient-to-r from-amber-500/20 via-orange-500/15 to-transparent border-amber-500/50 hover:border-amber-400 shadow-lg ring-1 ring-amber-500/30"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-bold text-sm text-white truncate">Engine Priority Order</span>
+                          <span className="text-[9px] px-2 py-0.5 rounded font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                            Resolution Sequence
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-gray-300 mb-1.5 leading-snug">Sort priority order for stream extraction &amp; failover.</p>
+                        <div className="flex items-center gap-1.5 text-xs font-semibold text-amber-300/90 overflow-x-hidden truncate">
+                          {priorityOrder.map((eng, idx) => (
+                            <span key={eng} className="flex items-center gap-1">
+                              {idx > 0 && <span className="text-gray-500 font-mono text-[10px]">→</span>}
+                              <span className="capitalize">{eng === 'private_extractor' ? 'Direct' : eng}</span>
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                      <ChevronRight className="w-5 h-5 text-amber-400 stroke-[2.2] flex-shrink-0" />
+                    </button>
+
                     {/* Item 1: TorBox Debrid Stream Engine */}
                     <button
                       id="drawer-engine-item-torbox"
                       data-engine-drawer-item="true"
                       type="button"
                       onKeyDown={(e) => {
-                        if (e.key === 'ArrowDown') {
+                        if (e.key === 'ArrowUp') {
+                          e.preventDefault();
+                          document.getElementById('drawer-engine-item-priority')?.focus();
+                        } else if (e.key === 'ArrowDown') {
                           e.preventDefault();
                           document.getElementById('drawer-engine-item-telegram')?.focus();
                         }
@@ -3324,16 +3398,254 @@ export const Settings: React.FC = () => {
                         </div>
                         <p className="text-[11px] text-gray-400 mb-1.5 leading-snug">Multi-server fallback embeds with customizable timeout &amp; priority servers.</p>
                         <div className="flex items-center gap-2 text-xs font-semibold">
-                          <span className="text-emerald-400 flex items-center gap-1">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                            Always Active • {(settings.streamResolverTimeout ?? 0) === 0 ? 'Unlimited' : `${settings.streamResolverTimeout}s`} Timeout
-                          </span>
+                          {isEmbedEnabled ? (
+                            <span className="text-emerald-400 flex items-center gap-1">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                              Enabled • {(settings.streamResolverTimeout ?? 0) === 0 ? 'Unlimited' : `${settings.streamResolverTimeout}s`} Timeout
+                            </span>
+                          ) : (
+                            <span className="text-gray-500 flex items-center gap-1">
+                              <span className="w-1.5 h-1.5 rounded-full bg-gray-600" />
+                              Disabled
+                            </span>
+                          )}
                         </div>
                       </div>
                       <ChevronRight className="w-5 h-5 text-gray-400 stroke-[2.2] flex-shrink-0" />
                     </button>
                   </>
                 );
+              })()}
+            </div>
+
+            {/* Drawer Footer Hint */}
+            <div className="p-4 border-t border-hbo-border/50 bg-black/40 flex items-center justify-center text-xs text-gray-400 select-none">
+              <span>Press <strong className="text-white font-semibold">Back</strong> to return</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* Android TV Engine Priority Order Right Drawer (Level 2)                   */}
+      {/* ========================================================================= */}
+      {showEnginePriorityDrawer && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          data-drawer-container="true"
+          className="fixed inset-0 z-[9999] flex justify-end bg-black/80 backdrop-blur-md animate-fade-in"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowEnginePriorityDrawer(false);
+              setShowEnginesDrawer(true);
+              setTimeout(() => {
+                document.getElementById('drawer-engine-item-priority')?.focus();
+              }, 50);
+            }
+          }}
+        >
+          {/* Left Side Parent Path Context */}
+          <div className="flex-1 hidden md:flex flex-col justify-center pl-16 pr-8 pointer-events-none select-none">
+            <div className="flex items-center gap-2 text-xs font-bold text-gray-400 tracking-wider uppercase mb-2">
+              <span className="text-gray-400">Settings</span>
+              <ChevronRight className="w-3.5 h-3.5 text-gray-500" />
+              <span className="text-gray-400">Playback &amp; Streaming</span>
+              <ChevronRight className="w-3.5 h-3.5 text-gray-500" />
+              <span className="text-gray-400">Stream Engines</span>
+              <ChevronRight className="w-3.5 h-3.5 text-gray-500" />
+              <span className="text-amber-400 font-semibold">Priority Order</span>
+            </div>
+            <h1 className="text-3xl font-extrabold text-white tracking-tight mb-2">Engine Priority Order</h1>
+            <p className="text-sm text-gray-400 max-w-md leading-relaxed">
+              Rearrange the sequence in which stream engines attempt video resolution. When an engine fails or is unavailable, the player cascade moves to the next engine.
+            </p>
+          </div>
+
+          <div className="w-full max-w-md h-full bg-hbo-card/95 border-l border-hbo-border/80 shadow-2xl flex flex-col justify-between animate-slide-in-right overflow-hidden">
+            {/* Drawer Body: 4 Engine Reordering Cards */}
+            <div className="flex-1 overflow-y-auto px-6 py-6 space-y-3 font-sans">
+              <div className="flex items-center justify-between pb-1">
+                <span className="text-xs font-bold text-gray-300">Resolution Sequence</span>
+                <span className="text-[10px] px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 font-bold border border-amber-500/40">
+                  4 Engines
+                </span>
+              </div>
+
+              {(() => {
+                const currentPriority: StreamResolverType[] = (settings.enginePriority && settings.enginePriority.length > 0)
+                  ? settings.enginePriority
+                  : ['torbox', 'telegram', 'embed', 'private_extractor'];
+
+                const currentEnabled = settings.enabledResolvers && settings.enabledResolvers.length > 0
+                  ? settings.enabledResolvers
+                  : ['embed'];
+
+                const engineMeta: Record<StreamResolverType, { title: string; tag: string; desc: string; tagClass: string }> = {
+                  torbox: {
+                    title: 'TorBox Debrid',
+                    tag: '4K Ultra HD',
+                    desc: 'Direct HTTPS 4K HDR & 1080p BluRay cloud streams via TorBox CDN.',
+                    tagClass: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40',
+                  },
+                  telegram: {
+                    title: 'Telegram Provider',
+                    tag: 'Direct MTProto',
+                    desc: 'Direct in-app video streaming from Telegram bots (MovieSubMalay / @msm32bot).',
+                    tagClass: 'bg-sky-500/20 text-sky-300 border-sky-500/40',
+                  },
+                  embed: {
+                    title: 'Embed Resolver',
+                    tag: 'Multi-Mirror',
+                    desc: 'Standard multi-server iframe embeds (VidLink, MoviesAPI) with ad sandboxing.',
+                    tagClass: 'bg-hbo-cyan/20 text-hbo-cyan border-hbo-cyan/40',
+                  },
+                  private_extractor: {
+                    title: 'Direct Extractor',
+                    tag: 'Consumet API',
+                    desc: 'Direct HLS .m3u8 streams resolved via private backend API.',
+                    tagClass: 'bg-hbo-purple/30 text-hbo-purple-light border-hbo-purple/40',
+                  },
+                };
+
+                const rankLabels = [
+                  { badge: '#1 Primary', class: 'bg-amber-500/20 text-amber-300 border-amber-500/40' },
+                  { badge: '#2 Secondary', class: 'bg-sky-500/20 text-sky-300 border-sky-500/40' },
+                  { badge: '#3 Third Choice', class: 'bg-purple-500/20 text-purple-300 border-purple-500/40' },
+                  { badge: '#4 Fallback', class: 'bg-gray-700/40 text-gray-300 border-gray-600/40' },
+                ];
+
+                return currentPriority.map((engineKey, idx) => {
+                  const meta = engineMeta[engineKey];
+                  const rank = rankLabels[idx] || { badge: `#${idx + 1}`, class: 'bg-gray-800 text-gray-400' };
+                  const isEnabled = currentEnabled.includes(engineKey);
+
+                  const moveUp = () => {
+                    if (idx <= 0) return;
+                    const updated = [...currentPriority];
+                    const temp = updated[idx];
+                    updated[idx] = updated[idx - 1];
+                    updated[idx - 1] = temp;
+                    handleUpdate({ enginePriority: updated });
+                    setTimeout(() => {
+                      document.getElementById(`drawer-prio-up-${idx - 1}`)?.focus();
+                    }, 50);
+                  };
+
+                  const moveDown = () => {
+                    if (idx >= currentPriority.length - 1) return;
+                    const updated = [...currentPriority];
+                    const temp = updated[idx];
+                    updated[idx] = updated[idx + 1];
+                    updated[idx + 1] = temp;
+                    handleUpdate({ enginePriority: updated });
+                    setTimeout(() => {
+                      document.getElementById(`drawer-prio-down-${idx + 1}`)?.focus();
+                    }, 50);
+                  };
+
+                  return (
+                    <div
+                      key={engineKey}
+                      id={`drawer-engine-prio-card-${idx}`}
+                      data-engine-prio-item="true"
+                      className="p-3.5 rounded-2xl border bg-hbo-dark/60 border-hbo-border flex items-center justify-between gap-3 transition-all"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className={`text-[10px] px-2 py-0.5 rounded font-mono font-bold border ${rank.class}`}>
+                            {rank.badge}
+                          </span>
+                          <span className="font-bold text-sm text-white truncate">{meta?.title || engineKey}</span>
+                          <span className={`text-[9px] px-1.5 py-0.5 rounded font-mono font-bold border ${meta?.tagClass || 'bg-gray-800 text-gray-400'}`}>
+                            {meta?.tag || ''}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-gray-400 leading-snug mb-1 truncate">{meta?.desc || ''}</p>
+                        <div className="flex items-center gap-1.5 text-[11px]">
+                          {isEnabled ? (
+                            <span className="text-emerald-400 flex items-center gap-1 font-semibold">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                              Active in Streams
+                            </span>
+                          ) : (
+                            <span className="text-gray-500 flex items-center gap-1">
+                              <span className="w-1.5 h-1.5 rounded-full bg-gray-600" />
+                              Disabled in Settings
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Reorder Action Buttons (Move Up / Move Down) with TV D-Pad navigation */}
+                      <div className="flex items-center gap-1.5 flex-shrink-0">
+                        <button
+                          id={`drawer-prio-up-${idx}`}
+                          data-engine-prio-btn="true"
+                          type="button"
+                          disabled={idx === 0}
+                          onKeyDown={(e) => {
+                            if (e.key === 'ArrowRight') {
+                              e.preventDefault();
+                              document.getElementById(`drawer-prio-down-${idx}`)?.focus();
+                            } else if (e.key === 'ArrowUp') {
+                              e.preventDefault();
+                              if (idx > 0) {
+                                document.getElementById(`drawer-prio-up-${idx - 1}`)?.focus();
+                              }
+                            } else if (e.key === 'ArrowDown') {
+                              e.preventDefault();
+                              if (idx < currentPriority.length - 1) {
+                                document.getElementById(`drawer-prio-up-${idx + 1}`)?.focus();
+                              }
+                            }
+                          }}
+                          onClick={moveUp}
+                          className={`w-9 h-9 rounded-xl border flex items-center justify-center transition-all tv-focus-target ${
+                            idx === 0
+                              ? 'opacity-25 border-white/5 bg-white/5 text-gray-600 cursor-not-allowed'
+                              : 'bg-hbo-dark border-hbo-border hover:border-amber-400 hover:bg-amber-500/20 text-amber-300'
+                          }`}
+                          title="Move Up"
+                        >
+                          <span className="font-bold text-sm">▲</span>
+                        </button>
+
+                        <button
+                          id={`drawer-prio-down-${idx}`}
+                          data-engine-prio-btn="true"
+                          type="button"
+                          disabled={idx === currentPriority.length - 1}
+                          onKeyDown={(e) => {
+                            if (e.key === 'ArrowLeft') {
+                              e.preventDefault();
+                              document.getElementById(`drawer-prio-up-${idx}`)?.focus();
+                            } else if (e.key === 'ArrowUp') {
+                              e.preventDefault();
+                              if (idx > 0) {
+                                document.getElementById(`drawer-prio-down-${idx - 1}`)?.focus();
+                              }
+                            } else if (e.key === 'ArrowDown') {
+                              e.preventDefault();
+                              if (idx < currentPriority.length - 1) {
+                                document.getElementById(`drawer-prio-down-${idx + 1}`)?.focus();
+                              }
+                            }
+                          }}
+                          onClick={moveDown}
+                          className={`w-9 h-9 rounded-xl border flex items-center justify-center transition-all tv-focus-target ${
+                            idx === currentPriority.length - 1
+                              ? 'opacity-25 border-white/5 bg-white/5 text-gray-600 cursor-not-allowed'
+                              : 'bg-hbo-dark border-hbo-border hover:border-amber-400 hover:bg-amber-500/20 text-amber-300'
+                          }`}
+                          title="Move Down"
+                        >
+                          <span className="font-bold text-sm">▼</span>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                });
               })()}
             </div>
 
@@ -4105,6 +4417,48 @@ export const Settings: React.FC = () => {
 
                 return (
                   <>
+                    {/* Item 0: Enable / Disable Embed Resolver Toggle */}
+                    <button
+                      id="drawer-embed-toggle"
+                      data-embed-drawer-item="true"
+                      type="button"
+                      onKeyDown={(e) => {
+                        if (e.key === 'ArrowDown') {
+                          e.preventDefault();
+                          document.getElementById('drawer-embed-sub-timeout')?.focus();
+                        }
+                      }}
+                      onClick={() => {
+                        let updated: StreamResolverType[];
+                        if (isEmbedEnabled) {
+                          if (currentEnabled.length === 1) return; // Must have at least one resolver enabled
+                          updated = currentEnabled.filter(r => r !== 'embed') as StreamResolverType[];
+                        } else {
+                          updated = [...currentEnabled, 'embed'] as StreamResolverType[];
+                        }
+                        handleUpdate({
+                          enabledResolvers: updated,
+                          streamResolver: updated[0] || 'embed'
+                        });
+                      }}
+                      className={`w-full p-4 rounded-xl border text-left transition-all tv-focus-target flex items-center justify-between ${
+                        isEmbedEnabled
+                          ? 'bg-hbo-purple/30 border-hbo-cyan text-white shadow-hbo-glow ring-1 ring-hbo-cyan/40'
+                          : 'bg-black/30 border-hbo-border hover:border-gray-600 text-gray-400'
+                      }`}
+                    >
+                      <div className="min-w-0 pr-3">
+                        <div className="font-bold text-sm text-white mb-0.5">Enable Embed Resolver</div>
+                        <p className="text-[11px] text-gray-400">Stream via web player iframe embeds (VidLink, MoviesAPI, etc.).</p>
+                      </div>
+                      <div className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 ${
+                        isEmbedEnabled ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40' : 'bg-white/5 text-gray-400 border border-white/10'
+                      }`}>
+                        {isEmbedEnabled ? <Check className="w-3.5 h-3.5 stroke-[2.5]" /> : <X className="w-3.5 h-3.5 stroke-[2.5]" />}
+                        <span>{isEmbedEnabled ? 'Enabled' : 'Disabled'}</span>
+                      </div>
+                    </button>
+
                     {/* Item 1: Stream Resolver Timeout Hub Button */}
                     <div className="bg-black/40 border border-hbo-border rounded-xl p-3.5 flex items-center justify-between">
                       <div className="min-w-0 pr-2">
@@ -4119,7 +4473,10 @@ export const Settings: React.FC = () => {
                         data-embed-drawer-item="true"
                         type="button"
                         onKeyDown={(e) => {
-                          if (e.key === 'ArrowDown') {
+                          if (e.key === 'ArrowUp') {
+                            e.preventDefault();
+                            document.getElementById('drawer-embed-toggle')?.focus();
+                          } else if (e.key === 'ArrowDown') {
                             e.preventDefault();
                             const target = document.getElementById('drawer-embed-sub-retries');
                             target?.focus();
@@ -4256,7 +4613,7 @@ export const Settings: React.FC = () => {
                                 document.getElementById('drawer-embed-priority-general')?.focus();
                               } else if (e.key === 'ArrowDown') {
                                 e.preventDefault();
-                                document.getElementById('drawer-embed-priority-asian')?.focus();
+                                document.getElementById('drawer-embed-priority-asean')?.focus();
                               }
                             }}
                             onClick={() => {

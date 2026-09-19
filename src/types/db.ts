@@ -93,6 +93,7 @@ export interface UserSettings {
   maturityLevel: 'all' | 'mature' | 'teen' | 'older_kids' | 'kids' | 'pg13' | 'family';
   streamResolver: StreamResolverType; // Legacy single selection
   enabledResolvers: StreamResolverType[]; // Multi or single enabled engines (e.g. ['torbox', 'private_extractor', 'embed'])
+  enginePriority?: StreamResolverType[]; // Priority order of engines (e.g. ['torbox', 'telegram', 'embed', 'private_extractor'])
   directStreamApiUrl?: string; // Custom or default Consumet API URL (e.g. https://tmdb-api-yfbu.onrender.com)
   torboxApiKey?: string; // TorBox API Key (for 4K HDR & 1080p cloud streams)
   enabledTelegramProviders?: string[]; // e.g. ['telegram-msm32']

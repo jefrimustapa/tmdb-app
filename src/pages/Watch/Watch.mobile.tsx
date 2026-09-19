@@ -79,12 +79,19 @@ export const Watch: React.FC = () => {
               s.enabledTelegramProviders
             );
 
+            const priorityList = s.enginePriority || ['torbox', 'telegram', 'embed', 'private_extractor'];
+            const telegramRank = priorityList.indexOf('telegram');
+            const embedRank = priorityList.indexOf('embed');
+            const prefersTelegramOverEmbed = telegramRank !== -1 && (embedRank === -1 || telegramRank < embedRank);
+
             let defaultProvider = 'vidlink';
-            if (animeFlag) {
+            if (prefersTelegramOverEmbed && hasTelegram && isTelegramMatching) {
+              defaultProvider = 'telegram-msm32';
+            } else if (animeFlag) {
               defaultProvider = s.topAnimeProviders?.[0] || 'megaplay-anime';
             } else if (koreanFlag) {
               defaultProvider = s.topKoreanProviders?.[0] || 'kisskh-kdrama';
-            } else if (hasTelegram && isTelegramMatching) {
+            } else if (!prefersTelegramOverEmbed && hasTelegram && isTelegramMatching && !hasEmbed) {
               defaultProvider = 'telegram-msm32';
             } else if (aseanFlag) {
               defaultProvider = s.topAseanProviders?.[0] || (s as any).topAsianProviders?.[0] || 'vidlink';

@@ -612,88 +612,109 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         }
       }
 
-      // 1. Try TorBox if enabled
-      if (enabledResolvers.includes('torbox') && torboxApiKey && torboxApiKey.trim()) {
-        try {
-          console.log('[Resolver] Checking TorBox 4K Cloud...');
-          setResolvingStatus('Checking TorBox 4K Cloud Debrid...');
-          const torboxRes = await fetchTorboxStream(tmdbId, undefined, mediaType, season, episode, torboxApiKey);
-          if (!isMounted) return;
-          if (torboxRes && torboxRes.sources && torboxRes.sources.length > 0) {
-            console.log(`[Resolver] ✅ Playing via TorBox 4K:`, torboxRes.sources[0].url);
-            setResolvingStatus('Connected to TorBox 4K Cloud');
-            setDirectStreamUrl(torboxRes.sources[0].url);
-            setDirectStreamLabel('TorBox 4K Cloud');
-            setPlayerMode('direct');
-            setIsExtracting(false);
-            setExtractionFailed(false);
-            setIsLoading(false);
-            return;
-          }
-        } catch (err) {
-          console.warn('[Resolver] TorBox error:', err);
-        }
-      }
+      const currentSettings = await dbService.getSettings();
+      const activeEnginePriority: StreamResolverType[] = (currentSettings.enginePriority && currentSettings.enginePriority.length > 0)
+        ? currentSettings.enginePriority
+        : ['torbox', 'telegram', 'embed', 'private_extractor'];
 
-      // 2. Try Private Consumet Extractor if enabled
-      if (enabledResolvers.includes('private_extractor')) {
-        try {
-          console.log('[Resolver] Checking Private Stream Extractor...');
-          setResolvingStatus('Querying Private Stream Extractor...');
-          const directRes = await fetchDirectStream(tmdbId, title, mediaType, season, episode, directStreamApiUrl);
-          if (!isMounted) return;
-          if (directRes && directRes.sources && directRes.sources.length > 0) {
-            console.log(`[Resolver] ✅ Playing via ${directRes.provider}:`, directRes.sources[0].url);
-            setResolvingStatus(`Connected via ${directRes.provider}`);
-            setDirectStreamUrl(directRes.sources[0].url);
-            setDirectStreamLabel(directRes.provider);
-            setPlayerMode('direct');
-            setIsExtracting(false);
-            setExtractionFailed(false);
-            setIsLoading(false);
-            return;
-          }
-        } catch (err) {
-          console.warn('[Resolver] Private extractor error:', err);
-        }
-      }
+      for (const engine of activeEnginePriority) {
+        if (!isMounted) return;
 
-      // 3. Try Telegram if enabled and title origin matches filter
-      if (enabledResolvers.includes('telegram') && isTelegramOriginMatching) {
-        try {
-          console.log('[Resolver] Checking Telegram Provider (MovieSubMalay)...');
-          setResolvingStatus('Checking Telegram MovieSubMalay Resolver...');
-          const msmRes = await msm32Service.resolveStream(
-            title,
-            releaseYear,
-            mediaType === 'tv' ? season : undefined,
-            mediaType === 'tv' ? episode : undefined
-          );
-          if (!isMounted) return;
-          if (msmRes && msmRes.streamUrl) {
-            console.log('[Resolver] ✅ Playing via Telegram Direct Stream:', msmRes.streamUrl);
-            setResolvingStatus('Connected to Telegram Stream');
-            setResolvedMsm32Url(msmRes.streamUrl);
-            setDirectStreamUrl(msmRes.streamUrl);
-            setDirectStreamLabel('Telegram (MSM32)');
-            setPlayerMode('direct');
-            setIsExtracting(false);
-            setExtractionFailed(false);
-            setIsLoading(false);
-            setIsProbing(false);
-            isPlayingRef.current = true;
-            return;
+        // 1. Try TorBox if enabled
+        if (engine === 'torbox' && enabledResolvers.includes('torbox') && torboxApiKey && torboxApiKey.trim()) {
+          try {
+            console.log('[Resolver] Checking TorBox 4K Cloud...');
+            setResolvingStatus('Checking TorBox 4K Cloud Debrid...');
+            const torboxRes = await fetchTorboxStream(tmdbId, undefined, mediaType, season, episode, torboxApiKey);
+            if (!isMounted) return;
+            if (torboxRes && torboxRes.sources && torboxRes.sources.length > 0) {
+              console.log(`[Resolver] ✅ Playing via TorBox 4K:`, torboxRes.sources[0].url);
+              setResolvingStatus('Connected to TorBox 4K Cloud');
+              setDirectStreamUrl(torboxRes.sources[0].url);
+              setDirectStreamLabel('TorBox 4K Cloud');
+              setPlayerMode('direct');
+              setIsExtracting(false);
+              setExtractionFailed(false);
+              setIsLoading(false);
+              return;
+            }
+          } catch (err) {
+            console.warn('[Resolver] TorBox error:', err);
           }
-        } catch (err) {
-          console.warn('[Resolver] Telegram waterfall error:', err);
+        }
+
+        // 2. Try Private Consumet Extractor if enabled
+        if (engine === 'private_extractor' && enabledResolvers.includes('private_extractor')) {
+          try {
+            console.log('[Resolver] Checking Private Stream Extractor...');
+            setResolvingStatus('Querying Private Stream Extractor...');
+            const directRes = await fetchDirectStream(tmdbId, title, mediaType, season, episode, directStreamApiUrl);
+            if (!isMounted) return;
+            if (directRes && directRes.sources && directRes.sources.length > 0) {
+              console.log(`[Resolver] ✅ Playing via ${directRes.provider}:`, directRes.sources[0].url);
+              setResolvingStatus(`Connected via ${directRes.provider}`);
+              setDirectStreamUrl(directRes.sources[0].url);
+              setDirectStreamLabel(directRes.provider);
+              setPlayerMode('direct');
+              setIsExtracting(false);
+              setExtractionFailed(false);
+              setIsLoading(false);
+              return;
+            }
+          } catch (err) {
+            console.warn('[Resolver] Private extractor error:', err);
+          }
+        }
+
+        // 3. Try Telegram if enabled and title origin matches filter
+        if (engine === 'telegram' && enabledResolvers.includes('telegram') && isTelegramOriginMatching) {
+          try {
+            console.log('[Resolver] Checking Telegram Provider (MovieSubMalay)...');
+            setResolvingStatus('Checking Telegram MovieSubMalay Resolver...');
+            const msmRes = await msm32Service.resolveStream(
+              title,
+              releaseYear,
+              mediaType === 'tv' ? season : undefined,
+              mediaType === 'tv' ? episode : undefined
+            );
+            if (!isMounted) return;
+            if (msmRes && msmRes.streamUrl) {
+              console.log('[Resolver] ✅ Playing via Telegram Direct Stream:', msmRes.streamUrl);
+              setResolvingStatus('Connected to Telegram Stream');
+              setResolvedMsm32Url(msmRes.streamUrl);
+              setDirectStreamUrl(msmRes.streamUrl);
+              setDirectStreamLabel('Telegram (MSM32)');
+              setPlayerMode('direct');
+              setIsExtracting(false);
+              setExtractionFailed(false);
+              setIsLoading(false);
+              setIsProbing(false);
+              isPlayingRef.current = true;
+              return;
+            }
+          } catch (err) {
+            console.warn('[Resolver] Telegram waterfall error:', err);
+          }
+        }
+
+        // 4. Try Embed Resolver if prioritized
+        if (engine === 'embed' && enabledResolvers.includes('embed')) {
+          console.log('[Resolver] Active: Embed Resolver');
+          setResolvingStatus(`Loading embed player (${provider.name})...`);
+          setPlayerMode('embed');
+          setDirectStreamUrl(null);
+          setDirectStreamLabel('Embed Mirror');
+          setIsExtracting(false);
+          setExtractionFailed(false);
+          return;
         }
       }
 
       if (!isMounted) return;
 
-      // 4. Fallback to Embed Resolver ONLY if explicitly enabled
+      // Final fallback to Embed Resolver ONLY if explicitly enabled
       if (enabledResolvers.includes('embed')) {
-        console.log('[Resolver] Active: Embed Resolver');
+        console.log('[Resolver] Fallback: Embed Resolver');
         setResolvingStatus(`Loading embed player (${provider.name})...`);
         setPlayerMode('embed');
         setDirectStreamUrl(null);
@@ -703,6 +724,10 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       } else {
         console.log('[Resolver] Direct stream not resolved and Embed Resolver is disabled.');
         setPlayerMode('error');
+        setDirectStreamUrl(null);
+        setIsExtracting(false);
+        setExtractionFailed(true);
+        setIsLoading(false);
       }
     };
 
