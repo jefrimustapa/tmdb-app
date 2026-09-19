@@ -380,7 +380,13 @@ export const Watch: React.FC = () => {
                              currentActive === nextBtn || 
                              currentActive === settingsBtn;
 
-      if (!isHeaderActive) return;
+      if (!isHeaderActive) {
+        if (e.key === 'ArrowUp' || e.keyCode === 19 || e.code === 'ArrowUp') {
+          e.preventDefault();
+          window.dispatchEvent(new CustomEvent('tmdb_show_header_focus_back'));
+        }
+        return;
+      }
 
       if (e.key === 'ArrowRight') {
         e.preventDefault();
