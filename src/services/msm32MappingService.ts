@@ -68,6 +68,10 @@ class Msm32MappingService {
     }
   }
 
+  public clearCache(): void {
+    this.clientCache.clear();
+  }
+
   /**
    * Resolve a title to a direct HTTP streaming URL via MSM Getter
    */
@@ -83,16 +87,16 @@ class Msm32MappingService {
       return null;
     }
 
-    // 1. Check local client cache first (0ms, 0 network requests)
-    const clientKey = `${(title || '').toLowerCase().trim()}_${year || ''}_${season || ''}_${episode || ''}_720`;
+    const baseUrl = await this.getBaseUrl();
+    if (signal?.aborted) return null;
+
+    // 1. Check local client cache first (0ms, 0 network requests) - strictly host-isolated
+    const clientKey = `${baseUrl}_${(title || '').toLowerCase().trim()}_${year || ''}_${season || ''}_${episode || ''}_720`;
     const localHit = this.clientCache.get(clientKey);
     if (localHit && Date.now() - localHit.timestamp < this.CACHE_TTL_MS) {
       console.log(`[MSM32] Client local cache HIT for "${title}" -> Instant stream`);
       return localHit.result;
     }
-
-    const baseUrl = await this.getBaseUrl();
-    if (signal?.aborted) return null;
 
     const controller = new AbortController();
     // Allow up to 35 seconds to accommodate cold starts on free containers

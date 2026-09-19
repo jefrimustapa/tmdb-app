@@ -4094,6 +4094,7 @@ export const Settings: React.FC = () => {
                             }}
                             onClick={() => {
                               const renderUrl = 'https://msm-getter.onrender.com';
+                              msm32Service.clearCache();
                               setMsmUrlInput(renderUrl);
                               handleUpdate({ msm32GetterUrl: renderUrl });
                             }}
@@ -4125,6 +4126,7 @@ export const Settings: React.FC = () => {
                             }}
                             onClick={() => {
                               const localUrl = 'http://localhost:3033';
+                              msm32Service.clearCache();
                               setMsmUrlInput(localUrl);
                               handleUpdate({ msm32GetterUrl: localUrl });
                             }}
@@ -4164,6 +4166,7 @@ export const Settings: React.FC = () => {
                                 e.preventDefault();
                                 const trimmed = msmUrlInput.trim().replace(/\/+$/, '');
                                 const finalUrl = trimmed || 'https://msm-getter.onrender.com';
+                                msm32Service.clearCache();
                                 handleUpdate({ msm32GetterUrl: finalUrl });
                                 setMsmUrlInput(finalUrl);
                               }
@@ -4190,6 +4193,7 @@ export const Settings: React.FC = () => {
                             onClick={() => {
                               const trimmed = msmUrlInput.trim().replace(/\/+$/, '');
                               const finalUrl = trimmed || 'https://msm-getter.onrender.com';
+                              msm32Service.clearCache();
                               handleUpdate({ msm32GetterUrl: finalUrl });
                               setMsmUrlInput(finalUrl);
                               setTestingMsm32(true);
