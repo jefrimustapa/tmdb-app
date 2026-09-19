@@ -1,5 +1,5 @@
 import Dexie, { type Table } from 'dexie';
-import type { WatchHistoryItem, LikedItem, WatchlistItem, UserSettings, RatingCacheItem } from '../types/db';
+import type { WatchHistoryItem, LikedItem, WatchlistItem, UserSettings, RatingCacheItem, StreamResolverType } from '../types/db';
 
 export class TMDBStreamerDB extends Dexie {
   history!: Table<WatchHistoryItem, number>;
@@ -76,14 +76,11 @@ export const DEFAULT_SETTINGS: UserSettings = {
   maturityLevel: 'all',
   streamResolver: 'embed',
   enabledResolvers: ['embed'],
-  enginePriority: ['torbox', 'telegram', 'embed', 'private_extractor'],
+  enginePriority: ['telegram', 'embed'],
   enabledTelegramProviders: ['telegram-msm32'],
   telegramProviderCountries: { 'telegram-msm32': ['MY', 'ID', 'SG'] },
   msm32GetterUrl: 'https://msm-getter.onrender.com',
   msm32ChunkSize: 524288,
-  directStreamMode: false,
-  directStreamApiUrl: 'https://tmdb-api-yfbu.onrender.com',
-  torboxApiKey: 'fd12d8fe-2429-43eb-bcb3-1a3d2dfeb5f9',
   streamHeaderTimeout: 5,
   streamResolverTimeout: 0,
   streamResolverRetries: 1,
@@ -359,22 +356,30 @@ export const dbService = {
       ];
       await db.settings.put(settings);
     }
-    if (!settings.streamResolver) {
-      settings.streamResolver = settings.directStreamMode ? 'private_extractor' : 'embed';
-      await db.settings.put(settings);
+    if (!settings.streamResolver || (settings.streamResolver as string) !== 'telegram') {
+      settings.streamResolver = 'embed';
     }
-    if (!settings.torboxApiKey) {
-      settings.torboxApiKey = 'fd12d8fe-2429-43eb-bcb3-1a3d2dfeb5f9';
-      await db.settings.put(settings);
-    }
-    if (!settings.enabledResolvers || settings.enabledResolvers.length === 0) {
+    // Clean up removed engines (torbox, private_extractor, directStreamMode)
+    delete (settings as any).directStreamMode;
+    delete (settings as any).directStreamApiUrl;
+    delete (settings as any).torboxApiKey;
+
+    const validResolvers: StreamResolverType[] = ['telegram', 'embed'];
+    if (settings.enabledResolvers && Array.isArray(settings.enabledResolvers)) {
+      const filtered = settings.enabledResolvers.filter(r => validResolvers.includes(r as any)) as StreamResolverType[];
+      settings.enabledResolvers = filtered.length > 0 ? filtered : ['embed'];
+    } else {
       settings.enabledResolvers = ['embed'];
-      await db.settings.put(settings);
     }
-    if (!settings.enginePriority || settings.enginePriority.length === 0) {
-      settings.enginePriority = ['torbox', 'telegram', 'embed', 'private_extractor'];
-      await db.settings.put(settings);
+    if (settings.enginePriority && Array.isArray(settings.enginePriority)) {
+      const filtered = settings.enginePriority.filter(r => validResolvers.includes(r as any)) as StreamResolverType[];
+      if (!filtered.includes('telegram')) filtered.unshift('telegram');
+      if (!filtered.includes('embed')) filtered.push('embed');
+      settings.enginePriority = filtered;
+    } else {
+      settings.enginePriority = ['telegram', 'embed'];
     }
+    await db.settings.put(settings);
     if (settings.performanceMode === undefined) {
       settings.performanceMode = getDefaultPerformanceMode();
       await db.settings.put(settings);

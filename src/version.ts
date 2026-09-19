@@ -2,12 +2,13 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20260919-0931';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.fix-asean-original-t.20260919-0931';
+export const APP_BUILD_NUMBER = '20260919-1158';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.fix-watch-header-ser.20260919-1158';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
-export const APP_BRANCH = 'fix-asean-original-t';
-export const APP_CHANGELOG = `* feat: add debug-search endpoint in server/msm-getter
+export const APP_BRANCH = 'fix-watch-header-ser';
+export const APP_CHANGELOG = `* fix: prioritize original titles in pencuri candidate scoring and regional drama queries (#115)
+* feat: add debug-search endpoint in server/msm-getter
 * fix: prioritize 720p resolution for telegram provider and quality-aware caching (#114)
 * feat: Telegram Provider (@msm32bot), Custom Direct Player UI, and Settings Restructure (#113)
 * refactor(providers): restructure provider categories and preferences for ASEAN and regional content (#112)
@@ -20,5 +21,4 @@ export const APP_CHANGELOG = `* feat: add debug-search endpoint in server/msm-ge
 * fix(device): improve platform detection accuracy for desktop web and touchscreen laptops (#105)
 * feat: add PencuriMovie provider, resolver retry settings, and network resilience (#104)
 * feat(tv): redesign leanback TV settings with nested drawers and dpad auto-scroll (#103)
-* perf(tv): improve Home screen initial loading time and rail batching (#101)
-* fix: handle unsupported and malformed subtitles, optimize video playback CPU usage, and refine virtual cursor click (#100)`;
+* perf(tv): improve Home screen initial loading time and rail batching (#101)`;

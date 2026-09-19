@@ -162,11 +162,9 @@ export const Settings: React.FC = () => {
   const [showAutoplayTimeoutDrawer, setShowAutoplayTimeoutDrawer] = useState(false);
   const [showEnginesDrawer, setShowEnginesDrawer] = useState(false);
   const [showEnginePriorityDrawer, setShowEnginePriorityDrawer] = useState(false);
-  const [showTorboxDrawer, setShowTorboxDrawer] = useState(false);
   const [showTelegramDrawer, setShowTelegramDrawer] = useState(false);
   const [showTelegramChunkDrawer, setShowTelegramChunkDrawer] = useState(false);
   const [showTelegramCountryDrawer, setShowTelegramCountryDrawer] = useState(false);
-  const [showDirectExtractorDrawer, setShowDirectExtractorDrawer] = useState(false);
   const [showEmbedResolverDrawer, setShowEmbedResolverDrawer] = useState(false);
   const [showEmbedTimeoutDrawer, setShowEmbedTimeoutDrawer] = useState(false);
   const [showEmbedRetryDrawer, setShowEmbedRetryDrawer] = useState(false);
@@ -182,7 +180,7 @@ export const Settings: React.FC = () => {
   const { detectedPlatform, activeLayout } = useDevice();
 
   const isPickerModalOpen = pickerModalSlot !== null;
-  const isAnyModalOpen = isPickerModalOpen || showMaturityDrawer || showTriggerDrawer || showAutoplayDrawer || showAutoplayTriggerDrawer || showAutoplayTimeoutDrawer || showEnginesDrawer || showEnginePriorityDrawer || showTorboxDrawer || showTelegramDrawer || showTelegramChunkDrawer || showTelegramCountryDrawer || showDirectExtractorDrawer || showEmbedResolverDrawer || showEmbedTimeoutDrawer || showEmbedRetryDrawer || activePriorityDrawer !== null || showTickerDrawer || showHeaderTimeoutDrawer || showPerfHudDrawer || showBackupDrawer;
+  const isAnyModalOpen = isPickerModalOpen || showMaturityDrawer || showTriggerDrawer || showAutoplayDrawer || showAutoplayTriggerDrawer || showAutoplayTimeoutDrawer || showEnginesDrawer || showEnginePriorityDrawer || showTelegramDrawer || showTelegramChunkDrawer || showTelegramCountryDrawer || showEmbedResolverDrawer || showEmbedTimeoutDrawer || showEmbedRetryDrawer || activePriorityDrawer !== null || showTickerDrawer || showHeaderTimeoutDrawer || showPerfHudDrawer || showBackupDrawer;
 
   // Viewport scroll helpers for TV remote navigation (snaps to absolute top / bottom)
   const scrollToPanelTop = () => {
@@ -285,7 +283,7 @@ export const Settings: React.FC = () => {
     } else if (showEnginesDrawer) {
       setTimeout(() => {
         const defaultEl = document.getElementById('drawer-engine-item-priority') ||
-                          document.getElementById('drawer-engine-item-torbox') ||
+                          document.getElementById('drawer-engine-item-telegram') ||
                           document.querySelector<HTMLElement>('[data-engine-drawer-item="true"]');
         if (defaultEl) {
           defaultEl.focus();
@@ -297,15 +295,6 @@ export const Settings: React.FC = () => {
         const defaultEl = document.getElementById('drawer-prio-down-0') ||
                           document.getElementById('drawer-prio-up-0') ||
                           document.querySelector<HTMLElement>('[data-engine-prio-item="true"]');
-        if (defaultEl) {
-          defaultEl.focus();
-          defaultEl.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-        }
-      }, 50);
-    } else if (showTorboxDrawer) {
-      setTimeout(() => {
-        const defaultEl = document.getElementById('drawer-torbox-toggle') ||
-                          document.querySelector<HTMLElement>('[data-torbox-drawer-item="true"]');
         if (defaultEl) {
           defaultEl.focus();
           defaultEl.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
@@ -333,15 +322,6 @@ export const Settings: React.FC = () => {
       setTimeout(() => {
         const defaultEl = document.getElementById('drawer-telegram-country-MY') ||
                           document.querySelector<HTMLElement>('[data-telegram-country-drawer-item]');
-        if (defaultEl) {
-          defaultEl.focus();
-          defaultEl.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-        }
-      }, 50);
-    } else if (showDirectExtractorDrawer) {
-      setTimeout(() => {
-        const defaultEl = document.getElementById('drawer-extractor-toggle') ||
-                          document.querySelector<HTMLElement>('[data-extractor-drawer-item="true"]');
         if (defaultEl) {
           defaultEl.focus();
           defaultEl.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
@@ -436,7 +416,7 @@ export const Settings: React.FC = () => {
         (window as any).AndroidBridge?.setDropdownOpen?.(false);
       } catch {}
     };
-  }, [pickerModalSlot, isPickerModalOpen, showMaturityDrawer, showTriggerDrawer, showAutoplayDrawer, showAutoplayTriggerDrawer, showAutoplayTimeoutDrawer, showEnginesDrawer, showTorboxDrawer, showTelegramDrawer, showTelegramChunkDrawer, showTelegramCountryDrawer, showDirectExtractorDrawer, showEmbedResolverDrawer, showEmbedTimeoutDrawer, activePriorityDrawer, showTickerDrawer, showHeaderTimeoutDrawer, showPerfHudDrawer, showBackupDrawer, isAnyModalOpen]);
+  }, [pickerModalSlot, isPickerModalOpen, showMaturityDrawer, showTriggerDrawer, showAutoplayDrawer, showAutoplayTriggerDrawer, showAutoplayTimeoutDrawer, showEnginesDrawer, showTelegramDrawer, showTelegramChunkDrawer, showTelegramCountryDrawer, showEmbedResolverDrawer, showEmbedTimeoutDrawer, activePriorityDrawer, showTickerDrawer, showHeaderTimeoutDrawer, showPerfHudDrawer, showBackupDrawer, isAnyModalOpen]);
 
   // Handle remote Back button, tmdb_close_dropdowns, and Escape dismissal for modals / drawers
   useEffect(() => {
@@ -506,22 +486,12 @@ export const Settings: React.FC = () => {
         }, 50);
         return;
       }
-      if (showTorboxDrawer) {
-        setShowTorboxDrawer(false);
-        setShowEnginesDrawer(true);
-        return;
-      }
       if (showTelegramDrawer) {
         setShowTelegramDrawer(false);
         setShowEnginesDrawer(true);
         setTimeout(() => {
           document.getElementById('drawer-engine-item-telegram')?.focus();
         }, 50);
-        return;
-      }
-      if (showDirectExtractorDrawer) {
-        setShowDirectExtractorDrawer(false);
-        setShowEnginesDrawer(true);
         return;
       }
       if (showEmbedResolverDrawer) {
@@ -628,11 +598,9 @@ export const Settings: React.FC = () => {
     showAutoplayTimeoutDrawer,
     showEnginesDrawer,
     showEnginePriorityDrawer,
-    showTorboxDrawer,
     showTelegramDrawer,
     showTelegramChunkDrawer,
     showTelegramCountryDrawer,
-    showDirectExtractorDrawer,
     showEmbedResolverDrawer,
     showEmbedTimeoutDrawer,
     activePriorityDrawer,
@@ -1455,7 +1423,7 @@ export const Settings: React.FC = () => {
                 </button>
               </div>
 
-              {/* Row 3: Stream Engines Hub (TorBox, Direct Extractor, Embed Resolver) */}
+              {/* Row 3: Stream Engines Hub (Telegram, Embed Resolver) */}
               <div
                 data-settings-row="true"
                 className="bg-hbo-card border border-hbo-border rounded-2xl p-4 shadow-lg flex items-center justify-between gap-4"
@@ -1466,7 +1434,7 @@ export const Settings: React.FC = () => {
                     <span>Playback Stream Engines</span>
                   </h3>
                   <p className="text-[11px] text-gray-400">
-                    Enable and configure cloud debrid, direct HLS extractors, and multi-mirror embeds.
+                    Enable and configure Telegram direct streaming and multi-mirror embeds.
                   </p>
                 </div>
 
@@ -1501,7 +1469,7 @@ export const Settings: React.FC = () => {
                           <span className="text-hbo-cyan font-bold">{count} Active {count === 1 ? 'Engine' : 'Engines'}</span>
                           <span className="text-gray-500">•</span>
                           <span className="text-gray-300 font-medium text-[11px]">
-                            {enabled.map(k => k === 'torbox' ? 'TorBox' : k === 'telegram' ? 'Telegram' : k === 'private_extractor' ? 'Direct Extractor' : 'Embed').join(', ')}
+                            {enabled.map(k => k === 'telegram' ? 'Telegram' : 'Embed').join(', ')}
                           </span>
                         </div>
                       </div>
@@ -3189,14 +3157,12 @@ export const Settings: React.FC = () => {
                 const currentEnabled = settings.enabledResolvers && settings.enabledResolvers.length > 0
                   ? settings.enabledResolvers
                   : ['embed'];
-                const isTorboxEnabled = currentEnabled.includes('torbox');
                 const isTelegramEnabled = currentEnabled.includes('telegram');
-                const isExtractorEnabled = currentEnabled.includes('private_extractor');
                 const isEmbedEnabled = currentEnabled.includes('embed');
 
                 const priorityOrder: StreamResolverType[] = (settings.enginePriority && settings.enginePriority.length > 0)
                   ? settings.enginePriority
-                  : ['torbox', 'telegram', 'embed', 'private_extractor'];
+                  : ['telegram', 'embed'];
 
                 return (
                   <>
@@ -3208,7 +3174,7 @@ export const Settings: React.FC = () => {
                       onKeyDown={(e) => {
                         if (e.key === 'ArrowDown') {
                           e.preventDefault();
-                          document.getElementById('drawer-engine-item-torbox')?.focus();
+                          document.getElementById('drawer-engine-item-telegram')?.focus();
                         }
                       }}
                       onClick={() => {
@@ -3229,7 +3195,7 @@ export const Settings: React.FC = () => {
                           {priorityOrder.map((eng, idx) => (
                             <span key={eng} className="flex items-center gap-1">
                               {idx > 0 && <span className="text-gray-500 font-mono text-[10px]">→</span>}
-                              <span className="capitalize">{eng === 'private_extractor' ? 'Direct' : eng}</span>
+                              <span className="capitalize">{eng}</span>
                             </span>
                           ))}
                         </div>
@@ -3237,9 +3203,9 @@ export const Settings: React.FC = () => {
                       <ChevronRight className="w-5 h-5 text-amber-400 stroke-[2.2] flex-shrink-0" />
                     </button>
 
-                    {/* Item 1: TorBox Debrid Stream Engine */}
+                    {/* Item 1: Telegram Provider Stream Engine */}
                     <button
-                      id="drawer-engine-item-torbox"
+                      id="drawer-engine-item-telegram"
                       data-engine-drawer-item="true"
                       type="button"
                       onKeyDown={(e) => {
@@ -3248,52 +3214,7 @@ export const Settings: React.FC = () => {
                           document.getElementById('drawer-engine-item-priority')?.focus();
                         } else if (e.key === 'ArrowDown') {
                           e.preventDefault();
-                          document.getElementById('drawer-engine-item-telegram')?.focus();
-                        }
-                      }}
-                      onClick={() => {
-                        setShowEnginesDrawer(false);
-                        setShowTorboxDrawer(true);
-                      }}
-                      className="w-full p-4 rounded-2xl border text-left transition-all tv-focus-target flex items-center justify-between gap-3 bg-hbo-dark/60 border-hbo-border hover:bg-hbo-hover hover:border-white/20"
-                    >
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="font-bold text-sm text-white truncate">TorBox Debrid</span>
-                          <span className="text-[9px] px-2 py-0.5 rounded font-mono font-bold bg-hbo-cyan/20 text-hbo-cyan border border-hbo-cyan/40">
-                            4K Ultra HD
-                          </span>
-                        </div>
-                        <p className="text-[11px] text-gray-400 mb-1.5 leading-snug">Direct HTTPS 4K HDR &amp; 1080p BluRay cloud streams via TorBox CDN.</p>
-                        <div className="flex items-center gap-2 text-xs font-semibold">
-                          {isTorboxEnabled ? (
-                            <span className="text-emerald-400 flex items-center gap-1">
-                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                              Enabled {settings.torboxApiKey ? '(API Configured)' : '(No API Key)'}
-                            </span>
-                          ) : (
-                            <span className="text-gray-500 flex items-center gap-1">
-                              <span className="w-1.5 h-1.5 rounded-full bg-gray-600" />
-                              Disabled
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      <ChevronRight className="w-5 h-5 text-gray-400 stroke-[2.2] flex-shrink-0" />
-                    </button>
-
-                    {/* Item 2: Telegram Provider Stream Engine */}
-                    <button
-                      id="drawer-engine-item-telegram"
-                      data-engine-drawer-item="true"
-                      type="button"
-                      onKeyDown={(e) => {
-                        if (e.key === 'ArrowUp') {
-                          e.preventDefault();
-                          document.getElementById('drawer-engine-item-torbox')?.focus();
-                        } else if (e.key === 'ArrowDown') {
-                          e.preventDefault();
-                          document.getElementById('drawer-engine-item-extractor')?.focus();
+                          document.getElementById('drawer-engine-item-embed')?.focus();
                         }
                       }}
                       onClick={() => {
@@ -3327,52 +3248,7 @@ export const Settings: React.FC = () => {
                       <ChevronRight className="w-5 h-5 text-gray-400 stroke-[2.2] flex-shrink-0" />
                     </button>
 
-                    {/* Item 3: Direct Extractor Stream Engine */}
-                    <button
-                      id="drawer-engine-item-extractor"
-                      data-engine-drawer-item="true"
-                      type="button"
-                      onKeyDown={(e) => {
-                        if (e.key === 'ArrowUp') {
-                          e.preventDefault();
-                          document.getElementById('drawer-engine-item-telegram')?.focus();
-                        } else if (e.key === 'ArrowDown') {
-                          e.preventDefault();
-                          document.getElementById('drawer-engine-item-embed')?.focus();
-                        }
-                      }}
-                      onClick={() => {
-                        setShowEnginesDrawer(false);
-                        setShowDirectExtractorDrawer(true);
-                      }}
-                      className="w-full p-4 rounded-2xl border text-left transition-all tv-focus-target flex items-center justify-between gap-3 bg-hbo-dark/60 border-hbo-border hover:bg-hbo-hover hover:border-white/20"
-                    >
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="font-bold text-sm text-white truncate">Direct Extractor</span>
-                          <span className="text-[9px] px-2 py-0.5 rounded font-mono font-bold bg-hbo-purple/30 text-hbo-purple-light border border-hbo-purple/40">
-                            Consumet API
-                          </span>
-                        </div>
-                        <p className="text-[11px] text-gray-400 mb-1.5 leading-snug">Direct HLS .m3u8 streams resolved via your private backend.</p>
-                        <div className="flex items-center gap-2 text-xs font-semibold">
-                          {isExtractorEnabled ? (
-                            <span className="text-emerald-400 flex items-center gap-1">
-                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                              Enabled
-                            </span>
-                          ) : (
-                            <span className="text-gray-500 flex items-center gap-1">
-                              <span className="w-1.5 h-1.5 rounded-full bg-gray-600" />
-                              Disabled
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      <ChevronRight className="w-5 h-5 text-gray-400 stroke-[2.2] flex-shrink-0" />
-                    </button>
-
-                    {/* Item 4: Embed Resolver Stream Engine */}
+                    {/* Item 2: Embed Resolver Stream Engine */}
                     <button
                       id="drawer-engine-item-embed"
                       data-engine-drawer-item="true"
@@ -3380,7 +3256,7 @@ export const Settings: React.FC = () => {
                       onKeyDown={(e) => {
                         if (e.key === 'ArrowUp') {
                           e.preventDefault();
-                          document.getElementById('drawer-engine-item-extractor')?.focus();
+                          document.getElementById('drawer-engine-item-telegram')?.focus();
                         }
                       }}
                       onClick={() => {
@@ -3468,26 +3344,20 @@ export const Settings: React.FC = () => {
               <div className="flex items-center justify-between pb-1">
                 <span className="text-xs font-bold text-gray-300">Resolution Sequence</span>
                 <span className="text-[10px] px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 font-bold border border-amber-500/40">
-                  4 Engines
+                  2 Engines
                 </span>
               </div>
 
               {(() => {
                 const currentPriority: StreamResolverType[] = (settings.enginePriority && settings.enginePriority.length > 0)
                   ? settings.enginePriority
-                  : ['torbox', 'telegram', 'embed', 'private_extractor'];
+                  : ['telegram', 'embed'];
 
                 const currentEnabled = settings.enabledResolvers && settings.enabledResolvers.length > 0
                   ? settings.enabledResolvers
                   : ['embed'];
 
                 const engineMeta: Record<StreamResolverType, { title: string; tag: string; desc: string; tagClass: string }> = {
-                  torbox: {
-                    title: 'TorBox Debrid',
-                    tag: '4K Ultra HD',
-                    desc: 'Direct HTTPS 4K HDR & 1080p BluRay cloud streams via TorBox CDN.',
-                    tagClass: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40',
-                  },
                   telegram: {
                     title: 'Telegram Provider',
                     tag: 'Direct MTProto',
@@ -3500,19 +3370,11 @@ export const Settings: React.FC = () => {
                     desc: 'Standard multi-server iframe embeds (VidLink, MoviesAPI) with ad sandboxing.',
                     tagClass: 'bg-hbo-cyan/20 text-hbo-cyan border-hbo-cyan/40',
                   },
-                  private_extractor: {
-                    title: 'Direct Extractor',
-                    tag: 'Consumet API',
-                    desc: 'Direct HLS .m3u8 streams resolved via private backend API.',
-                    tagClass: 'bg-hbo-purple/30 text-hbo-purple-light border-hbo-purple/40',
-                  },
                 };
 
                 const rankLabels = [
                   { badge: '#1 Primary', class: 'bg-amber-500/20 text-amber-300 border-amber-500/40' },
-                  { badge: '#2 Secondary', class: 'bg-sky-500/20 text-sky-300 border-sky-500/40' },
-                  { badge: '#3 Third Choice', class: 'bg-purple-500/20 text-purple-300 border-purple-500/40' },
-                  { badge: '#4 Fallback', class: 'bg-gray-700/40 text-gray-300 border-gray-600/40' },
+                  { badge: '#2 Fallback', class: 'bg-sky-500/20 text-sky-300 border-sky-500/40' },
                 ];
 
                 return currentPriority.map((engineKey, idx) => {
@@ -3717,7 +3579,7 @@ export const Settings: React.FC = () => {
                         }
                       }}
                       onClick={() => {
-                        let updated: ('embed' | 'private_extractor' | 'torbox' | 'telegram')[];
+                        let updated: StreamResolverType[];
                         if (isTelegramEnabled) {
                           if (currentEnabled.length === 1) return;
                           updated = currentEnabled.filter(r => r !== 'telegram') as any;
@@ -4164,216 +4026,7 @@ export const Settings: React.FC = () => {
         </div>
       )}
 
-      {/* ========================================================================= */}
-      {/* Android TV TorBox Debrid Right Drawer (Level 2)                           */}
-      {/* ========================================================================= */}
-      {showTorboxDrawer && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          data-drawer-container="true"
-          className="fixed inset-0 z-[9999] flex justify-end bg-black/80 backdrop-blur-md animate-fade-in"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) {
-              setShowTorboxDrawer(false);
-              setShowEnginesDrawer(true);
-            }
-          }}
-        >
-          {/* Left Side Parent Path Context */}
-          <div className="flex-1 hidden md:flex flex-col justify-center pl-16 pr-8 pointer-events-none select-none">
-            <div className="flex items-center gap-2 text-xs font-bold text-gray-400 tracking-wider uppercase mb-2">
-              <span className="text-gray-400">Settings</span>
-              <ChevronRight className="w-3.5 h-3.5 text-gray-500" />
-              <span className="text-gray-400">Playback &amp; Streaming</span>
-              <ChevronRight className="w-3.5 h-3.5 text-gray-500" />
-              <span className="text-hbo-cyan font-semibold">Stream Engines</span>
-            </div>
-            <h1 className="text-3xl font-extrabold text-white tracking-tight mb-2">TorBox Debrid</h1>
-            <p className="text-sm text-gray-400 max-w-md leading-relaxed">
-              Configure TorBox Debrid cloud caching for direct high-bitrate 4K HDR streams.
-            </p>
-          </div>
 
-          <div className="w-full max-w-md h-full bg-hbo-card/95 border-l border-hbo-border/80 shadow-2xl flex flex-col justify-between animate-slide-in-right overflow-hidden">
-            {/* Drawer Body */}
-            <div className="flex-1 overflow-y-auto px-6 py-6 space-y-4 font-sans">
-              {(() => {
-                const currentEnabled = settings.enabledResolvers && settings.enabledResolvers.length > 0
-                  ? settings.enabledResolvers
-                  : ['embed'];
-                const isTorboxEnabled = currentEnabled.includes('torbox');
-
-                return (
-                  <>
-                    {/* Enable / Disable Engine Toggle */}
-                    <button
-                      id="drawer-torbox-toggle"
-                      data-torbox-drawer-item="true"
-                      type="button"
-                      onKeyDown={(e) => {
-                        if (e.key === 'ArrowDown' && isTorboxEnabled) {
-                          e.preventDefault();
-                          document.getElementById('drawer-input-torbox-apikey')?.focus();
-                        }
-                      }}
-                      onClick={() => {
-                        let updated: ('embed' | 'private_extractor' | 'torbox')[];
-                        if (isTorboxEnabled) {
-                          if (currentEnabled.length === 1) return;
-                          updated = currentEnabled.filter(r => r !== 'torbox') as ('embed' | 'private_extractor' | 'torbox')[];
-                        } else {
-                          updated = [...currentEnabled, 'torbox'] as ('embed' | 'private_extractor' | 'torbox')[];
-                        }
-                        handleUpdate({
-                          enabledResolvers: updated,
-                          streamResolver: updated[0] || 'embed'
-                        });
-                      }}
-                      className={`w-full p-4 rounded-xl border text-left transition-all tv-focus-target flex items-center justify-between ${
-                        isTorboxEnabled
-                          ? 'bg-hbo-purple/30 border-hbo-cyan text-white shadow-hbo-glow ring-1 ring-hbo-cyan/40'
-                          : 'bg-black/30 border-hbo-border hover:border-gray-600 text-gray-400'
-                      }`}
-                    >
-                      <div className="min-w-0 pr-3">
-                        <div className="font-bold text-sm text-white mb-0.5">Enable TorBox Engine</div>
-                        <p className="text-[11px] text-gray-400">Stream directly via TorBox cloud caching server.</p>
-                      </div>
-                      <div className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 ${
-                        isTorboxEnabled ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40' : 'bg-white/5 text-gray-400 border border-white/10'
-                      }`}>
-                        {isTorboxEnabled ? <Check className="w-3.5 h-3.5 stroke-[2.5]" /> : <X className="w-3.5 h-3.5 stroke-[2.5]" />}
-                        <span>{isTorboxEnabled ? 'Enabled' : 'Disabled'}</span>
-                      </div>
-                    </button>
-
-                    {/* TorBox API Key input */}
-                    {isTorboxEnabled && (
-                      <div
-                        data-torbox-drawer-item="true"
-                        className="bg-black/40 border border-emerald-500/40 rounded-xl p-4 space-y-2"
-                      >
-                        <p className="font-bold text-xs text-emerald-400 flex items-center gap-1.5">
-                          <Radio className="w-3.5 h-3.5 text-emerald-400" />
-                          <span>TorBox Debrid API Key</span>
-                        </p>
-                        <input
-                          id="drawer-input-torbox-apikey"
-                          type="password"
-                          placeholder="Paste your TorBox API Key here..."
-                          value={settings.torboxApiKey || ''}
-                          onChange={(e) => handleUpdate({ torboxApiKey: e.target.value })}
-                          onKeyDown={(e) => {
-                            if (e.key === 'ArrowUp') {
-                              e.preventDefault();
-                              document.getElementById('drawer-torbox-toggle')?.focus();
-                            }
-                          }}
-                          className="w-full bg-black/60 border border-gray-700 focus:border-emerald-400 text-white px-3 py-2 rounded-xl text-xs font-mono outline-none tv-focus-target"
-                        />
-                        <p className="text-[10px] text-gray-500">Obtain your API key from your TorBox dashboard settings.</p>
-                      </div>
-                    )}
-                  </>
-                );
-              })()}
-            </div>
-
-            {/* Drawer Footer Hint */}
-            <div className="p-4 border-t border-hbo-border/50 bg-black/40 flex items-center justify-center text-xs text-gray-400 select-none">
-              <span>Press <strong className="text-white font-semibold">Back</strong> to return</span>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ========================================================================= */}
-      {/* Android TV Direct Extractor Right Drawer (Level 2)                       */}
-      {/* ========================================================================= */}
-      {showDirectExtractorDrawer && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          data-drawer-container="true"
-          className="fixed inset-0 z-[9999] flex justify-end bg-black/80 backdrop-blur-md animate-fade-in"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) {
-              setShowDirectExtractorDrawer(false);
-              setShowEnginesDrawer(true);
-            }
-          }}
-        >
-          {/* Left Side Parent Path Context */}
-          <div className="flex-1 hidden md:flex flex-col justify-center pl-16 pr-8 pointer-events-none select-none">
-            <div className="flex items-center gap-2 text-xs font-bold text-gray-400 tracking-wider uppercase mb-2">
-              <span className="text-gray-400">Settings</span>
-              <ChevronRight className="w-3.5 h-3.5 text-gray-500" />
-              <span className="text-gray-400">Playback &amp; Streaming</span>
-              <ChevronRight className="w-3.5 h-3.5 text-gray-500" />
-              <span className="text-hbo-cyan font-semibold">Stream Engines</span>
-            </div>
-            <h1 className="text-3xl font-extrabold text-white tracking-tight mb-2">Direct Extractor</h1>
-            <p className="text-sm text-gray-400 max-w-md leading-relaxed">
-              Resolve and play raw HLS .m3u8 video streams directly without web iframe embedding.
-            </p>
-          </div>
-
-          <div className="w-full max-w-md h-full bg-hbo-card/95 border-l border-hbo-border/80 shadow-2xl flex flex-col justify-between animate-slide-in-right overflow-hidden">
-            {/* Drawer Body */}
-            <div className="flex-1 overflow-y-auto px-6 py-6 space-y-4 font-sans">
-              {(() => {
-                const currentEnabled = settings.enabledResolvers && settings.enabledResolvers.length > 0
-                  ? settings.enabledResolvers
-                  : ['embed'];
-                const isExtractorEnabled = currentEnabled.includes('private_extractor');
-
-                return (
-                  <button
-                    id="drawer-extractor-toggle"
-                    data-extractor-drawer-item="true"
-                    type="button"
-                    onClick={() => {
-                      let updated: ('embed' | 'private_extractor' | 'torbox')[];
-                      if (isExtractorEnabled) {
-                        if (currentEnabled.length === 1) return;
-                        updated = currentEnabled.filter(r => r !== 'private_extractor') as ('embed' | 'private_extractor' | 'torbox')[];
-                      } else {
-                        updated = [...currentEnabled, 'private_extractor'] as ('embed' | 'private_extractor' | 'torbox')[];
-                      }
-                      handleUpdate({
-                        enabledResolvers: updated,
-                        streamResolver: updated[0] || 'embed'
-                      });
-                    }}
-                    className={`w-full p-4 rounded-xl border text-left transition-all tv-focus-target flex items-center justify-between ${
-                      isExtractorEnabled
-                        ? 'bg-hbo-purple/30 border-hbo-cyan text-white shadow-hbo-glow ring-1 ring-hbo-cyan/40'
-                        : 'bg-black/30 border-hbo-border hover:border-gray-600 text-gray-400'
-                    }`}
-                  >
-                    <div className="min-w-0 pr-3">
-                      <div className="font-bold text-sm text-white mb-0.5">Enable Direct Extractor</div>
-                      <p className="text-[11px] text-gray-400">Direct HLS .m3u8 streams resolved via Consumet API backend.</p>
-                    </div>
-                    <div className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 ${
-                      isExtractorEnabled ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40' : 'bg-white/5 text-gray-400 border border-white/10'
-                    }`}>
-                      {isExtractorEnabled ? <Check className="w-3.5 h-3.5 stroke-[2.5]" /> : <X className="w-3.5 h-3.5 stroke-[2.5]" />}
-                      <span>{isExtractorEnabled ? 'Enabled' : 'Disabled'}</span>
-                    </div>
-                  </button>
-                );
-              })()}
-            </div>
-
-            {/* Drawer Footer Hint */}
-            <div className="p-4 border-t border-hbo-border/50 bg-black/40 flex items-center justify-center text-xs text-gray-400 select-none">
-              <span>Press <strong className="text-white font-semibold">Back</strong> to return</span>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* ========================================================================= */}
       {/* Android TV Embed Resolver Right Drawer (Level 2)                          */}
