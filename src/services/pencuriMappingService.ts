@@ -215,12 +215,19 @@ async function searchPencuri(
       const matches = Array.from(html.matchAll(regex));
 
       if (matches.length > 0) {
-        const normTitle = cleanTitleForSearch(title).toLowerCase();
+        const titleWords = cleanTitleForSearch(title).toLowerCase().split(/\s+/).filter(w => w.length > 2);
+        const origWords = originalTitle
+          ? cleanTitleForSearch(originalTitle).toLowerCase().split(/\s+/).filter(w => w.length > 2)
+          : [];
+
         const candidates = matches.map(m => {
           const url = m[1];
           const slug = url.split('/').filter(Boolean).pop()?.toLowerCase() || '';
           let score = 0;
-          normTitle.split(/\s+/).filter(w => w.length > 2).forEach(w => { if (slug.includes(w)) score += 2; });
+          // Priority to originalTitle tokens for Southeast Asian/Malay media (+3 per matching word)
+          origWords.forEach(w => { if (slug.includes(w)) score += 3; });
+          // Secondary scoring against title tokens (+2 per matching word)
+          titleWords.forEach(w => { if (slug.includes(w)) score += 2; });
           if (year && slug.includes(String(year))) score += 3;
           return { url, score };
         });

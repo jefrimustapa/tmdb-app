@@ -67,11 +67,11 @@ function cleanSearchQuery(title: string): string {
  * Searches dramacool.net.my for drama detail page slug
  */
 async function findDramaSlug(title: string, year?: string | number, originalTitle?: string): Promise<string | null> {
-  const queries = [
-    title.trim(),
-    cleanSearchQuery(title),
-    originalTitle ? cleanSearchQuery(originalTitle) : null
-  ].filter((q): q is string => Boolean(q && q.length > 1));
+  const hasDiffOriginal = Boolean(originalTitle && originalTitle.trim().toLowerCase() !== title.trim().toLowerCase());
+  const queries = (hasDiffOriginal && originalTitle
+    ? [originalTitle.trim(), cleanSearchQuery(originalTitle), title.trim(), cleanSearchQuery(title)]
+    : [title.trim(), cleanSearchQuery(title), ...(originalTitle ? [cleanSearchQuery(originalTitle)] : [])]
+  ).filter((q): q is string => Boolean(q && q.length > 1));
 
   const uniqueQueries = [...new Set(queries)];
 

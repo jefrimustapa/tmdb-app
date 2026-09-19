@@ -116,11 +116,11 @@ export async function resolveKisskhStream(
   }
 
   try {
-    const queries = [
-      title.trim(),
-      cleanSearchQuery(title),
-      originalTitle ? cleanSearchQuery(originalTitle) : null
-    ].filter((q): q is string => Boolean(q && q.length > 1));
+    const hasDiffOriginal = Boolean(originalTitle && originalTitle.trim().toLowerCase() !== title.trim().toLowerCase());
+    const queries = (hasDiffOriginal && originalTitle
+      ? [originalTitle.trim(), cleanSearchQuery(originalTitle), title.trim(), cleanSearchQuery(title)]
+      : [title.trim(), cleanSearchQuery(title), ...(originalTitle ? [cleanSearchQuery(originalTitle)] : [])]
+    ).filter((q): q is string => Boolean(q && q.length > 1));
 
     const uniqueQueries = [...new Set(queries)];
 
