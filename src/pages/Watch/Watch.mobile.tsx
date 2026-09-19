@@ -25,6 +25,7 @@ export const Watch: React.FC = () => {
   const [details, setDetails] = useState<TMDBMovieDetails | TMDBTVDetails | null>(null);
   const [seasonDetails, setSeasonDetails] = useState<TMDBSeasonDetails | null>(null);
   const [providerId, setProviderId] = useState('vidlink');
+  const [activeServerLabel, setActiveServerLabel] = useState<string>('');
   const [userSelectedProvider, setUserSelectedProvider] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -79,7 +80,7 @@ export const Watch: React.FC = () => {
               s.enabledTelegramProviders
             );
 
-            const priorityList = s.enginePriority || ['torbox', 'telegram', 'embed', 'private_extractor'];
+            const priorityList = s.enginePriority || ['telegram', 'embed'];
             const telegramRank = priorityList.indexOf('telegram');
             const embedRank = priorityList.indexOf('embed');
             const prefersTelegramOverEmbed = telegramRank !== -1 && (embedRank === -1 || telegramRank < embedRank);
@@ -620,7 +621,7 @@ export const Watch: React.FC = () => {
                       <span className="text-white/40 select-none">•</span>
                     </>
                   )}
-                  <span className="text-white/90 font-medium truncate max-w-[100px] sm:max-w-[120px]">{currentProviderName}</span>
+                  <span className="text-white/90 font-medium truncate max-w-[100px] sm:max-w-[120px]">{activeServerLabel || currentProviderName}</span>
                 </div>
               </button>
             </div>
@@ -716,7 +717,14 @@ export const Watch: React.FC = () => {
             originalTitle={details.original_title || details.original_name}
             onProviderChange={(p) => {
               setUserSelectedProvider(true);
+              setActiveServerLabel('');
               setProviderId(p.id);
+            }}
+            onActiveServerChange={(serverLabel, activeId) => {
+              setActiveServerLabel(serverLabel);
+              if (activeId && activeId !== providerId) {
+                setProviderId(activeId);
+              }
             }}
             onProbingStatusChange={(probing, idx, total) => {
               setIsProbing(probing);

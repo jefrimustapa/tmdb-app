@@ -175,9 +175,7 @@ export const Settings: React.FC = () => {
     | 'engine-telegram'
     | 'telegram-chunk'
     | 'telegram-country'
-    | 'engine-torbox'
     | 'engine-embed'
-    | 'engine-extractor'
     | 'priorityPicker'
     | 'adblock'
     | 'headerTimeout'
@@ -573,7 +571,7 @@ export const Settings: React.FC = () => {
                       <h3 className="text-sm sm:text-base font-bold text-white">Stream Resolver Engines & Priority</h3>
                     </div>
                     <p className="text-xs text-gray-400 mt-1">
-                      Configure TorBox debrid, private extractors, timeout, and fallback embed mirrors.
+                      Configure Telegram direct streaming, fallback embed mirrors, and resolution order.
                     </p>
                   </div>
 
@@ -1242,7 +1240,7 @@ export const Settings: React.FC = () => {
           {(() => {
             const currentPriority = (settings.enginePriority && settings.enginePriority.length > 0)
               ? settings.enginePriority
-              : ['torbox', 'telegram', 'embed', 'private_extractor'];
+              : ['telegram', 'embed'];
             return (
               <div className="rounded-xl border border-amber-500/40 bg-gradient-to-r from-amber-500/15 via-orange-500/10 to-transparent p-3.5">
                 <div className="flex items-center justify-between gap-2">
@@ -1268,7 +1266,7 @@ export const Settings: React.FC = () => {
                   {currentPriority.map((eng, idx) => (
                     <span key={eng} className="flex items-center gap-1">
                       {idx > 0 && <span className="text-gray-500 font-mono text-[10px]">→</span>}
-                      <span className="capitalize">{eng === 'private_extractor' ? 'Direct' : eng}</span>
+                      <span className="capitalize">{eng}</span>
                     </span>
                   ))}
                 </div>
@@ -1278,10 +1276,8 @@ export const Settings: React.FC = () => {
 
           {/* Engine Cards — each has toggle + Configure sub-drawer */}
           {[
-            { id: 'torbox'            as const, title: 'TorBox Debrid',     tag: '4K Ultra HD',    desc: 'Direct HTTPS 4K HDR & 1080p BluRay cloud streams via TorBox CDN.',                              subDrawer: 'engine-torbox'    as const },
-            { id: 'telegram'          as const, title: 'Telegram Provider',  tag: 'Direct MTProto', desc: 'Direct in-app video streaming from Telegram bots (MovieSubMalay / @msm32bot).',                subDrawer: 'engine-telegram'  as const },
-            { id: 'private_extractor' as const, title: 'Private Extractor',  tag: 'Consumet API',   desc: 'Direct HLS .m3u8 streams resolved via private backend API.',                                   subDrawer: 'engine-extractor' as const },
-            { id: 'embed'             as const, title: 'Embed Resolver',     tag: 'Multi-Mirror',   desc: 'Standard multi-server iframe embeds (VidLink, MoviesAPI) with ad sandboxing.',                 subDrawer: 'engine-embed'     as const },
+            { id: 'telegram' as const, title: 'Telegram Provider', tag: 'Direct MTProto', desc: 'Direct in-app video streaming from Telegram bots (MovieSubMalay / @msm32bot).', subDrawer: 'engine-telegram' as const },
+            { id: 'embed' as const, title: 'Embed Resolver', tag: 'Multi-Mirror', desc: 'Standard multi-server iframe embeds (VidLink, MoviesAPI) with ad sandboxing.', subDrawer: 'engine-embed' as const },
           ].map((resOption) => {
             const currentEnabled = settings.enabledResolvers && settings.enabledResolvers.length > 0
               ? settings.enabledResolvers : ['embed'];
@@ -1295,12 +1291,12 @@ export const Settings: React.FC = () => {
                   type="button"
                   className="w-full p-3.5 text-left"
                   onClick={() => {
-                    let updated: ('embed' | 'private_extractor' | 'torbox' | 'telegram')[];
+                    let updated: ('embed' | 'telegram')[];
                     if (isEnabled) {
                       if (currentEnabled.length === 1) return;
-                      updated = currentEnabled.filter(r => r !== resOption.id) as ('embed' | 'private_extractor' | 'torbox' | 'telegram')[];
+                      updated = currentEnabled.filter(r => r !== resOption.id) as ('embed' | 'telegram')[];
                     } else {
-                      updated = [...currentEnabled, resOption.id] as ('embed' | 'private_extractor' | 'torbox' | 'telegram')[];
+                      updated = [...currentEnabled, resOption.id] as ('embed' | 'telegram')[];
                     }
                     handleUpdate({ enabledResolvers: updated, streamResolver: updated[0] || 'embed' });
                   }}
@@ -1347,19 +1343,13 @@ export const Settings: React.FC = () => {
           {(() => {
             const currentPriority: StreamResolverType[] = (settings.enginePriority && settings.enginePriority.length > 0)
               ? settings.enginePriority
-              : ['torbox', 'telegram', 'embed', 'private_extractor'];
+              : ['telegram', 'embed'];
 
             const currentEnabled = settings.enabledResolvers && settings.enabledResolvers.length > 0
               ? settings.enabledResolvers
               : ['embed'];
 
             const engineMeta: Record<StreamResolverType, { title: string; tag: string; desc: string; tagClass: string }> = {
-              torbox: {
-                title: 'TorBox Debrid',
-                tag: '4K Ultra HD',
-                desc: 'Direct HTTPS 4K HDR & 1080p BluRay cloud streams via TorBox CDN.',
-                tagClass: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40',
-              },
               telegram: {
                 title: 'Telegram Provider',
                 tag: 'Direct MTProto',
@@ -1372,19 +1362,11 @@ export const Settings: React.FC = () => {
                 desc: 'Standard multi-server iframe embeds (VidLink, MoviesAPI) with ad sandboxing.',
                 tagClass: 'bg-hbo-cyan/20 text-hbo-cyan border-hbo-cyan/40',
               },
-              private_extractor: {
-                title: 'Direct Extractor',
-                tag: 'Consumet API',
-                desc: 'Direct HLS .m3u8 streams resolved via private backend API.',
-                tagClass: 'bg-hbo-purple/30 text-hbo-purple-light border-hbo-purple/40',
-              },
             };
 
             const rankLabels = [
               { badge: '#1 Primary', class: 'bg-amber-500/20 text-amber-300 border-amber-500/40' },
-              { badge: '#2 Secondary', class: 'bg-sky-500/20 text-sky-300 border-sky-500/40' },
-              { badge: '#3 Third Choice', class: 'bg-purple-500/20 text-purple-300 border-purple-500/40' },
-              { badge: '#4 Fallback', class: 'bg-gray-700/40 text-gray-300 border-gray-600/40' },
+              { badge: '#2 Fallback', class: 'bg-sky-500/20 text-sky-300 border-sky-500/40' },
             ];
 
             return currentPriority.map((engineKey, idx) => {
@@ -1727,54 +1709,7 @@ export const Settings: React.FC = () => {
         </div>
       </SettingsDrawer>
 
-      {/* 3a-TB. Sub-Drawer: TorBox Engine Settings */}
-      <SettingsDrawer
-        isOpen={activeDrawer === 'engine-torbox'}
-        onClose={() => setActiveDrawer(null)}
-        onBack={() => setActiveDrawer('resolvers')}
-        title="TorBox Debrid"
-        subtitle="Configure your TorBox API key for 4K HDR cloud streams."
-        categoryLabel="Stream Engines > TorBox"
-      >
-        <div className="space-y-4">
-          <div className="p-3.5 rounded-xl bg-emerald-950/20 border border-emerald-500/40 text-xs text-gray-300 space-y-2">
-            <p className="font-bold text-emerald-400 flex items-center gap-1.5">
-              <Radio className="w-3.5 h-3.5 text-emerald-400" />
-              <span>TorBox API Key</span>
-            </p>
-            <input
-              type="password"
-              placeholder="Paste your TorBox API Key here..."
-              value={settings.torboxApiKey || ''}
-              onChange={(e) => handleUpdate({ torboxApiKey: e.target.value })}
-              className="w-full bg-black/60 border border-gray-700 focus:border-emerald-400 text-white px-3 py-2 rounded-lg text-xs font-mono outline-none"
-            />
-            <p className="text-[10px] text-gray-500">Get your API key from torbox.app. Enables 4K HDR & BluRay direct streams.</p>
-          </div>
-        </div>
-      </SettingsDrawer>
 
-      {/* 3a-EX. Sub-Drawer: Private Extractor Engine Settings */}
-      <SettingsDrawer
-        isOpen={activeDrawer === 'engine-extractor'}
-        onClose={() => setActiveDrawer(null)}
-        onBack={() => setActiveDrawer('resolvers')}
-        title="Private Extractor"
-        subtitle="Direct HLS streams via private backend Consumet API."
-        categoryLabel="Stream Engines > Extractor"
-      >
-        <div className="space-y-4">
-          <div className="p-3.5 rounded-xl bg-violet-950/20 border border-violet-500/40 text-xs text-gray-300">
-            <p className="font-bold text-violet-400 flex items-center gap-1.5 mb-2">
-              <Zap className="w-3.5 h-3.5 text-violet-400" />
-              <span>Private Extractor</span>
-            </p>
-            <p className="text-[11px] text-gray-400 leading-relaxed">
-              Resolves direct HLS .m3u8 streams via a private Consumet API backend. No additional configuration required — streams are automatically resolved when this engine is enabled.
-            </p>
-          </div>
-        </div>
-      </SettingsDrawer>
 
       {/* 3a-EM. Sub-Drawer: Embed Resolver Settings */}
       <SettingsDrawer
