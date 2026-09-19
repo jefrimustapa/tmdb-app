@@ -2,12 +2,13 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20260919-0354';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-add-provider-te.20260919-0354';
+export const APP_BUILD_NUMBER = '20260919-0404';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-add-provider-te.20260919-0404';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
 export const APP_BRANCH = 'feat-add-provider-te';
-export const APP_CHANGELOG = `* feat(settings): add configurable Telegram stream chunk slice buffer size (256KB, 512KB, 1MB)
+export const APP_CHANGELOG = `* feat(player): convert bottom glass bar to docked drawer style
+* feat(settings): add configurable Telegram stream chunk slice buffer size (256KB, 512KB, 1MB)
 * feat(player): unify buffering spinner and seek status directly inside center controls
 * fix(player): remove cyan feedback ripple popup on seek and double-tap
 * style(player): adjust center control icons to 30% transparency (opacity-70)
@@ -20,5 +21,4 @@ export const APP_CHANGELOG = `* feat(settings): add configurable Telegram stream
 * feat(player): add custom HTML5 player with themed controls, 10s skip buttons, and cinematic loading screen for direct streams
 * fix(msm-getter): define missing rangeHeader in /stream/:docId
 * feat(telegram): add multi-tier caching (central db on server + memory cache in app)
-* feat(telegram): point msm32 getter to production render service with https proxy support
-* feat: add msm-getter microservice and Dockerfile for cloud deployment`;
+* feat(telegram): point msm32 getter to production render service with https proxy support`;

@@ -653,10 +653,8 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
           </button>
         </div>
 
-        {/* Bottom Drawer Glass Bar: Scrubber, Timers, Volume */}
-        <div className="w-full bg-black/85 backdrop-blur-2xl border-t border-white/15 rounded-t-2xl sm:rounded-t-3xl px-4 sm:px-6 pt-2 pb-5 sm:pb-6 shadow-[0_-10px_30px_rgba(0,0,0,0.8)] pointer-events-auto space-y-2">
-          {/* Drawer Handle Indicator */}
-          <div className="w-9 h-1 bg-white/25 rounded-full mx-auto mb-1.5" />
+        {/* Standard End-to-End Bottom Bar: Scrubber, Timers, Volume */}
+        <div className="w-full bg-gradient-to-t from-black/95 via-black/80 to-transparent backdrop-blur-md px-4 sm:px-6 pt-6 pb-4 sm:pb-6 pointer-events-auto space-y-2.5">
 
           {/* Progress / Scrub Bar */}
           <div className="relative flex items-center w-full group/scrubber cursor-pointer">

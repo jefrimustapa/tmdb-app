@@ -32,7 +32,7 @@ interface VideoPlayerProps {
   episodeTitle?: string;
   providerId: string;
   onProviderChange: (p: StreamProvider) => void;
-  onProbingStatusChange?: (isProbing: boolean, currentServerIndex: number) => void;
+  onProbingStatusChange?: (isProbing: boolean, currentServerIndex: number, totalServers?: number) => void;
   nextEpisodeInfo?: { season: number; episode: number; title?: string; stillPath?: string | null } | null;
   onNextEpisode?: () => void;
   initialTimestamp?: number;
@@ -1401,11 +1401,6 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     };
   }, []);
 
-  // Notify parent of probing status updates
-  useEffect(() => {
-    const currentIndex = STREAM_PROVIDERS.findIndex((p) => p.id === providerId);
-    onProbingStatusChange?.(isProbing, currentIndex >= 0 ? currentIndex + 1 : 1);
-  }, [isProbing, providerId, onProbingStatusChange]);
 
   // Initialize progress and preserve previous progress
   useEffect(() => {
@@ -1470,7 +1465,26 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     return topProviders;
   }, [isAnime, activeAsean, isKorean, topAnimeProviders, topAseanProviders, topKoreanProviders, topProviders]);
 
-  const orderedProviders = React.useMemo(() => getOrderedProviders(activeTopProviders, isAnime, activeAsean, isKorean), [activeTopProviders, isAnime, activeAsean, isKorean]);
+  const orderedProviders = React.useMemo(() => {
+    const list = getOrderedProviders(activeTopProviders, isAnime, activeAsean, isKorean);
+    const hasEmbed = enabledResolvers.includes('embed');
+    const hasTelegram = enabledResolvers.includes('telegram');
+    return list.filter((p) => {
+      const isDirect = p.engine === 'telegram';
+      if (isDirect) return hasTelegram;
+      return hasEmbed;
+    });
+  }, [activeTopProviders, isAnime, activeAsean, isKorean, enabledResolvers]);
+
+  // Notify parent of probing status updates
+  useEffect(() => {
+    const currentIndex = orderedProviders.findIndex((p) => p.id === providerId);
+    onProbingStatusChange?.(
+      isProbing,
+      currentIndex >= 0 ? currentIndex + 1 : 1,
+      orderedProviders.length
+    );
+  }, [isProbing, providerId, onProbingStatusChange, orderedProviders]);
 
   const cycleToNextProvider = useCallback(() => {
     resetControlsTimer();

@@ -56,6 +56,7 @@ export const Watch: React.FC = () => {
 
   const [isProbing, setIsProbing] = useState(false);
   const [serverIndex, setServerIndex] = useState(1);
+  const [totalServers, setTotalServers] = useState(1);
   const [headerVisible, setHeaderVisible] = useState(true);
   const [headerTimeoutSeconds, setHeaderTimeoutSeconds] = useState(5);
   const headerTimeoutRef = React.useRef(5);
@@ -923,9 +924,12 @@ export const Watch: React.FC = () => {
               setUserSelectedProvider(true);
               setProviderId(p.id);
             }}
-            onProbingStatusChange={(probing, idx) => {
+            onProbingStatusChange={(probing, idx, total) => {
               setIsProbing(probing);
               setServerIndex(idx);
+              if (typeof total === 'number' && total > 0) {
+                setTotalServers(total);
+              }
             }}
             nextEpisodeInfo={nextEpisodeInfo}
             onNextEpisode={handleNextEpisode}
@@ -953,6 +957,7 @@ export const Watch: React.FC = () => {
           }}
           isProbing={isProbing}
           serverIndex={serverIndex}
+          totalServers={totalServers}
           isAnime={isAnime}
           isAsean={isAsean}
           isKorean={isKorean}
