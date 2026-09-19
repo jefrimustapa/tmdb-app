@@ -14,7 +14,7 @@ import { resolveLari21Stream } from '../../services/lariMappingService';
 import { resolvePencuriStream, clearPencuriCache } from '../../services/pencuriMappingService';
 import { resolveKisskhStream } from '../../services/kisskhMappingService';
 import { resolveDramacoolStream, type DramacoolServer } from '../../services/dramacoolMappingService';
-import { msm32Service } from '../../services/msm32MappingService';
+import { msm32Service, type Msm32ResolveResult } from '../../services/msm32MappingService';
 import { SubtitleOverlay } from './SubtitleOverlay';
 import type { SubtitleCue } from '../../services/subtitleService';
 import { CustomDirectPlayer } from './CustomDirectPlayer';
@@ -351,15 +351,50 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         }
         try {
           console.log(`[Resolver] Telegram Provider (${provider.name})...`);
-          const msmRes = await msm32Service.resolveStream(
-            title,
-            releaseYear,
-            mediaType === 'tv' ? season : undefined,
-            mediaType === 'tv' ? episode : undefined,
-            abortController.signal
+
+          const isSoutheastAsian = Boolean(
+            activeAsean ||
+            details?.original_language === 'ms' ||
+            details?.original_language === 'id' ||
+            details?.original_language === 'th' ||
+            details?.original_language === 'tl' ||
+            details?.original_language === 'vi' ||
+            effectiveOriginCountries.some(c => ['MY', 'ID', 'SG', 'TH', 'PH', 'VN'].includes(c))
           );
 
-          if (!isMounted || abortController.signal.aborted) return;
+          const cleanOrig = originalTitle?.trim();
+          const cleanTitle = title.trim();
+          const hasDiffOriginal = Boolean(cleanOrig && cleanOrig.toLowerCase() !== cleanTitle.toLowerCase());
+          const telegramSearchTitles: string[] = isSoutheastAsian && hasDiffOriginal && cleanOrig
+            ? [cleanOrig, cleanTitle]
+            : hasDiffOriginal && cleanOrig
+            ? [cleanTitle, cleanOrig]
+            : [cleanTitle];
+
+          let msmRes: Msm32ResolveResult | null = null;
+          for (const searchTitle of telegramSearchTitles) {
+            if (!isMounted || abortController.signal.aborted) return;
+            console.log(`[Resolver] Telegram Provider (${provider.name}) searching for "${searchTitle}"...`);
+            const res = await msm32Service.resolveStream(
+              searchTitle,
+              releaseYear,
+              mediaType === 'tv' ? season : undefined,
+              mediaType === 'tv' ? episode : undefined,
+              abortController.signal
+            );
+
+            if (!isMounted || abortController.signal.aborted) return;
+
+            if (res && res.streamUrl) {
+              // Guard: If resolving a movie and the filename contains S01E02 / S1E1, it is a false-positive TV episode match
+              if (mediaType === 'movie' && res.filename && /S\d{1,2}E\d{1,2}/i.test(res.filename) && telegramSearchTitles.length > 1 && searchTitle !== telegramSearchTitles[telegramSearchTitles.length - 1]) {
+                console.warn(`[Resolver] Telegram result for "${searchTitle}" appears to be a TV episode (${res.filename}) for a movie, trying alternative title...`);
+                continue;
+              }
+              msmRes = res;
+              break;
+            }
+          }
 
           if (msmRes && msmRes.streamUrl) {
             console.log('[Resolver] ✅ Playing via Telegram Direct Stream:', msmRes.streamUrl);
@@ -675,14 +710,48 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           try {
             console.log('[Resolver] Checking Telegram Provider (MovieSubMalay)...');
             setResolvingStatus('Checking Telegram MovieSubMalay Resolver...');
-            const msmRes = await msm32Service.resolveStream(
-              title,
-              releaseYear,
-              mediaType === 'tv' ? season : undefined,
-              mediaType === 'tv' ? episode : undefined,
-              abortController.signal
+
+            const isSoutheastAsian = Boolean(
+              activeAsean ||
+              details?.original_language === 'ms' ||
+              details?.original_language === 'id' ||
+              details?.original_language === 'th' ||
+              details?.original_language === 'tl' ||
+              details?.original_language === 'vi' ||
+              effectiveOriginCountries.some(c => ['MY', 'ID', 'SG', 'TH', 'PH', 'VN'].includes(c))
             );
-            if (!isMounted || abortController.signal.aborted) return;
+
+            const cleanOrig = originalTitle?.trim();
+            const cleanTitle = title.trim();
+            const hasDiffOriginal = Boolean(cleanOrig && cleanOrig.toLowerCase() !== cleanTitle.toLowerCase());
+            const telegramSearchTitles: string[] = isSoutheastAsian && hasDiffOriginal && cleanOrig
+              ? [cleanOrig, cleanTitle]
+              : hasDiffOriginal && cleanOrig
+              ? [cleanTitle, cleanOrig]
+              : [cleanTitle];
+
+            let msmRes: Msm32ResolveResult | null = null;
+            for (const searchTitle of telegramSearchTitles) {
+              if (!isMounted || abortController.signal.aborted) return;
+              console.log(`[Resolver] Telegram waterfall searching for "${searchTitle}"...`);
+              const res = await msm32Service.resolveStream(
+                searchTitle,
+                releaseYear,
+                mediaType === 'tv' ? season : undefined,
+                mediaType === 'tv' ? episode : undefined,
+                abortController.signal
+              );
+              if (!isMounted || abortController.signal.aborted) return;
+              if (res && res.streamUrl) {
+                if (mediaType === 'movie' && res.filename && /S\d{1,2}E\d{1,2}/i.test(res.filename) && telegramSearchTitles.length > 1 && searchTitle !== telegramSearchTitles[telegramSearchTitles.length - 1]) {
+                  console.warn(`[Resolver] Telegram waterfall result for "${searchTitle}" appears to be a TV episode (${res.filename}) for a movie, trying alternative title...`);
+                  continue;
+                }
+                msmRes = res;
+                break;
+              }
+            }
+
             if (msmRes && msmRes.streamUrl) {
               console.log('[Resolver] ✅ Playing via Telegram Direct Stream:', msmRes.streamUrl);
               setResolvingStatus('Connected to Telegram Stream');

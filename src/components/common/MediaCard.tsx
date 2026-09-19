@@ -40,6 +40,10 @@ const MediaCardComponent: React.FC<MediaCardProps> = ({
   const navigate = useNavigate();
   const mediaType: 'movie' | 'tv' = (type === 'tv' || item.media_type === 'tv' || (!item.title && !!item.name)) ? 'tv' : 'movie';
   const title = item.title || item.name || 'Untitled';
+  const originalTitle = item.original_title || item.original_name;
+  const hasAlternativeTitle = Boolean(
+    originalTitle && originalTitle.trim().toLowerCase() !== title.trim().toLowerCase()
+  );
   const releaseYear = (item.release_date || item.first_air_date || '').split('-')[0];
 
   const [isPerfMode, setIsPerfMode] = useState(() => 
@@ -402,9 +406,14 @@ const MediaCardComponent: React.FC<MediaCardProps> = ({
 
         {/* Title & Metadata Footer */}
         <div className="p-2.5">
-          <h4 className="text-xs sm:text-sm font-bold text-white line-clamp-1 group-hover:text-hbo-cyan transition-colors">
+          <h4 className="text-xs sm:text-sm font-bold text-white line-clamp-1 group-hover:text-hbo-cyan transition-colors" title={hasAlternativeTitle ? `${title} (${originalTitle})` : title}>
             {title}
           </h4>
+          {hasAlternativeTitle && (
+            <p className="text-[10px] sm:text-[11px] text-gray-400 line-clamp-1 italic mt-0.5">
+              {originalTitle}
+            </p>
+          )}
           {isLandscape ? (
             <div className="flex items-center gap-1.5 mt-0.5">
               <p className="text-[11px] sm:text-xs text-gray-400 truncate flex-1 min-w-0">

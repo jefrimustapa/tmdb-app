@@ -290,6 +290,10 @@ export const Details: React.FC = () => {
   }
 
   const title = details.title || details.name || 'Untitled';
+  const originalTitle = details.original_title || details.original_name;
+  const hasAlternativeTitle = Boolean(
+    originalTitle && originalTitle.trim().toLowerCase() !== title.trim().toLowerCase()
+  );
   const isPerfMode = typeof document !== 'undefined' && document.documentElement.getAttribute('data-perf-mode') === 'true';
   const backdropUrl = tmdbImages.backdrop(details.backdrop_path, isPerfMode ? 'w780' : 'w1280');
   const posterUrl = tmdbImages.poster(details.poster_path, 'w500');
@@ -382,9 +386,19 @@ export const Details: React.FC = () => {
               ) : null}
             </div>
 
-            <h1 className="text-2xl sm:text-4xl md:text-5xl lg:text-6xl font-black font-display tracking-tight text-white leading-tight drop-shadow-2xl">
-              {title}
-            </h1>
+            <div className="space-y-1">
+              <h1 className="text-2xl sm:text-4xl md:text-5xl lg:text-6xl font-black font-display tracking-tight text-white leading-tight drop-shadow-2xl">
+                {title}
+              </h1>
+              {hasAlternativeTitle && (
+                <div className="flex items-center justify-center sm:justify-start gap-2 pt-0.5 text-sm sm:text-base text-gray-300 font-medium">
+                  <span className="px-2 py-0.5 rounded bg-white/10 text-xs font-semibold uppercase tracking-wider text-hbo-cyan border border-white/15">
+                    Original Title
+                  </span>
+                  <span className="text-white/90 italic font-semibold">{originalTitle}</span>
+                </div>
+              )}
+            </div>
 
             {/* Quick Meta Row */}
             <div className="flex items-center justify-center sm:justify-start gap-3 text-xs sm:text-sm text-gray-300 font-semibold flex-wrap min-h-[22px]">

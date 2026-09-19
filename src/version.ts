@@ -2,12 +2,13 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20260919-0614';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-add-provider-te.20260919-0614';
+export const APP_BUILD_NUMBER = '20260919-0632';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-add-provider-te.20260919-0632';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
 export const APP_BRANCH = 'feat-add-provider-te';
-export const APP_CHANGELOG = `* feat(settings): add engine priority sorting subdrawer, enable/disable embed on tv, and embed timeout/retry on mobile
+export const APP_CHANGELOG = `* feat(player): add US origin filter, abort Telegram resolution on exit, and clean up buffering audio
+* feat(settings): add engine priority sorting subdrawer, enable/disable embed on tv, and embed timeout/retry on mobile
 * feat(telegram): remove url textbox, auto-ping on settings open, and fix watch provider selection
 * fix(tv): move telegram chunk buffer & origin filters to subdrawers with full dpad navigation
 * chore: bump build version
@@ -20,5 +21,4 @@ export const APP_CHANGELOG = `* feat(settings): add engine priority sorting subd
 * fix: remove bottom bar background — fully transparent
 * fix: end-to-end bottom bar + server count fix + embed/direct server separation
 * feat(player): convert bottom glass bar to docked drawer style
-* feat(settings): add configurable Telegram stream chunk slice buffer size (256KB, 512KB, 1MB)
-* feat(player): unify buffering spinner and seek status directly inside center controls`;
+* feat(settings): add configurable Telegram stream chunk slice buffer size (256KB, 512KB, 1MB)`;
