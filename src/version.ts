@@ -2,12 +2,13 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20260919-1618';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-improve-telegra.20260919-1618';
+export const APP_BUILD_NUMBER = '20260919-1626';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-improve-telegra.20260919-1626';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
 export const APP_BRANCH = 'feat-improve-telegra';
-export const APP_CHANGELOG = `* fix(player): restrict play, pause, +10s, -10s notifications to TV remote usage only
+export const APP_CHANGELOG = `* fix(player,settings): restore seek animation, limit HUD to TV remote, and move slice & origin filters under MSM32bot
+* fix(player): restrict play, pause, +10s, -10s notifications to TV remote usage only
 * fix(msm32): enforce https for onrender.com and auto-fallback from unrouteable local dev endpoints in Capacitor
 * fix(msm32): isolate client cache by baseUrl and clear cache on endpoint update
 * feat(settings): add MSM32bot sub-drawer with custom microservice URL input and presets
@@ -20,5 +21,4 @@ export const APP_CHANGELOG = `* fix(player): restrict play, pause, +10s, -10s no
 * feat: Telegram Provider (@msm32bot), Custom Direct Player UI, and Settings Restructure (#113)
 * refactor(providers): restructure provider categories and preferences for ASEAN and regional content (#112)
 * feat(settings): TV active category border, mobile sub-drawers hierarchy, scroll lock & General tab rename (#111)
-* fix(tv): eliminate delay on remote back navigation and land focus on TV navbar Home icon (#110)
-* fix(tv): eliminate navigation lag on TV navbar during Home data load (#109)`;
+* fix(tv): eliminate delay on remote back navigation and land focus on TV navbar Home icon (#110)`;

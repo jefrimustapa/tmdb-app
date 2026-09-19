@@ -40,6 +40,7 @@ import {
   Save,
   SlidersHorizontal,
   Send,
+  Trash2,
 } from 'lucide-react';
 
 type MobileCategory = 'playback' | 'display' | 'content' | 'system';
@@ -200,6 +201,8 @@ export const Settings: React.FC = () => {
   const [testingMsm32, setTestingMsm32] = useState(false);
   const [msm32TestResult, setMsm32TestResult] = useState<Msm32HealthResult | null>(null);
   const [msmUrlInput, setMsmUrlInput] = useState<string>('');
+  const [cacheStats, setCacheStats] = useState(() => msm32Service.getCacheStats());
+  const [cacheClearFeedback, setCacheClearFeedback] = useState<string | null>(null);
 
   // Keep local msmUrlInput in sync with persisted settings
   useEffect(() => {
@@ -211,6 +214,7 @@ export const Settings: React.FC = () => {
   // Auto-ping MSM Getter microservice whenever the user enters the Telegram or MSM32 drawer
   useEffect(() => {
     if (activeDrawer === 'engine-telegram' || activeDrawer === 'telegram-msm32') {
+      setCacheStats(msm32Service.getCacheStats());
       setTestingMsm32(true);
       setMsm32TestResult(null);
       const url = settings?.msm32GetterUrl;
@@ -1253,12 +1257,7 @@ export const Settings: React.FC = () => {
             return (
               <div className="rounded-xl border border-amber-500/40 bg-gradient-to-r from-amber-500/15 via-orange-500/10 to-transparent p-3.5">
                 <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <span className="font-bold text-xs sm:text-sm text-white">Engine Priority Order</span>
-                    <span className="text-[10px] px-2 py-0.5 rounded font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40">
-                      Sequence
-                    </span>
-                  </div>
+                  <span className="font-bold text-xs sm:text-sm text-white">Engine Priority Order</span>
                   <button
                     type="button"
                     onClick={() => setActiveDrawer('engine-priority')}
@@ -1720,6 +1719,42 @@ export const Settings: React.FC = () => {
               <ChevronRight className="w-4 h-4 text-gray-400" />
             </div>
           </button>
+
+          {/* Local Stream Cache Clearing */}
+          <div className="p-3.5 rounded-xl bg-white/5 border border-white/10 space-y-2.5">
+            <div className="flex items-center justify-between">
+              <div>
+                <span className="text-xs font-semibold text-white block">Local Stream Fast Cache</span>
+                <span className="text-[10px] text-gray-400">
+                  In-app fast lookup cache for resolved &amp; failed stream attempts
+                </span>
+              </div>
+              <span className="text-[10px] text-sky-400 font-mono font-bold bg-sky-500/10 px-2 py-0.5 rounded border border-sky-400/20">
+                {cacheStats.total} {cacheStats.total === 1 ? 'entry' : 'entries'}
+              </span>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                const cleared = msm32Service.clearCache();
+                setCacheStats(msm32Service.getCacheStats());
+                setCacheClearFeedback(cleared > 0 ? `Cleared ${cleared} cached stream ${cleared > 1 ? 'items' : 'item'}` : 'Cache is already clean');
+                setTimeout(() => setCacheClearFeedback(null), 3000);
+              }}
+              className="w-full py-2 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/40 font-bold text-xs flex items-center justify-center gap-1.5 transition-all active:scale-[0.98]"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>Clear Local Cache</span>
+            </button>
+
+            {cacheClearFeedback && (
+              <div className="p-2 rounded-lg text-[11px] flex items-center gap-1.5 border bg-rose-950/40 text-rose-300 border-rose-500/40">
+                <Check className="w-3.5 h-3.5 text-rose-400 flex-shrink-0" />
+                <span>{cacheClearFeedback}</span>
+              </div>
+            )}
+          </div>
 
           <p className="text-[11px] text-gray-400 leading-relaxed">
             The MSM Getter microservice executes queries against the Telegram bot <span className="text-sky-300 font-mono">@msm32bot</span>, resolving file documents and generating chunked HTTP byte-range streams directly into the custom player.
