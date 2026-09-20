@@ -2,12 +2,15 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20260920-1047';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.fix-msm32bot-setting.20260920-1047';
+export const APP_BUILD_NUMBER = '20260920-1727';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.perf-msm-stream-buff.20260920-1727';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
-export const APP_BRANCH = 'fix-msm32bot-setting';
-export const APP_CHANGELOG = `* fix(tv): fix D-pad remote navigation for all MSM32bot settings menus (#123)
+export const APP_BRANCH = 'perf-msm-stream-buff';
+export const APP_CHANGELOG = `* perf: implement 32MB in-memory LRU block cache, MP4 container scoring preference, and video preload auto
+* fix(msm-getter): eliminate TCPObfuscated handshake delay, fix TDZ error, and add robust DC migration handling
+* perf: improve MSM32 1080p stream buffering with concurrent pipelining and dynamic quality selection
+* fix(tv): fix D-pad remote navigation for all MSM32bot settings menus (#123)
 * feat(filter): include standalone word 'sex' in adult title filtering (#122)
 * feat(player): compact playback settings header and add persistent global subtitle font size adjustment (#121)
 * feat(anime): support multi-season and continuous episode offset mapping to MAL, replace TV tag with year in MySpace (#120)
@@ -18,7 +21,4 @@ export const APP_CHANGELOG = `* fix(tv): fix D-pad remote navigation for all MSM
 * fix: prioritize original titles in pencuri candidate scoring and regional drama queries (#115)
 * feat: add debug-search endpoint in server/msm-getter
 * fix: prioritize 720p resolution for telegram provider and quality-aware caching (#114)
-* feat: Telegram Provider (@msm32bot), Custom Direct Player UI, and Settings Restructure (#113)
-* refactor(providers): restructure provider categories and preferences for ASEAN and regional content (#112)
-* feat(settings): TV active category border, mobile sub-drawers hierarchy, scroll lock & General tab rename (#111)
-* fix(tv): eliminate delay on remote back navigation and land focus on TV navbar Home icon (#110)`;
+* feat: Telegram Provider (@msm32bot), Custom Direct Player UI, and Settings Restructure (#113)`;

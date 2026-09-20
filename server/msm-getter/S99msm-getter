@@ -1,0 +1,72 @@
+#!/bin/sh
+
+ENABLED=yes
+DESC="MSM Getter Microservice"
+APP_DIR=/opt/app/msm-getter
+PID_FILE=/opt/var/run/msm-getter.pid
+LOG_FILE=$APP_DIR/msm-getter.log
+
+start() {
+    echo -n "Starting $DESC... "
+    if [ -f "$PID_FILE" ] && kill -0 $(cat "$PID_FILE") 2>/dev/null; then
+        echo "already running."
+        return 0
+    fi
+
+    echo 1 > /proc/sys/vm/overcommit_memory
+    mkdir -p /opt/var/run
+
+    export PATH=/opt/bin:/opt/sbin:$PATH
+    cd $APP_DIR
+    nohup env LD_PRELOAD=/opt/lib/libfixmadvise.so /opt/bin/node index.js >> $LOG_FILE 2>&1 &
+    PID=$!
+    echo $PID > "$PID_FILE"
+    echo "done (PID: $PID)."
+}
+
+stop() {
+    echo -n "Stopping $DESC... "
+    if [ -f "$PID_FILE" ]; then
+        PID=$(cat "$PID_FILE")
+        kill $PID 2>/dev/null
+        rm -f "$PID_FILE"
+        echo "done."
+    else
+        killall node 2>/dev/null
+        echo "done."
+    fi
+}
+
+status() {
+    if [ -f "$PID_FILE" ] && kill -0 $(cat "$PID_FILE") 2>/dev/null; then
+        echo "$DESC is running (PID: $(cat $PID_FILE))."
+        return 0
+    elif pidof node >/dev/null 2>&1; then
+        echo "$DESC node process is running (PID: $(pidof node))."
+        return 0
+    else
+        echo "$DESC is stopped."
+        return 1
+    fi
+}
+
+case "$1" in
+    start)
+        start
+        ;;
+    stop)
+        stop
+        ;;
+    restart)
+        stop
+        sleep 2
+        start
+        ;;
+    status|check)
+        status
+        ;;
+    *)
+        echo "Usage: $0 {start|stop|restart|status}"
+        exit 1
+        ;;
+esac

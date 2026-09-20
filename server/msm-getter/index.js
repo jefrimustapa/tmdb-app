@@ -30,11 +30,10 @@ if (!apiId || !apiHash) {
 }
 
 let client = new TelegramClient(new StringSession(session), apiId, apiHash, {
-  connection: ConnectionTCPObfuscated,
   connectionRetries: 5,
   deviceModel: 'MSM Getter Server',
   appVersion: '1.0.0',
-  systemVersion: 'Linux/Docker',
+  systemVersion: 'Linux/ASUS',
 });
 
 let isConnected = false;
@@ -671,6 +670,7 @@ app.get('/api/resolve', async (req, res) => {
             if (is1080) qualityScore = 50;
             else if (is720) qualityScore = 30;
           }
+          if (fnLower.includes('.mp4') || fnLower.includes('mp4')) qualityScore += 15;
 
           matchingRecentDocs.push({ doc, filename, qualityScore });
         }
@@ -811,6 +811,7 @@ app.get('/api/resolve', async (req, res) => {
         if (btnText.includes('1080p') || btnText.includes('1080')) score += 50;
         else if (btnText.includes('720p') || btnText.includes('720')) score += 30;
       }
+      if (btnText.toLowerCase().includes('.mp4') || btnText.toLowerCase().includes('mp4')) score += 35;
       if (btnText.includes('malaysub') || btnText.includes('msm')) score += 5;
 
       return score;
@@ -1082,12 +1083,321 @@ app.get('/api/resolve', async (req, res) => {
   }
 });
 
+// In-Memory LRU Block Cache for Telegram MTProto Stream Chunks
+// Caches up to 64 blocks (32 MB RAM) to eliminate seek latency when players ping-pong between audio & video clusters in MKV files.
+const BLOCK_CACHE_MAX_ENTRIES = 64; // 64 x 512KB = 32 MB
+const globalBlockCache = new Map();
+const activeStreams = new Map(); // key: docId -> { abort: Function }
+
+function getCachedBlock(docId, blockIdx) {
+  const key = `${docId}:${blockIdx}`;
+  if (globalBlockCache.has(key)) {
+    const data = globalBlockCache.get(key);
+    globalBlockCache.delete(key);
+    globalBlockCache.set(key, data);
+    return data;
+  }
+  return null;
+}
+
+function setCachedBlock(docId, blockIdx, data) {
+  if (!data || data.length === 0) return;
+  const key = `${docId}:${blockIdx}`;
+  if (globalBlockCache.has(key)) {
+    globalBlockCache.delete(key);
+  } else if (globalBlockCache.size >= BLOCK_CACHE_MAX_ENTRIES) {
+    const oldestKey = globalBlockCache.keys().next().value;
+    globalBlockCache.delete(oldestKey);
+  }
+  globalBlockCache.set(key, data);
+}
+
+/**
+ * High-performance Pipelined Telegram Document Streamer
+ * Concurrently prefetches upcoming 512KB chunks across parallel MTProto pipelines (sliding window)
+ * ensuring continuous high-throughput delivery with zero buffer underruns for 1080p/4K playback.
+ */
+async function streamTelegramPipelined(client, targetDoc, startByte, endByte, res, req, customChunkSize, customConcurrency) {
+  // Map requested chunkSize to MTProto block size and concurrency
+  let CHUNK_SIZE = 512 * 1024; // 512KB: Native Telegram MTProto block limit
+  let CONCURRENCY = 4;         // Default: 4 concurrent chunks (2MB sliding window)
+
+  if (customChunkSize === 262144) {
+    CHUNK_SIZE = 256 * 1024;
+    CONCURRENCY = 2; // Eco mode: 512KB sliding window (low bandwidth / mobile)
+  } else if (customChunkSize === 1048576) {
+    CHUNK_SIZE = 512 * 1024;
+    CONCURRENCY = 6; // Turbo mode: 3MB sliding window (high-bitrate 1080p)
+  } else if (customConcurrency && typeof customConcurrency === 'number') {
+    CONCURRENCY = customConcurrency;
+  }
+
+  let dcId = targetDoc.dcId || 2;
+  let sender = await client.getSender(dcId);
+  const fileRef = Buffer.isBuffer(targetDoc.fileReference)
+    ? targetDoc.fileReference
+    : Buffer.from(String(targetDoc.fileReference || ''), 'hex');
+
+  const location = new Api.InputDocumentFileLocation({
+    id: bigInt(targetDoc.id),
+    accessHash: bigInt(targetDoc.accessHash),
+    fileReference: fileRef,
+    thumbSize: '',
+  });
+
+  const startBlock = Math.floor(startByte / CHUNK_SIZE);
+  const endBlock = Math.floor(endByte / CHUNK_SIZE);
+
+  let aborted = false;
+  let activeBlock = startBlock;
+  req.on('close', () => {
+    aborted = true;
+    console.log(`[PIPELINE CLOSED by client] active: block ${activeBlock}/${endBlock}, aborted remaining blocks.`);
+  });
+
+  console.log(`[PIPELINE START] blocks ${startBlock}..${endBlock} (${endBlock - startBlock + 1} blocks), concurrency: ${CONCURRENCY}, chunkSize: ${CHUNK_SIZE / 1024}KB`);
+
+  async function fetchBlock(blockIdx) {
+    if (aborted) return null;
+
+    // 1. Check in-memory LRU cache (0ms instant lookup)
+    const cached = getCachedBlock(targetDoc.id.toString(), blockIdx);
+    if (cached) {
+      return cached;
+    }
+
+    const offset = blockIdx * CHUNK_SIZE;
+    if (offset >= Number(targetDoc.size)) return null;
+
+    const request = new Api.upload.GetFile({
+      location,
+      offset: bigInt(offset),
+      limit: CHUNK_SIZE,
+    });
+
+    try {
+      sender = await client.getSender(sender?.dcId || dcId);
+      const result = await client.invokeWithSender(request, sender);
+      const bytes = result.bytes;
+      if (bytes && bytes.length > 0) {
+        setCachedBlock(targetDoc.id.toString(), blockIdx, bytes);
+      }
+      return bytes;
+    } catch (err) {
+      const msg = `${err.errorMessage || ''} ${err.message || ''}`;
+      const dcMatch = msg.match(/(?:FILE_MIGRATE_|stored in DC\s*)(\d+)/i);
+      const newDc = err.newDc || err.dc || (dcMatch ? parseInt(dcMatch[1], 10) : null);
+      if (newDc) {
+        console.log(`[STREAM MIGRATE] Document lives on DC ${newDc} (was ${dcId}). Re-routing...`);
+        dcId = newDc;
+        targetDoc.dcId = newDc;
+        sender = await client.getSender(newDc);
+        const result = await client.invokeWithSender(request, sender);
+        const bytes = result.bytes;
+        if (bytes && bytes.length > 0) {
+          setCachedBlock(targetDoc.id.toString(), blockIdx, bytes);
+        }
+        return bytes;
+      }
+      throw err;
+    }
+  }
+
+  async function fetchBlockWithRetry(blockIdx, retries = 2) {
+    for (let attempt = 0; attempt <= retries; attempt++) {
+      if (aborted) return null;
+      try {
+        const bytes = await fetchBlock(blockIdx);
+        if (bytes) return bytes;
+      } catch (err) {
+        if (attempt === retries || aborted) throw err;
+        console.warn(`[STREAM RETRY] Block ${blockIdx} attempt ${attempt + 1} failed (${err.message}). Retrying in 500ms...`);
+        await new Promise(r => setTimeout(r, 500));
+      }
+    }
+    return null;
+  }
+
+  let nextBlockToFetch = startBlock;
+  const inFlight = new Map();
+
+  const streamKey = targetDoc.id.toString();
+  activeStreams.set(streamKey, {
+    abort: () => {
+      aborted = true;
+      inFlight.clear();
+    }
+  });
+
+  const cleanupStream = () => {
+    if (activeStreams.get(streamKey)) {
+      activeStreams.delete(streamKey);
+    }
+  };
+  req.on('close', cleanupStream);
+  res.on('finish', cleanupStream);
+
+  // 1. First-Chunk Express Delivery:
+  // Immediately fetch & send the first block alone with 100% bandwidth.
+  // This allows the video decoder to display frames instantly (< 300ms) after seek without waiting for parallel chunks.
+  const firstBlockData = await fetchBlockWithRetry(startBlock);
+  if (aborted || res.destroyed || res.writableEnded) {
+    cleanupStream();
+    return;
+  }
+  if (!firstBlockData || firstBlockData.length === 0) {
+    if (!res.writableEnded) res.end();
+    cleanupStream();
+    return;
+  }
+
+  const firstBlockStart = startBlock * CHUNK_SIZE;
+  const firstSliceStart = Math.max(0, startByte - firstBlockStart);
+  const firstSliceEnd = Math.min(firstBlockData.length, (endByte - firstBlockStart) + 1);
+  if (firstSliceStart < firstSliceEnd) {
+    res.write(firstBlockData.subarray(firstSliceStart, firstSliceEnd));
+  }
+
+  if (startBlock === endBlock) {
+    if (!res.writableEnded) res.end();
+    cleanupStream();
+    return;
+  }
+
+  // 2. Sliding-Window Pipeline for subsequent blocks
+  nextBlockToFetch = startBlock + 1;
+
+  function fillPipeline() {
+    while (!aborted && inFlight.size < CONCURRENCY && nextBlockToFetch <= endBlock) {
+      const idx = nextBlockToFetch++;
+      const p = fetchBlockWithRetry(idx).catch(err => {
+        if (!aborted) console.warn(`[STREAM PIPE WARN] Block ${idx} fetch error: ${err.message}`);
+        return null;
+      });
+      inFlight.set(idx, p);
+    }
+  }
+
+  for (let currentBlock = startBlock + 1; currentBlock <= endBlock; currentBlock++) {
+    activeBlock = currentBlock;
+    if (aborted || res.destroyed || res.writableEnded) break;
+
+    fillPipeline();
+
+    const blockPromise = inFlight.get(currentBlock);
+    inFlight.delete(currentBlock);
+
+    if (!blockPromise) break;
+
+    const buffer = await blockPromise;
+    if (!buffer || buffer.length === 0) break;
+
+    const blockStartPos = currentBlock * CHUNK_SIZE;
+    const sliceStart = Math.max(0, startByte - blockStartPos);
+    const sliceEnd = Math.min(buffer.length, (endByte - blockStartPos) + 1);
+
+    if (sliceStart < sliceEnd) {
+      const slice = buffer.subarray(sliceStart, sliceEnd);
+      res.write(slice);
+    }
+  }
+
+  cleanupStream();
+  if (!res.writableEnded) {
+    res.end();
+  }
+}
+
+// GitHub Auto-Deploy Webhook
+app.post('/api/github-webhook', async (req, res) => {
+  try {
+    const event = req.headers['x-github-event'];
+    if (event === 'ping') {
+      console.log('[WEBHOOK] Received GitHub ping event. Connection active!');
+      return res.json({ msg: 'pong' });
+    }
+
+    if (event !== 'push') {
+      return res.json({ msg: `Ignored event: ${event}` });
+    }
+
+    const payload = req.body;
+    const branch = payload.ref;
+    console.log(`[WEBHOOK] Push received for ${branch} by ${payload.pusher?.name || 'unknown'}`);
+
+    if (branch !== 'refs/heads/main' && branch !== 'refs/heads/master') {
+      return res.json({ msg: `Ignored branch ${branch}` });
+    }
+
+    // Check if files under server/msm-getter/ were modified
+    const commits = payload.commits || [];
+    let serverFilesChanged = false;
+    for (const c of commits) {
+      const allModified = [...(c.added || []), ...(c.modified || [])];
+      if (allModified.some(f => f.startsWith('server/msm-getter/'))) {
+        serverFilesChanged = true;
+        break;
+      }
+    }
+
+    if (!serverFilesChanged && commits.length > 0) {
+      console.log('[WEBHOOK] No changes in server/msm-getter/ detected in this push.');
+      return res.json({ msg: 'No server changes detected' });
+    }
+
+    console.log('[WEBHOOK] Changes detected in server/msm-getter/! Triggering auto-deployment...');
+    res.json({ msg: 'Deployment initiated' });
+
+    // Download latest files from GitHub and restart service
+    setTimeout(async () => {
+      try {
+        const fs = await import('fs');
+        const repo = payload.repository?.full_name || 'jefrimustapa/tmdb-app';
+        const rawBase = `https://raw.githubusercontent.com/${repo}/main/server/msm-getter`;
+
+        console.log(`[AUTO-DEPLOY] Downloading latest index.js from ${rawBase}/index.js...`);
+        const idxRes = await axios.get(`${rawBase}/index.js`, { responseType: 'text', timeout: 15000 });
+        if (idxRes.data && idxRes.data.length > 1000) {
+          fs.writeFileSync(path.join(__dirname, 'index.js'), idxRes.data, 'utf-8');
+        }
+
+        console.log(`[AUTO-DEPLOY] Downloading latest db.js from ${rawBase}/db.js...`);
+        const dbRes = await axios.get(`${rawBase}/db.js`, { responseType: 'text', timeout: 15000 }).catch(() => null);
+        if (dbRes?.data && dbRes.data.length > 200) {
+          fs.writeFileSync(path.join(__dirname, 'db.js'), dbRes.data, 'utf-8');
+        }
+
+        console.log('[AUTO-DEPLOY] Code updated successfully! Restarting service in 1s...');
+        setTimeout(() => {
+          import('child_process').then(cp => {
+            cp.exec('/opt/etc/init.d/S99msm-getter restart');
+          });
+        }, 1000);
+      } catch (dErr) {
+        console.error('[AUTO-DEPLOY ERROR] Failed to download or restart:', dErr.message);
+      }
+    }, 500);
+
+  } catch (err) {
+    console.error('[WEBHOOK ERROR]', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Stream endpoint with HTTP 206 Partial Content Range support
 app.get('/stream/:docId', async (req, res) => {
   try {
     await initTelegram();
     const docId = req.params.docId;
     const rangeHeader = req.headers.range;
+
+    // Instantly terminate any previous in-flight stream pipeline for this document (e.g. user seeked forward)
+    // to free 100% of the router's MTProto download bandwidth for the new seek position immediately.
+    if (activeStreams.has(docId)) {
+      console.log(`[STREAM CANCEL] Terminating previous in-flight stream for doc ${docId} on new seek.`);
+      try { activeStreams.get(docId).abort(); } catch {}
+      activeStreams.delete(docId);
+    }
 
     let targetDoc = null;
     let targetMedia = null;
@@ -1106,7 +1416,7 @@ app.get('/stream/:docId', async (req, res) => {
         date: dbRecord.date || Math.floor(Date.now() / 1000),
         mimeType: dbRecord.mimeType || 'video/mp4',
         size: bigInt(dbRecord.size),
-        dcId: dbRecord.dcId || 4,
+        dcId: dbRecord.dcId || 2,
         attributes: [new Api.DocumentAttributeFilename({ fileName: dbRecord.filename })],
       });
       targetMedia = new Api.MessageMediaDocument({ document: targetDoc });
@@ -1144,10 +1454,9 @@ app.get('/stream/:docId', async (req, res) => {
       return res.end();
     }
 
-    // Parse user-specified chunk size from query parameter (e.g. ?chunkSize=262144)
+    // Parse user-specified chunk size / pipeline mode from query parameter (e.g. ?chunkSize=1048576)
     const parsedChunk = parseInt(req.query.chunkSize, 10);
-    const validChunkSizes = [131072, 262144, 524288, 1048576]; // 128KB, 256KB, 512KB, 1MB
-    const downloadChunkSize = validChunkSizes.includes(parsedChunk) ? parsedChunk : 512 * 1024;
+    const downloadChunkSize = [131072, 262144, 524288, 1048576].includes(parsedChunk) ? parsedChunk : 512 * 1024;
 
     if (!rangeHeader) {
       res.writeHead(200, {
@@ -1156,17 +1465,7 @@ app.get('/stream/:docId', async (req, res) => {
         'Accept-Ranges': 'bytes',
         'Content-Disposition': `inline; filename="${encodeURIComponent(filename)}"`,
       });
-
-      const iter = client.iterDownload({
-        file: targetMedia,
-        requestSize: downloadChunkSize,
-      });
-
-      for await (const chunk of iter) {
-        if (res.destroyed || res.writableEnded) break;
-        res.write(chunk);
-      }
-      if (!res.writableEnded) res.end();
+      await streamTelegramPipelined(client, targetDoc, 0, fileSize - 1, res, req, downloadChunkSize);
     } else {
       const parts = rangeHeader.replace(/bytes=/, '').split('-');
       const start = parseInt(parts[0], 10);
@@ -1178,6 +1477,7 @@ app.get('/stream/:docId', async (req, res) => {
       }
 
       const chunkSize = (end - start) + 1;
+      console.log(`[STREAM REQ] ${req.method} Range: "${rangeHeader}" -> start: ${start}, end: ${end} (${chunkSize} bytes, chunkParam: ${req.query.chunkSize || 'default'})`);
       res.writeHead(206, {
         'Content-Range': `bytes ${start}-${end}/${fileSize}`,
         'Accept-Ranges': 'bytes',
@@ -1186,24 +1486,7 @@ app.get('/stream/:docId', async (req, res) => {
         'Content-Disposition': `inline; filename="${encodeURIComponent(filename)}"`,
       });
 
-      let offset = bigInt(start);
-      let bytesLeft = chunkSize;
-      let aborted = false;
-
-      req.on('close', () => { aborted = true; });
-
-      const iter = client.iterDownload({
-        file: targetMedia,
-        offset,
-        limit: bytesLeft,
-        requestSize: downloadChunkSize,
-      });
-
-      for await (const chunk of iter) {
-        if (aborted || res.destroyed || res.writableEnded) break;
-        res.write(chunk);
-      }
-      if (!res.writableEnded) res.end();
+      await streamTelegramPipelined(client, targetDoc, start, end, res, req, downloadChunkSize);
     }
   } catch (err) {
     if (err.code !== 'ERR_STREAM_WRITE_AFTER_END' && err.code !== 'ECONNRESET' && err.code !== 'EPIPE') {
