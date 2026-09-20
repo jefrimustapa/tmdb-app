@@ -165,6 +165,7 @@ export const Settings: React.FC = () => {
   const [showEnginePriorityDrawer, setShowEnginePriorityDrawer] = useState(false);
   const [showTelegramDrawer, setShowTelegramDrawer] = useState(false);
   const [showTelegramMsmDrawer, setShowTelegramMsmDrawer] = useState(false);
+  const [showTelegramUrlDrawer, setShowTelegramUrlDrawer] = useState(false);
   const [showTelegramChunkDrawer, setShowTelegramChunkDrawer] = useState(false);
   const [showTelegramCountryDrawer, setShowTelegramCountryDrawer] = useState(false);
   const [showEmbedResolverDrawer, setShowEmbedResolverDrawer] = useState(false);
@@ -185,7 +186,7 @@ export const Settings: React.FC = () => {
   const { detectedPlatform, activeLayout } = useDevice();
 
   const isPickerModalOpen = pickerModalSlot !== null;
-  const isAnyModalOpen = isPickerModalOpen || showMaturityDrawer || showTriggerDrawer || showAutoplayDrawer || showAutoplayTriggerDrawer || showAutoplayTimeoutDrawer || showEnginesDrawer || showEnginePriorityDrawer || showTelegramDrawer || showTelegramMsmDrawer || showTelegramChunkDrawer || showTelegramCountryDrawer || showEmbedResolverDrawer || showEmbedTimeoutDrawer || showEmbedRetryDrawer || activePriorityDrawer !== null || showTickerDrawer || showHeaderTimeoutDrawer || showPerfHudDrawer || showBackupDrawer;
+  const isAnyModalOpen = isPickerModalOpen || showMaturityDrawer || showTriggerDrawer || showAutoplayDrawer || showAutoplayTriggerDrawer || showAutoplayTimeoutDrawer || showEnginesDrawer || showEnginePriorityDrawer || showTelegramDrawer || showTelegramMsmDrawer || showTelegramUrlDrawer || showTelegramChunkDrawer || showTelegramCountryDrawer || showEmbedResolverDrawer || showEmbedTimeoutDrawer || showEmbedRetryDrawer || activePriorityDrawer !== null || showTickerDrawer || showHeaderTimeoutDrawer || showPerfHudDrawer || showBackupDrawer;
 
   // Viewport scroll helpers for TV remote navigation (snaps to absolute top / bottom)
   const scrollToPanelTop = () => {
@@ -325,8 +326,18 @@ export const Settings: React.FC = () => {
     } else if (showTelegramMsmDrawer) {
       setTimeout(() => {
         const defaultEl = document.getElementById('drawer-msm-toggle') ||
-                          document.getElementById('drawer-msm-url-input') ||
+                          document.getElementById('drawer-msm32-sub-url') ||
                           document.querySelector<HTMLElement>('[data-telegram-msm-drawer-item="true"]');
+        if (defaultEl) {
+          defaultEl.focus();
+          defaultEl.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        }
+      }, 50);
+    } else if (showTelegramUrlDrawer) {
+      setTimeout(() => {
+        const defaultEl = document.querySelector<HTMLElement>('[data-telegram-url-drawer-item][data-telegram-url-selected="true"]') ||
+                          document.getElementById('drawer-msm-preset-render') ||
+                          document.querySelector<HTMLElement>('[data-telegram-url-drawer-item]');
         if (defaultEl) {
           defaultEl.focus();
           defaultEl.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
@@ -439,7 +450,7 @@ export const Settings: React.FC = () => {
         (window as any).AndroidBridge?.setDropdownOpen?.(false);
       } catch {}
     };
-  }, [pickerModalSlot, isPickerModalOpen, showMaturityDrawer, showTriggerDrawer, showAutoplayDrawer, showAutoplayTriggerDrawer, showAutoplayTimeoutDrawer, showEnginesDrawer, showEnginePriorityDrawer, showTelegramDrawer, showTelegramMsmDrawer, showTelegramChunkDrawer, showTelegramCountryDrawer, showEmbedResolverDrawer, showEmbedTimeoutDrawer, showEmbedRetryDrawer, activePriorityDrawer, showTickerDrawer, showHeaderTimeoutDrawer, showPerfHudDrawer, showBackupDrawer, isAnyModalOpen]);
+  }, [pickerModalSlot, isPickerModalOpen, showMaturityDrawer, showTriggerDrawer, showAutoplayDrawer, showAutoplayTriggerDrawer, showAutoplayTimeoutDrawer, showEnginesDrawer, showEnginePriorityDrawer, showTelegramDrawer, showTelegramMsmDrawer, showTelegramUrlDrawer, showTelegramChunkDrawer, showTelegramCountryDrawer, showEmbedResolverDrawer, showEmbedTimeoutDrawer, showEmbedRetryDrawer, activePriorityDrawer, showTickerDrawer, showHeaderTimeoutDrawer, showPerfHudDrawer, showBackupDrawer, isAnyModalOpen]);
 
   // Handle remote Back button, tmdb_close_dropdowns, and Escape dismissal for modals / drawers
   useEffect(() => {
@@ -478,6 +489,14 @@ export const Settings: React.FC = () => {
         setShowTelegramDrawer(true);
         setTimeout(() => {
           document.getElementById('drawer-msm32-sub')?.focus();
+        }, 50);
+        return;
+      }
+      if (showTelegramUrlDrawer) {
+        setShowTelegramUrlDrawer(false);
+        setShowTelegramMsmDrawer(true);
+        setTimeout(() => {
+          document.getElementById('drawer-msm32-sub-url')?.focus();
         }, 50);
         return;
       }
@@ -631,6 +650,7 @@ export const Settings: React.FC = () => {
     showEnginePriorityDrawer,
     showTelegramDrawer,
     showTelegramMsmDrawer,
+    showTelegramUrlDrawer,
     showTelegramChunkDrawer,
     showTelegramCountryDrawer,
     showEmbedResolverDrawer,
@@ -3921,6 +3941,199 @@ export const Settings: React.FC = () => {
       )}
 
       {/* ========================================================================= */}
+      {/* Android TV Telegram Microservice Endpoint URL Right Drawer (Level 3)      */}
+      {/* ========================================================================= */}
+      {showTelegramUrlDrawer && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          data-drawer-container="true"
+          className="fixed inset-0 z-[9999] flex justify-end bg-black/80 backdrop-blur-md animate-fade-in"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowTelegramUrlDrawer(false);
+              setShowTelegramMsmDrawer(true);
+            }
+          }}
+        >
+          {/* Left Side Parent Path Context */}
+          <div className="flex-1 hidden md:flex flex-col justify-center pl-16 pr-8 pointer-events-none select-none">
+            <div className="flex items-center gap-2 text-xs font-bold text-gray-400 tracking-wider uppercase mb-2">
+              <span className="text-gray-400">Settings</span>
+              <ChevronRight className="w-3.5 h-3.5 text-gray-500" />
+              <span className="text-gray-400">Playback &amp; Streaming</span>
+              <ChevronRight className="w-3.5 h-3.5 text-gray-500" />
+              <span className="text-gray-400">Stream Engines</span>
+              <ChevronRight className="w-3.5 h-3.5 text-gray-500" />
+              <span className="text-gray-400">Telegram</span>
+              <ChevronRight className="w-3.5 h-3.5 text-gray-500" />
+              <span className="text-hbo-cyan font-semibold">MSM32bot</span>
+            </div>
+            <h1 className="text-3xl font-extrabold text-white tracking-tight mb-2">Microservice Endpoint URL</h1>
+            <p className="text-sm text-gray-400 max-w-md leading-relaxed">
+              Select a quick preset or enter custom server address running Telegram MTProto client.
+            </p>
+          </div>
+
+          <div className="w-full max-w-md h-full bg-hbo-card/95 border-l border-hbo-border/80 shadow-2xl flex flex-col justify-between animate-slide-in-right overflow-hidden">
+            {/* Drawer Body */}
+            <div className="flex-1 overflow-y-auto px-6 py-6 space-y-4 font-sans">
+              {(() => {
+                const currentUrl = settings.msm32GetterUrl || 'https://msm-getter.onrender.com';
+                const isRenderSelected = currentUrl === 'https://msm-getter.onrender.com';
+                const isLocalSelected = currentUrl === 'http://localhost:3033';
+
+                const applyUrl = (url: string) => {
+                  const trimmed = url.trim().replace(/\/+$/, '');
+                  const finalUrl = trimmed || 'https://msm-getter.onrender.com';
+                  msm32Service.clearCache();
+                  handleUpdate({ msm32GetterUrl: finalUrl });
+                  setMsmUrlInput(finalUrl);
+                  setTestingMsm32(true);
+                  setMsm32TestResult(null);
+                  msm32Service.testConnection(finalUrl)
+                    .then((res) => setMsm32TestResult(res))
+                    .catch((err: any) => setMsm32TestResult({ ok: false, error: err?.message || 'Connection failed' }))
+                    .finally(() => setTestingMsm32(false));
+                };
+
+                return (
+                  <>
+                    <div className="space-y-1">
+                      <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block">Server Presets</span>
+                      <p className="text-[11px] text-gray-400 leading-snug">
+                        Choose a pre-configured backend endpoint. Selecting immediately updates settings.
+                      </p>
+                    </div>
+
+                    {/* Preset 1: Render Cloud */}
+                    <button
+                      id="drawer-msm-preset-render"
+                      data-telegram-url-drawer-item="true"
+                      data-telegram-url-selected={isRenderSelected ? 'true' : 'false'}
+                      type="button"
+                      onKeyDown={(e) => {
+                        if (e.key === 'ArrowDown') {
+                          e.preventDefault();
+                          const target = document.getElementById('drawer-msm-preset-local');
+                          target?.focus();
+                          target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                        }
+                      }}
+                      onClick={() => applyUrl('https://msm-getter.onrender.com')}
+                      className={`w-full p-4 rounded-xl border text-left transition-all tv-focus-target flex items-center justify-between gap-3 ${
+                        isRenderSelected
+                          ? 'bg-sky-950/40 border-sky-400 text-white shadow-hbo-glow ring-1 ring-sky-400/40'
+                          : 'bg-black/30 border-hbo-border hover:border-gray-600 text-gray-400'
+                      }`}
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-bold text-sm text-white">Render Cloud</span>
+                          <span className="text-[10px] text-sky-400 font-mono font-bold bg-sky-500/10 px-1.5 py-0.5 rounded border border-sky-400/20">
+                            Default
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-gray-400 font-mono truncate">https://msm-getter.onrender.com</p>
+                        <p className="text-[10px] text-gray-500 mt-1">Hosted on Render cloud. Auto spins down when idle.</p>
+                      </div>
+                      <div className={`w-6 h-6 rounded-full border flex items-center justify-center flex-shrink-0 ${
+                        isRenderSelected ? 'bg-sky-500 border-sky-400 text-black' : 'border-gray-600 bg-black/40 text-transparent'
+                      }`}>
+                        <Check className="w-3.5 h-3.5 stroke-[3]" />
+                      </div>
+                    </button>
+
+                    {/* Preset 2: Local PC */}
+                    <button
+                      id="drawer-msm-preset-local"
+                      data-telegram-url-drawer-item="true"
+                      data-telegram-url-selected={isLocalSelected ? 'true' : 'false'}
+                      type="button"
+                      onKeyDown={(e) => {
+                        if (e.key === 'ArrowUp') {
+                          e.preventDefault();
+                          const target = document.getElementById('drawer-msm-preset-render');
+                          target?.focus();
+                          target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                        } else if (e.key === 'ArrowDown') {
+                          e.preventDefault();
+                          const target = document.getElementById('drawer-msm-url-input');
+                          target?.focus();
+                          target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                        }
+                      }}
+                      onClick={() => applyUrl('http://localhost:3033')}
+                      className={`w-full p-4 rounded-xl border text-left transition-all tv-focus-target flex items-center justify-between gap-3 ${
+                        isLocalSelected
+                          ? 'bg-sky-950/40 border-sky-400 text-white shadow-hbo-glow ring-1 ring-sky-400/40'
+                          : 'bg-black/30 border-hbo-border hover:border-gray-600 text-gray-400'
+                      }`}
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-bold text-sm text-white">Local PC</span>
+                          <span className="text-[10px] text-sky-400 font-mono font-bold bg-sky-500/10 px-1.5 py-0.5 rounded border border-sky-400/20">
+                            Fastest
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-gray-400 font-mono truncate">http://localhost:3033</p>
+                        <p className="text-[10px] text-gray-500 mt-1">Local host server on port 3033. Zero cloud latency.</p>
+                      </div>
+                      <div className={`w-6 h-6 rounded-full border flex items-center justify-center flex-shrink-0 ${
+                        isLocalSelected ? 'bg-sky-500 border-sky-400 text-black' : 'border-gray-600 bg-black/40 text-transparent'
+                      }`}>
+                        <Check className="w-3.5 h-3.5 stroke-[3]" />
+                      </div>
+                    </button>
+
+                    {/* Custom Address Input (Auto-saves on Enter or blur) */}
+                    <div className="space-y-2 pt-2 border-t border-hbo-border/50">
+                      <div>
+                        <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block">Custom Server Address</span>
+                        <p className="text-[11px] text-gray-400 mt-0.5">Press Enter on remote keyboard to apply.</p>
+                      </div>
+                      <input
+                        id="drawer-msm-url-input"
+                        data-telegram-url-drawer-item="true"
+                        type="text"
+                        value={msmUrlInput}
+                        onChange={(e) => setMsmUrlInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'ArrowUp') {
+                            e.preventDefault();
+                            const target = document.getElementById('drawer-msm-preset-local');
+                            target?.focus();
+                            target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                          } else if (e.key === 'Enter') {
+                            e.preventDefault();
+                            applyUrl(msmUrlInput);
+                          }
+                        }}
+                        onBlur={() => {
+                          const trimmed = msmUrlInput.trim().replace(/\/+$/, '');
+                          if (trimmed && trimmed !== settings.msm32GetterUrl) {
+                            applyUrl(trimmed);
+                          }
+                        }}
+                        placeholder="https://msm-getter.onrender.com"
+                        className="w-full bg-black/50 border border-white/15 rounded-xl px-4 py-3 text-xs text-white font-mono placeholder:text-gray-600 focus:outline-none focus:border-sky-400/80 transition-colors tv-focus-target"
+                      />
+                    </div>
+                  </>
+                );
+              })()}
+            </div>
+
+            {/* Drawer Footer Hint */}
+            <div className="p-4 border-t border-hbo-border/50 bg-black/40 flex items-center justify-center text-xs text-gray-400 select-none">
+              <span>Press <strong className="text-white font-semibold">Back</strong> to return</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
       {/* Android TV Telegram MSM32 Sub-Drawer (Level 3)                            */}
       {/* ========================================================================= */}
       {showTelegramMsmDrawer && (
@@ -3971,7 +4184,9 @@ export const Settings: React.FC = () => {
                       onKeyDown={(e) => {
                         if (e.key === 'ArrowDown') {
                           e.preventDefault();
-                          document.getElementById('drawer-msm-preset-render')?.focus();
+                          const target = document.getElementById('drawer-msm32-sub-url');
+                          target?.focus();
+                          target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
                         }
                       }}
                       onClick={() => {
@@ -4001,163 +4216,43 @@ export const Settings: React.FC = () => {
                       </div>
                     </button>
 
-                    {/* Microservice Endpoint URL Section */}
-                    <div className="bg-black/40 border border-hbo-border rounded-xl p-4 space-y-3">
-                      <div>
-                        <span className="text-xs font-bold text-white block mb-0.5">Microservice Endpoint URL</span>
-                        <p className="text-[11px] text-gray-400">
-                          Backend server running Telegram MTProto client (Render cloud or local PC).
-                        </p>
-                      </div>
-
-                      {/* Quick URL Presets */}
-                      <div className="space-y-1.5">
-                        <span className="text-[10px] text-gray-400 font-bold block uppercase tracking-wider">Quick Presets</span>
-                        <div className="grid grid-cols-2 gap-2">
-                          <button
-                            id="drawer-msm-preset-render"
-                            data-telegram-msm-drawer-item="true"
-                            type="button"
-                            onKeyDown={(e) => {
-                              if (e.key === 'ArrowUp') {
-                                e.preventDefault();
-                                document.getElementById('drawer-msm-toggle')?.focus();
-                              } else if (e.key === 'ArrowDown') {
-                                e.preventDefault();
-                                document.getElementById('drawer-msm-url-input')?.focus();
-                              } else if (e.key === 'ArrowRight') {
-                                e.preventDefault();
-                                document.getElementById('drawer-msm-preset-local')?.focus();
-                              }
-                            }}
-                            onClick={() => {
-                              const renderUrl = 'https://msm-getter.onrender.com';
-                              msm32Service.clearCache();
-                              setMsmUrlInput(renderUrl);
-                              handleUpdate({ msm32GetterUrl: renderUrl });
-                            }}
-                            className={`p-2.5 rounded-lg border text-left transition-all tv-focus-target ${
-                              currentUrl === 'https://msm-getter.onrender.com'
-                                ? 'bg-sky-500/20 border-sky-400 text-sky-300'
-                                : 'bg-white/5 border-white/10 text-gray-400 hover:text-white'
-                            }`}
-                          >
-                            <div className="text-xs font-bold">Render Cloud</div>
-                            <div className="text-[9px] text-gray-400 font-mono truncate">msm-getter.onrender.com</div>
-                          </button>
-
-                          <button
-                            id="drawer-msm-preset-local"
-                            data-telegram-msm-drawer-item="true"
-                            type="button"
-                            onKeyDown={(e) => {
-                              if (e.key === 'ArrowUp') {
-                                e.preventDefault();
-                                document.getElementById('drawer-msm-toggle')?.focus();
-                              } else if (e.key === 'ArrowDown') {
-                                e.preventDefault();
-                                document.getElementById('drawer-msm-url-input')?.focus();
-                              } else if (e.key === 'ArrowLeft') {
-                                e.preventDefault();
-                                document.getElementById('drawer-msm-preset-render')?.focus();
-                              }
-                            }}
-                            onClick={() => {
-                              const localUrl = 'http://localhost:3033';
-                              msm32Service.clearCache();
-                              setMsmUrlInput(localUrl);
-                              handleUpdate({ msm32GetterUrl: localUrl });
-                            }}
-                            className={`p-2.5 rounded-lg border text-left transition-all tv-focus-target ${
-                              currentUrl === 'http://localhost:3033'
-                                ? 'bg-sky-500/20 border-sky-400 text-sky-300'
-                                : 'bg-white/5 border-white/10 text-gray-400 hover:text-white'
-                            }`}
-                          >
-                            <div className="text-xs font-bold">Local PC</div>
-                            <div className="text-[9px] text-gray-400 font-mono truncate">localhost:3033</div>
-                          </button>
+                    {/* Sub-Drawer Item: Microservice Endpoint URL */}
+                    <div className="bg-black/40 border border-hbo-border rounded-xl p-3.5 flex items-center justify-between">
+                      <div className="min-w-0 pr-2">
+                        <div className="font-bold text-xs text-white flex items-center gap-1.5 mb-0.5">
+                          <Server className="w-3.5 h-3.5 text-sky-400" />
+                          <span>Microservice Endpoint URL</span>
                         </div>
+                        <p className="text-[10px] text-gray-400">Backend server running Telegram MTProto client.</p>
                       </div>
-
-                      {/* URL Text Input & Save Button */}
-                      <div className="space-y-1.5 pt-1">
-                        <span className="text-[10px] text-gray-400 font-bold block uppercase tracking-wider">Custom Server Address</span>
-                        <div className="flex items-center gap-2">
-                          <input
-                            id="drawer-msm-url-input"
-                            data-telegram-msm-drawer-item="true"
-                            type="text"
-                            value={msmUrlInput}
-                            onChange={(e) => setMsmUrlInput(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === 'ArrowUp') {
-                                e.preventDefault();
-                                document.getElementById('drawer-msm-preset-render')?.focus();
-                              } else if (e.key === 'ArrowDown') {
-                                e.preventDefault();
-                                const target = document.getElementById('drawer-btn-msm32-test');
-                                target?.focus();
-                                target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-                              } else if (e.key === 'ArrowRight') {
-                                e.preventDefault();
-                                const target = document.getElementById('drawer-msm-url-save');
-                                target?.focus();
-                                target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-                              } else if (e.key === 'Enter') {
-                                e.preventDefault();
-                                const trimmed = msmUrlInput.trim().replace(/\/+$/, '');
-                                const finalUrl = trimmed || 'https://msm-getter.onrender.com';
-                                msm32Service.clearCache();
-                                handleUpdate({ msm32GetterUrl: finalUrl });
-                                setMsmUrlInput(finalUrl);
-                              }
-                            }}
-                            placeholder="https://msm-getter.onrender.com"
-                            className="flex-1 bg-black/50 border border-white/15 rounded-xl px-3 py-2 text-xs text-white font-mono placeholder:text-gray-600 focus:outline-none focus:border-sky-400/80 transition-colors tv-focus-target"
-                          />
-                          <button
-                            id="drawer-msm-url-save"
-                            data-telegram-msm-drawer-item="true"
-                            type="button"
-                            onKeyDown={(e) => {
-                              if (e.key === 'ArrowUp') {
-                                e.preventDefault();
-                                const target = document.getElementById('drawer-msm-preset-local');
-                                target?.focus();
-                                target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-                              } else if (e.key === 'ArrowDown') {
-                                e.preventDefault();
-                                const target = document.getElementById('drawer-btn-msm32-test');
-                                target?.focus();
-                                target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-                              } else if (e.key === 'ArrowLeft') {
-                                e.preventDefault();
-                                const target = document.getElementById('drawer-msm-url-input');
-                                target?.focus();
-                                target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-                              }
-                            }}
-                            onClick={() => {
-                              const trimmed = msmUrlInput.trim().replace(/\/+$/, '');
-                              const finalUrl = trimmed || 'https://msm-getter.onrender.com';
-                              msm32Service.clearCache();
-                              handleUpdate({ msm32GetterUrl: finalUrl });
-                              setMsmUrlInput(finalUrl);
-                              setTestingMsm32(true);
-                              setMsm32TestResult(null);
-                              msm32Service.testConnection(finalUrl)
-                                .then((res) => setMsm32TestResult(res))
-                                .catch((err: any) => setMsm32TestResult({ ok: false, error: err?.message || 'Connection failed' }))
-                                .finally(() => setTestingMsm32(false));
-                            }}
-                            className="px-3.5 py-2 rounded-xl bg-sky-500 hover:bg-sky-400 text-black font-bold text-xs flex items-center gap-1.5 transition-all tv-focus-target flex-shrink-0"
-                          >
-                            <Save className="w-3.5 h-3.5" />
-                            <span>Save</span>
-                          </button>
-                        </div>
-                      </div>
+                      <button
+                        id="drawer-msm32-sub-url"
+                        data-telegram-msm-drawer-item="true"
+                        type="button"
+                        onKeyDown={(e) => {
+                          if (e.key === 'ArrowUp') {
+                            e.preventDefault();
+                            const target = document.getElementById('drawer-msm-toggle');
+                            target?.focus();
+                            target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                          } else if (e.key === 'ArrowDown') {
+                            e.preventDefault();
+                            const target = document.getElementById('drawer-btn-msm32-test');
+                            target?.focus();
+                            target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                          }
+                        }}
+                        onClick={() => {
+                          setShowTelegramMsmDrawer(false);
+                          setShowTelegramUrlDrawer(true);
+                        }}
+                        className="px-3 py-1.5 rounded-lg border text-xs font-bold transition-all tv-focus-target flex items-center gap-1.5 border-hbo-border bg-hbo-dark/80 hover:bg-hbo-hover text-white flex-shrink-0"
+                      >
+                        <span className="text-sky-400 font-mono">
+                          {currentUrl.includes('localhost') ? 'Local PC' : 'Render Cloud'}
+                        </span>
+                        <ChevronRight className="w-3.5 h-3.5 text-gray-400" />
+                      </button>
                     </div>
 
                     {/* Microservice Health Test & Re-ping */}
@@ -4175,7 +4270,7 @@ export const Settings: React.FC = () => {
                         onKeyDown={(e) => {
                           if (e.key === 'ArrowUp') {
                             e.preventDefault();
-                            const target = document.getElementById('drawer-msm-url-input');
+                            const target = document.getElementById('drawer-msm32-sub-url');
                             target?.focus();
                             target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
                           } else if (e.key === 'ArrowDown') {

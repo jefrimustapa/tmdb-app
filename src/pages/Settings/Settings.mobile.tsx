@@ -175,6 +175,7 @@ export const Settings: React.FC = () => {
     | 'engine-priority'
     | 'engine-telegram'
     | 'telegram-msm32'
+    | 'telegram-url'
     | 'telegram-chunk'
     | 'telegram-country'
     | 'engine-embed'
@@ -1550,84 +1551,23 @@ export const Settings: React.FC = () => {
             );
           })()}
 
-          {/* Microservice Endpoint URL Configuration */}
-          <div className="p-3.5 rounded-xl bg-white/5 border border-white/10 space-y-3">
-            <div>
+          {/* Microservice Endpoint URL Sub-Drawer Entry */}
+          <button
+            type="button"
+            onClick={() => setActiveDrawer('telegram-url')}
+            className="w-full flex items-center justify-between p-3.5 rounded-xl bg-white/5 border border-white/10 hover:border-sky-400/50 hover:bg-white/10 transition-all text-left"
+          >
+            <div className="space-y-0.5">
               <span className="text-xs font-semibold text-white block">Microservice Endpoint URL</span>
-              <span className="text-[10px] text-gray-400">
-                Backend host running Telegram GramJS MTProto client (Render cloud or local PC)
+              <span className="text-[10px] text-gray-400">Backend server running Telegram MTProto client</span>
+            </div>
+            <div className="flex items-center gap-1.5 flex-shrink-0">
+              <span className="text-[10px] text-sky-400 font-mono font-bold bg-sky-500/10 px-2 py-0.5 rounded border border-sky-400/20">
+                {settings.msm32GetterUrl?.includes('localhost') ? 'Local PC' : 'Render Cloud'}
               </span>
+              <ChevronRight className="w-4 h-4 text-gray-400" />
             </div>
-
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <input
-                  type="text"
-                  value={msmUrlInput}
-                  onChange={(e) => setMsmUrlInput(e.target.value)}
-                  placeholder="https://msm-getter.onrender.com"
-                  className="flex-1 bg-black/40 border border-white/15 rounded-xl px-3 py-2 text-xs text-white font-mono placeholder:text-gray-600 focus:outline-none focus:border-sky-400/80 transition-colors"
-                />
-                <button
-                  type="button"
-                  onClick={() => {
-                    const trimmed = msmUrlInput.trim().replace(/\/+$/, '');
-                    const finalUrl = trimmed || 'https://msm-getter.onrender.com';
-                    msm32Service.clearCache();
-                    handleUpdate({ msm32GetterUrl: finalUrl });
-                    setMsmUrlInput(finalUrl);
-                    setTestingMsm32(true);
-                    setMsm32TestResult(null);
-                    msm32Service.testConnection(finalUrl)
-                      .then((res) => setMsm32TestResult(res))
-                      .catch((err: any) => setMsm32TestResult({ ok: false, error: err?.message || 'Connection failed' }))
-                      .finally(() => setTestingMsm32(false));
-                  }}
-                  className="px-3.5 py-2 rounded-xl bg-sky-500 hover:bg-sky-400 text-black font-bold text-xs flex items-center gap-1.5 transition-colors flex-shrink-0"
-                >
-                  <Save className="w-3.5 h-3.5" />
-                  <span>Save</span>
-                </button>
-              </div>
-
-              {/* Quick Presets */}
-              <div className="flex items-center gap-2 pt-1">
-                <span className="text-[10px] text-gray-400 font-semibold flex-shrink-0">Presets:</span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const renderUrl = 'https://msm-getter.onrender.com';
-                    msm32Service.clearCache();
-                    setMsmUrlInput(renderUrl);
-                    handleUpdate({ msm32GetterUrl: renderUrl });
-                  }}
-                  className={`text-[10px] px-2.5 py-1 rounded-lg border font-semibold transition-all ${
-                    (settings.msm32GetterUrl || 'https://msm-getter.onrender.com') === 'https://msm-getter.onrender.com'
-                      ? 'bg-sky-500/20 text-sky-300 border-sky-500/40'
-                      : 'bg-white/5 text-gray-400 border-white/10 hover:text-white'
-                  }`}
-                >
-                  Render Cloud (Default)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const localUrl = 'http://localhost:3033';
-                    msm32Service.clearCache();
-                    setMsmUrlInput(localUrl);
-                    handleUpdate({ msm32GetterUrl: localUrl });
-                  }}
-                  className={`text-[10px] px-2.5 py-1 rounded-lg border font-semibold transition-all ${
-                    settings.msm32GetterUrl === 'http://localhost:3033'
-                      ? 'bg-sky-500/20 text-sky-300 border-sky-500/40'
-                      : 'bg-white/5 text-gray-400 border-white/10 hover:text-white'
-                  }`}
-                >
-                  Localhost (3033)
-                </button>
-              </div>
-            </div>
-          </div>
+          </button>
 
           {/* Microservice Health & Re-ping */}
           <div className="p-3.5 rounded-xl bg-white/5 border border-white/10 space-y-2.5">
@@ -1759,6 +1699,141 @@ export const Settings: React.FC = () => {
           <p className="text-[11px] text-gray-400 leading-relaxed">
             The MSM Getter microservice executes queries against the Telegram bot <span className="text-sky-300 font-mono">@msm32bot</span>, resolving file documents and generating chunked HTTP byte-range streams directly into the custom player.
           </p>
+        </div>
+      </SettingsDrawer>
+
+      {/* 3a-TG-URL. Sub-Drawer: MSM32bot Endpoint URL */}
+      <SettingsDrawer
+        isOpen={activeDrawer === 'telegram-url'}
+        onClose={() => setActiveDrawer(null)}
+        onBack={() => setActiveDrawer('telegram-msm32')}
+        title="Microservice Endpoint URL"
+        subtitle="Configure backend server running Telegram MTProto client (Render cloud or local PC)."
+        categoryLabel="Telegram > MSM32bot > Endpoint URL"
+      >
+        <div className="space-y-4">
+          <div className="p-3.5 rounded-xl bg-white/5 border border-white/10 space-y-3">
+            <span className="text-xs font-semibold text-white block">Server Presets</span>
+            <div className="space-y-2">
+              {/* Preset 1: Render Cloud */}
+              <button
+                type="button"
+                onClick={() => {
+                  const renderUrl = 'https://msm-getter.onrender.com';
+                  msm32Service.clearCache();
+                  setMsmUrlInput(renderUrl);
+                  handleUpdate({ msm32GetterUrl: renderUrl });
+                  setTestingMsm32(true);
+                  setMsm32TestResult(null);
+                  msm32Service.testConnection(renderUrl)
+                    .then((res) => setMsm32TestResult(res))
+                    .catch((err: any) => setMsm32TestResult({ ok: false, error: err?.message || 'Connection failed' }))
+                    .finally(() => setTestingMsm32(false));
+                }}
+                className={`w-full p-3.5 rounded-xl border text-left transition-all flex items-center justify-between gap-3 ${
+                  (settings.msm32GetterUrl || 'https://msm-getter.onrender.com') === 'https://msm-getter.onrender.com'
+                    ? 'bg-sky-950/40 border-sky-400 text-white'
+                    : 'bg-white/5 border-white/10 text-gray-400'
+                }`}
+              >
+                <div>
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <span className="font-bold text-xs text-white">Render Cloud</span>
+                    <span className="text-[9px] text-sky-400 font-mono font-bold bg-sky-500/10 px-1.5 py-0.5 rounded border border-sky-400/20">
+                      Default
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-gray-400 font-mono truncate">https://msm-getter.onrender.com</p>
+                  <p className="text-[10px] text-gray-500 mt-1">Hosted on Render. Auto spins down when idle.</p>
+                </div>
+                <div className={`w-5 h-5 rounded-full border flex items-center justify-center flex-shrink-0 ${
+                  (settings.msm32GetterUrl || 'https://msm-getter.onrender.com') === 'https://msm-getter.onrender.com'
+                    ? 'bg-sky-500 border-sky-400 text-black'
+                    : 'border-gray-600 bg-black/40 text-transparent'
+                }`}>
+                  <Check className="w-3 h-3 stroke-[3]" />
+                </div>
+              </button>
+
+              {/* Preset 2: Local PC */}
+              <button
+                type="button"
+                onClick={() => {
+                  const localUrl = 'http://localhost:3033';
+                  msm32Service.clearCache();
+                  setMsmUrlInput(localUrl);
+                  handleUpdate({ msm32GetterUrl: localUrl });
+                  setTestingMsm32(true);
+                  setMsm32TestResult(null);
+                  msm32Service.testConnection(localUrl)
+                    .then((res) => setMsm32TestResult(res))
+                    .catch((err: any) => setMsm32TestResult({ ok: false, error: err?.message || 'Connection failed' }))
+                    .finally(() => setTestingMsm32(false));
+                }}
+                className={`w-full p-3.5 rounded-xl border text-left transition-all flex items-center justify-between gap-3 ${
+                  settings.msm32GetterUrl === 'http://localhost:3033'
+                    ? 'bg-sky-950/40 border-sky-400 text-white'
+                    : 'bg-white/5 border-white/10 text-gray-400'
+                }`}
+              >
+                <div>
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <span className="font-bold text-xs text-white">Local PC</span>
+                    <span className="text-[9px] text-sky-400 font-mono font-bold bg-sky-500/10 px-1.5 py-0.5 rounded border border-sky-400/20">
+                      Fastest
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-gray-400 font-mono truncate">http://localhost:3033</p>
+                  <p className="text-[10px] text-gray-500 mt-1">Local host server on port 3033. Zero cloud latency.</p>
+                </div>
+                <div className={`w-5 h-5 rounded-full border flex items-center justify-center flex-shrink-0 ${
+                  settings.msm32GetterUrl === 'http://localhost:3033'
+                    ? 'bg-sky-500 border-sky-400 text-black'
+                    : 'border-gray-600 bg-black/40 text-transparent'
+                }`}>
+                  <Check className="w-3 h-3 stroke-[3]" />
+                </div>
+              </button>
+            </div>
+          </div>
+
+          {/* Custom Address Input (Auto-saves on Enter or blur) */}
+          <div className="p-3.5 rounded-xl bg-white/5 border border-white/10 space-y-2">
+            <div>
+              <span className="text-xs font-semibold text-white block">Custom Server Address</span>
+              <span className="text-[10px] text-gray-400">Enter custom server URL. Automatically applied.</span>
+            </div>
+            <input
+              type="text"
+              value={msmUrlInput}
+              onChange={(e) => {
+                const val = e.target.value;
+                setMsmUrlInput(val);
+                const trimmed = val.trim().replace(/\/+$/, '');
+                if (trimmed && (trimmed.startsWith('http://') || trimmed.startsWith('https://'))) {
+                  msm32Service.clearCache();
+                  handleUpdate({ msm32GetterUrl: trimmed });
+                }
+              }}
+              onBlur={() => {
+                const trimmed = msmUrlInput.trim().replace(/\/+$/, '');
+                const finalUrl = trimmed || 'https://msm-getter.onrender.com';
+                if (finalUrl !== settings.msm32GetterUrl) {
+                  msm32Service.clearCache();
+                  handleUpdate({ msm32GetterUrl: finalUrl });
+                  setMsmUrlInput(finalUrl);
+                  setTestingMsm32(true);
+                  setMsm32TestResult(null);
+                  msm32Service.testConnection(finalUrl)
+                    .then((res) => setMsm32TestResult(res))
+                    .catch((err: any) => setMsm32TestResult({ ok: false, error: err?.message || 'Connection failed' }))
+                    .finally(() => setTestingMsm32(false));
+                }
+              }}
+              placeholder="https://msm-getter.onrender.com"
+              className="w-full bg-black/40 border border-white/15 rounded-xl px-3.5 py-2.5 text-xs text-white font-mono placeholder:text-gray-600 focus:outline-none focus:border-sky-400/80 transition-colors"
+            />
+          </div>
         </div>
       </SettingsDrawer>
 

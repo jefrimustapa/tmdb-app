@@ -2,12 +2,13 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20260920-1029';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.fix-msm32bot-setting.20260920-1029';
+export const APP_BUILD_NUMBER = '20260920-1047';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.fix-msm32bot-setting.20260920-1047';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
 export const APP_BRANCH = 'fix-msm32bot-setting';
-export const APP_CHANGELOG = `* feat(filter): include standalone word 'sex' in adult title filtering (#122)
+export const APP_CHANGELOG = `* fix(tv): fix D-pad remote navigation for all MSM32bot settings menus (#123)
+* feat(filter): include standalone word 'sex' in adult title filtering (#122)
 * feat(player): compact playback settings header and add persistent global subtitle font size adjustment (#121)
 * feat(anime): support multi-season and continuous episode offset mapping to MAL, replace TV tag with year in MySpace (#120)
 * fix(player): resolve selected embed provider directly without Telegram waterfall (#119)
@@ -20,5 +21,4 @@ export const APP_CHANGELOG = `* feat(filter): include standalone word 'sex' in a
 * feat: Telegram Provider (@msm32bot), Custom Direct Player UI, and Settings Restructure (#113)
 * refactor(providers): restructure provider categories and preferences for ASEAN and regional content (#112)
 * feat(settings): TV active category border, mobile sub-drawers hierarchy, scroll lock & General tab rename (#111)
-* fix(tv): eliminate delay on remote back navigation and land focus on TV navbar Home icon (#110)
-* fix(tv): eliminate navigation lag on TV navbar during Home data load (#109)`;
+* fix(tv): eliminate delay on remote back navigation and land focus on TV navbar Home icon (#110)`;
