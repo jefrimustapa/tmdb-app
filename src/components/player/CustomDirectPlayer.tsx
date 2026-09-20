@@ -97,6 +97,8 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
   const seekAccumulatorRef = useRef<number>(0);
   const playFeedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const remoteHudTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingSeekTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const targetSeekTimeRef = useRef<number | null>(null);
 
   const hasSeekedInitialRef = useRef(false);
 
@@ -169,6 +171,9 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
       if (hlsRef.current) {
         hlsRef.current.destroy();
         hlsRef.current = null;
+      }
+      if (pendingSeekTimerRef.current) {
+        clearTimeout(pendingSeekTimerRef.current);
       }
     };
   }, []);
@@ -318,15 +323,17 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
     resetControlsTimer();
   }, [isTV, resetControlsTimer]);
 
-  // Handle Relative Seek (+10s or -10s)
+  // Handle Relative Seek (+10s or -10s) with 280ms commit debouncing
+  // Updates the visual UI & HUD immediately, but debounces the actual hardware seek
+  // to avoid flooding the stream with aborted Range requests on rapid skip taps.
   const handleSeekRelative = useCallback((seconds: number, fromRemote = false) => {
     const video = videoRef.current;
     if (!video) return;
 
-    const newTime = Math.max(0, Math.min(video.duration || 0, video.currentTime + seconds));
-    video.currentTime = newTime;
+    const currentBase = targetSeekTimeRef.current !== null ? targetSeekTimeRef.current : video.currentTime;
+    const newTime = Math.max(0, Math.min(video.duration || 0, currentBase + seconds));
+    targetSeekTimeRef.current = newTime;
     setCurrentTime(newTime);
-    onProgress?.(newTime, video.duration || 0, video.paused);
 
     // Accumulate consecutive seeks if triggered within 800ms for central button animation (All devices)
     seekAccumulatorRef.current = (seekAccumulatorRef.current === 0 || (seconds > 0 && seekAccumulatorRef.current < 0) || (seconds < 0 && seekAccumulatorRef.current > 0))
@@ -353,6 +360,16 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
         setRemoteHudFeedback(null);
       }, 800);
     }
+
+    // Debounce actual hardware seek commit by 280ms
+    if (pendingSeekTimerRef.current) clearTimeout(pendingSeekTimerRef.current);
+    pendingSeekTimerRef.current = setTimeout(() => {
+      if (videoRef.current && targetSeekTimeRef.current !== null) {
+        videoRef.current.currentTime = targetSeekTimeRef.current;
+        onProgress?.(targetSeekTimeRef.current, videoRef.current.duration || 0, videoRef.current.paused);
+        targetSeekTimeRef.current = null;
+      }
+    }, 280);
 
     resetControlsTimer();
   }, [isTV, onProgress, resetControlsTimer]);
@@ -667,6 +684,7 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
         autoPlay
         playsInline
         webkit-playsinline="true"
+        preload="auto"
         poster="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
         muted={isMuted}
         className="w-full h-full object-contain bg-black transform-gpu will-change-transform"
@@ -692,7 +710,16 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
           setIsInitialLoading(false);
           setIsBuffering(false);
         }}
-        onWaiting={() => setIsBuffering(true)}
+        onWaiting={(e) => {
+          const el = e.currentTarget;
+          const bufferedEnd = el.buffered.length > 0 ? el.buffered.end(el.buffered.length - 1) : 0;
+          console.warn(`[DirectPlayer] Waiting for buffer at ${el.currentTime.toFixed(1)}s (buffer ahead: ${(bufferedEnd - el.currentTime).toFixed(1)}s)`);
+          setIsBuffering(true);
+        }}
+        onStalled={(e) => {
+          const el = e.currentTarget;
+          console.warn(`[DirectPlayer] Stream stalled at ${el.currentTime.toFixed(1)}s`);
+        }}
         onPlaying={() => {
           setIsInitialLoading(false);
           setIsBuffering(false);

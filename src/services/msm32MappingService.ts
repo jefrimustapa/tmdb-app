@@ -187,11 +187,14 @@ class Msm32MappingService {
     }
 
     try {
+      const settings = await dbService.getSettings();
+      const maxQuality = settings?.msm32MaxQuality || '1080';
+
       const params = new URLSearchParams({ title });
       if (year) params.append('year', String(year));
       if (typeof season === 'number' && !isNaN(season)) params.append('season', String(season));
       if (typeof episode === 'number' && !isNaN(episode)) params.append('episode', String(episode));
-      params.append('maxQuality', '720'); // cap server-side resolution to 720p max
+      params.append('maxQuality', maxQuality);
 
       const res = await fetch(`${baseUrl}/api/resolve?${params.toString()}`, {
         signal: controller.signal,
@@ -216,7 +219,6 @@ class Msm32MappingService {
 
       if (data.success && data.streamUrl) {
         let finalStreamUrl = data.streamUrl;
-        const settings = await dbService.getSettings();
         const chunkSize = settings?.msm32ChunkSize || 524288;
         try {
           const u = new URL(finalStreamUrl);

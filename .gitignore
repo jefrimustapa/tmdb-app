@@ -60,3 +60,6 @@ attachment/
 
 .build-state.local.json
 android/app/build-info.json
+
+# MSM Getter runtime data
+server/msm-getter/data/
