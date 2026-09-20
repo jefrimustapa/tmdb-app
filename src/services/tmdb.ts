@@ -18,6 +18,7 @@ import {
   getResolvedMediaCertification,
   getCachedMediaCertification,
   containsExplicitAdultText,
+  containsExplicitAdultTitle,
   extractMovieCertification,
   extractTVCertification
 } from './contentRatingFilter';
@@ -27,7 +28,8 @@ export {
   isExplicitAdultCertification,
   checkMovieIsExplicitAdult,
   checkTVIsExplicitAdult,
-  getCachedMediaCertification
+  getCachedMediaCertification,
+  containsExplicitAdultTitle
 };
 
 const TMDB_BASE_URL = 'https://api.themoviedb.org/3';
@@ -180,8 +182,13 @@ async function tmdbFetch<T>(endpoint: string, params: Record<string, string | nu
   const filterMediaItemList = async (items: any[], defaultMediaType?: 'movie' | 'tv'): Promise<any[]> => {
     if (!Array.isArray(items) || items.length === 0) return items;
 
-    // Fast filter by item.adult flag
-    let filtered = items.filter((item: any) => !item?.adult);
+    // Fast filter by item.adult flag and explicit title keywords (e.g. "sex", "porn", "erotica")
+    let filtered = items.filter((item: any) => {
+      if (!item || item.adult) return false;
+      const titleToCheck = `${item.title || ''} ${item.name || ''} ${item.original_title || ''} ${item.original_name || ''}`.trim();
+      if (containsExplicitAdultTitle(titleToCheck)) return false;
+      return true;
+    });
 
     const isPerfMode = settings.performanceMode === true;
     if (!isPerfMode) {
@@ -244,10 +251,15 @@ async function tmdbFetch<T>(endpoint: string, params: Record<string, string | nu
     return filtered;
   };
 
-  // Helper for fast synchronous adult filtering (item.adult + Strategy 5 text check)
+  // Helper for fast synchronous adult filtering (item.adult + explicit title & Strategy 5 text check)
   const fastFilterMediaItemList = (items: any[]): any[] => {
     if (!Array.isArray(items) || items.length === 0) return items;
-    let filtered = items.filter((item: any) => !item?.adult);
+    let filtered = items.filter((item: any) => {
+      if (!item || item.adult) return false;
+      const titleToCheck = `${item.title || ''} ${item.name || ''} ${item.original_title || ''} ${item.original_name || ''}`.trim();
+      if (containsExplicitAdultTitle(titleToCheck)) return false;
+      return true;
+    });
     if (settings.performanceMode !== true) {
       filtered = filtered.filter((item: any) => {
         if (!item) return false;
@@ -459,6 +471,14 @@ export const tmdbApi = {
     if (settings.filterAdult === false || settings.performanceMode === true) {
       return items;
     }
+
+    // Fast-purge explicit adult titles (including titles with "sex") upfront
+    items = items.filter((item: any) => {
+      if (!item || item.adult) return false;
+      const titleToCheck = `${item.title || ''} ${item.name || ''} ${item.original_title || ''} ${item.original_name || ''}`.trim();
+      if (containsExplicitAdultTitle(titleToCheck)) return false;
+      return true;
+    });
 
     const fetchReleaseDates = async (id: number) => {
       const relUrl = `${TMDB_BASE_URL}/movie/${id}/release_dates?api_key=${TMDB_API_KEY}`;
