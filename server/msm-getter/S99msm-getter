@@ -4,7 +4,18 @@ ENABLED=yes
 DESC="MSM Getter Microservice"
 APP_DIR=/opt/app/msm-getter
 PID_FILE=/opt/var/run/msm-getter.pid
-LOG_FILE=$APP_DIR/msm-getter.log
+LOG_FILE=/tmp/msm-getter.log
+MAX_LOG_BYTES=5242880 # 5 MB cap
+
+rotate_log() {
+    if [ -f "$LOG_FILE" ]; then
+        LOG_SIZE=$(wc -c < "$LOG_FILE" 2>/dev/null || echo 0)
+        if [ "$LOG_SIZE" -gt "$MAX_LOG_BYTES" ]; then
+            tail -n 2000 "$LOG_FILE" > "${LOG_FILE}.old" 2>/dev/null
+            cat /dev/null > "$LOG_FILE"
+        fi
+    fi
+}
 
 start() {
     echo -n "Starting $DESC... "
@@ -13,6 +24,10 @@ start() {
         return 0
     fi
 
+    # Rotate log if it exceeds 5 MB to protect RAM disk space
+    rotate_log
+
+    # Ensure overcommit memory is enabled for V8 engine
     echo 1 > /proc/sys/vm/overcommit_memory
     mkdir -p /opt/var/run
 

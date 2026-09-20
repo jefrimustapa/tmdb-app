@@ -1221,7 +1221,8 @@ async function streamTelegramPipelined(client, targetDoc, startByte, endByte, re
   let nextBlockToFetch = startBlock;
   const inFlight = new Map();
 
-  const streamKey = targetDoc.id.toString();
+  const clientSession = req?.headers?.['x-client-id'] || req?.ip || req?.socket?.remoteAddress || 'client';
+  const streamKey = `${clientSession}:${targetDoc.id}`;
   activeStreams.set(streamKey, {
     abort: () => {
       aborted = true;
@@ -1391,12 +1392,14 @@ app.get('/stream/:docId', async (req, res) => {
     const docId = req.params.docId;
     const rangeHeader = req.headers.range;
 
-    // Instantly terminate any previous in-flight stream pipeline for this document (e.g. user seeked forward)
+    // Instantly terminate any previous in-flight stream pipeline for this document for the same client session (e.g. user seeked forward)
     // to free 100% of the router's MTProto download bandwidth for the new seek position immediately.
-    if (activeStreams.has(docId)) {
-      console.log(`[STREAM CANCEL] Terminating previous in-flight stream for doc ${docId} on new seek.`);
-      try { activeStreams.get(docId).abort(); } catch {}
-      activeStreams.delete(docId);
+    const clientSession = req.headers['x-client-id'] || req.ip || req.socket.remoteAddress || 'client';
+    const streamSessionKey = `${clientSession}:${docId}`;
+    if (activeStreams.has(streamSessionKey)) {
+      console.log(`[STREAM CANCEL] Terminating previous in-flight stream for client ${clientSession} doc ${docId} on new seek.`);
+      try { activeStreams.get(streamSessionKey).abort(); } catch {}
+      activeStreams.delete(streamSessionKey);
     }
 
     let targetDoc = null;
