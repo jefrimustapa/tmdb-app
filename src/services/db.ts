@@ -79,7 +79,7 @@ export const DEFAULT_SETTINGS: UserSettings = {
   enginePriority: ['telegram', 'embed'],
   enabledTelegramProviders: ['telegram-msm32'],
   telegramProviderCountries: { 'telegram-msm32': ['MY', 'ID', 'SG'] },
-  msm32GetterUrl: 'https://msm-getter.onrender.com',
+  msm32GetterUrl: 'http://julietmike.net:3033',
   msm32ChunkSize: 524288,
   msm32MaxQuality: '1080',
   streamHeaderTimeout: 5,

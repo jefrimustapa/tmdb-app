@@ -212,7 +212,7 @@ export const Settings: React.FC = () => {
   // Keep local msmUrlInput in sync with persisted settings
   useEffect(() => {
     if (settings?.msm32GetterUrl !== undefined) {
-      setMsmUrlInput(settings.msm32GetterUrl || 'https://msm-getter.onrender.com');
+      setMsmUrlInput(settings.msm32GetterUrl || 'http://julietmike.net:3033');
     }
   }, [settings?.msm32GetterUrl]);
 
@@ -3980,13 +3980,13 @@ export const Settings: React.FC = () => {
             {/* Drawer Body */}
             <div className="flex-1 overflow-y-auto px-6 py-6 space-y-4 font-sans">
               {(() => {
-                const currentUrl = settings.msm32GetterUrl || 'https://msm-getter.onrender.com';
+                const currentUrl = settings.msm32GetterUrl || 'http://julietmike.net:3033';
+                const isJmSelected = currentUrl === 'http://julietmike.net:3033';
                 const isRenderSelected = currentUrl === 'https://msm-getter.onrender.com';
-                const isLocalSelected = currentUrl === 'http://localhost:3033';
 
                 const applyUrl = (url: string) => {
                   const trimmed = url.trim().replace(/\/+$/, '');
-                  const finalUrl = trimmed || 'https://msm-getter.onrender.com';
+                  const finalUrl = trimmed || 'http://julietmike.net:3033';
                   msm32Service.clearCache();
                   handleUpdate({ msm32GetterUrl: finalUrl });
                   setMsmUrlInput(finalUrl);
@@ -4007,16 +4007,59 @@ export const Settings: React.FC = () => {
                       </p>
                     </div>
 
-                    {/* Preset 1: Render Cloud */}
+                    {/* Preset 1: julietmike.net (Default) */}
+                    <button
+                      id="drawer-msm-preset-julietmike"
+                      data-telegram-url-drawer-item="true"
+                      data-telegram-url-selected={isJmSelected ? 'true' : 'false'}
+                      type="button"
+                      onKeyDown={(e) => {
+                        if (e.key === 'ArrowDown') {
+                          e.preventDefault();
+                          const target = document.getElementById('drawer-msm-preset-render');
+                          target?.focus();
+                          target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                        }
+                      }}
+                      onClick={() => applyUrl('http://julietmike.net:3033')}
+                      className={`w-full p-4 rounded-xl border text-left transition-all tv-focus-target flex items-center justify-between gap-3 ${
+                        isJmSelected
+                          ? 'bg-sky-950/40 border-sky-400 text-white shadow-hbo-glow ring-1 ring-sky-400/40'
+                          : 'bg-black/30 border-hbo-border hover:border-gray-600 text-gray-400'
+                      }`}
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-bold text-sm text-white">julietmike.net</span>
+                          <span className="text-[10px] text-sky-400 font-mono font-bold bg-sky-500/10 px-1.5 py-0.5 rounded border border-sky-400/20">
+                            Default
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-gray-400 font-mono truncate">http://julietmike.net:3033</p>
+                        <p className="text-[10px] text-gray-500 mt-1">Direct streaming on port 3033. High performance.</p>
+                      </div>
+                      <div className={`w-6 h-6 rounded-full border flex items-center justify-center flex-shrink-0 ${
+                        isJmSelected ? 'bg-sky-500 border-sky-400 text-black' : 'border-gray-600 bg-black/40 text-transparent'
+                      }`}>
+                        <Check className="w-3.5 h-3.5 stroke-[3]" />
+                      </div>
+                    </button>
+
+                    {/* Preset 2: Render Cloud */}
                     <button
                       id="drawer-msm-preset-render"
                       data-telegram-url-drawer-item="true"
                       data-telegram-url-selected={isRenderSelected ? 'true' : 'false'}
                       type="button"
                       onKeyDown={(e) => {
-                        if (e.key === 'ArrowDown') {
+                        if (e.key === 'ArrowUp') {
                           e.preventDefault();
-                          const target = document.getElementById('drawer-msm-preset-local');
+                          const target = document.getElementById('drawer-msm-preset-julietmike');
+                          target?.focus();
+                          target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                        } else if (e.key === 'ArrowDown') {
+                          e.preventDefault();
+                          const target = document.getElementById('drawer-msm-url-input');
                           target?.focus();
                           target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
                         }
@@ -4031,8 +4074,8 @@ export const Settings: React.FC = () => {
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2 mb-1">
                           <span className="font-bold text-sm text-white">Render Cloud</span>
-                          <span className="text-[10px] text-sky-400 font-mono font-bold bg-sky-500/10 px-1.5 py-0.5 rounded border border-sky-400/20">
-                            Default
+                          <span className="text-[10px] text-gray-400 font-mono font-bold bg-white/10 px-1.5 py-0.5 rounded border border-white/20">
+                            Cloud
                           </span>
                         </div>
                         <p className="text-[11px] text-gray-400 font-mono truncate">https://msm-getter.onrender.com</p>
@@ -4040,49 +4083,6 @@ export const Settings: React.FC = () => {
                       </div>
                       <div className={`w-6 h-6 rounded-full border flex items-center justify-center flex-shrink-0 ${
                         isRenderSelected ? 'bg-sky-500 border-sky-400 text-black' : 'border-gray-600 bg-black/40 text-transparent'
-                      }`}>
-                        <Check className="w-3.5 h-3.5 stroke-[3]" />
-                      </div>
-                    </button>
-
-                    {/* Preset 2: Local PC */}
-                    <button
-                      id="drawer-msm-preset-local"
-                      data-telegram-url-drawer-item="true"
-                      data-telegram-url-selected={isLocalSelected ? 'true' : 'false'}
-                      type="button"
-                      onKeyDown={(e) => {
-                        if (e.key === 'ArrowUp') {
-                          e.preventDefault();
-                          const target = document.getElementById('drawer-msm-preset-render');
-                          target?.focus();
-                          target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-                        } else if (e.key === 'ArrowDown') {
-                          e.preventDefault();
-                          const target = document.getElementById('drawer-msm-url-input');
-                          target?.focus();
-                          target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-                        }
-                      }}
-                      onClick={() => applyUrl('http://localhost:3033')}
-                      className={`w-full p-4 rounded-xl border text-left transition-all tv-focus-target flex items-center justify-between gap-3 ${
-                        isLocalSelected
-                          ? 'bg-sky-950/40 border-sky-400 text-white shadow-hbo-glow ring-1 ring-sky-400/40'
-                          : 'bg-black/30 border-hbo-border hover:border-gray-600 text-gray-400'
-                      }`}
-                    >
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="font-bold text-sm text-white">Local PC</span>
-                          <span className="text-[10px] text-sky-400 font-mono font-bold bg-sky-500/10 px-1.5 py-0.5 rounded border border-sky-400/20">
-                            Fastest
-                          </span>
-                        </div>
-                        <p className="text-[11px] text-gray-400 font-mono truncate">http://localhost:3033</p>
-                        <p className="text-[10px] text-gray-500 mt-1">Local host server on port 3033. Zero cloud latency.</p>
-                      </div>
-                      <div className={`w-6 h-6 rounded-full border flex items-center justify-center flex-shrink-0 ${
-                        isLocalSelected ? 'bg-sky-500 border-sky-400 text-black' : 'border-gray-600 bg-black/40 text-transparent'
                       }`}>
                         <Check className="w-3.5 h-3.5 stroke-[3]" />
                       </div>
@@ -4103,7 +4103,7 @@ export const Settings: React.FC = () => {
                         onKeyDown={(e) => {
                           if (e.key === 'ArrowUp') {
                             e.preventDefault();
-                            const target = document.getElementById('drawer-msm-preset-local');
+                            const target = document.getElementById('drawer-msm-preset-render');
                             target?.focus();
                             target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
                           } else if (e.key === 'Enter') {
@@ -4117,7 +4117,7 @@ export const Settings: React.FC = () => {
                             applyUrl(trimmed);
                           }
                         }}
-                        placeholder="https://msm-getter.onrender.com"
+                        placeholder="http://julietmike.net:3033"
                         className="w-full bg-black/50 border border-white/15 rounded-xl px-4 py-3 text-xs text-white font-mono placeholder:text-gray-600 focus:outline-none focus:border-sky-400/80 transition-colors tv-focus-target"
                       />
                     </div>
