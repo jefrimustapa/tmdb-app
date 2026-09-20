@@ -144,6 +144,17 @@ export function isExplicitAdultCertification(cert?: string | null, countryCode?:
 // Regex patterns for explicit sexual, nudity, pornographic, and erotic content in descriptors, notes, or overviews
 const EXPLICIT_TEXT_REGEX = /\b(porn|porno|pornography|pornographic|erotic|erotica|softcore|hentai|full[- ]frontal nudity|explicit sex|hardcore sex|sexual violence|sensual massage|sex scene|adultery|infidelity|extramarital sex|erotic thriller)\b/i;
 
+// Regex specifically tailored for titles (includes standalone word "sex" with word boundary)
+export const EXPLICIT_TITLE_REGEX = /\b(sex|porn|porno|pornography|pornographic|erotic|erotica|softcore|hentai)\b/i;
+
+/**
+ * Check if a media title contains explicit adult keywords like "sex", "porn", "erotica" (word-boundary aware).
+ */
+export function containsExplicitAdultTitle(title?: string | null): boolean {
+  if (!title) return false;
+  return EXPLICIT_TITLE_REGEX.test(title);
+}
+
 /**
  * Check if a text description, note, or overview contains explicit sexual / adult keywords (Strategy 5).
  */
