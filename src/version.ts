@@ -2,12 +2,13 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20260920-1719';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.perf-msm-stream-buff.20260920-1719';
+export const APP_BUILD_NUMBER = '20260920-1727';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.perf-msm-stream-buff.20260920-1727';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
 export const APP_BRANCH = 'perf-msm-stream-buff';
-export const APP_CHANGELOG = `* fix(msm-getter): eliminate TCPObfuscated handshake delay, fix TDZ error, and add robust DC migration handling
+export const APP_CHANGELOG = `* perf: implement 32MB in-memory LRU block cache, MP4 container scoring preference, and video preload auto
+* fix(msm-getter): eliminate TCPObfuscated handshake delay, fix TDZ error, and add robust DC migration handling
 * perf: improve MSM32 1080p stream buffering with concurrent pipelining and dynamic quality selection
 * fix(tv): fix D-pad remote navigation for all MSM32bot settings menus (#123)
 * feat(filter): include standalone word 'sex' in adult title filtering (#122)
@@ -20,5 +21,4 @@ export const APP_CHANGELOG = `* fix(msm-getter): eliminate TCPObfuscated handsha
 * fix: prioritize original titles in pencuri candidate scoring and regional drama queries (#115)
 * feat: add debug-search endpoint in server/msm-getter
 * fix: prioritize 720p resolution for telegram provider and quality-aware caching (#114)
-* feat: Telegram Provider (@msm32bot), Custom Direct Player UI, and Settings Restructure (#113)
-* refactor(providers): restructure provider categories and preferences for ASEAN and regional content (#112)`;
+* feat: Telegram Provider (@msm32bot), Custom Direct Player UI, and Settings Restructure (#113)`;

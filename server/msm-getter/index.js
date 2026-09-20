@@ -1087,6 +1087,7 @@ app.get('/api/resolve', async (req, res) => {
 // Caches up to 64 blocks (32 MB RAM) to eliminate seek latency when players ping-pong between audio & video clusters in MKV files.
 const BLOCK_CACHE_MAX_ENTRIES = 64; // 64 x 512KB = 32 MB
 const globalBlockCache = new Map();
+const activeStreams = new Map(); // key: docId -> { abort: Function }
 
 function getCachedBlock(docId, blockIdx) {
   const key = `${docId}:${blockIdx}`;
@@ -1220,6 +1221,52 @@ async function streamTelegramPipelined(client, targetDoc, startByte, endByte, re
   let nextBlockToFetch = startBlock;
   const inFlight = new Map();
 
+  const streamKey = targetDoc.id.toString();
+  activeStreams.set(streamKey, {
+    abort: () => {
+      aborted = true;
+      inFlight.clear();
+    }
+  });
+
+  const cleanupStream = () => {
+    if (activeStreams.get(streamKey)) {
+      activeStreams.delete(streamKey);
+    }
+  };
+  req.on('close', cleanupStream);
+  res.on('finish', cleanupStream);
+
+  // 1. First-Chunk Express Delivery:
+  // Immediately fetch & send the first block alone with 100% bandwidth.
+  // This allows the video decoder to display frames instantly (< 300ms) after seek without waiting for parallel chunks.
+  const firstBlockData = await fetchBlockWithRetry(startBlock);
+  if (aborted || res.destroyed || res.writableEnded) {
+    cleanupStream();
+    return;
+  }
+  if (!firstBlockData || firstBlockData.length === 0) {
+    if (!res.writableEnded) res.end();
+    cleanupStream();
+    return;
+  }
+
+  const firstBlockStart = startBlock * CHUNK_SIZE;
+  const firstSliceStart = Math.max(0, startByte - firstBlockStart);
+  const firstSliceEnd = Math.min(firstBlockData.length, (endByte - firstBlockStart) + 1);
+  if (firstSliceStart < firstSliceEnd) {
+    res.write(firstBlockData.subarray(firstSliceStart, firstSliceEnd));
+  }
+
+  if (startBlock === endBlock) {
+    if (!res.writableEnded) res.end();
+    cleanupStream();
+    return;
+  }
+
+  // 2. Sliding-Window Pipeline for subsequent blocks
+  nextBlockToFetch = startBlock + 1;
+
   function fillPipeline() {
     while (!aborted && inFlight.size < CONCURRENCY && nextBlockToFetch <= endBlock) {
       const idx = nextBlockToFetch++;
@@ -1231,7 +1278,7 @@ async function streamTelegramPipelined(client, targetDoc, startByte, endByte, re
     }
   }
 
-  for (let currentBlock = startBlock; currentBlock <= endBlock; currentBlock++) {
+  for (let currentBlock = startBlock + 1; currentBlock <= endBlock; currentBlock++) {
     activeBlock = currentBlock;
     if (aborted || res.destroyed || res.writableEnded) break;
 
@@ -1255,6 +1302,7 @@ async function streamTelegramPipelined(client, targetDoc, startByte, endByte, re
     }
   }
 
+  cleanupStream();
   if (!res.writableEnded) {
     res.end();
   }
@@ -1342,6 +1390,14 @@ app.get('/stream/:docId', async (req, res) => {
     await initTelegram();
     const docId = req.params.docId;
     const rangeHeader = req.headers.range;
+
+    // Instantly terminate any previous in-flight stream pipeline for this document (e.g. user seeked forward)
+    // to free 100% of the router's MTProto download bandwidth for the new seek position immediately.
+    if (activeStreams.has(docId)) {
+      console.log(`[STREAM CANCEL] Terminating previous in-flight stream for doc ${docId} on new seek.`);
+      try { activeStreams.get(docId).abort(); } catch {}
+      activeStreams.delete(docId);
+    }
 
     let targetDoc = null;
     let targetMedia = null;
