@@ -439,7 +439,7 @@ export const Settings: React.FC = () => {
         (window as any).AndroidBridge?.setDropdownOpen?.(false);
       } catch {}
     };
-  }, [pickerModalSlot, isPickerModalOpen, showMaturityDrawer, showTriggerDrawer, showAutoplayDrawer, showAutoplayTriggerDrawer, showAutoplayTimeoutDrawer, showEnginesDrawer, showTelegramDrawer, showTelegramChunkDrawer, showTelegramCountryDrawer, showEmbedResolverDrawer, showEmbedTimeoutDrawer, activePriorityDrawer, showTickerDrawer, showHeaderTimeoutDrawer, showPerfHudDrawer, showBackupDrawer, isAnyModalOpen]);
+  }, [pickerModalSlot, isPickerModalOpen, showMaturityDrawer, showTriggerDrawer, showAutoplayDrawer, showAutoplayTriggerDrawer, showAutoplayTimeoutDrawer, showEnginesDrawer, showEnginePriorityDrawer, showTelegramDrawer, showTelegramMsmDrawer, showTelegramChunkDrawer, showTelegramCountryDrawer, showEmbedResolverDrawer, showEmbedTimeoutDrawer, showEmbedRetryDrawer, activePriorityDrawer, showTickerDrawer, showHeaderTimeoutDrawer, showPerfHudDrawer, showBackupDrawer, isAnyModalOpen]);
 
   // Handle remote Back button, tmdb_close_dropdowns, and Escape dismissal for modals / drawers
   useEffect(() => {
@@ -630,11 +630,17 @@ export const Settings: React.FC = () => {
     showEnginesDrawer,
     showEnginePriorityDrawer,
     showTelegramDrawer,
+    showTelegramMsmDrawer,
     showTelegramChunkDrawer,
     showTelegramCountryDrawer,
     showEmbedResolverDrawer,
     showEmbedTimeoutDrawer,
+    showEmbedRetryDrawer,
     activePriorityDrawer,
+    showTickerDrawer,
+    showHeaderTimeoutDrawer,
+    showPerfHudDrawer,
+    showBackupDrawer,
     isAnyModalOpen
   ]);
 
@@ -3603,7 +3609,9 @@ export const Settings: React.FC = () => {
                       onKeyDown={(e) => {
                         if (e.key === 'ArrowDown') {
                           e.preventDefault();
-                          document.getElementById('drawer-msm32-toggle')?.focus();
+                          const target = document.getElementById('drawer-msm32-sub');
+                          target?.focus();
+                          target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
                         }
                       }}
                       onClick={() => {
@@ -4088,10 +4096,14 @@ export const Settings: React.FC = () => {
                                 document.getElementById('drawer-msm-preset-render')?.focus();
                               } else if (e.key === 'ArrowDown') {
                                 e.preventDefault();
-                                document.getElementById('drawer-btn-msm32-test')?.focus();
+                                const target = document.getElementById('drawer-btn-msm32-test');
+                                target?.focus();
+                                target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
                               } else if (e.key === 'ArrowRight') {
                                 e.preventDefault();
-                                document.getElementById('drawer-msm-url-save')?.focus();
+                                const target = document.getElementById('drawer-msm-url-save');
+                                target?.focus();
+                                target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
                               } else if (e.key === 'Enter') {
                                 e.preventDefault();
                                 const trimmed = msmUrlInput.trim().replace(/\/+$/, '');
@@ -4111,13 +4123,19 @@ export const Settings: React.FC = () => {
                             onKeyDown={(e) => {
                               if (e.key === 'ArrowUp') {
                                 e.preventDefault();
-                                document.getElementById('drawer-msm-preset-local')?.focus();
+                                const target = document.getElementById('drawer-msm-preset-local');
+                                target?.focus();
+                                target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
                               } else if (e.key === 'ArrowDown') {
                                 e.preventDefault();
-                                document.getElementById('drawer-btn-msm32-test')?.focus();
+                                const target = document.getElementById('drawer-btn-msm32-test');
+                                target?.focus();
+                                target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
                               } else if (e.key === 'ArrowLeft') {
                                 e.preventDefault();
-                                document.getElementById('drawer-msm-url-input')?.focus();
+                                const target = document.getElementById('drawer-msm-url-input');
+                                target?.focus();
+                                target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
                               }
                             }}
                             onClick={() => {
@@ -4153,11 +4171,13 @@ export const Settings: React.FC = () => {
                         id="drawer-btn-msm32-test"
                         data-telegram-msm-drawer-item="true"
                         type="button"
-                        disabled={testingMsm32}
+                        aria-busy={testingMsm32}
                         onKeyDown={(e) => {
                           if (e.key === 'ArrowUp') {
                             e.preventDefault();
-                            document.getElementById('drawer-msm-url-input')?.focus();
+                            const target = document.getElementById('drawer-msm-url-input');
+                            target?.focus();
+                            target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
                           } else if (e.key === 'ArrowDown') {
                             e.preventDefault();
                             const target = document.getElementById('drawer-msm32-sub-chunk');
@@ -4166,6 +4186,7 @@ export const Settings: React.FC = () => {
                           }
                         }}
                         onClick={async () => {
+                          if (testingMsm32) return;
                           setTestingMsm32(true);
                           setMsm32TestResult(null);
                           try {
@@ -4177,7 +4198,9 @@ export const Settings: React.FC = () => {
                             setTestingMsm32(false);
                           }
                         }}
-                        className="w-full py-2.5 rounded-xl bg-sky-500 hover:bg-sky-400 text-black font-bold text-xs flex items-center justify-center gap-2 transition-all tv-focus-target disabled:opacity-50"
+                        className={`w-full py-2.5 rounded-xl text-black font-bold text-xs flex items-center justify-center gap-2 transition-all tv-focus-target ${
+                          testingMsm32 ? 'bg-sky-400/80 cursor-wait' : 'bg-sky-500 hover:bg-sky-400'
+                        }`}
                       >
                         <RefreshCw className={`w-3.5 h-3.5 ${testingMsm32 ? 'animate-spin' : ''}`} />
                         <span>{testingMsm32 ? 'Pinging Server (Waking Up)...' : 'Re-ping Microservice Server'}</span>
