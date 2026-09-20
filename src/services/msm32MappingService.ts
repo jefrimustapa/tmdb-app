@@ -69,9 +69,8 @@ class Msm32MappingService {
 
     // In native Capacitor or HTTPS web context, insecure http:// URLs get blocked by Chromium Mixed Content.
     // If the configured URL is an unrouteable local IP or empty, default securely to Render Cloud.
-    const isHttpsContext = typeof window !== 'undefined' && window.location?.protocol === 'https:';
-    if (!url || url === 'http://localhost:3033' || (isHttpsContext && (url.startsWith('http://192.168.') || url.startsWith('http://10.') || url.startsWith('http://localhost')))) {
-      url = 'https://msm-getter.onrender.com';
+    if (!url) {
+      url = 'http://julietmike.net:3033';
     }
 
     return url.replace(/\/+$/, '');
@@ -82,7 +81,7 @@ class Msm32MappingService {
    */
   async testConnection(customUrl?: string): Promise<Msm32HealthResult> {
     let target = customUrl?.trim();
-    if (!target || target === 'http://localhost:3033') {
+    if (!target) {
       target = await this.getBaseUrl();
     }
     const baseUrl = target.replace(/\/+$/, '');
