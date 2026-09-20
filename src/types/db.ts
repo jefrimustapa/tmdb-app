@@ -111,5 +111,6 @@ export interface UserSettings {
   virtualCursorStyle?: VirtualCursorStyle; // Cursor style/appearance (10 options)
   performanceMode?: boolean; // Lite graphics & fast 60fps rendering (Default: ON for TV, OFF for Mobile)
   showPerformanceHud?: boolean | 'off' | 'watch_only' | 'all_pages'; // Performance HUD mode
+  subtitleFontSize?: number; // Global subtitle font size percentage (70 - 180, default 100)
   updatedAt: number;
 }
