@@ -6,13 +6,15 @@ interface SubtitleOverlayProps {
   currentTime: number;
   offsetSeconds?: number;
   enabled?: boolean;
+  fontSize?: number;
 }
 
 export const SubtitleOverlay: React.FC<SubtitleOverlayProps> = ({
   cues,
   currentTime,
   offsetSeconds = 0,
-  enabled = true
+  enabled = true,
+  fontSize = 100
 }) => {
   if (!enabled || !cues || cues.length === 0) {
     return null;
@@ -40,15 +42,18 @@ export const SubtitleOverlay: React.FC<SubtitleOverlayProps> = ({
     return null;
   }
 
+  const scaleFactor = Math.max(0.6, Math.min(2.2, (fontSize || 100) / 100));
+
   return (
     <div
       className="absolute bottom-10 sm:bottom-14 md:bottom-16 left-0 right-0 z-30 pointer-events-none flex justify-center items-end px-4 sm:px-8 select-none transition-opacity duration-150"
       aria-live="off"
     >
-      <div className="max-w-[92vw] sm:max-w-[80vw] md:max-w-[70vw] text-center">
+      <div className="max-w-[92vw] sm:max-w-[80vw] md:max-w-[70vw] text-center text-xs sm:text-sm md:text-base lg:text-lg">
         <span
-          className="inline-block text-white font-semibold text-xs sm:text-sm md:text-base lg:text-lg px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-md tracking-wide leading-relaxed"
+          className="inline-block text-white font-semibold px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-md tracking-wide leading-relaxed"
           style={{
+            fontSize: `${scaleFactor}em`,
             backgroundColor: 'rgba(50, 50, 50, 0.2)',
             textShadow: '0 1px 2px rgba(0, 0, 0, 0.9)',
             wordBreak: 'break-word',

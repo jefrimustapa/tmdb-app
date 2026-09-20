@@ -70,7 +70,13 @@ export const Watch: React.FC = () => {
   const [activeSubtitleTrackId, setActiveSubtitleTrackId] = useState<string | null>(null);
   const [customSubtitleCues, setCustomSubtitleCues] = useState<SubtitleCue[]>([]);
   const [customSubtitleOffset, setCustomSubtitleOffset] = useState<number>(0);
+  const [subtitleFontSize, setSubtitleFontSize] = useState<number>(100);
   const [isSubtitlesLoading, setIsSubtitlesLoading] = useState(false);
+
+  const handleAdjustSubtitleFontSize = (size: number) => {
+    setSubtitleFontSize(size);
+    dbService.updateSettings({ subtitleFontSize: size });
+  };
   // Selected subtitle track & badge label (e.g. "EN-1", "MS-2")
   const activeSubLabel = useMemo(() => {
     if (!activeSubtitleTrackId) return null;
@@ -252,6 +258,9 @@ export const Watch: React.FC = () => {
           }
           if (s.enabledResolvers && s.enabledResolvers.length > 0) {
             setEnabledResolvers(s.enabledResolvers);
+          }
+          if (s.subtitleFontSize !== undefined) {
+            setSubtitleFontSize(s.subtitleFontSize);
           }
           setCursorSettings({
             enabled: s.virtualCursorEnabled ?? true,
@@ -973,6 +982,7 @@ export const Watch: React.FC = () => {
             customSubtitleCues={customSubtitleCues}
             customSubtitleOffset={customSubtitleOffset}
             customSubtitleEnabled={Boolean(activeSubtitleTrackId && customSubtitleCues.length > 0)}
+            customSubtitleFontSize={subtitleFontSize}
           />
         </div>
 
@@ -986,6 +996,8 @@ export const Watch: React.FC = () => {
           onSelectTrack={handleSelectSubtitleTrack}
           syncOffset={customSubtitleOffset}
           onAdjustSync={(newOffset) => setCustomSubtitleOffset(newOffset)}
+          fontSize={subtitleFontSize}
+          onAdjustFontSize={handleAdjustSubtitleFontSize}
           isLoadingSubtitles={isSubtitlesLoading}
           currentProviderId={providerId}
           onSelectProvider={(p) => {
