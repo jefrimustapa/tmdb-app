@@ -670,6 +670,7 @@ app.get('/api/resolve', async (req, res) => {
             if (is1080) qualityScore = 50;
             else if (is720) qualityScore = 30;
           }
+          if (fnLower.includes('.mp4') || fnLower.includes('mp4')) qualityScore += 15;
 
           matchingRecentDocs.push({ doc, filename, qualityScore });
         }
@@ -810,6 +811,7 @@ app.get('/api/resolve', async (req, res) => {
         if (btnText.includes('1080p') || btnText.includes('1080')) score += 50;
         else if (btnText.includes('720p') || btnText.includes('720')) score += 30;
       }
+      if (btnText.toLowerCase().includes('.mp4') || btnText.toLowerCase().includes('mp4')) score += 35;
       if (btnText.includes('malaysub') || btnText.includes('msm')) score += 5;
 
       return score;
@@ -1081,6 +1083,34 @@ app.get('/api/resolve', async (req, res) => {
   }
 });
 
+// In-Memory LRU Block Cache for Telegram MTProto Stream Chunks
+// Caches up to 64 blocks (32 MB RAM) to eliminate seek latency when players ping-pong between audio & video clusters in MKV files.
+const BLOCK_CACHE_MAX_ENTRIES = 64; // 64 x 512KB = 32 MB
+const globalBlockCache = new Map();
+
+function getCachedBlock(docId, blockIdx) {
+  const key = `${docId}:${blockIdx}`;
+  if (globalBlockCache.has(key)) {
+    const data = globalBlockCache.get(key);
+    globalBlockCache.delete(key);
+    globalBlockCache.set(key, data);
+    return data;
+  }
+  return null;
+}
+
+function setCachedBlock(docId, blockIdx, data) {
+  if (!data || data.length === 0) return;
+  const key = `${docId}:${blockIdx}`;
+  if (globalBlockCache.has(key)) {
+    globalBlockCache.delete(key);
+  } else if (globalBlockCache.size >= BLOCK_CACHE_MAX_ENTRIES) {
+    const oldestKey = globalBlockCache.keys().next().value;
+    globalBlockCache.delete(oldestKey);
+  }
+  globalBlockCache.set(key, data);
+}
+
 /**
  * High-performance Pipelined Telegram Document Streamer
  * Concurrently prefetches upcoming 512KB chunks across parallel MTProto pipelines (sliding window)
@@ -1128,6 +1158,13 @@ async function streamTelegramPipelined(client, targetDoc, startByte, endByte, re
 
   async function fetchBlock(blockIdx) {
     if (aborted) return null;
+
+    // 1. Check in-memory LRU cache (0ms instant lookup)
+    const cached = getCachedBlock(targetDoc.id.toString(), blockIdx);
+    if (cached) {
+      return cached;
+    }
+
     const offset = blockIdx * CHUNK_SIZE;
     if (offset >= Number(targetDoc.size)) return null;
 
@@ -1140,7 +1177,11 @@ async function streamTelegramPipelined(client, targetDoc, startByte, endByte, re
     try {
       sender = await client.getSender(sender?.dcId || dcId);
       const result = await client.invokeWithSender(request, sender);
-      return result.bytes;
+      const bytes = result.bytes;
+      if (bytes && bytes.length > 0) {
+        setCachedBlock(targetDoc.id.toString(), blockIdx, bytes);
+      }
+      return bytes;
     } catch (err) {
       const msg = `${err.errorMessage || ''} ${err.message || ''}`;
       const dcMatch = msg.match(/(?:FILE_MIGRATE_|stored in DC\s*)(\d+)/i);
@@ -1151,7 +1192,11 @@ async function streamTelegramPipelined(client, targetDoc, startByte, endByte, re
         targetDoc.dcId = newDc;
         sender = await client.getSender(newDc);
         const result = await client.invokeWithSender(request, sender);
-        return result.bytes;
+        const bytes = result.bytes;
+        if (bytes && bytes.length > 0) {
+          setCachedBlock(targetDoc.id.toString(), blockIdx, bytes);
+        }
+        return bytes;
       }
       throw err;
     }

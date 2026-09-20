@@ -667,6 +667,7 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
         autoPlay
         playsInline
         webkit-playsinline="true"
+        preload="auto"
         poster="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
         muted={isMuted}
         className="w-full h-full object-contain bg-black transform-gpu will-change-transform"
@@ -692,7 +693,16 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
           setIsInitialLoading(false);
           setIsBuffering(false);
         }}
-        onWaiting={() => setIsBuffering(true)}
+        onWaiting={(e) => {
+          const el = e.currentTarget;
+          const bufferedEnd = el.buffered.length > 0 ? el.buffered.end(el.buffered.length - 1) : 0;
+          console.warn(`[DirectPlayer] Waiting for buffer at ${el.currentTime.toFixed(1)}s (buffer ahead: ${(bufferedEnd - el.currentTime).toFixed(1)}s)`);
+          setIsBuffering(true);
+        }}
+        onStalled={(e) => {
+          const el = e.currentTarget;
+          console.warn(`[DirectPlayer] Stream stalled at ${el.currentTime.toFixed(1)}s`);
+        }}
         onPlaying={() => {
           setIsInitialLoading(false);
           setIsBuffering(false);
