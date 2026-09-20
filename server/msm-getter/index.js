@@ -30,11 +30,10 @@ if (!apiId || !apiHash) {
 }
 
 let client = new TelegramClient(new StringSession(session), apiId, apiHash, {
-  connection: ConnectionTCPObfuscated,
   connectionRetries: 5,
   deviceModel: 'MSM Getter Server',
   appVersion: '1.0.0',
-  systemVersion: 'Linux/Docker',
+  systemVersion: 'Linux/ASUS',
 });
 
 let isConnected = false;
@@ -1115,8 +1114,17 @@ async function streamTelegramPipelined(client, targetDoc, startByte, endByte, re
     thumbSize: '',
   });
 
+  const startBlock = Math.floor(startByte / CHUNK_SIZE);
+  const endBlock = Math.floor(endByte / CHUNK_SIZE);
+
   let aborted = false;
-  req.on('close', () => { aborted = true; });
+  let activeBlock = startBlock;
+  req.on('close', () => {
+    aborted = true;
+    console.log(`[PIPELINE CLOSED by client] active: block ${activeBlock}/${endBlock}, aborted remaining blocks.`);
+  });
+
+  console.log(`[PIPELINE START] blocks ${startBlock}..${endBlock} (${endBlock - startBlock + 1} blocks), concurrency: ${CONCURRENCY}, chunkSize: ${CHUNK_SIZE / 1024}KB`);
 
   async function fetchBlock(blockIdx) {
     if (aborted) return null;
@@ -1134,20 +1142,35 @@ async function streamTelegramPipelined(client, targetDoc, startByte, endByte, re
       const result = await client.invokeWithSender(request, sender);
       return result.bytes;
     } catch (err) {
-      if (err.className === 'FileMigrateError' || (err.errorMessage && err.errorMessage.includes('FILE_MIGRATE_'))) {
-        const newDc = err.newDc || err.dc;
-        if (newDc) {
-          sender = await client.getSender(newDc);
-          const result = await client.invokeWithSender(request, sender);
-          return result.bytes;
-        }
+      const msg = `${err.errorMessage || ''} ${err.message || ''}`;
+      const dcMatch = msg.match(/(?:FILE_MIGRATE_|stored in DC\s*)(\d+)/i);
+      const newDc = err.newDc || err.dc || (dcMatch ? parseInt(dcMatch[1], 10) : null);
+      if (newDc) {
+        console.log(`[STREAM MIGRATE] Document lives on DC ${newDc} (was ${dcId}). Re-routing...`);
+        dcId = newDc;
+        targetDoc.dcId = newDc;
+        sender = await client.getSender(newDc);
+        const result = await client.invokeWithSender(request, sender);
+        return result.bytes;
       }
       throw err;
     }
   }
 
-  const startBlock = Math.floor(startByte / CHUNK_SIZE);
-  const endBlock = Math.floor(endByte / CHUNK_SIZE);
+  async function fetchBlockWithRetry(blockIdx, retries = 2) {
+    for (let attempt = 0; attempt <= retries; attempt++) {
+      if (aborted) return null;
+      try {
+        const bytes = await fetchBlock(blockIdx);
+        if (bytes) return bytes;
+      } catch (err) {
+        if (attempt === retries || aborted) throw err;
+        console.warn(`[STREAM RETRY] Block ${blockIdx} attempt ${attempt + 1} failed (${err.message}). Retrying in 500ms...`);
+        await new Promise(r => setTimeout(r, 500));
+      }
+    }
+    return null;
+  }
 
   let nextBlockToFetch = startBlock;
   const inFlight = new Map();
@@ -1155,7 +1178,7 @@ async function streamTelegramPipelined(client, targetDoc, startByte, endByte, re
   function fillPipeline() {
     while (!aborted && inFlight.size < CONCURRENCY && nextBlockToFetch <= endBlock) {
       const idx = nextBlockToFetch++;
-      const p = fetchBlock(idx).catch(err => {
+      const p = fetchBlockWithRetry(idx).catch(err => {
         if (!aborted) console.warn(`[STREAM PIPE WARN] Block ${idx} fetch error: ${err.message}`);
         return null;
       });
@@ -1164,6 +1187,7 @@ async function streamTelegramPipelined(client, targetDoc, startByte, endByte, re
   }
 
   for (let currentBlock = startBlock; currentBlock <= endBlock; currentBlock++) {
+    activeBlock = currentBlock;
     if (aborted || res.destroyed || res.writableEnded) break;
 
     fillPipeline();
@@ -1352,6 +1376,7 @@ app.get('/stream/:docId', async (req, res) => {
       }
 
       const chunkSize = (end - start) + 1;
+      console.log(`[STREAM REQ] ${req.method} Range: "${rangeHeader}" -> start: ${start}, end: ${end} (${chunkSize} bytes, chunkParam: ${req.query.chunkSize || 'default'})`);
       res.writeHead(206, {
         'Content-Range': `bytes ${start}-${end}/${fileSize}`,
         'Accept-Ranges': 'bytes',
