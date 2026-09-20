@@ -1618,6 +1618,26 @@ export const Settings: React.FC = () => {
             )}
           </div>
 
+          {/* Quality Selection Button */}
+          <button
+            type="button"
+            onClick={() => {
+              const currentQuality = settings.msm32MaxQuality || '1080';
+              handleUpdate({ msm32MaxQuality: currentQuality === '1080' ? '720' : '1080' });
+            }}
+            className="w-full flex items-center justify-between p-3.5 rounded-xl bg-white/5 border border-white/10 hover:border-sky-400/50 hover:bg-white/10 transition-all text-left"
+          >
+            <div className="space-y-0.5">
+              <span className="text-xs font-semibold text-white block">Max Stream Resolution</span>
+              <span className="text-[11px] text-gray-400">Preferred video resolution for Telegram streams</span>
+            </div>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <span className="text-[10px] text-sky-400 font-mono font-bold bg-sky-500/10 px-2 py-0.5 rounded border border-sky-400/20">
+                {(settings.msm32MaxQuality || '1080') === '1080' ? '1080p (Full HD)' : '720p (HD)'}
+              </span>
+            </div>
+          </button>
+
           {/* Navigation to Stream Chunk Sub-Drawer */}
           <button
             type="button"
@@ -1625,12 +1645,12 @@ export const Settings: React.FC = () => {
             className="w-full flex items-center justify-between p-3.5 rounded-xl bg-white/5 border border-white/10 hover:border-sky-400/50 hover:bg-white/10 transition-all text-left"
           >
             <div className="space-y-0.5">
-              <span className="text-xs font-semibold text-white block">Stream Chunk Slice Buffer</span>
-              <span className="text-[11px] text-gray-400">Configure seek latency and throughput slice size</span>
+              <span className="text-xs font-semibold text-white block">Stream Pipeline Buffer</span>
+              <span className="text-[11px] text-gray-400">Configure prefetch concurrency and pipeline depth</span>
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">
               <span className="text-[10px] text-sky-400 font-mono font-bold bg-sky-500/10 px-2 py-0.5 rounded border border-sky-400/20">
-                {((settings.msm32ChunkSize || 524288) / 1024).toFixed(0)} KB
+                {settings.msm32ChunkSize === 1048576 ? '1 MB (Turbo)' : settings.msm32ChunkSize === 262144 ? '256 KB (Eco)' : '512 KB (Standard)'}
               </span>
               <ChevronRight className="w-4 h-4 text-gray-400" />
             </div>
@@ -1856,9 +1876,9 @@ export const Settings: React.FC = () => {
 
           <div className="grid grid-cols-1 gap-2">
             {[
-              { label: '256 KB', desc: 'Fastest Seek • Recommended for Mobile/Cellular data connections', val: 262144 },
-              { label: '512 KB', desc: 'Balanced (Default) • Optimum balance between start latency & throughput', val: 524288 },
-              { label: '1 MB', desc: 'High Bitrate • Best for fast Wi-Fi and high-speed fiber broadband', val: 1048576 }
+              { label: '256 KB (Eco Pipeline)', desc: '2 parallel streams (512KB in-flight) • Fastest seek & low cellular data usage', val: 262144 },
+              { label: '512 KB (Standard Pipeline)', desc: '4 parallel streams (2MB in-flight) • Balanced latency & steady throughput (Default)', val: 524288 },
+              { label: '1 MB (Turbo Pipeline)', desc: '6 parallel streams (3MB in-flight) • Maximum prefetch throughput for smooth 1080p', val: 1048576 }
             ].map((c) => {
               const isCurrent = (settings.msm32ChunkSize || 524288) === c.val;
               return (

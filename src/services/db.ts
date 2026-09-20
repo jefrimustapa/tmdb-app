@@ -81,6 +81,7 @@ export const DEFAULT_SETTINGS: UserSettings = {
   telegramProviderCountries: { 'telegram-msm32': ['MY', 'ID', 'SG'] },
   msm32GetterUrl: 'https://msm-getter.onrender.com',
   msm32ChunkSize: 524288,
+  msm32MaxQuality: '1080',
   streamHeaderTimeout: 5,
   streamResolverTimeout: 0,
   streamResolverRetries: 1,

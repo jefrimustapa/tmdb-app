@@ -41,6 +41,7 @@ import {
   Upload,
   HardDrive,
   Globe,
+  Sliders,
   Save,
   Send,
   Trash2,
@@ -3754,9 +3755,9 @@ export const Settings: React.FC = () => {
             <div className="flex-1 overflow-y-auto px-6 py-6 space-y-3 font-sans">
               {(() => {
                 const chunkOptions = [
-                  { val: 262144, label: '256 KB', desc: 'Fastest seek & instant startup • Recommended for low latency or mobile hotspot.' },
-                  { val: 524288, label: '512 KB (Default & Recommended)', desc: 'Optimum balance between seek response time and stable network throughput.' },
-                  { val: 1048576, label: '1 MB', desc: 'High throughput • Best for high-bitrate 1080p/4K on high-speed fiber broadband.' },
+                  { val: 262144, label: '256 KB (Eco Pipeline)', desc: '2 parallel streams (512KB in-flight) • Fastest seek & low data usage for mobile hotspot.' },
+                  { val: 524288, label: '512 KB (Standard Pipeline)', desc: '4 parallel streams (2MB in-flight) • Optimum balance between seek response and stable throughput.' },
+                  { val: 1048576, label: '1 MB (Turbo Pipeline)', desc: '6 parallel streams (3MB in-flight) • Maximum prefetch throughput for smooth, zero-stutter 1080p.' },
                 ];
                 const currentVal = settings.msm32ChunkSize || 524288;
 
@@ -4275,7 +4276,7 @@ export const Settings: React.FC = () => {
                             target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
                           } else if (e.key === 'ArrowDown') {
                             e.preventDefault();
-                            const target = document.getElementById('drawer-msm32-sub-chunk');
+                            const target = document.getElementById('drawer-msm32-sub-quality');
                             target?.focus();
                             target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
                           }
@@ -4326,14 +4327,52 @@ export const Settings: React.FC = () => {
                       )}
                     </div>
 
+                    {/* Sub-Drawer Item: Max Stream Resolution */}
+                    <div className="bg-black/40 border border-hbo-border rounded-xl p-3.5 flex items-center justify-between">
+                      <div className="min-w-0 pr-2">
+                        <div className="font-bold text-xs text-white flex items-center gap-1.5 mb-0.5">
+                          <Sliders className="w-3.5 h-3.5 text-sky-400" />
+                          <span>Max Stream Resolution</span>
+                        </div>
+                        <p className="text-[10px] text-gray-400">Target video resolution for Telegram streams.</p>
+                      </div>
+                      <button
+                        id="drawer-msm32-sub-quality"
+                        data-telegram-msm-drawer-item="true"
+                        type="button"
+                        onKeyDown={(e) => {
+                          if (e.key === 'ArrowUp') {
+                            e.preventDefault();
+                            const target = document.getElementById('drawer-btn-msm32-test');
+                            target?.focus();
+                            target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                          } else if (e.key === 'ArrowDown') {
+                            e.preventDefault();
+                            const target = document.getElementById('drawer-msm32-sub-chunk');
+                            target?.focus();
+                            target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                          }
+                        }}
+                        onClick={() => {
+                          const currentQuality = settings.msm32MaxQuality || '1080';
+                          handleUpdate({ msm32MaxQuality: currentQuality === '1080' ? '720' : '1080' });
+                        }}
+                        className="px-3 py-1.5 rounded-lg border text-xs font-bold transition-all tv-focus-target flex items-center gap-1.5 border-hbo-border bg-hbo-dark/80 hover:bg-hbo-hover text-white flex-shrink-0"
+                      >
+                        <span className="text-sky-400 font-mono">
+                          {(settings.msm32MaxQuality || '1080') === '1080' ? '1080p (Full HD)' : '720p (HD)'}
+                        </span>
+                      </button>
+                    </div>
+
                     {/* Sub-Drawer Item: Stream Chunk Slice Buffer */}
                     <div className="bg-black/40 border border-hbo-border rounded-xl p-3.5 flex items-center justify-between">
                       <div className="min-w-0 pr-2">
                         <div className="font-bold text-xs text-white flex items-center gap-1.5 mb-0.5">
                           <HardDrive className="w-3.5 h-3.5 text-sky-400" />
-                          <span>Stream Chunk Slice Buffer</span>
+                          <span>Stream Pipeline Buffer</span>
                         </div>
-                        <p className="text-[10px] text-gray-400">Configure seek latency and throughput slice size.</p>
+                        <p className="text-[10px] text-gray-400">Configure prefetch concurrency and pipeline depth.</p>
                       </div>
                       <button
                         id="drawer-msm32-sub-chunk"
@@ -4342,7 +4381,7 @@ export const Settings: React.FC = () => {
                         onKeyDown={(e) => {
                           if (e.key === 'ArrowUp') {
                             e.preventDefault();
-                            const target = document.getElementById('drawer-btn-msm32-test');
+                            const target = document.getElementById('drawer-msm32-sub-quality');
                             target?.focus();
                             target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
                           } else if (e.key === 'ArrowDown') {
