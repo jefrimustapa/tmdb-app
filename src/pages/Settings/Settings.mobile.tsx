@@ -1735,7 +1735,47 @@ export const Settings: React.FC = () => {
           <div className="p-3.5 rounded-xl bg-white/5 border border-white/10 space-y-3">
             <span className="text-xs font-semibold text-white block">Server Presets</span>
             <div className="space-y-2">
-              {/* Preset 1: Render Cloud */}
+              {/* Preset 1: julietmike.net (Default) */}
+              <button
+                type="button"
+                onClick={() => {
+                  const jmUrl = 'http://julietmike.net:3033';
+                  msm32Service.clearCache();
+                  setMsmUrlInput(jmUrl);
+                  handleUpdate({ msm32GetterUrl: jmUrl });
+                  setTestingMsm32(true);
+                  setMsm32TestResult(null);
+                  msm32Service.testConnection(jmUrl)
+                    .then((res) => setMsm32TestResult(res))
+                    .catch((err: any) => setMsm32TestResult({ ok: false, error: err?.message || 'Connection failed' }))
+                    .finally(() => setTestingMsm32(false));
+                }}
+                className={`w-full p-3.5 rounded-xl border text-left transition-all flex items-center justify-between gap-3 ${
+                  (settings.msm32GetterUrl || 'http://julietmike.net:3033') === 'http://julietmike.net:3033'
+                    ? 'bg-sky-950/40 border-sky-400 text-white'
+                    : 'bg-white/5 border-white/10 text-gray-400'
+                }`}
+              >
+                <div>
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <span className="font-bold text-xs text-white">julietmike.net</span>
+                    <span className="text-[9px] text-sky-400 font-mono font-bold bg-sky-500/10 px-1.5 py-0.5 rounded border border-sky-400/20">
+                      Default
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-gray-400 font-mono truncate">http://julietmike.net:3033</p>
+                  <p className="text-[10px] text-gray-500 mt-1">Direct streaming on port 3033. High performance.</p>
+                </div>
+                <div className={`w-5 h-5 rounded-full border flex items-center justify-center flex-shrink-0 ${
+                  (settings.msm32GetterUrl || 'http://julietmike.net:3033') === 'http://julietmike.net:3033'
+                    ? 'bg-sky-500 border-sky-400 text-black'
+                    : 'border-gray-600 bg-black/40 text-transparent'
+                }`}>
+                  <Check className="w-3 h-3 stroke-[3]" />
+                </div>
+              </button>
+
+              {/* Preset 2: Render Cloud */}
               <button
                 type="button"
                 onClick={() => {
@@ -1751,7 +1791,7 @@ export const Settings: React.FC = () => {
                     .finally(() => setTestingMsm32(false));
                 }}
                 className={`w-full p-3.5 rounded-xl border text-left transition-all flex items-center justify-between gap-3 ${
-                  (settings.msm32GetterUrl || 'https://msm-getter.onrender.com') === 'https://msm-getter.onrender.com'
+                  settings.msm32GetterUrl === 'https://msm-getter.onrender.com'
                     ? 'bg-sky-950/40 border-sky-400 text-white'
                     : 'bg-white/5 border-white/10 text-gray-400'
                 }`}
@@ -1759,55 +1799,15 @@ export const Settings: React.FC = () => {
                 <div>
                   <div className="flex items-center gap-2 mb-0.5">
                     <span className="font-bold text-xs text-white">Render Cloud</span>
-                    <span className="text-[9px] text-sky-400 font-mono font-bold bg-sky-500/10 px-1.5 py-0.5 rounded border border-sky-400/20">
-                      Default
+                    <span className="text-[9px] text-gray-400 font-mono font-bold bg-white/10 px-1.5 py-0.5 rounded border border-white/20">
+                      Cloud
                     </span>
                   </div>
                   <p className="text-[10px] text-gray-400 font-mono truncate">https://msm-getter.onrender.com</p>
                   <p className="text-[10px] text-gray-500 mt-1">Hosted on Render. Auto spins down when idle.</p>
                 </div>
                 <div className={`w-5 h-5 rounded-full border flex items-center justify-center flex-shrink-0 ${
-                  (settings.msm32GetterUrl || 'https://msm-getter.onrender.com') === 'https://msm-getter.onrender.com'
-                    ? 'bg-sky-500 border-sky-400 text-black'
-                    : 'border-gray-600 bg-black/40 text-transparent'
-                }`}>
-                  <Check className="w-3 h-3 stroke-[3]" />
-                </div>
-              </button>
-
-              {/* Preset 2: Local PC */}
-              <button
-                type="button"
-                onClick={() => {
-                  const localUrl = 'http://localhost:3033';
-                  msm32Service.clearCache();
-                  setMsmUrlInput(localUrl);
-                  handleUpdate({ msm32GetterUrl: localUrl });
-                  setTestingMsm32(true);
-                  setMsm32TestResult(null);
-                  msm32Service.testConnection(localUrl)
-                    .then((res) => setMsm32TestResult(res))
-                    .catch((err: any) => setMsm32TestResult({ ok: false, error: err?.message || 'Connection failed' }))
-                    .finally(() => setTestingMsm32(false));
-                }}
-                className={`w-full p-3.5 rounded-xl border text-left transition-all flex items-center justify-between gap-3 ${
-                  settings.msm32GetterUrl === 'http://localhost:3033'
-                    ? 'bg-sky-950/40 border-sky-400 text-white'
-                    : 'bg-white/5 border-white/10 text-gray-400'
-                }`}
-              >
-                <div>
-                  <div className="flex items-center gap-2 mb-0.5">
-                    <span className="font-bold text-xs text-white">Local PC</span>
-                    <span className="text-[9px] text-sky-400 font-mono font-bold bg-sky-500/10 px-1.5 py-0.5 rounded border border-sky-400/20">
-                      Fastest
-                    </span>
-                  </div>
-                  <p className="text-[10px] text-gray-400 font-mono truncate">http://localhost:3033</p>
-                  <p className="text-[10px] text-gray-500 mt-1">Local host server on port 3033. Zero cloud latency.</p>
-                </div>
-                <div className={`w-5 h-5 rounded-full border flex items-center justify-center flex-shrink-0 ${
-                  settings.msm32GetterUrl === 'http://localhost:3033'
+                  settings.msm32GetterUrl === 'https://msm-getter.onrender.com'
                     ? 'bg-sky-500 border-sky-400 text-black'
                     : 'border-gray-600 bg-black/40 text-transparent'
                 }`}>
@@ -1837,7 +1837,7 @@ export const Settings: React.FC = () => {
               }}
               onBlur={() => {
                 const trimmed = msmUrlInput.trim().replace(/\/+$/, '');
-                const finalUrl = trimmed || 'https://msm-getter.onrender.com';
+                const finalUrl = trimmed || 'http://julietmike.net:3033';
                 if (finalUrl !== settings.msm32GetterUrl) {
                   msm32Service.clearCache();
                   handleUpdate({ msm32GetterUrl: finalUrl });
