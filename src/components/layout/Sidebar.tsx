@@ -49,7 +49,7 @@ export const Sidebar: React.FC = () => {
               data-nav-path={link.path}
               data-active-route={link.path === '/' ? location.pathname === '/' : location.pathname.startsWith(link.path)}
               className={({ isActive }) =>
-                `group relative flex items-center justify-center lg:justify-start gap-3.5 px-3 py-3 rounded-xl font-semibold text-sm transition-colors duration-75 tv-focus-target ${
+                `group relative flex items-center justify-center lg:justify-start gap-3.5 px-3 py-3 rounded-xl font-semibold text-sm transition-colors duration-75 tv-focus-target cursor-pointer ${
                   isActive
                     ? 'active text-white'
                     : 'text-gray-400 hover:text-white'
