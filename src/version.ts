@@ -2,12 +2,14 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20260920-2349';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-msm-server-juli.20260920-2349';
+export const APP_BUILD_NUMBER = '20260921-0107';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-msm-getter-log-.20260921-0107';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
-export const APP_BRANCH = 'feat-msm-server-juli';
-export const APP_CHANGELOG = `* fix(msm-getter): relocate logs to RAM tmpfs, add 5MB auto-rotation, and isolate active streams by clientSession (#125)
+export const APP_BRANCH = 'feat-msm-getter-log-';
+export const APP_CHANGELOG = `* fix(msm-getter): add TCP stream backpressure, auto-respawn supervisor, 256MB heap cap, and disable USB swap (#127)
+* feat(settings): set default MSM server to julietmike.net and remove local PC preset (#126)
+* fix(msm-getter): relocate logs to RAM tmpfs, add 5MB auto-rotation, and isolate active streams by clientSession (#125)
 * perf: improve MSM Telegram 1080p stream buffering, seek latency, and router pipeline engine (#124)
 * fix(tv): fix D-pad remote navigation for all MSM32bot settings menus (#123)
 * feat(filter): include standalone word 'sex' in adult title filtering (#122)
@@ -19,6 +21,4 @@ export const APP_CHANGELOG = `* fix(msm-getter): relocate logs to RAM tmpfs, add
 * feat: remove torbox and private extractor engines, sync active server indicator to watch header (#116)
 * fix: prioritize original titles in pencuri candidate scoring and regional drama queries (#115)
 * feat: add debug-search endpoint in server/msm-getter
-* fix: prioritize 720p resolution for telegram provider and quality-aware caching (#114)
-* feat: Telegram Provider (@msm32bot), Custom Direct Player UI, and Settings Restructure (#113)
-* refactor(providers): restructure provider categories and preferences for ASEAN and regional content (#112)`;
+* fix: prioritize 720p resolution for telegram provider and quality-aware caching (#114)`;
