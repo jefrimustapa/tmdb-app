@@ -94,18 +94,48 @@ function normalizeTitle(str) {
     .trim();
 }
 
+// Helper: Sanitize string before extracting sequel numbers to prevent false positives from audio/codecs/resolutions/sizes
+function sanitizeForSequel(str) {
+  if (!str) return '';
+  return str
+    .toLowerCase()
+    // Remove resolutions (e.g. 720p, 1080p, 2160p, 4k, 2k)
+    .replace(/\b\d{3,4}p\b/g, ' ')
+    .replace(/\b[248]k\b/g, ' ')
+    // Remove release years (e.g. 1999, 2024, 2025)
+    .replace(/\b(19\d\d|20[0-3]\d)\b/g, ' ')
+    // Remove audio specs (e.g. AAC 2.0, AAC2.0, 5.1, 7.1, 2.0, AC3 2.0, DDP 5.1)
+    .replace(/\b(?:aac|ac3|eac3|ddp?|dts|flac)?\s*[1-7]\.[0-2]\b/gi, ' ')
+    .replace(/\b(?:aac|ac3|eac3|ddp?|dts|flac)\s*[1-7]\b/gi, ' ')
+    // Remove video codecs (e.g. x264, x265, h264, h265, h.264, h.2.64, h.2)
+    .replace(/\b[hx]\.?26[45]\b/gi, ' ')
+    .replace(/\b[hx]\.2(?:\.64)?\b/gi, ' ')
+    .replace(/\b(10bit|8bit)\b/gi, ' ')
+    // Remove file sizes (e.g. 1.02 GB, 782.22 MB)
+    .replace(/\b\d+(\.\d+)?\s*(mb|gb|tb|kb)\b/gi, ' ')
+    // Remove search result counts, pages, and fractions (e.g. "8 results", "page 2", "1/2", "(1/1)")
+    .replace(/\b\d+\s*results?\b/gi, ' ')
+    .replace(/\bpage\s*\d+\b/gi, ' ')
+    .replace(/\b\d+\s*\/\s*\d+\b/g, ' ')
+    // Remove common file extensions
+    .replace(/\.(mp4|mkv|avi|mov|wmv|flv|webm)$/i, ' ');
+}
+
 // Helper: Extract sequel number / identifier from a title string (e.g. "Polis Evo 2" -> 2, "Polis Evo III" -> 3)
 function extractSequelInfo(str) {
   if (!str) return null;
-  const s = ` ${str.toLowerCase()} `;
+  const clean = sanitizeForSequel(str);
+  const s = ` ${clean.replace(/[^\w\s]/gi, ' ').replace(/\s+/g, ' ')} `;
+
   // Roman numerals: ii -> 2, iii -> 3, iv -> 4, v -> 5, vi -> 6
   const romanMatch = s.match(/\b(?:part|chapter|musim|season)?\s*(ii|iii|iv|v|vi)\b/i);
   if (romanMatch) {
     const map = { ii: 2, iii: 3, iv: 4, v: 5, vi: 6 };
     return map[romanMatch[1].toLowerCase()] || null;
   }
-  // Explicit Arabic numbers: e.g. " 2 ", " 3 ", " 4 ", "part 2", "part 3", "2.0"
-  const numMatch = s.match(/\b(?:part|chapter|musim|season)?\s*([2-9])(?:\.0)?\b/i);
+
+  // Explicit Arabic numbers: e.g. " 2 ", " 3 ", " 4 ", "part 2", "part 3"
+  const numMatch = s.match(/\b(?:part|chapter|musim|season)?\s*([2-9])\b/i);
   if (numMatch) {
     return parseInt(numMatch[1], 10);
   }
@@ -935,16 +965,18 @@ app.get('/api/debug-search', async (req, res) => {
     await new Promise(r => setTimeout(r, 2000));
     const msgs = await client.getMessages('msm32bot', { limit: 5 });
     const buttons = [];
+    let msgText = '';
     for (const m of msgs) {
       if (m.id > sentMsg.id && m.replyMarkup?.rows) {
+        if (!msgText) msgText = m.message || '';
         for (const row of m.replyMarkup.rows) {
           for (const btn of row.buttons) {
-            buttons.push({ text: btn.text, url: btn.url, className: btn.className });
+            buttons.push({ text: btn.text, url: btn.url, className: btn.className, buttonId: btn.buttonId });
           }
         }
       }
     }
-    res.json({ success: true, query, count: buttons.length, buttons });
+    res.json({ success: true, query, msgText, count: buttons.length, buttons });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -1258,7 +1290,7 @@ app.get('/api/resolve', async (req, res) => {
       } else {
         // Movie validation: Sequel and Release Year Alignment
         const targetSequel = extractSequelInfo(title);
-        const btnSequel = extractSequelInfo(btnText) || extractSequelInfo(msgText);
+        const btnSequel = extractSequelInfo(btnText);
         if (targetSequel) {
           if (btnSequel === targetSequel) {
             score += 150; // Strong reward for matching target sequel number
@@ -1275,7 +1307,7 @@ app.get('/api/resolve', async (req, res) => {
         }
 
         const targetYear = parseInt(year, 10) || extractYear(title);
-        const btnYear = extractYear(btnText) || extractYear(msgText);
+        const btnYear = extractYear(btnText);
         if (targetYear && btnYear) {
           if (Math.abs(targetYear - btnYear) <= 1) {
             score += 90; // Reward matching release year
@@ -1431,10 +1463,10 @@ app.get('/api/resolve', async (req, res) => {
         }
       }
 
-      if (targetButtonId) break;
+      if (targetButtonId !== null && targetButtonId !== undefined) break;
     }
 
-    if (!targetButtonId) {
+    if (targetButtonId === null || targetButtonId === undefined) {
       if (fallbackCached) {
         console.log(`[RESOLVE] 720p not found from bot, falling back to cached 1080p stream for "${baseCacheKey}"`);
         return fallbackCached;
