@@ -97,7 +97,7 @@ export interface UserSettings {
   enginePriority?: StreamResolverType[]; // Priority order of engines (e.g. ['telegram', 'embed'])
   enabledTelegramProviders?: string[]; // e.g. ['telegram-msm32']
   telegramProviderCountries?: Record<string, OriginCountryCode[]>; // e.g. { 'telegram-msm32': ['MY', 'ID', 'SG'] }
-  msm32GetterUrl?: string; // e.g. 'https://msm-getter.onrender.com'
+  msm32GetterUrl?: string; // e.g. 'https://www.julietmike.net:3033'
   msm32ChunkSize?: number; // Chunk buffer slice in bytes: 262144 (256KB Eco), 524288 (512KB Standard), 1048576 (1MB Turbo)
   msm32MaxQuality?: '720' | '1080'; // Resolution preference: '720' or '1080' (default: '1080')
   streamHeaderTimeout: number; // in seconds, e.g. 3, 5, 8, or 0 for always visible
