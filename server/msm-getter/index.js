@@ -1625,6 +1625,88 @@ function writeWithBackpressure(res, chunk) {
   });
 }
 
+// Active in-flight fileReference refresh promises keyed by docId
+const inFlightFileRefRefreshes = new Map();
+
+async function refreshDocumentFileReference(client, targetDoc) {
+  const docIdStr = targetDoc.id.toString();
+  if (inFlightFileRefRefreshes.has(docIdStr)) {
+    console.log(`[FILE_REF RECOVERY] Joining existing in-flight refresh for Doc ID: ${docIdStr}`);
+    return inFlightFileRefRefreshes.get(docIdStr);
+  }
+
+  const refreshPromise = (async () => {
+    console.log(`[FILE_REF RECOVERY] Refreshing expired fileReference for Doc ID: ${docIdStr}...`);
+
+    // 1. Scan recent chat messages from @msm32bot for the exact document ID
+    try {
+      const recentMsgs = await client.getMessages('msm32bot', { limit: 100 });
+      for (const m of recentMsgs) {
+        if (m.media?.document?.id?.toString() === docIdStr) {
+          const freshRef = m.media.document.fileReference;
+          if (freshRef) {
+            console.log(`[FILE_REF RECOVERY] Found fresh fileReference in chat message ${m.id} for Doc ID: ${docIdStr}!`);
+            const dbRecord = db.getByDocId(docIdStr);
+            if (dbRecord && dbRecord.queryKey) {
+              db.set(dbRecord.queryKey, {
+                ...dbRecord,
+                fileReference: freshRef.toString('hex'),
+                createdAt: Date.now(),
+              });
+            }
+            return freshRef;
+          }
+        }
+      }
+    } catch (scanErr) {
+      console.warn('[FILE_REF RECOVERY] Chat scan error:', scanErr.message);
+    }
+
+    // 2. If not found in recent chat, search by filename or queryKey via bot
+    const dbRecord = db.getByDocId(docIdStr);
+    if (dbRecord) {
+      const searchTerm = dbRecord.filename
+        ? dbRecord.filename.replace(/\.mp4|\.mkv|\.avi/gi, '').replace(/[^\w\s]/gi, ' ').replace(/\s+/g, ' ').trim()
+        : dbRecord.queryKey;
+
+      if (searchTerm) {
+        console.log(`[FILE_REF RECOVERY] Re-querying bot with: "${searchTerm}" for Doc ID: ${docIdStr}...`);
+        try {
+          await client.sendMessage('msm32bot', { message: searchTerm });
+          await new Promise(r => setTimeout(r, 2000));
+          const msgs = await client.getMessages('msm32bot', { limit: 15 });
+          for (const m of msgs) {
+            if (m.media?.document?.id?.toString() === docIdStr) {
+              const freshRef = m.media.document.fileReference;
+              if (freshRef) {
+                console.log(`[FILE_REF RECOVERY] Successfully refreshed fileReference via bot re-query!`);
+                if (dbRecord.queryKey) {
+                  db.set(dbRecord.queryKey, {
+                    ...dbRecord,
+                    fileReference: freshRef.toString('hex'),
+                    createdAt: Date.now(),
+                  });
+                }
+                return freshRef;
+              }
+            }
+          }
+        } catch (qErr) {
+          console.warn('[FILE_REF RECOVERY] Bot re-query error:', qErr.message);
+        }
+      }
+    }
+
+    console.warn(`[FILE_REF RECOVERY] Unable to refresh fileReference for Doc ID: ${docIdStr}`);
+    return null;
+  })().finally(() => {
+    inFlightFileRefRefreshes.delete(docIdStr);
+  });
+
+  inFlightFileRefRefreshes.set(docIdStr, refreshPromise);
+  return refreshPromise;
+}
+
 /**
  * High-performance Pipelined Telegram Document Streamer
  * Concurrently prefetches upcoming 512KB chunks across parallel MTProto pipelines (sliding window)
@@ -1712,11 +1794,31 @@ async function streamTelegramPipelined(client, targetDoc, startByte, endByte, re
         }
         return bytes;
       }
+
+      // Automatically recover from expired Telegram file references (HMAC token expiry)
+      if (msg.includes('FILE_REFERENCE') || err.errorMessage === 'FILE_REFERENCE_EXPIRED') {
+        console.warn(`[STREAM WARN] File reference expired on Doc ${targetDoc.id}. Auto-refreshing...`);
+        const freshRef = await refreshDocumentFileReference(client, targetDoc);
+        if (freshRef) {
+          targetDoc.fileReference = freshRef;
+          location.fileReference = freshRef;
+          request.location.fileReference = freshRef;
+          console.log(`[STREAM RECOVERY] Successfully swapped fresh fileReference. Retrying block ${blockIdx}...`);
+          sender = await client.getSender(sender?.dcId || dcId);
+          const result = await client.invokeWithSender(request, sender);
+          const bytes = result.bytes;
+          if (bytes && bytes.length > 0) {
+            setCachedBlock(targetDoc.id.toString(), blockIdx, bytes);
+          }
+          return bytes;
+        }
+      }
+
       throw err;
     }
   }
 
-  async function fetchBlockWithRetry(blockIdx, retries = 2) {
+  async function fetchBlockWithRetry(blockIdx, retries = 3) {
     for (let attempt = 0; attempt <= retries; attempt++) {
       if (aborted) return null;
       try {
@@ -1724,6 +1826,11 @@ async function streamTelegramPipelined(client, targetDoc, startByte, endByte, re
         if (bytes) return bytes;
       } catch (err) {
         if (attempt === retries || aborted) throw err;
+        const msg = `${err.errorMessage || ''} ${err.message || ''}`;
+        if (msg.includes('FILE_REFERENCE')) {
+          console.warn(`[STREAM RETRY] File reference expired. Waiting for refresh on attempt ${attempt + 1}...`);
+          await refreshDocumentFileReference(client, targetDoc);
+        }
         console.warn(`[STREAM RETRY] Block ${blockIdx} attempt ${attempt + 1} failed (${err.message}). Retrying in 500ms...`);
         await new Promise(r => setTimeout(r, 500));
       }
