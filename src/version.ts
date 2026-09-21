@@ -2,12 +2,14 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20260921-1331';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-default-https-j.20260921-1331';
+export const APP_BUILD_NUMBER = '20260921-1403';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.fix-msm-getter-resol.20260921-1403';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
-export const APP_BRANCH = 'feat-default-https-j';
-export const APP_CHANGELOG = `* feat(msm-getter): enable native HTTPS server with Let's Encrypt certificates
+export const APP_BRANCH = 'fix-msm-getter-resol';
+export const APP_CHANGELOG = `* Merge pull request #131 from jefrimustapa/feat/default-https-julietmike
+* feat(msm): use https://www.julietmike.net:3033 as single default preset and remove onrender
+* feat(msm-getter): enable native HTTPS server with Let's Encrypt certificates
 * Revert "Merge pull request #130 from jefrimustapa/fix/msm-stream-resolution"
 * Merge pull request #130 from jefrimustapa/fix/msm-stream-resolution
 * fix(msm): prevent false sequel penalties and handle bot message metadata in stream resolution
@@ -19,6 +21,4 @@ export const APP_CHANGELOG = `* feat(msm-getter): enable native HTTPS server wit
 * perf: improve MSM Telegram 1080p stream buffering, seek latency, and router pipeline engine (#124)
 * fix(tv): fix D-pad remote navigation for all MSM32bot settings menus (#123)
 * feat(filter): include standalone word 'sex' in adult title filtering (#122)
-* feat(player): compact playback settings header and add persistent global subtitle font size adjustment (#121)
-* feat(anime): support multi-season and continuous episode offset mapping to MAL, replace TV tag with year in MySpace (#120)
-* fix(player): resolve selected embed provider directly without Telegram waterfall (#119)`;
+* feat(player): compact playback settings header and add persistent global subtitle font size adjustment (#121)`;
