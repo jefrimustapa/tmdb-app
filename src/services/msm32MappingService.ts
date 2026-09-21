@@ -25,7 +25,7 @@ class Msm32MappingService {
   private clientCache = new Map<string, Msm32CacheEntry>();
   private readonly CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours for successful resolves
   private readonly FAILED_CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes for failed attempts
-  private readonly STORAGE_KEY = 'msm32_client_cache';
+  private readonly STORAGE_KEY = 'msm32_client_cache_v2';
 
   constructor() {
     this.loadFromStorage();
@@ -34,6 +34,8 @@ class Msm32MappingService {
   private loadFromStorage() {
     try {
       if (typeof window === 'undefined' || !window.localStorage) return;
+      // Clean up legacy v1 cache to prevent stale/mismatched sequel playback
+      localStorage.removeItem('msm32_client_cache');
       const raw = localStorage.getItem(this.STORAGE_KEY);
       if (raw) {
         const entries: [string, Msm32CacheEntry][] = JSON.parse(raw);
@@ -121,6 +123,7 @@ class Msm32MappingService {
     try {
       if (typeof window !== 'undefined' && window.localStorage) {
         localStorage.removeItem(this.STORAGE_KEY);
+        localStorage.removeItem('msm32_client_cache');
       }
     } catch {}
     return count;
@@ -158,8 +161,11 @@ class Msm32MappingService {
     const baseUrl = await this.getBaseUrl();
     if (signal?.aborted) return null;
 
+    const settings = await dbService.getSettings();
+    const maxQuality = settings?.msm32MaxQuality || '1080';
+
     // 1. Check local client cache first (0ms, 0 network requests) - strictly host-isolated
-    const clientKey = `${baseUrl}_${(title || '').toLowerCase().trim()}_${year || ''}_${season || ''}_${episode || ''}_720`;
+    const clientKey = `${baseUrl}_${(title || '').toLowerCase().trim()}_${year || ''}_${season || ''}_${episode || ''}_${maxQuality}`;
     const localHit = this.clientCache.get(clientKey);
     if (localHit) {
       if (localHit.result && Date.now() - localHit.timestamp < this.CACHE_TTL_MS) {

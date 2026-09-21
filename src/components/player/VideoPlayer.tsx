@@ -400,6 +400,28 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                 console.warn(`[Resolver] Telegram result for "${searchTitle}" appears to be a TV episode (${res.filename}) for a movie, trying alternative title...`);
                 continue;
               }
+
+              // Guard: If resolving a movie, reject if filename belongs to a conflicting sequel number or release year
+              if (mediaType === 'movie' && res.filename) {
+                const targetSequelMatch = title.match(/\b([2-9]|ii|iii|iv|v)\b/i);
+                if (targetSequelMatch) {
+                  const targetSeq = targetSequelMatch[1].toLowerCase();
+                  const fnSeqMatch = res.filename.match(/\b([2-9]|ii|iii|iv|v)\b/i);
+                  const fnSeq = fnSeqMatch ? fnSeqMatch[1].toLowerCase() : null;
+                  if (fnSeq && fnSeq !== targetSeq) {
+                    console.warn(`[Resolver] Telegram result for "${title}" has conflicting sequel in filename (${res.filename}), skipping...`);
+                    continue;
+                  }
+                }
+                if (releaseYear) {
+                  const fnYearMatch = res.filename.match(/\b(19\d\d|20[0-3]\d)\b/);
+                  if (fnYearMatch && Math.abs(parseInt(String(releaseYear), 10) - parseInt(fnYearMatch[1], 10)) > 1) {
+                    console.warn(`[Resolver] Telegram result for "${title}" (${releaseYear}) has conflicting release year in filename (${res.filename}), skipping...`);
+                    continue;
+                  }
+                }
+              }
+
               msmRes = res;
               break;
             }
