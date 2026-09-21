@@ -1084,8 +1084,8 @@ app.get('/api/resolve', async (req, res) => {
 });
 
 // In-Memory LRU Block Cache for Telegram MTProto Stream Chunks
-// Caches up to 64 blocks (32 MB RAM) to eliminate seek latency when players ping-pong between audio & video clusters in MKV files.
-const BLOCK_CACHE_MAX_ENTRIES = 64; // 64 x 512KB = 32 MB
+// Caches up to 16 blocks (8 MB RAM) to eliminate seek latency while protecting router RAM from exhaustion.
+const BLOCK_CACHE_MAX_ENTRIES = 16; // 16 x 512KB = 8 MB
 const globalBlockCache = new Map();
 const activeStreams = new Map(); // key: docId -> { abort: Function }
 
@@ -1110,6 +1110,25 @@ function setCachedBlock(docId, blockIdx, data) {
     globalBlockCache.delete(oldestKey);
   }
   globalBlockCache.set(key, data);
+}
+
+/**
+ * Write a buffer chunk to the HTTP response with strict TCP backpressure.
+ * Pauses upstream fetching if the client's network buffer is full.
+ */
+function writeWithBackpressure(res, chunk) {
+  if (res.destroyed || res.writableEnded) return Promise.resolve();
+  if (res.write(chunk)) return Promise.resolve();
+  return new Promise((resolve) => {
+    const onDrain = () => { cleanup(); resolve(); };
+    const onClose = () => { cleanup(); resolve(); };
+    const cleanup = () => {
+      res.off('drain', onDrain);
+      res.off('close', onClose);
+    };
+    res.once('drain', onDrain);
+    res.once('close', onClose);
+  });
 }
 
 /**
@@ -1256,7 +1275,7 @@ async function streamTelegramPipelined(client, targetDoc, startByte, endByte, re
   const firstSliceStart = Math.max(0, startByte - firstBlockStart);
   const firstSliceEnd = Math.min(firstBlockData.length, (endByte - firstBlockStart) + 1);
   if (firstSliceStart < firstSliceEnd) {
-    res.write(firstBlockData.subarray(firstSliceStart, firstSliceEnd));
+    await writeWithBackpressure(res, firstBlockData.subarray(firstSliceStart, firstSliceEnd));
   }
 
   if (startBlock === endBlock) {
@@ -1299,7 +1318,7 @@ async function streamTelegramPipelined(client, targetDoc, startByte, endByte, re
 
     if (sliceStart < sliceEnd) {
       const slice = buffer.subarray(sliceStart, sliceEnd);
-      res.write(slice);
+      await writeWithBackpressure(res, slice);
     }
   }
 
