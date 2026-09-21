@@ -182,8 +182,6 @@ export const Settings: React.FC = () => {
   const [testingMsm32, setTestingMsm32] = useState(false);
   const [msm32TestResult, setMsm32TestResult] = useState<Msm32HealthResult | null>(null);
   const [msmUrlInput, setMsmUrlInput] = useState<string>('');
-  const [cacheStats, setCacheStats] = useState(() => msm32Service.getCacheStats());
-  const [cacheClearFeedback, setCacheClearFeedback] = useState<string | null>(null);
   const clickCountRef = useRef(0);
   const clickTimerRef = useRef<NodeJS.Timeout | null>(null);
   const { detectedPlatform, activeLayout } = useDevice();
@@ -221,7 +219,6 @@ export const Settings: React.FC = () => {
   // Auto-ping MSM Getter microservice whenever the user enters the Telegram provider or MSM32 drawer
   useEffect(() => {
     if (showTelegramDrawer || showTelegramMsmDrawer) {
-      setCacheStats(msm32Service.getCacheStats());
       setTestingMsm32(true);
       setMsm32TestResult(null);
       const url = settings?.msm32GetterUrl;
@@ -4463,45 +4460,6 @@ export const Settings: React.FC = () => {
                       </button>
                     </div>
 
-                    {/* Item: Clear Local Stream Cache */}
-                    <div className="bg-black/40 border border-hbo-border rounded-xl p-3.5 flex items-center justify-between">
-                      <div className="min-w-0 pr-2">
-                        <div className="font-bold text-xs text-white flex items-center gap-1.5 mb-0.5">
-                          <Trash2 className="w-3.5 h-3.5 text-rose-400" />
-                          <span>Local Stream Fast Cache</span>
-                        </div>
-                        <p className="text-[10px] text-gray-400">
-                          {cacheClearFeedback ? (
-                            <span className="text-rose-300 font-semibold">{cacheClearFeedback}</span>
-                          ) : (
-                            `In-app cache of resolved & failed lookups (${cacheStats.total} ${cacheStats.total === 1 ? 'entry' : 'entries'}).`
-                          )}
-                        </p>
-                      </div>
-                      <button
-                        id="drawer-msm32-btn-clear-cache"
-                        data-telegram-msm-drawer-item="true"
-                        type="button"
-                        onKeyDown={(e) => {
-                          if (e.key === 'ArrowUp') {
-                            e.preventDefault();
-                            const target = document.getElementById('drawer-msm32-sub-country');
-                            target?.focus();
-                            target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-                          }
-                        }}
-                        onClick={() => {
-                          const cleared = msm32Service.clearCache();
-                          setCacheStats(msm32Service.getCacheStats());
-                          setCacheClearFeedback(cleared > 0 ? `Cleared ${cleared} cached stream record${cleared > 1 ? 's' : ''}!` : 'Cache is already clean');
-                          setTimeout(() => setCacheClearFeedback(null), 3000);
-                        }}
-                        className="px-3.5 py-1.5 rounded-lg border text-xs font-bold transition-all tv-focus-target flex items-center gap-1.5 border-rose-500/40 bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 flex-shrink-0"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                        <span>Clear Cache</span>
-                      </button>
-                    </div>
                   </>
                 );
               })()}

@@ -94,6 +94,42 @@ function normalizeTitle(str) {
     .trim();
 }
 
+// Helper: Extract sequel number / identifier from a title string (e.g. "Polis Evo 2" -> 2, "Polis Evo III" -> 3)
+function extractSequelInfo(str) {
+  if (!str) return null;
+  const s = ` ${str.toLowerCase()} `;
+  // Roman numerals: ii -> 2, iii -> 3, iv -> 4, v -> 5, vi -> 6
+  const romanMatch = s.match(/\b(?:part|chapter|musim|season)?\s*(ii|iii|iv|v|vi)\b/i);
+  if (romanMatch) {
+    const map = { ii: 2, iii: 3, iv: 4, v: 5, vi: 6 };
+    return map[romanMatch[1].toLowerCase()] || null;
+  }
+  // Explicit Arabic numbers: e.g. " 2 ", " 3 ", " 4 ", "part 2", "part 3", "2.0"
+  const numMatch = s.match(/\b(?:part|chapter|musim|season)?\s*([2-9])(?:\.0)?\b/i);
+  if (numMatch) {
+    return parseInt(numMatch[1], 10);
+  }
+  return null;
+}
+
+// Helper: Extract 4-digit release year from a string
+function extractYear(str) {
+  if (!str) return null;
+  const m = str.match(/\b(19\d\d|20[0-3]\d)\b/);
+  return m ? parseInt(m[1], 10) : null;
+}
+
+// Helper: Extract significant search tokens from title (retaining digits, roman numerals, and words >= 2 chars)
+function extractTitleTokens(str) {
+  const norm = normalizeTitle(str);
+  return norm.split(' ').filter(t => {
+    if (!t) return false;
+    if (/^\d+$/.test(t)) return true; // keep digits: 2, 3, 4
+    if (/^(ii|iii|iv|v|vi)$/i.test(t)) return true; // keep roman numerals
+    return t.length >= 2;
+  });
+}
+
 // Web Auth State in RAM
 let pendingAuth = {
   client: null,
@@ -1009,8 +1045,9 @@ app.get('/api/resolve', async (req, res) => {
 
     // Check if matching document was recently delivered in chat
     const recentMsgs = await client.getMessages('msm32bot', { limit: 25 });
-    const normSearch = normalizeTitle(title);
-    const titleTokens = normSearch.split(' ').filter(t => t.length > 2);
+    const titleTokens = extractTitleTokens(title);
+    const targetSequel = extractSequelInfo(title);
+    const targetYear = parseInt(year, 10) || extractYear(title);
     const matchingRecentDocs = [];
 
     for (const msg of recentMsgs) {
@@ -1021,7 +1058,8 @@ app.get('/api/resolve', async (req, res) => {
         const normFn = normalizeTitle(filename);
 
         const matchesAllTokens = titleTokens.length > 0 && titleTokens.every(t => normFn.includes(t));
-        let matchesEpisode = true;
+        let matchesCandidate = matchesAllTokens;
+
         if (isTv) {
           const epKeywords = [
             `s${sPadded}e${epPadded}`,
@@ -1038,13 +1076,13 @@ app.get('/api/resolve', async (req, res) => {
           ];
           const hasTarget = epKeywords.some(kw => normFn.includes(kw));
           if (!hasTarget) {
-            matchesEpisode = false;
+            matchesCandidate = false;
           } else {
             const otherEpMatch = normFn.match(/\b(s\d+e(\d+)|e(\d+)|ep\s*(\d+)|episod\s*(\d+)|episode\s*(\d+))\b/);
             if (otherEpMatch) {
               const foundNum = parseInt(otherEpMatch[2] || otherEpMatch[3] || otherEpMatch[4] || otherEpMatch[5] || otherEpMatch[6], 10);
               if (!isNaN(foundNum) && foundNum !== eNum) {
-                matchesEpisode = false;
+                matchesCandidate = false;
               }
             }
           }
@@ -1054,17 +1092,36 @@ app.get('/api/resolve', async (req, res) => {
             const hasSeason1 = normFn.match(/\b(s0?1|season\s*1|musim\s*1)\b/);
             const hasTargetSeason = normFn.match(new RegExp(`\\b(s0?${sNum}|season\\s*${sNum}|musim\\s*${sNum})\\b`));
             if (hasSeason1 && !hasTargetSeason) {
-              matchesEpisode = false;
+              matchesCandidate = false;
             }
           } else if (sNum === 1) {
             const hasHigherSeason = normFn.match(/\b(s0?[2-9]|season\s*[2-9]|musim\s*[2-9])\b/);
             if (hasHigherSeason) {
-              matchesEpisode = false;
+              matchesCandidate = false;
             }
+          }
+        } else {
+          // Movie validation: strictly enforce sequel number and release year alignment
+          const docSequel = extractSequelInfo(filename);
+          if (targetSequel) {
+            if (docSequel !== targetSequel) {
+              matchesCandidate = false;
+            }
+          } else {
+            // Target is original movie without sequel number -> reject docs that have a sequel number
+            if (docSequel) {
+              matchesCandidate = false;
+            }
+          }
+
+          // Release year validation: reject if filename has an explicit conflicting release year
+          const docYear = extractYear(filename);
+          if (targetYear && docYear && Math.abs(targetYear - docYear) > 1) {
+            matchesCandidate = false;
           }
         }
 
-        if (matchesAllTokens && matchesEpisode) {
+        if (matchesCandidate) {
           const fnLower = (filename || '').toLowerCase();
           const is720 = fnLower.includes('720p') || fnLower.includes('720');
           const is1080 = fnLower.includes('1080p') || fnLower.includes('1080');
@@ -1196,6 +1253,34 @@ app.get('/api/resolve', async (req, res) => {
           const hasHigherSeason = combinedNorm.match(/\b(s0?[2-9]|season\s*[2-9]|musim\s*[2-9])\b/);
           if (hasHigherSeason) {
             score -= 500;
+          }
+        }
+      } else {
+        // Movie validation: Sequel and Release Year Alignment
+        const targetSequel = extractSequelInfo(title);
+        const btnSequel = extractSequelInfo(btnText) || extractSequelInfo(msgText);
+        if (targetSequel) {
+          if (btnSequel === targetSequel) {
+            score += 150; // Strong reward for matching target sequel number
+          } else if (btnSequel) {
+            score -= 600; // Heavy penalty for wrong sequel number
+          } else {
+            score -= 400; // Heavy penalty if candidate lacks sequel number
+          }
+        } else {
+          // Target is original without sequel number -> reject candidates with sequel numbers
+          if (btnSequel) {
+            score -= 600;
+          }
+        }
+
+        const targetYear = parseInt(year, 10) || extractYear(title);
+        const btnYear = extractYear(btnText) || extractYear(msgText);
+        if (targetYear && btnYear) {
+          if (Math.abs(targetYear - btnYear) <= 1) {
+            score += 90; // Reward matching release year
+          } else {
+            score -= 450; // Heavy penalty for conflicting release year
           }
         }
       }
@@ -1540,6 +1625,88 @@ function writeWithBackpressure(res, chunk) {
   });
 }
 
+// Active in-flight fileReference refresh promises keyed by docId
+const inFlightFileRefRefreshes = new Map();
+
+async function refreshDocumentFileReference(client, targetDoc) {
+  const docIdStr = targetDoc.id.toString();
+  if (inFlightFileRefRefreshes.has(docIdStr)) {
+    console.log(`[FILE_REF RECOVERY] Joining existing in-flight refresh for Doc ID: ${docIdStr}`);
+    return inFlightFileRefRefreshes.get(docIdStr);
+  }
+
+  const refreshPromise = (async () => {
+    console.log(`[FILE_REF RECOVERY] Refreshing expired fileReference for Doc ID: ${docIdStr}...`);
+
+    // 1. Scan recent chat messages from @msm32bot for the exact document ID
+    try {
+      const recentMsgs = await client.getMessages('msm32bot', { limit: 100 });
+      for (const m of recentMsgs) {
+        if (m.media?.document?.id?.toString() === docIdStr) {
+          const freshRef = m.media.document.fileReference;
+          if (freshRef) {
+            console.log(`[FILE_REF RECOVERY] Found fresh fileReference in chat message ${m.id} for Doc ID: ${docIdStr}!`);
+            const dbRecord = db.getByDocId(docIdStr);
+            if (dbRecord && dbRecord.queryKey) {
+              db.set(dbRecord.queryKey, {
+                ...dbRecord,
+                fileReference: freshRef.toString('hex'),
+                createdAt: Date.now(),
+              });
+            }
+            return freshRef;
+          }
+        }
+      }
+    } catch (scanErr) {
+      console.warn('[FILE_REF RECOVERY] Chat scan error:', scanErr.message);
+    }
+
+    // 2. If not found in recent chat, search by filename or queryKey via bot
+    const dbRecord = db.getByDocId(docIdStr);
+    if (dbRecord) {
+      const searchTerm = dbRecord.filename
+        ? dbRecord.filename.replace(/\.mp4|\.mkv|\.avi/gi, '').replace(/[^\w\s]/gi, ' ').replace(/\s+/g, ' ').trim()
+        : dbRecord.queryKey;
+
+      if (searchTerm) {
+        console.log(`[FILE_REF RECOVERY] Re-querying bot with: "${searchTerm}" for Doc ID: ${docIdStr}...`);
+        try {
+          await client.sendMessage('msm32bot', { message: searchTerm });
+          await new Promise(r => setTimeout(r, 2000));
+          const msgs = await client.getMessages('msm32bot', { limit: 15 });
+          for (const m of msgs) {
+            if (m.media?.document?.id?.toString() === docIdStr) {
+              const freshRef = m.media.document.fileReference;
+              if (freshRef) {
+                console.log(`[FILE_REF RECOVERY] Successfully refreshed fileReference via bot re-query!`);
+                if (dbRecord.queryKey) {
+                  db.set(dbRecord.queryKey, {
+                    ...dbRecord,
+                    fileReference: freshRef.toString('hex'),
+                    createdAt: Date.now(),
+                  });
+                }
+                return freshRef;
+              }
+            }
+          }
+        } catch (qErr) {
+          console.warn('[FILE_REF RECOVERY] Bot re-query error:', qErr.message);
+        }
+      }
+    }
+
+    console.warn(`[FILE_REF RECOVERY] Unable to refresh fileReference for Doc ID: ${docIdStr}`);
+    return null;
+  })().finally(() => {
+    inFlightFileRefRefreshes.delete(docIdStr);
+  });
+
+  inFlightFileRefRefreshes.set(docIdStr, refreshPromise);
+  return refreshPromise;
+}
+
 /**
  * High-performance Pipelined Telegram Document Streamer
  * Concurrently prefetches upcoming 512KB chunks across parallel MTProto pipelines (sliding window)
@@ -1627,11 +1794,31 @@ async function streamTelegramPipelined(client, targetDoc, startByte, endByte, re
         }
         return bytes;
       }
+
+      // Automatically recover from expired Telegram file references (HMAC token expiry)
+      if (msg.includes('FILE_REFERENCE') || err.errorMessage === 'FILE_REFERENCE_EXPIRED') {
+        console.warn(`[STREAM WARN] File reference expired on Doc ${targetDoc.id}. Auto-refreshing...`);
+        const freshRef = await refreshDocumentFileReference(client, targetDoc);
+        if (freshRef) {
+          targetDoc.fileReference = freshRef;
+          location.fileReference = freshRef;
+          request.location.fileReference = freshRef;
+          console.log(`[STREAM RECOVERY] Successfully swapped fresh fileReference. Retrying block ${blockIdx}...`);
+          sender = await client.getSender(sender?.dcId || dcId);
+          const result = await client.invokeWithSender(request, sender);
+          const bytes = result.bytes;
+          if (bytes && bytes.length > 0) {
+            setCachedBlock(targetDoc.id.toString(), blockIdx, bytes);
+          }
+          return bytes;
+        }
+      }
+
       throw err;
     }
   }
 
-  async function fetchBlockWithRetry(blockIdx, retries = 2) {
+  async function fetchBlockWithRetry(blockIdx, retries = 3) {
     for (let attempt = 0; attempt <= retries; attempt++) {
       if (aborted) return null;
       try {
@@ -1639,6 +1826,11 @@ async function streamTelegramPipelined(client, targetDoc, startByte, endByte, re
         if (bytes) return bytes;
       } catch (err) {
         if (attempt === retries || aborted) throw err;
+        const msg = `${err.errorMessage || ''} ${err.message || ''}`;
+        if (msg.includes('FILE_REFERENCE')) {
+          console.warn(`[STREAM RETRY] File reference expired. Waiting for refresh on attempt ${attempt + 1}...`);
+          await refreshDocumentFileReference(client, targetDoc);
+        }
         console.warn(`[STREAM RETRY] Block ${blockIdx} attempt ${attempt + 1} failed (${err.message}). Retrying in 500ms...`);
         await new Promise(r => setTimeout(r, 500));
       }
@@ -1796,11 +1988,9 @@ app.post('/api/github-webhook', async (req, res) => {
           fs.writeFileSync(path.join(__dirname, 'db.js'), dbRes.data, 'utf-8');
         }
 
-        console.log('[AUTO-DEPLOY] Code updated successfully! Restarting service in 1s...');
+        console.log('[AUTO-DEPLOY] Code updated successfully! Exiting process for supervisor respawn in 1s...');
         setTimeout(() => {
-          import('child_process').then(cp => {
-            cp.exec('/opt/etc/init.d/S99msm-getter restart');
-          });
+          process.exit(0);
         }, 1000);
       } catch (dErr) {
         console.error('[AUTO-DEPLOY ERROR] Failed to download or restart:', dErr.message);
