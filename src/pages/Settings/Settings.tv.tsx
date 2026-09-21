@@ -45,6 +45,8 @@ import {
   Save,
   Send,
   Trash2,
+  Terminal,
+  ExternalLink,
 } from 'lucide-react';
 
 type TVCategory = 'playback' | 'display' | 'controls' | 'content' | 'system';
@@ -4326,6 +4328,24 @@ export const Settings: React.FC = () => {
                         </div>
                       )}
                     </div>
+
+                    {/* View Server Logs in Browser Button */}
+                    <button
+                      id="drawer-btn-msm32-logs"
+                      data-telegram-msm-drawer-item="true"
+                      type="button"
+                      onClick={() => {
+                        const target = `${(settings.msm32GetterUrl || 'http://julietmike.net:3033').replace(/\/+$/, '')}/logs`;
+                        window.open(target, '_blank');
+                      }}
+                      className="w-full py-2.5 px-3 rounded-xl border text-xs font-bold transition-all tv-focus-target flex items-center justify-between border-sky-500/30 bg-sky-500/10 hover:bg-sky-500/20 text-sky-300"
+                    >
+                      <div className="flex items-center gap-2">
+                        <Terminal className="w-4 h-4 text-sky-400" />
+                        <span>View Live Server Logs &amp; Diagnostics</span>
+                      </div>
+                      <ExternalLink className="w-3.5 h-3.5 text-sky-400" />
+                    </button>
 
                     {/* Sub-Drawer Item: Max Stream Resolution */}
                     <div className="bg-black/40 border border-hbo-border rounded-xl p-3.5 flex items-center justify-between">

@@ -8,6 +8,7 @@ import { StringSession } from 'telegram/sessions/index.js';
 import { ConnectionTCPObfuscated } from 'telegram/network/connection/TCPObfuscated.js';
 import bigInt from 'big-integer';
 import axios from 'axios';
+import fs from 'fs';
 import { db } from './db.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -24,6 +25,13 @@ const port = process.env.PORT || 3033;
 const apiId = parseInt(process.env.TG_API_ID, 10);
 const apiHash = process.env.TG_API_HASH;
 let session = process.env.TG_SESSION || '';
+const LOG_PATH = process.env.LOG_FILE || (process.platform === 'win32' ? path.join(__dirname, 'msm-getter.log') : '/tmp/msm-getter.log');
+
+function getLogFilePath() {
+  if (fs.existsSync('/tmp/msm-getter.log')) return '/tmp/msm-getter.log';
+  if (fs.existsSync(LOG_PATH)) return LOG_PATH;
+  return path.join(__dirname, 'msm-getter.log');
+}
 
 if (!apiId || !apiHash) {
   console.error('[ERROR] TG_API_ID or TG_API_HASH missing from .env!');
@@ -269,6 +277,16 @@ app.get(['/', '/auth'], (req, res) => {
       <p class="text-xs text-slate-400">Telegram MTProto Cloud Streaming Gateway</p>
     </div>
 
+    <!-- Navigation Tabs -->
+    <div class="flex items-center justify-center gap-2 pb-1">
+      <a href="/auth" class="px-3 py-1 rounded-lg text-xs font-semibold text-sky-400 bg-sky-500/10 border border-sky-500/20">
+        🔑 Auth Portal
+      </a>
+      <a href="/logs" class="px-3 py-1 rounded-lg text-xs font-semibold text-slate-400 hover:text-white bg-slate-800/60 border border-slate-700/60 transition">
+        📄 Live Logs
+      </a>
+    </div>
+
     <!-- Live Status Pill -->
     <div id="statusContainer" class="p-3.5 rounded-xl bg-slate-800/60 border border-slate-700/60 flex items-center justify-between">
       <div class="flex items-center gap-2.5">
@@ -461,6 +479,397 @@ app.get(['/', '/auth'], (req, res) => {
     }
 
     checkStatus();
+  </script>
+</body>
+</html>`);
+});
+
+// ==========================================
+// 1b. SERVER-SIDE LOG VIEWER & DIAGNOSTICS
+// ==========================================
+
+// System Stats Endpoint (Uptime, Memory RSS, Active Streams, Log Size)
+app.get('/api/system/stats', (req, res) => {
+  const mem = process.memoryUsage();
+  let logSizeKB = 0;
+  try {
+    const logPath = getLogFilePath();
+    if (fs.existsSync(logPath)) {
+      logSizeKB = Math.round(fs.statSync(logPath).size / 1024);
+    }
+  } catch {}
+  res.json({
+    status: 'ok',
+    uptime: Math.round(process.uptime()),
+    isConnected,
+    cachedStreams: db.size(),
+    activeStreams: activeStreams.size,
+    authError: authError || null,
+    memory: {
+      rssMB: Math.round(mem.rss / (1024 * 1024)),
+      heapUsedMB: Math.round(mem.heapUsed / (1024 * 1024)),
+      heapTotalMB: Math.round(mem.heapTotal / (1024 * 1024)),
+    },
+    logSizeKB,
+  });
+});
+
+// Log Snapshot API (Last N lines from RAM disk)
+app.get('/api/logs', (req, res) => {
+  try {
+    const linesCount = parseInt(req.query.lines, 10) || 200;
+    const logPath = getLogFilePath();
+
+    if (!fs.existsSync(logPath)) {
+      return res.json({ success: true, logs: ['[INFO] Log file is currently empty or not initialized yet.'], totalLines: 0, fileSizeKB: 0 });
+    }
+
+    const stat = fs.statSync(logPath);
+    // Read up to last 256KB of the log file for instant response
+    const maxReadBytes = 256 * 1024;
+    const startPos = Math.max(0, stat.size - maxReadBytes);
+    const readLength = stat.size - startPos;
+    const buffer = Buffer.alloc(readLength);
+    const fd = fs.openSync(logPath, 'r');
+    fs.readSync(fd, buffer, 0, readLength, startPos);
+    fs.closeSync(fd);
+
+    const text = buffer.toString('utf8');
+    const allLines = text.split(/\r?\n/).filter(l => l.trim().length > 0);
+    const sliced = allLines.slice(-linesCount);
+
+    return res.json({
+      success: true,
+      logs: sliced,
+      totalLines: allLines.length,
+      fileSizeKB: Math.round(stat.size / 1024),
+    });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Server-Sent Events (SSE) Live Log Streaming
+app.get('/api/logs/stream', (req, res) => {
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    'Connection': 'keep-alive',
+    'Access-Control-Allow-Origin': '*',
+  });
+  res.write(': connected\n\n');
+
+  const logPath = getLogFilePath();
+  let lastSize = 0;
+  if (fs.existsSync(logPath)) {
+    lastSize = fs.statSync(logPath).size;
+  }
+
+  // Poll for file changes every 1.5s (only while browser client is connected)
+  const interval = setInterval(() => {
+    try {
+      if (res.destroyed || res.writableEnded) {
+        clearInterval(interval);
+        return;
+      }
+      if (!fs.existsSync(logPath)) return;
+      const curSize = fs.statSync(logPath).size;
+      if (curSize > lastSize) {
+        const readLen = curSize - lastSize;
+        const buf = Buffer.alloc(readLen);
+        const fd = fs.openSync(logPath, 'r');
+        fs.readSync(fd, buf, 0, readLen, lastSize);
+        fs.closeSync(fd);
+        lastSize = curSize;
+
+        const newText = buf.toString('utf8');
+        const lines = newText.split(/\r?\n/).filter(l => l.trim().length > 0);
+        if (lines.length > 0) {
+          res.write(`data: ${JSON.stringify({ lines })}\n\n`);
+        }
+      } else if (curSize < lastSize) {
+        // File was rotated or cleared
+        lastSize = curSize;
+      }
+    } catch {}
+  }, 1500);
+
+  // Heartbeat ping every 15s to keep connection alive through NAT / reverse proxies
+  const heartbeat = setInterval(() => {
+    if (res.destroyed || res.writableEnded) {
+      clearInterval(heartbeat);
+      return;
+    }
+    res.write(': ping\n\n');
+  }, 15000);
+
+  req.on('close', () => {
+    clearInterval(interval);
+    clearInterval(heartbeat);
+  });
+});
+
+// Download Raw Log File
+app.get('/api/logs/download', (req, res) => {
+  try {
+    const logPath = getLogFilePath();
+    if (!fs.existsSync(logPath)) {
+      return res.status(404).send('No log file found.');
+    }
+    const filename = `msm-getter-${new Date().toISOString().slice(0, 10)}.log`;
+    res.download(logPath, filename);
+  } catch (err) {
+    res.status(500).send(err.message);
+  }
+});
+
+// Dedicated Web Log Viewer GUI
+app.get('/logs', (req, res) => {
+  res.send(`<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MSM Getter — Live Log Console</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { background-color: #0B0F17; color: #E2E8F0; font-family: ui-sans-serif, system-ui, sans-serif; }
+    .glow-box { box-shadow: 0 0 25px rgba(56, 189, 248, 0.08); }
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: #0F172A; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #475569; }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col p-3 sm:p-6 max-w-7xl mx-auto w-full space-y-4">
+  <!-- Top Navigation & Header -->
+  <header class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-3 border-b border-slate-800">
+    <div class="flex items-center gap-3">
+      <div class="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-sky-500/10 text-sky-400 border border-sky-500/20">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7"></path></svg>
+      </div>
+      <div>
+        <h1 class="text-lg font-black tracking-tight text-white flex items-center gap-2">
+          MSM Getter <span class="text-xs font-mono font-normal px-2 py-0.5 rounded bg-sky-500/10 text-sky-400 border border-sky-500/20">Live Console</span>
+        </h1>
+        <p class="text-xs text-slate-400">Telegram MTProto Cloud Streaming Server Logs</p>
+      </div>
+    </div>
+    
+    <!-- Navigation Tabs -->
+    <nav class="flex items-center gap-2">
+      <a href="/auth" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800/80 transition">
+        🔑 Auth Portal
+      </a>
+      <a href="/logs" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-sky-400 bg-sky-500/10 border border-sky-500/20 transition">
+        📄 Live Logs
+      </a>
+      <a href="/api/logs/download" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 bg-slate-800 hover:bg-slate-700 border border-slate-700 transition flex items-center gap-1.5">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+        Download .log
+      </a>
+    </nav>
+  </header>
+
+  <!-- Live System Metrics Bar -->
+  <div class="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
+    <div class="p-3 rounded-xl bg-slate-900 border border-slate-800/80">
+      <span class="text-[10px] text-slate-400 font-semibold block uppercase tracking-wider">Status</span>
+      <div class="flex items-center gap-2 mt-1">
+        <span id="metricDot" class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+        <span id="metricStatus" class="text-xs font-bold text-emerald-400">Online</span>
+      </div>
+    </div>
+    <div class="p-3 rounded-xl bg-slate-900 border border-slate-800/80">
+      <span class="text-[10px] text-slate-400 font-semibold block uppercase tracking-wider">Uptime</span>
+      <span id="metricUptime" class="text-xs font-bold font-mono text-white mt-1 block">--</span>
+    </div>
+    <div class="p-3 rounded-xl bg-slate-900 border border-slate-800/80">
+      <span class="text-[10px] text-slate-400 font-semibold block uppercase tracking-wider">Node RAM (RSS)</span>
+      <span id="metricRam" class="text-xs font-bold font-mono text-sky-400 mt-1 block">-- MB</span>
+    </div>
+    <div class="p-3 rounded-xl bg-slate-900 border border-slate-800/80">
+      <span class="text-[10px] text-slate-400 font-semibold block uppercase tracking-wider">Active Streams</span>
+      <span id="metricStreams" class="text-xs font-bold font-mono text-white mt-1 block">0 active</span>
+    </div>
+    <div class="p-3 rounded-xl bg-slate-900 border border-slate-800/80 col-span-2 sm:col-span-1">
+      <span class="text-[10px] text-slate-400 font-semibold block uppercase tracking-wider">Log File Size</span>
+      <span id="metricLogSize" class="text-xs font-bold font-mono text-slate-300 mt-1 block">-- KB</span>
+    </div>
+  </div>
+
+  <!-- Terminal Controls & Filters -->
+  <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 pt-1">
+    <div class="flex flex-wrap items-center gap-1.5 text-xs font-medium">
+      <button onclick="setFilter('')" id="btnFilterAll" class="px-2.5 py-1 rounded-lg bg-sky-500/20 text-sky-300 border border-sky-400/30 font-bold transition">All</button>
+      <button onclick="setFilter('[STREAM')" id="btnFilterStream" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition">Streams</button>
+      <button onclick="setFilter('[TG]')" id="btnFilterTg" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition">Telegram</button>
+      <button onclick="setFilter('ERROR')" id="btnFilterError" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition">Errors</button>
+      <button onclick="setFilter('[SUPERVISOR]')" id="btnFilterSup" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition">Supervisor</button>
+    </div>
+
+    <div class="flex items-center gap-2.5 flex-1 sm:max-w-md justify-end">
+      <div class="relative flex-1">
+        <input id="searchInput" type="text" placeholder="Search logs (e.g. 1080p, Polis, docId)..." 
+          class="w-full bg-slate-900 border border-slate-800 focus:border-sky-400 rounded-lg px-3 py-1.5 text-xs text-white placeholder:text-slate-500 outline-none font-mono transition" />
+      </div>
+      <label class="flex items-center gap-1.5 text-xs text-slate-400 cursor-pointer select-none">
+        <input id="autoScroll" type="checkbox" checked class="rounded bg-slate-900 border-slate-700 text-sky-500 focus:ring-0" />
+        <span>Auto-scroll</span>
+      </label>
+      <button onclick="clearDisplay()" class="px-2.5 py-1 text-xs text-slate-400 hover:text-white bg-slate-900 hover:bg-slate-800 rounded-lg border border-slate-800 transition">
+        Clear
+      </button>
+    </div>
+  </div>
+
+  <!-- Terminal Window -->
+  <div class="relative flex-1 bg-slate-950 border border-slate-800/80 rounded-2xl overflow-hidden shadow-2xl glow-box flex flex-col min-h-[500px]">
+    <div class="bg-slate-900/90 border-b border-slate-800/80 px-4 py-2 flex items-center justify-between">
+      <div class="flex items-center gap-2">
+        <div class="flex gap-1.5">
+          <span class="w-3 h-3 rounded-full bg-rose-500/70 inline-block"></span>
+          <span class="w-3 h-3 rounded-full bg-amber-500/70 inline-block"></span>
+          <span class="w-3 h-3 rounded-full bg-emerald-500/70 inline-block"></span>
+        </div>
+        <span class="text-[11px] font-mono text-slate-400 ml-2">/tmp/msm-getter.log</span>
+      </div>
+      <div class="flex items-center gap-2 text-[11px] text-slate-400 font-mono">
+        <span id="lineCount">0 lines</span>
+        <span id="streamStatusBadge" class="inline-flex items-center gap-1 text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span> Live Stream
+        </span>
+      </div>
+    </div>
+
+    <!-- Output Body -->
+    <div id="terminalBody" class="p-4 overflow-y-auto flex-1 font-mono text-[11px] leading-relaxed space-y-0.5 select-text">
+      <div class="text-slate-500 italic">Connecting to live log stream...</div>
+    </div>
+  </div>
+
+  <script>
+    let rawLines = [];
+    let currentFilter = '';
+    const terminal = document.getElementById('terminalBody');
+    const autoScrollCheck = document.getElementById('autoScroll');
+    const searchInput = document.getElementById('searchInput');
+
+    function formatLine(line) {
+      const escaped = line.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      if (line.includes('[ERROR]') || line.includes('[FATAL]') || line.includes('Error:')) {
+        return '<div class="text-rose-400 bg-rose-500/5 px-1 rounded">' + escaped + '</div>';
+      } else if (line.includes('[WARN]')) {
+        return '<div class="text-amber-400 bg-amber-500/5 px-1 rounded">' + escaped + '</div>';
+      } else if (line.includes('[STREAM') || line.includes('[PIPELINE')) {
+        return '<div class="text-sky-300 bg-sky-500/5 px-1 rounded font-medium">' + escaped + '</div>';
+      } else if (line.includes('[SUPERVISOR')) {
+        return '<div class="text-emerald-400 bg-emerald-500/5 px-1 rounded font-medium">' + escaped + '</div>';
+      } else if (line.includes('[TG]') || line.includes('[AUTH')) {
+        return '<div class="text-purple-300 bg-purple-500/5 px-1 rounded">' + escaped + '</div>';
+      }
+      return '<div class="text-slate-300">' + escaped + '</div>';
+    }
+
+    function renderLines() {
+      const search = searchInput.value.toLowerCase();
+      const filtered = rawLines.filter(l => {
+        if (currentFilter && !l.includes(currentFilter)) return false;
+        if (search && !l.toLowerCase().includes(search)) return false;
+        return true;
+      });
+      terminal.innerHTML = filtered.map(formatLine).join('') || '<div class="text-slate-500 italic">No matching log lines.</div>';
+      document.getElementById('lineCount').textContent = filtered.length + ' lines';
+      if (autoScrollCheck.checked) {
+        terminal.scrollTop = terminal.scrollHeight;
+      }
+    }
+
+    function appendLines(newLines) {
+      rawLines.push(...newLines);
+      if (rawLines.length > 2000) rawLines = rawLines.slice(-1500);
+      renderLines();
+    }
+
+    function setFilter(filter) {
+      currentFilter = filter;
+      document.querySelectorAll('[id^="btnFilter"]').forEach(b => {
+        b.className = 'px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition';
+      });
+      if (!filter) document.getElementById('btnFilterAll').className = 'px-2.5 py-1 rounded-lg bg-sky-500/20 text-sky-300 border border-sky-400/30 font-bold transition';
+      else if (filter.includes('STREAM')) document.getElementById('btnFilterStream').className = 'px-2.5 py-1 rounded-lg bg-sky-500/20 text-sky-300 border border-sky-400/30 font-bold transition';
+      else if (filter.includes('TG')) document.getElementById('btnFilterTg').className = 'px-2.5 py-1 rounded-lg bg-purple-500/20 text-purple-300 border border-purple-400/30 font-bold transition';
+      else if (filter.includes('ERROR')) document.getElementById('btnFilterError').className = 'px-2.5 py-1 rounded-lg bg-rose-500/20 text-rose-300 border border-rose-400/30 font-bold transition';
+      else if (filter.includes('SUPERVISOR')) document.getElementById('btnFilterSup').className = 'px-2.5 py-1 rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 font-bold transition';
+      renderLines();
+    }
+
+    function clearDisplay() {
+      rawLines = [];
+      renderLines();
+    }
+
+    searchInput.addEventListener('input', renderLines);
+
+    // Initial log fetch
+    async function fetchInitialLogs() {
+      try {
+        const res = await fetch('/api/logs?lines=300');
+        const data = await res.json();
+        if (data.success && data.logs) {
+          rawLines = data.logs;
+          renderLines();
+        }
+      } catch (err) {
+        terminal.innerHTML = '<div class="text-rose-400">Failed to load initial logs: ' + err.message + '</div>';
+      }
+    }
+
+    // Connect Server-Sent Events (SSE)
+    function connectSSE() {
+      const badge = document.getElementById('streamStatusBadge');
+      const es = new EventSource('/api/logs/stream');
+      es.onopen = () => {
+        badge.className = 'inline-flex items-center gap-1 text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20';
+        badge.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span> Live Stream';
+      };
+      es.onmessage = (e) => {
+        try {
+          const data = JSON.parse(e.data);
+          if (data.lines && data.lines.length > 0) {
+            appendLines(data.lines);
+          }
+        } catch {}
+      };
+      es.onerror = () => {
+        badge.className = 'inline-flex items-center gap-1 text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20';
+        badge.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span> Reconnecting...';
+      };
+    }
+
+    // System Metrics Polling
+    async function pollMetrics() {
+      try {
+        const res = await fetch('/api/system/stats');
+        const d = await res.json();
+        document.getElementById('metricUptime').textContent = Math.floor(d.uptime / 3600) + 'h ' + Math.floor((d.uptime % 3600) / 60) + 'm ' + (d.uptime % 60) + 's';
+        document.getElementById('metricRam').textContent = (d.memory?.rssMB || 0) + ' MB';
+        document.getElementById('metricStreams').textContent = (d.activeStreams || 0) + ' active';
+        document.getElementById('metricLogSize').textContent = (d.logSizeKB || 0) + ' KB';
+        if (d.isConnected) {
+          document.getElementById('metricDot').className = 'w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse';
+          document.getElementById('metricStatus').textContent = 'Online';
+        } else {
+          document.getElementById('metricDot').className = 'w-2.5 h-2.5 rounded-full bg-rose-400';
+          document.getElementById('metricStatus').textContent = 'Offline';
+        }
+      } catch {}
+    }
+
+    fetchInitialLogs();
+    connectSSE();
+    pollMetrics();
+    setInterval(pollMetrics, 3000);
   </script>
 </body>
 </html>`);

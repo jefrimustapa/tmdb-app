@@ -41,6 +41,8 @@ import {
   SlidersHorizontal,
   Send,
   Trash2,
+  Terminal,
+  ExternalLink,
 } from 'lucide-react';
 
 type MobileCategory = 'playback' | 'display' | 'content' | 'system';
@@ -175,6 +177,7 @@ export const Settings: React.FC = () => {
     | 'engine-priority'
     | 'engine-telegram'
     | 'telegram-msm32'
+    | 'telegram-logs'
     | 'telegram-url'
     | 'telegram-chunk'
     | 'telegram-country'
@@ -225,6 +228,54 @@ export const Settings: React.FC = () => {
         .finally(() => setTestingMsm32(false));
     }
   }, [activeDrawer, settings?.msm32GetterUrl]);
+
+  // Server Logs Viewer State
+  const [serverLogs, setServerLogs] = useState<string[]>([]);
+  const [loadingServerLogs, setLoadingServerLogs] = useState(false);
+  const [serverLogSearch, setServerLogSearch] = useState('');
+  const [serverStats, setServerStats] = useState<{
+    uptime?: number;
+    isConnected?: boolean;
+    activeStreams?: number;
+    memory?: { rssMB: number; heapUsedMB: number };
+    logSizeKB?: number;
+  } | null>(null);
+  const [autoPollLogs, setAutoPollLogs] = useState(false);
+
+  const fetchServerLogs = async () => {
+    const baseUrl = (settings?.msm32GetterUrl || 'http://julietmike.net:3033').replace(/\/+$/, '');
+    setLoadingServerLogs(true);
+    try {
+      const [logsRes, statsRes] = await Promise.all([
+        fetch(`${baseUrl}/api/logs?lines=150`).then((r) => r.json()).catch(() => null),
+        fetch(`${baseUrl}/api/system/stats`).then((r) => r.json()).catch(() => null),
+      ]);
+      if (logsRes?.success && Array.isArray(logsRes.logs)) {
+        setServerLogs(logsRes.logs);
+      }
+      if (statsRes?.status === 'ok') {
+        setServerStats(statsRes);
+      }
+    } catch {
+      // ignore
+    } finally {
+      setLoadingServerLogs(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeDrawer === 'telegram-logs') {
+      fetchServerLogs();
+    }
+  }, [activeDrawer, settings?.msm32GetterUrl]);
+
+  useEffect(() => {
+    if (activeDrawer !== 'telegram-logs' || !autoPollLogs) return;
+    const interval = setInterval(() => {
+      fetchServerLogs();
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [activeDrawer, autoPollLogs, settings?.msm32GetterUrl]);
 
   const filterSentinelRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -1618,6 +1669,29 @@ export const Settings: React.FC = () => {
             )}
           </div>
 
+          {/* Navigation to Live Server Logs Drawer */}
+          <button
+            type="button"
+            onClick={() => setActiveDrawer('telegram-logs')}
+            className="w-full flex items-center justify-between p-3.5 rounded-xl bg-white/5 border border-white/10 hover:border-sky-400/50 hover:bg-white/10 transition-all text-left"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-sky-500/10 border border-sky-500/20 flex items-center justify-center text-sky-400 flex-shrink-0">
+                <Terminal className="w-4 h-4" />
+              </div>
+              <div className="space-y-0.5">
+                <span className="text-xs font-semibold text-white block">Live Server Logs &amp; Diagnostics</span>
+                <span className="text-[10px] text-gray-400">View real-time MTProto logs, memory &amp; active streams</span>
+              </div>
+            </div>
+            <div className="flex items-center gap-1.5 flex-shrink-0">
+              <span className="text-[10px] text-emerald-400 font-mono font-bold bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-400/20">
+                Logs
+              </span>
+              <ChevronRight className="w-4 h-4 text-gray-400" />
+            </div>
+          </button>
+
           {/* Quality Selection Button */}
           <button
             type="button"
@@ -1719,6 +1793,119 @@ export const Settings: React.FC = () => {
           <p className="text-[11px] text-gray-400 leading-relaxed">
             The MSM Getter microservice executes queries against the Telegram bot <span className="text-sky-300 font-mono">@msm32bot</span>, resolving file documents and generating chunked HTTP byte-range streams directly into the custom player.
           </p>
+        </div>
+      </SettingsDrawer>
+
+      {/* 3a-TG-LOGS. Sub-Drawer: Live Server Logs & Diagnostics Console */}
+      <SettingsDrawer
+        isOpen={activeDrawer === 'telegram-logs'}
+        onClose={() => setActiveDrawer(null)}
+        onBack={() => setActiveDrawer('telegram-msm32')}
+        title="Server Logs & Console"
+        subtitle={`Live diagnostic logs from ${settings.msm32GetterUrl || 'http://julietmike.net:3033'}`}
+        categoryLabel="Telegram > MSM32bot > Server Logs"
+      >
+        <div className="space-y-3">
+          {/* Live Metrics Chips */}
+          <div className="grid grid-cols-3 gap-2">
+            <div className="p-2.5 rounded-xl bg-white/5 border border-white/10 text-center">
+              <span className="text-[9px] text-gray-400 block uppercase tracking-wider font-semibold">Status</span>
+              <span className={`text-xs font-bold font-mono mt-0.5 block ${serverStats?.isConnected ? 'text-emerald-400' : 'text-amber-400'}`}>
+                {serverStats?.isConnected ? 'Online' : 'Standby'}
+              </span>
+            </div>
+            <div className="p-2.5 rounded-xl bg-white/5 border border-white/10 text-center">
+              <span className="text-[9px] text-gray-400 block uppercase tracking-wider font-semibold">Memory (RSS)</span>
+              <span className="text-xs font-bold font-mono text-sky-400 mt-0.5 block">
+                {serverStats?.memory?.rssMB ? `${serverStats.memory.rssMB} MB` : '--'}
+              </span>
+            </div>
+            <div className="p-2.5 rounded-xl bg-white/5 border border-white/10 text-center">
+              <span className="text-[9px] text-gray-400 block uppercase tracking-wider font-semibold">Active Streams</span>
+              <span className="text-xs font-bold font-mono text-white mt-0.5 block">
+                {serverStats?.activeStreams !== undefined ? `${serverStats.activeStreams}` : '0'}
+              </span>
+            </div>
+          </div>
+
+          {/* Action Row: Open Web GUI & Auto-Poll */}
+          <div className="flex items-center justify-between gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                const target = `${(settings.msm32GetterUrl || 'http://julietmike.net:3033').replace(/\/+$/, '')}/logs`;
+                window.open(target, '_blank');
+              }}
+              className="px-3 py-1.5 rounded-lg bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 border border-sky-500/20 text-xs font-semibold flex items-center gap-1.5 transition-colors"
+            >
+              <ExternalLink className="w-3.5 h-3.5" />
+              <span>Open Web Console</span>
+            </button>
+
+            <div className="flex items-center gap-2">
+              <label className="flex items-center gap-1.5 text-[11px] text-gray-400 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={autoPollLogs}
+                  onChange={(e) => setAutoPollLogs(e.target.checked)}
+                  className="rounded bg-black/40 border-white/20 text-sky-500 focus:ring-0"
+                />
+                <span>Auto-poll (3s)</span>
+              </label>
+
+              <button
+                type="button"
+                disabled={loadingServerLogs}
+                onClick={fetchServerLogs}
+                className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-gray-300 border border-white/10 transition-colors disabled:opacity-50"
+                title="Refresh Logs"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${loadingServerLogs ? 'animate-spin' : ''}`} />
+              </button>
+            </div>
+          </div>
+
+          {/* Search Input */}
+          <div className="relative">
+            <input
+              type="text"
+              value={serverLogSearch}
+              onChange={(e) => setServerLogSearch(e.target.value)}
+              placeholder="Search logs (STREAM, ERROR, docId)..."
+              className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-white font-mono placeholder:text-gray-600 focus:outline-none focus:border-sky-400/80 transition-colors"
+            />
+          </div>
+
+          {/* Terminal Box */}
+          <div className="p-3 bg-black/80 border border-white/10 rounded-xl font-mono text-[10px] leading-relaxed max-h-[52vh] overflow-y-auto space-y-1 select-text">
+            {loadingServerLogs && serverLogs.length === 0 ? (
+              <div className="text-gray-500 py-4 text-center">Loading logs from microservice...</div>
+            ) : serverLogs.length === 0 ? (
+              <div className="text-gray-500 py-4 text-center">No logs available. Ensure server is online.</div>
+            ) : (
+              serverLogs
+                .filter((l) => !serverLogSearch || l.toLowerCase().includes(serverLogSearch.toLowerCase()))
+                .map((line, idx) => {
+                  let color = 'text-gray-300';
+                  if (line.includes('[ERROR]') || line.includes('[FATAL]') || line.includes('Error:')) {
+                    color = 'text-rose-400 font-semibold';
+                  } else if (line.includes('[WARN]')) {
+                    color = 'text-amber-400';
+                  } else if (line.includes('[STREAM') || line.includes('[PIPELINE')) {
+                    color = 'text-sky-300 font-semibold';
+                  } else if (line.includes('[SUPERVISOR')) {
+                    color = 'text-emerald-400';
+                  } else if (line.includes('[TG]') || line.includes('[AUTH')) {
+                    color = 'text-purple-300';
+                  }
+                  return (
+                    <div key={idx} className={`${color} break-all`}>
+                      {line}
+                    </div>
+                  );
+                })
+            )}
+          </div>
         </div>
       </SettingsDrawer>
 
