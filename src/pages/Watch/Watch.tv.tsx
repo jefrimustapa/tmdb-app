@@ -13,6 +13,7 @@ import { isAseanMedia, isKoreanMedia } from '../../services/lariMappingService';
 import { ArrowLeft, SkipForward, SkipBack, Settings, FastForward, Rewind } from 'lucide-react';
 
 import type { VirtualCursorStyle, StreamResolverType } from '../../types/db';
+import type { OriginCountryCode } from '../../types/stream';
 
 
 export const Watch: React.FC = () => {
@@ -30,6 +31,7 @@ export const Watch: React.FC = () => {
   const [activeServerLabel, setActiveServerLabel] = useState<string>('');
   const [userSelectedProvider, setUserSelectedProvider] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [telegramProviderCountries, setTelegramProviderCountries] = useState<Record<string, OriginCountryCode[]> | undefined>(undefined);
 
   const [cursorActive, setCursorActive] = useState(false);
   const [cursorSettings, setCursorSettings] = useState<{
@@ -258,6 +260,9 @@ export const Watch: React.FC = () => {
           }
           if (s.enabledResolvers && s.enabledResolvers.length > 0) {
             setEnabledResolvers(s.enabledResolvers);
+          }
+          if (s.telegramProviderCountries) {
+            setTelegramProviderCountries(s.telegramProviderCountries);
           }
           if (s.subtitleFontSize !== undefined) {
             setSubtitleFontSize(s.subtitleFontSize);
@@ -957,6 +962,7 @@ export const Watch: React.FC = () => {
             isUserSelected={userSelectedProvider}
             details={details}
             originCountries={mediaOrigins}
+            telegramProviderCountries={telegramProviderCountries}
             releaseYear={releaseYear}
             originalTitle={details.original_title || details.original_name}
             onProviderChange={(p) => {

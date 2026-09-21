@@ -93,7 +93,8 @@ class Msm32MappingService {
     year?: number | string,
     season?: number,
     episode?: number,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    force?: boolean
   ): Promise<Msm32ResolveResult | null> {
     if (signal?.aborted) {
       console.log(`[MSM32] Resolution aborted prior to request for "${title}"`);
@@ -104,8 +105,8 @@ class Msm32MappingService {
     if (signal?.aborted) return null;
 
     const controller = new AbortController();
-    // Allow up to 35 seconds to accommodate cold starts on free containers
-    const timer = setTimeout(() => controller.abort(), 35000);
+    // Allow up to 45 seconds to accommodate sequential MTProto queue and bot dispatches
+    const timer = setTimeout(() => controller.abort(), 45000);
 
     const onExternalAbort = () => {
       clearTimeout(timer);
@@ -125,6 +126,7 @@ class Msm32MappingService {
       if (typeof season === 'number' && !isNaN(season)) params.append('season', String(season));
       if (typeof episode === 'number' && !isNaN(episode)) params.append('episode', String(episode));
       params.append('maxQuality', maxQuality);
+      if (force) params.append('force', 'true');
 
       const res = await fetch(`${baseUrl}/api/resolve?${params.toString()}`, {
         signal: controller.signal,

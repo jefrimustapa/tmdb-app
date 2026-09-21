@@ -99,15 +99,26 @@ function normalizeTitle(str) {
 // Helper: Extract sequel number / identifier from a title string (e.g. "Polis Evo 2" -> 2, "Polis Evo III" -> 3)
 function extractSequelInfo(str) {
   if (!str) return null;
-  const s = ` ${str.toLowerCase()} `;
+  // Clean out common false positive patterns:
+  // 1. Bot search results headers: "8 results for..."
+  // 2. Audio channel descriptions: "AAC 2.0", "DD 5.1", "2.0", "5.1"
+  // 3. Pagination tags: "(1/1)", "(2/2)"
+  const cleaned = str
+    .replace(/\b\d+\s*results\b/gi, ' ')
+    .replace(/\b(aac|ac3|eac3|dts|ddp|flac|audio)?\s*[257]\.[01]\b/gi, ' ')
+    .replace(/\b\d+\/\d+\b/g, ' ')
+    .replace(/\b(19\d\d|20[0-3]\d)\b/g, ' '); // Strip 4-digit years so "2025" isn't confused
+
+  const s = ` ${cleaned.toLowerCase()} `;
   // Roman numerals: ii -> 2, iii -> 3, iv -> 4, v -> 5, vi -> 6
   const romanMatch = s.match(/\b(?:part|chapter|musim|season)?\s*(ii|iii|iv|v|vi)\b/i);
   if (romanMatch) {
     const map = { ii: 2, iii: 3, iv: 4, v: 5, vi: 6 };
     return map[romanMatch[1].toLowerCase()] || null;
   }
-  // Explicit Arabic numbers: e.g. " 2 ", " 3 ", " 4 ", "part 2", "part 3", "2.0"
-  const numMatch = s.match(/\b(?:part|chapter|musim|season)?\s*([2-9])(?:\.0)?\b/i);
+  // Explicit Arabic numbers: e.g. " 2 ", " 3 ", " 4 ", "part 2", "part 3"
+  const numMatch = s.match(/\b(?:part|chapter|musim|season)\s*([2-9])\b/i) ||
+                   s.match(/\b([2-9])\b/);
   if (numMatch) {
     return parseInt(numMatch[1], 10);
   }
@@ -952,6 +963,20 @@ app.get('/api/debug-search', async (req, res) => {
   }
 });
 
+// Cache management endpoints
+app.post('/api/cache/clear', (req, res) => {
+  db.clear();
+  return res.json({ success: true, message: 'Central database cache cleared' });
+});
+
+app.get('/api/cache/evict', (req, res) => {
+  const { key, docId } = req.query;
+  let evicted = false;
+  if (key) evicted = db.delete(key) || evicted;
+  if (docId) evicted = db.deleteByDocId(docId) || evicted;
+  return res.json({ success: true, evicted, key, docId });
+});
+
 // Resolver endpoint: /api/resolve?title=Kelas+Cikgu+Hiragi&season=1&episode=1
 app.get('/api/resolve', async (req, res) => {
   const { title, year, season, episode, maxQuality = '720', force, refresh } = req.query;
@@ -1260,7 +1285,7 @@ app.get('/api/resolve', async (req, res) => {
       } else {
         // Movie validation: Sequel and Release Year Alignment
         const targetSequel = extractSequelInfo(title);
-        const btnSequel = extractSequelInfo(btnText) || extractSequelInfo(msgText);
+        const btnSequel = extractSequelInfo(btnText);
         if (targetSequel) {
           if (btnSequel === targetSequel) {
             score += 150; // Strong reward for matching target sequel number
@@ -1456,7 +1481,32 @@ app.get('/api/resolve', async (req, res) => {
     const authUrl = authRes.url;
     console.log('[RESOLVE] Authorized URL generated successfully.');
 
-    // Execute Ad-Gate HTTP handshake
+    // Execute Ad-Gate HTTP handshake with automatic retry for transient Cloudflare / network timeouts
+    async function axiosWithRetry(fn, desc, maxRetries = 2, delayMs = 1000) {
+      let lastErr;
+      for (let attempt = 1; attempt <= maxRetries + 1; attempt++) {
+        try {
+          return await fn();
+        } catch (err) {
+          lastErr = err;
+          const isNetworkOrTimeout = err.code === 'ECONNABORTED' ||
+                                     err.code === 'ETIMEDOUT' ||
+                                     err.code === 'ECONNRESET' ||
+                                     err.code === 'EAI_AGAIN' ||
+                                     err.code === 'ENOTFOUND' ||
+                                     (err.response && err.response.status >= 500);
+          if (attempt <= maxRetries && isNetworkOrTimeout) {
+            console.warn(`[RESOLVE RETRY] ${desc} attempt ${attempt} failed (${err.code || err.message}). Retrying in ${delayMs}ms...`);
+            await new Promise(r => setTimeout(r, delayMs));
+            delayMs = Math.round(delayMs * 1.5);
+          } else {
+            throw err;
+          }
+        }
+      }
+      throw lastErr;
+    }
+
     const cookieMap = new Map();
     function processSetCookies(header) {
       if (!header) return;
@@ -1469,25 +1519,35 @@ app.get('/api/resolve', async (req, res) => {
     }
 
     console.log(`[RESOLVE] Stepping through ad-gate: ${authUrl}...`);
-    const step1 = await axios.get(authUrl, {
-      maxRedirects: 0,
-      timeout: 10000,
-      validateStatus: (s) => s >= 200 && s < 400,
-      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
-    });
+    const step1 = await axiosWithRetry(
+      () => axios.get(authUrl, {
+        maxRedirects: 0,
+        timeout: 25000,
+        validateStatus: (s) => s >= 200 && s < 400,
+        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
+      }),
+      'Step 1 (ad-gate auth)',
+      2,
+      1000
+    );
     processSetCookies(step1.headers['set-cookie']);
 
     const redirectPath = step1.headers['location'] || (authUrl.match(/\/link\/[^\s&?]+/)?.[0] || '/');
     const targetUrl = new URL(redirectPath, authUrl).toString();
 
-    const step2 = await axios.get(targetUrl, {
-      timeout: 10000,
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        Cookie: Array.from(cookieMap.entries()).map(([k, v]) => `${k}=${v}`).join('; '),
-        Referer: authUrl,
-      },
-    });
+    const step2 = await axiosWithRetry(
+      () => axios.get(targetUrl, {
+        timeout: 25000,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          Cookie: Array.from(cookieMap.entries()).map(([k, v]) => `${k}=${v}`).join('; '),
+          Referer: authUrl,
+        },
+      }),
+      'Step 2 (target page)',
+      2,
+      1000
+    );
     processSetCookies(step2.headers['set-cookie']);
 
     const html = step2.data || '';
@@ -1505,24 +1565,40 @@ app.get('/api/resolve', async (req, res) => {
         file_shortcode: shortcode,
       });
 
-      await axios.post('https://go.msmbot.club/wp-admin/admin-ajax.php', postData.toString(), {
-        timeout: 10000,
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-          Cookie: Array.from(cookieMap.entries()).map(([k, v]) => `${k}=${v}`).join('; '),
-          Referer: targetUrl,
-        },
-      });
+      try {
+        const ajaxRes = await axiosWithRetry(
+          () => axios.post('https://go.msmbot.club/wp-admin/admin-ajax.php', postData.toString(), {
+            timeout: 25000,
+            headers: {
+              'Content-Type': 'application/x-www-form-urlencoded',
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+              Cookie: Array.from(cookieMap.entries()).map(([k, v]) => `${k}=${v}`).join('; '),
+              Referer: targetUrl,
+            },
+          }),
+          'msmbot_getfile ajax',
+          2,
+          1000
+        );
+        console.log(`[RESOLVE] msmbot_getfile response: ${JSON.stringify(ajaxRes.data || 'ok')}`);
+        if (ajaxRes.data?.data?.description === 'forward_failed' || (ajaxRes.data?.data && ajaxRes.data.data.ok === false)) {
+          const err = new Error(`Media forward failed on @msm32bot for "${queryTitle}" (source file deleted or inaccessible on Telegram)`);
+          err.status = 404;
+          throw err;
+        }
+      } catch (postErr) {
+        if (postErr.status === 404) throw postErr;
+        console.warn(`[RESOLVE WARN] msmbot_getfile request issue (${postErr.message}). Checking Telegram chat for delivery anyway...`);
+      }
     }
 
     console.log(`[RESOLVE] Waiting for media delivery from @msm32bot (newer than msgId: ${sentMsgId})...`);
     let deliveredDoc = null;
     let filename = chosenFilename || queryTitle;
 
-    for (let attempt = 0; attempt < 8; attempt++) {
+    for (let attempt = 0; attempt < 15; attempt++) {
       await new Promise(r => setTimeout(r, 2000));
-      const incoming = await client.getMessages('msm32bot', { limit: 5 });
+      const incoming = await client.getMessages('msm32bot', { limit: 10 });
       for (const im of incoming) {
         if (im.id > sentMsgId && im.media?.document) {
           deliveredDoc = im.media.document;
@@ -1664,42 +1740,55 @@ async function refreshDocumentFileReference(client, targetDoc) {
       console.warn('[FILE_REF RECOVERY] Chat scan error:', scanErr.message);
     }
 
-    // 2. If not found in recent chat, search by filename or queryKey via bot
+    // 2. If not found in recent chat, search by clean title or queryKey via bot
     const dbRecord = db.getByDocId(docIdStr);
     if (dbRecord) {
-      const searchTerm = dbRecord.filename
-        ? dbRecord.filename.replace(/\.mp4|\.mkv|\.avi/gi, '').replace(/[^\w\s]/gi, ' ').replace(/\s+/g, ' ').trim()
-        : dbRecord.queryKey;
+      let searchTerm = '';
+      if (dbRecord.queryKey) {
+        searchTerm = dbRecord.queryKey.replace(/_(?:720|1080)p$/i, '').trim();
+      } else if (dbRecord.filename) {
+        searchTerm = dbRecord.filename
+          .replace(/^[#\[][^\]\s]+[\]\s]*/g, '') // remove #NPRH22 or [Group]
+          .replace(/\.(mp4|mkv|avi)$/i, '')
+          .replace(/[\._\-]/g, ' ')
+          .replace(/[^\w\s]/g, ' ')
+          .replace(/\s+/g, ' ')
+          .trim();
+      }
 
       if (searchTerm) {
         console.log(`[FILE_REF RECOVERY] Re-querying bot with: "${searchTerm}" for Doc ID: ${docIdStr}...`);
         try {
-          await client.sendMessage('msm32bot', { message: searchTerm });
-          await new Promise(r => setTimeout(r, 2000));
-          const msgs = await client.getMessages('msm32bot', { limit: 15 });
-          for (const m of msgs) {
-            if (m.media?.document?.id?.toString() === docIdStr) {
-              const freshRef = m.media.document.fileReference;
-              if (freshRef) {
-                console.log(`[FILE_REF RECOVERY] Successfully refreshed fileReference via bot re-query!`);
-                if (dbRecord.queryKey) {
-                  db.set(dbRecord.queryKey, {
-                    ...dbRecord,
-                    fileReference: freshRef.toString('hex'),
-                    createdAt: Date.now(),
-                  });
+          await queueTelegramTask(async () => {
+            await client.sendMessage('msm32bot', { message: searchTerm });
+            await new Promise(r => setTimeout(r, 2500));
+            const msgs = await client.getMessages('msm32bot', { limit: 20 });
+            for (const m of msgs) {
+              if (m.media?.document?.id?.toString() === docIdStr) {
+                const freshRef = m.media.document.fileReference;
+                if (freshRef) {
+                  console.log(`[FILE_REF RECOVERY] Successfully refreshed fileReference via bot re-query!`);
+                  if (dbRecord.queryKey) {
+                    db.set(dbRecord.queryKey, {
+                      ...dbRecord,
+                      fileReference: freshRef.toString('hex'),
+                      createdAt: Date.now(),
+                    });
+                  }
+                  return freshRef;
                 }
-                return freshRef;
               }
             }
-          }
+            return null;
+          });
         } catch (qErr) {
           console.warn('[FILE_REF RECOVERY] Bot re-query error:', qErr.message);
         }
       }
     }
 
-    console.warn(`[FILE_REF RECOVERY] Unable to refresh fileReference for Doc ID: ${docIdStr}`);
+    console.warn(`[FILE_REF RECOVERY] Unable to refresh fileReference for Doc ID: ${docIdStr}. Evicting stale entry from DB...`);
+    db.deleteByDocId(docIdStr);
     return null;
   })().finally(() => {
     inFlightFileRefRefreshes.delete(docIdStr);

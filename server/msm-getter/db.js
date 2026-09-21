@@ -75,6 +75,38 @@ class CentralDatabase {
     return record;
   }
 
+  delete(queryKey) {
+    const existing = this.byQuery.get(queryKey);
+    if (existing) {
+      this.byQuery.delete(queryKey);
+      if (existing.docId) this.byDocId.delete(String(existing.docId));
+      this.save();
+      console.log(`[DB] Evicted cache entry: "${queryKey}" (Doc ID: ${existing.docId})`);
+      return true;
+    }
+    return false;
+  }
+
+  deleteByDocId(docId) {
+    const docIdStr = String(docId);
+    const existing = this.byDocId.get(docIdStr);
+    if (existing) {
+      this.byDocId.delete(docIdStr);
+      if (existing.queryKey) this.byQuery.delete(existing.queryKey);
+      this.save();
+      console.log(`[DB] Evicted record by Doc ID: ${docIdStr} ("${existing.queryKey}")`);
+      return true;
+    }
+    return false;
+  }
+
+  clear() {
+    this.byQuery.clear();
+    this.byDocId.clear();
+    this.save();
+    console.log('[DB] Cleared all cache records from central DB.');
+  }
+
   size() {
     return this.byDocId.size;
   }
