@@ -8,6 +8,7 @@ import { WatchSettingsModal, type WatchSettingsTab } from '../../components/play
 import { searchSubtitles, fetchAndParseSubtitle, type SubtitleTrack, type SubtitleCue } from '../../services/subtitleService';
 import { dbService } from '../../services/db';
 import type { StreamResolverType } from '../../types/db';
+import type { OriginCountryCode } from '../../types/stream';
 import { getProviderById, extractMediaOriginCountries, isProviderMatchingMedia } from '../../services/streamProviders';
 import { isAnimeMedia } from '../../services/animeMappingService';
 import { isAseanMedia, isKoreanMedia } from '../../services/lariMappingService';
@@ -33,6 +34,7 @@ export const Watch: React.FC = () => {
   const mediaType = (type === 'tv' ? 'tv' : 'movie') as 'movie' | 'tv';
 
   const [enabledResolvers, setEnabledResolvers] = useState<StreamResolverType[]>(['embed']);
+  const [telegramProviderCountries, setTelegramProviderCountries] = useState<Record<string, OriginCountryCode[]> | undefined>(undefined);
 
   const isKorean = useMemo(() => isKoreanMedia(details), [details]);
   const isAnime = useMemo(() => isAnimeMedia(details), [details]);
@@ -108,6 +110,9 @@ export const Watch: React.FC = () => {
           }
           if (s.enabledResolvers && s.enabledResolvers.length > 0) {
             setEnabledResolvers(s.enabledResolvers);
+          }
+          if (s.telegramProviderCountries) {
+            setTelegramProviderCountries(s.telegramProviderCountries);
           }
           if (s.streamHeaderTimeout !== undefined) {
             setHeaderTimeoutSeconds(s.streamHeaderTimeout);
@@ -723,6 +728,7 @@ export const Watch: React.FC = () => {
             isUserSelected={userSelectedProvider}
             details={details}
             originCountries={mediaOrigins}
+            telegramProviderCountries={telegramProviderCountries}
             releaseYear={releaseYear}
             originalTitle={details.original_title || details.original_name}
             onProviderChange={(p) => {
