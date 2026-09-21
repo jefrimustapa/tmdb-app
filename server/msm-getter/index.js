@@ -1581,7 +1581,13 @@ app.get('/api/resolve', async (req, res) => {
           1000
         );
         console.log(`[RESOLVE] msmbot_getfile response: ${JSON.stringify(ajaxRes.data || 'ok')}`);
+        if (ajaxRes.data?.data?.description === 'forward_failed' || (ajaxRes.data?.data && ajaxRes.data.data.ok === false)) {
+          const err = new Error(`Media forward failed on @msm32bot for "${queryTitle}" (source file deleted or inaccessible on Telegram)`);
+          err.status = 404;
+          throw err;
+        }
       } catch (postErr) {
+        if (postErr.status === 404) throw postErr;
         console.warn(`[RESOLVE WARN] msmbot_getfile request issue (${postErr.message}). Checking Telegram chat for delivery anyway...`);
       }
     }
