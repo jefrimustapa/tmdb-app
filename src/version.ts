@@ -2,12 +2,15 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20260921-0107';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-msm-getter-log-.20260921-0107';
+export const APP_BUILD_NUMBER = '20260921-0159';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.fix-msm-sequel-strea.20260921-0159';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
-export const APP_BRANCH = 'feat-msm-getter-log-';
-export const APP_CHANGELOG = `* fix(msm-getter): add TCP stream backpressure, auto-respawn supervisor, 256MB heap cap, and disable USB swap (#127)
+export const APP_BRANCH = 'fix-msm-sequel-strea';
+export const APP_CHANGELOG = `* fix(player): bump msm32 client cache to v2 and add sequel guard in player
+* fix(msm-getter): enforce sequel number and release year alignment in stream resolution
+* feat(settings): add real-time server log viewer web console and in-app diagnostics drawer (#128)
+* fix(msm-getter): add TCP stream backpressure, auto-respawn supervisor, 256MB heap cap, and disable USB swap (#127)
 * feat(settings): set default MSM server to julietmike.net and remove local PC preset (#126)
 * fix(msm-getter): relocate logs to RAM tmpfs, add 5MB auto-rotation, and isolate active streams by clientSession (#125)
 * perf: improve MSM Telegram 1080p stream buffering, seek latency, and router pipeline engine (#124)
@@ -18,7 +21,4 @@ export const APP_CHANGELOG = `* fix(msm-getter): add TCP stream backpressure, au
 * fix(player): resolve selected embed provider directly without Telegram waterfall (#119)
 * feat(telegram-msm): series pagination, settings restructure, cache clearing & player controls refinement (#118)
 * feat(tv): support play, pause, seek with remote control and OSD feedback in custom player (#117)
-* feat: remove torbox and private extractor engines, sync active server indicator to watch header (#116)
-* fix: prioritize original titles in pencuri candidate scoring and regional drama queries (#115)
-* feat: add debug-search endpoint in server/msm-getter
-* fix: prioritize 720p resolution for telegram provider and quality-aware caching (#114)`;
+* feat: remove torbox and private extractor engines, sync active server indicator to watch header (#116)`;
