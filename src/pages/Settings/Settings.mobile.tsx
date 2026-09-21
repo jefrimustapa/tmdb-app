@@ -3,7 +3,7 @@ import { dbService } from '../../services/db';
 import type { UserSettings, StreamResolverType } from '../../types/db';
 import { STREAM_PROVIDERS, CATEGORY_BADGE_CONFIG, ORIGIN_COUNTRY_LABELS } from '../../services/streamProviders';
 import type { OriginCountryCode } from '../../types/stream';
-import { msm32Service, type Msm32HealthResult } from '../../services/msm32MappingService';
+import { msm32Service, getMsmServerLabel, type Msm32HealthResult } from '../../services/msm32MappingService';
 import { useDevice } from '../../hooks/useDevice';
 import { Logo } from '../../components/common/Logo';
 import { APP_VERSION, APP_BUILD_NUMBER, APP_VERSION_FULL, APP_BUILD_CHANNEL, APP_CHANGELOG } from '../../version';
@@ -209,7 +209,7 @@ export const Settings: React.FC = () => {
   // Keep local msmUrlInput in sync with persisted settings
   useEffect(() => {
     if (settings?.msm32GetterUrl !== undefined) {
-      setMsmUrlInput(settings.msm32GetterUrl || 'https://msm-getter.onrender.com');
+      setMsmUrlInput(settings.msm32GetterUrl || 'https://www.julietmike.net:3033');
     }
   }, [settings?.msm32GetterUrl]);
 
@@ -1529,7 +1529,7 @@ export const Settings: React.FC = () => {
           {(() => {
             const enabledTg = settings.enabledTelegramProviders || ['telegram-msm32'];
             const isMsmEnabled = enabledTg.includes('telegram-msm32');
-            const displayUrl = (settings.msm32GetterUrl || 'https://msm-getter.onrender.com').replace(/^https?:\/\//, '');
+            const displayUrl = (settings.msm32GetterUrl || 'https://www.julietmike.net:3033').replace(/^https?:\/\//, '');
             return (
               <button
                 type="button"
@@ -1611,7 +1611,7 @@ export const Settings: React.FC = () => {
             </div>
             <div className="flex items-center gap-1.5 flex-shrink-0">
               <span className="text-[10px] text-sky-400 font-mono font-bold bg-sky-500/10 px-2 py-0.5 rounded border border-sky-400/20">
-                {settings.msm32GetterUrl?.includes('localhost') ? 'Local PC' : 'Render Cloud'}
+                {getMsmServerLabel(settings.msm32GetterUrl)}
               </span>
               <ChevronRight className="w-4 h-4 text-gray-400" />
             </div>
@@ -1877,18 +1877,18 @@ export const Settings: React.FC = () => {
         onClose={() => setActiveDrawer(null)}
         onBack={() => setActiveDrawer('telegram-msm32')}
         title="Microservice Endpoint URL"
-        subtitle="Configure backend server running Telegram MTProto client (Render cloud or local PC)."
+        subtitle="Configure backend server running Telegram MTProto client."
         categoryLabel="Telegram > MSM32bot > Endpoint URL"
       >
         <div className="space-y-4">
           <div className="p-3.5 rounded-xl bg-white/5 border border-white/10 space-y-3">
             <span className="text-xs font-semibold text-white block">Server Presets</span>
             <div className="space-y-2">
-              {/* Preset 1: julietmike.net (Default) */}
+              {/* Preset 1: www.julietmike.net (Default) */}
               <button
                 type="button"
                 onClick={() => {
-                  const jmUrl = 'http://julietmike.net:3033';
+                  const jmUrl = 'https://www.julietmike.net:3033';
                   msm32Service.clearCache();
                   setMsmUrlInput(jmUrl);
                   handleUpdate({ msm32GetterUrl: jmUrl });
@@ -1900,7 +1900,7 @@ export const Settings: React.FC = () => {
                     .finally(() => setTestingMsm32(false));
                 }}
                 className={`w-full p-3.5 rounded-xl border text-left transition-all flex items-center justify-between gap-3 ${
-                  (settings.msm32GetterUrl || 'http://julietmike.net:3033') === 'http://julietmike.net:3033'
+                  (settings.msm32GetterUrl || 'https://www.julietmike.net:3033') === 'https://www.julietmike.net:3033'
                     ? 'bg-sky-950/40 border-sky-400 text-white'
                     : 'bg-white/5 border-white/10 text-gray-400'
                 }`}
@@ -1909,54 +1909,14 @@ export const Settings: React.FC = () => {
                   <div className="flex items-center gap-2 mb-0.5">
                     <span className="font-bold text-xs text-white">julietmike.net</span>
                     <span className="text-[9px] text-sky-400 font-mono font-bold bg-sky-500/10 px-1.5 py-0.5 rounded border border-sky-400/20">
-                      Default
+                      Default (SSL)
                     </span>
                   </div>
-                  <p className="text-[10px] text-gray-400 font-mono truncate">http://julietmike.net:3033</p>
-                  <p className="text-[10px] text-gray-500 mt-1">Direct streaming on port 3033. High performance.</p>
+                  <p className="text-[10px] text-gray-400 font-mono truncate">https://www.julietmike.net:3033</p>
+                  <p className="text-[10px] text-gray-500 mt-1">Direct HTTPS streaming on port 3033. High performance.</p>
                 </div>
                 <div className={`w-5 h-5 rounded-full border flex items-center justify-center flex-shrink-0 ${
-                  (settings.msm32GetterUrl || 'http://julietmike.net:3033') === 'http://julietmike.net:3033'
-                    ? 'bg-sky-500 border-sky-400 text-black'
-                    : 'border-gray-600 bg-black/40 text-transparent'
-                }`}>
-                  <Check className="w-3 h-3 stroke-[3]" />
-                </div>
-              </button>
-
-              {/* Preset 2: Render Cloud */}
-              <button
-                type="button"
-                onClick={() => {
-                  const renderUrl = 'https://msm-getter.onrender.com';
-                  msm32Service.clearCache();
-                  setMsmUrlInput(renderUrl);
-                  handleUpdate({ msm32GetterUrl: renderUrl });
-                  setTestingMsm32(true);
-                  setMsm32TestResult(null);
-                  msm32Service.testConnection(renderUrl)
-                    .then((res) => setMsm32TestResult(res))
-                    .catch((err: any) => setMsm32TestResult({ ok: false, error: err?.message || 'Connection failed' }))
-                    .finally(() => setTestingMsm32(false));
-                }}
-                className={`w-full p-3.5 rounded-xl border text-left transition-all flex items-center justify-between gap-3 ${
-                  settings.msm32GetterUrl === 'https://msm-getter.onrender.com'
-                    ? 'bg-sky-950/40 border-sky-400 text-white'
-                    : 'bg-white/5 border-white/10 text-gray-400'
-                }`}
-              >
-                <div>
-                  <div className="flex items-center gap-2 mb-0.5">
-                    <span className="font-bold text-xs text-white">Render Cloud</span>
-                    <span className="text-[9px] text-gray-400 font-mono font-bold bg-white/10 px-1.5 py-0.5 rounded border border-white/20">
-                      Cloud
-                    </span>
-                  </div>
-                  <p className="text-[10px] text-gray-400 font-mono truncate">https://msm-getter.onrender.com</p>
-                  <p className="text-[10px] text-gray-500 mt-1">Hosted on Render. Auto spins down when idle.</p>
-                </div>
-                <div className={`w-5 h-5 rounded-full border flex items-center justify-center flex-shrink-0 ${
-                  settings.msm32GetterUrl === 'https://msm-getter.onrender.com'
+                  (settings.msm32GetterUrl || 'https://www.julietmike.net:3033') === 'https://www.julietmike.net:3033'
                     ? 'bg-sky-500 border-sky-400 text-black'
                     : 'border-gray-600 bg-black/40 text-transparent'
                 }`}>
@@ -1986,7 +1946,7 @@ export const Settings: React.FC = () => {
               }}
               onBlur={() => {
                 const trimmed = msmUrlInput.trim().replace(/\/+$/, '');
-                const finalUrl = trimmed || 'http://julietmike.net:3033';
+                const finalUrl = trimmed || 'https://www.julietmike.net:3033';
                 if (finalUrl !== settings.msm32GetterUrl) {
                   msm32Service.clearCache();
                   handleUpdate({ msm32GetterUrl: finalUrl });
@@ -1999,7 +1959,7 @@ export const Settings: React.FC = () => {
                     .finally(() => setTestingMsm32(false));
                 }
               }}
-              placeholder="https://msm-getter.onrender.com"
+              placeholder="https://www.julietmike.net:3033"
               className="w-full bg-black/40 border border-white/15 rounded-xl px-3.5 py-2.5 text-xs text-white font-mono placeholder:text-gray-600 focus:outline-none focus:border-sky-400/80 transition-colors"
             />
           </div>
