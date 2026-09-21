@@ -1,4 +1,6 @@
 import express from 'express';
+import http from 'http';
+import https from 'https';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
@@ -2128,11 +2130,61 @@ process.on('unhandledRejection', (reason) => {
   console.error('[UNHANDLED REJECTION]', reason);
 });
 
-app.listen(port, async () => {
-  console.log(`[SERVER] MSM Getter microservice listening on port ${port}`);
+// Locate SSL certificates (Let's Encrypt on Asuswrt or custom environment paths)
+const certCandidates = [
+  process.env.SSL_CERT_PATH,
+  '/etc/cert.pem',
+  '/jffs/.le/www.julietmike.net_ecc/fullchain.pem',
+  '/jffs/ssl/cert.pem',
+].filter(Boolean);
+
+const keyCandidates = [
+  process.env.SSL_KEY_PATH,
+  '/etc/key.pem',
+  '/jffs/.le/www.julietmike.net_ecc/domain.key',
+  '/jffs/ssl/key.pem',
+].filter(Boolean);
+
+const sslCertFile = certCandidates.find(p => fs.existsSync(p));
+const sslKeyFile = keyCandidates.find(p => fs.existsSync(p));
+
+let serverInstance;
+
+if (sslCertFile && sslKeyFile) {
   try {
-    await initTelegram();
-  } catch (err) {
-    console.warn(`[SERVER] Telegram not connected on startup (${err.message}). Web auth portal ready at /auth.`);
+    const sslOptions = {
+      key: fs.readFileSync(sslKeyFile),
+      cert: fs.readFileSync(sslCertFile),
+    };
+    serverInstance = https.createServer(sslOptions, app);
+    serverInstance.listen(port, async () => {
+      console.log(`[SERVER] MSM Getter microservice listening securely on HTTPS port ${port} (cert: ${sslCertFile})`);
+      try {
+        await initTelegram();
+      } catch (err) {
+        console.warn(`[SERVER] Telegram not connected on startup (${err.message}). Web auth portal ready at /auth.`);
+      }
+    });
+  } catch (sslErr) {
+    console.error('[SERVER SSL ERROR] Failed to initialize HTTPS server, falling back to HTTP:', sslErr);
+    serverInstance = http.createServer(app);
+    serverInstance.listen(port, async () => {
+      console.log(`[SERVER] MSM Getter microservice fallback listening on HTTP port ${port}`);
+      try {
+        await initTelegram();
+      } catch (err) {
+        console.warn(`[SERVER] Telegram not connected on startup (${err.message}). Web auth portal ready at /auth.`);
+      }
+    });
   }
-});
+} else {
+  serverInstance = http.createServer(app);
+  serverInstance.listen(port, async () => {
+    console.log(`[SERVER] MSM Getter microservice listening on HTTP port ${port}`);
+    try {
+      await initTelegram();
+    } catch (err) {
+      console.warn(`[SERVER] Telegram not connected on startup (${err.message}). Web auth portal ready at /auth.`);
+    }
+  });
+}

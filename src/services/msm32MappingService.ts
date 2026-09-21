@@ -34,15 +34,8 @@ class Msm32MappingService {
     const settings = await dbService.getSettings();
     let url = settings?.msm32GetterUrl?.trim();
     
-    // Automatically sanitize and enforce https for onrender.com
-    if (url && url.includes('onrender.com') && url.startsWith('http://')) {
-      url = url.replace('http://', 'https://');
-    }
-
-    // In native Capacitor or HTTPS web context, insecure http:// URLs get blocked by Chromium Mixed Content.
-    // If the configured URL is an unrouteable local IP or empty, default securely to Render Cloud.
     if (!url) {
-      url = 'http://julietmike.net:3033';
+      url = 'https://www.julietmike.net:3033';
     }
 
     return url.replace(/\/+$/, '');
@@ -186,3 +179,22 @@ class Msm32MappingService {
 }
 
 export const msm32Service = new Msm32MappingService();
+
+/**
+ * Returns a human-friendly label for the MSM server badge
+ */
+export function getMsmServerLabel(url?: string): string {
+  if (!url) return 'Default';
+  if (url.includes('julietmike.net')) {
+    return 'julietmike.net';
+  }
+  if (url.includes('localhost') || url.includes('127.0.0.1')) {
+    return 'Local PC';
+  }
+  try {
+    const parsed = new URL(url);
+    return parsed.hostname;
+  } catch {
+    return url;
+  }
+}
