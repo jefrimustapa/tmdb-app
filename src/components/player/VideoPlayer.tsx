@@ -49,11 +49,13 @@ interface VideoPlayerProps {
   customSubtitleFontSize?: number;
   details?: any;
   originCountries?: OriginCountryCode[];
+  telegramProviderCountries?: Record<string, OriginCountryCode[]>;
 }
 
 export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   details,
   originCountries,
+  telegramProviderCountries: initialTelegramCountries,
   mediaType,
   tmdbId,
   title,
@@ -104,7 +106,14 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const [topKoreanProviders, setTopKoreanProviders] = useState<string[]>(['kisskh-kdrama', 'cinesrc', 'moviesapi']);
   const [enabledResolvers, setEnabledResolvers] = useState<StreamResolverType[]>(['embed']);
   const [enabledTelegramProviders, setEnabledTelegramProviders] = useState<string[]>(['telegram-msm32']);
-  const [telegramProviderCountries, setTelegramProviderCountries] = useState<Record<string, OriginCountryCode[]>>({ 'telegram-msm32': ['MY', 'ID', 'SG'] });
+  const [telegramProviderCountries, setTelegramProviderCountries] = useState<Record<string, OriginCountryCode[]> | undefined>(initialTelegramCountries);
+
+  useEffect(() => {
+    if (initialTelegramCountries) {
+      setTelegramProviderCountries(initialTelegramCountries);
+    }
+  }, [initialTelegramCountries]);
+
   const [playbackCurrentTime, setPlaybackCurrentTime] = useState<number>(0);
 
   const effectiveOriginCountries = useMemo(() => {
@@ -327,7 +336,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
       // 0. TELEGRAM PROVIDER (MovieSubMalay MSM32)
       if (providerId === 'telegram-msm32' || provider.engine === 'telegram') {
-        if (!isTelegramOriginMatching) {
+        if (!isTelegramOriginMatching && !isUserSelected) {
           console.log(`[Resolver] Title origin (${effectiveOriginCountries.join(',') || 'unknown'}) is not within telegram-msm filter, skipping to next engine...`);
           if (enabledResolvers.includes('embed')) {
             const fallbackProvider = isAnime
@@ -735,7 +744,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       isMounted = false;
       abortController.abort();
     };
-  }, [enabledResolvers, tmdbId, title, mediaType, season, episode, activeAsean, providerId, releaseYear, originalTitle, topAnimeProviders, topAseanProviders, isUserSelected]);
+  }, [enabledResolvers, tmdbId, title, mediaType, season, episode, activeAsean, providerId, releaseYear, originalTitle, topAnimeProviders, topAseanProviders, isUserSelected, isTelegramOriginMatching]);
 
   const [resumeTimestamp, setResumeTimestamp] = useState<number>(initialTimestamp || 0);
   const [resolvedAnimeMapping, setResolvedAnimeMapping] = useState<ResolvedAnimeMapping | null>(null);

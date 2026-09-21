@@ -2,12 +2,14 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20260921-1403';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.fix-msm-getter-resol.20260921-1403';
+export const APP_BUILD_NUMBER = '20260921-1441';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.fix-msm-getter-resol.20260921-1441';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
 export const APP_BRANCH = 'fix-msm-getter-resol';
-export const APP_CHANGELOG = `* Merge pull request #131 from jefrimustapa/feat/default-https-julietmike
+export const APP_CHANGELOG = `* fix(msm-getter): add axiosWithRetry helper with backoff for ad-gate requests
+* fix(msm): fix false sequel penalty, extend ad-gate timeouts, and auto-evict expired stream refs
+* Merge pull request #131 from jefrimustapa/feat/default-https-julietmike
 * feat(msm): use https://www.julietmike.net:3033 as single default preset and remove onrender
 * feat(msm-getter): enable native HTTPS server with Let's Encrypt certificates
 * Revert "Merge pull request #130 from jefrimustapa/fix/msm-stream-resolution"
@@ -19,6 +21,4 @@ export const APP_CHANGELOG = `* Merge pull request #131 from jefrimustapa/feat/d
 * feat(settings): set default MSM server to julietmike.net and remove local PC preset (#126)
 * fix(msm-getter): relocate logs to RAM tmpfs, add 5MB auto-rotation, and isolate active streams by clientSession (#125)
 * perf: improve MSM Telegram 1080p stream buffering, seek latency, and router pipeline engine (#124)
-* fix(tv): fix D-pad remote navigation for all MSM32bot settings menus (#123)
-* feat(filter): include standalone word 'sex' in adult title filtering (#122)
-* feat(player): compact playback settings header and add persistent global subtitle font size adjustment (#121)`;
+* fix(tv): fix D-pad remote navigation for all MSM32bot settings menus (#123)`;
