@@ -2,13 +2,16 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20260921-0159';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.fix-msm-sequel-strea.20260921-0159';
+export const APP_BUILD_NUMBER = '20260921-1331';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-default-https-j.20260921-1331';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
-export const APP_BRANCH = 'fix-msm-sequel-strea';
-export const APP_CHANGELOG = `* fix(player): bump msm32 client cache to v2 and add sequel guard in player
-* fix(msm-getter): enforce sequel number and release year alignment in stream resolution
+export const APP_BRANCH = 'feat-default-https-j';
+export const APP_CHANGELOG = `* feat(msm-getter): enable native HTTPS server with Let's Encrypt certificates
+* Revert "Merge pull request #130 from jefrimustapa/fix/msm-stream-resolution"
+* Merge pull request #130 from jefrimustapa/fix/msm-stream-resolution
+* fix(msm): prevent false sequel penalties and handle bot message metadata in stream resolution
+* fix(msm): fix sequel stream matching, remove client cache, and auto-refresh expired telegram file references (#129)
 * feat(settings): add real-time server log viewer web console and in-app diagnostics drawer (#128)
 * fix(msm-getter): add TCP stream backpressure, auto-respawn supervisor, 256MB heap cap, and disable USB swap (#127)
 * feat(settings): set default MSM server to julietmike.net and remove local PC preset (#126)
@@ -18,7 +21,4 @@ export const APP_CHANGELOG = `* fix(player): bump msm32 client cache to v2 and a
 * feat(filter): include standalone word 'sex' in adult title filtering (#122)
 * feat(player): compact playback settings header and add persistent global subtitle font size adjustment (#121)
 * feat(anime): support multi-season and continuous episode offset mapping to MAL, replace TV tag with year in MySpace (#120)
-* fix(player): resolve selected embed provider directly without Telegram waterfall (#119)
-* feat(telegram-msm): series pagination, settings restructure, cache clearing & player controls refinement (#118)
-* feat(tv): support play, pause, seek with remote control and OSD feedback in custom player (#117)
-* feat: remove torbox and private extractor engines, sync active server indicator to watch header (#116)`;
+* fix(player): resolve selected embed provider directly without Telegram waterfall (#119)`;
