@@ -1481,7 +1481,32 @@ app.get('/api/resolve', async (req, res) => {
     const authUrl = authRes.url;
     console.log('[RESOLVE] Authorized URL generated successfully.');
 
-    // Execute Ad-Gate HTTP handshake
+    // Execute Ad-Gate HTTP handshake with automatic retry for transient Cloudflare / network timeouts
+    async function axiosWithRetry(fn, desc, maxRetries = 2, delayMs = 1000) {
+      let lastErr;
+      for (let attempt = 1; attempt <= maxRetries + 1; attempt++) {
+        try {
+          return await fn();
+        } catch (err) {
+          lastErr = err;
+          const isNetworkOrTimeout = err.code === 'ECONNABORTED' ||
+                                     err.code === 'ETIMEDOUT' ||
+                                     err.code === 'ECONNRESET' ||
+                                     err.code === 'EAI_AGAIN' ||
+                                     err.code === 'ENOTFOUND' ||
+                                     (err.response && err.response.status >= 500);
+          if (attempt <= maxRetries && isNetworkOrTimeout) {
+            console.warn(`[RESOLVE RETRY] ${desc} attempt ${attempt} failed (${err.code || err.message}). Retrying in ${delayMs}ms...`);
+            await new Promise(r => setTimeout(r, delayMs));
+            delayMs = Math.round(delayMs * 1.5);
+          } else {
+            throw err;
+          }
+        }
+      }
+      throw lastErr;
+    }
+
     const cookieMap = new Map();
     function processSetCookies(header) {
       if (!header) return;
@@ -1494,25 +1519,35 @@ app.get('/api/resolve', async (req, res) => {
     }
 
     console.log(`[RESOLVE] Stepping through ad-gate: ${authUrl}...`);
-    const step1 = await axios.get(authUrl, {
-      maxRedirects: 0,
-      timeout: 25000,
-      validateStatus: (s) => s >= 200 && s < 400,
-      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
-    });
+    const step1 = await axiosWithRetry(
+      () => axios.get(authUrl, {
+        maxRedirects: 0,
+        timeout: 25000,
+        validateStatus: (s) => s >= 200 && s < 400,
+        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
+      }),
+      'Step 1 (ad-gate auth)',
+      2,
+      1000
+    );
     processSetCookies(step1.headers['set-cookie']);
 
     const redirectPath = step1.headers['location'] || (authUrl.match(/\/link\/[^\s&?]+/)?.[0] || '/');
     const targetUrl = new URL(redirectPath, authUrl).toString();
 
-    const step2 = await axios.get(targetUrl, {
-      timeout: 25000,
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        Cookie: Array.from(cookieMap.entries()).map(([k, v]) => `${k}=${v}`).join('; '),
-        Referer: authUrl,
-      },
-    });
+    const step2 = await axiosWithRetry(
+      () => axios.get(targetUrl, {
+        timeout: 25000,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          Cookie: Array.from(cookieMap.entries()).map(([k, v]) => `${k}=${v}`).join('; '),
+          Referer: authUrl,
+        },
+      }),
+      'Step 2 (target page)',
+      2,
+      1000
+    );
     processSetCookies(step2.headers['set-cookie']);
 
     const html = step2.data || '';
@@ -1531,15 +1566,20 @@ app.get('/api/resolve', async (req, res) => {
       });
 
       try {
-        const ajaxRes = await axios.post('https://go.msmbot.club/wp-admin/admin-ajax.php', postData.toString(), {
-          timeout: 25000,
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-            Cookie: Array.from(cookieMap.entries()).map(([k, v]) => `${k}=${v}`).join('; '),
-            Referer: targetUrl,
-          },
-        });
+        const ajaxRes = await axiosWithRetry(
+          () => axios.post('https://go.msmbot.club/wp-admin/admin-ajax.php', postData.toString(), {
+            timeout: 25000,
+            headers: {
+              'Content-Type': 'application/x-www-form-urlencoded',
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+              Cookie: Array.from(cookieMap.entries()).map(([k, v]) => `${k}=${v}`).join('; '),
+              Referer: targetUrl,
+            },
+          }),
+          'msmbot_getfile ajax',
+          2,
+          1000
+        );
         console.log(`[RESOLVE] msmbot_getfile response: ${JSON.stringify(ajaxRes.data || 'ok')}`);
       } catch (postErr) {
         console.warn(`[RESOLVE WARN] msmbot_getfile request issue (${postErr.message}). Checking Telegram chat for delivery anyway...`);
