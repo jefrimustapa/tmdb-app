@@ -4,6 +4,7 @@ ENABLED=yes
 DESC="MSM Getter Microservice"
 APP_DIR=/opt/app/msm-getter
 PID_FILE=/opt/var/run/msm-getter.pid
+SUP_PID_FILE=/opt/var/run/msm-getter-sup.pid
 LOG_FILE=/tmp/msm-getter.log
 MAX_LOG_BYTES=5242880 # 5 MB cap
 
@@ -17,10 +18,31 @@ rotate_log() {
     fi
 }
 
+supervisor_loop() {
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] [SUPERVISOR] Starting supervisor loop (PID $$)..." >> "$LOG_FILE"
+    while [ -f "$SUP_PID_FILE" ]; do
+        rotate_log
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] [SUPERVISOR] Spawning node with 256MB heap limit..." >> "$LOG_FILE"
+        env LD_PRELOAD=/opt/lib/libfixmadvise.so /opt/bin/node --max-old-space-size=256 index.js >> "$LOG_FILE" 2>&1 &
+        NODE_PID=$!
+        echo $NODE_PID > "$PID_FILE"
+        wait $NODE_PID
+        EXIT_CODE=$?
+        rm -f "$PID_FILE"
+        if [ ! -f "$SUP_PID_FILE" ]; then
+            echo "[$(date '+%Y-%m-%d %H:%M:%S')] [SUPERVISOR] Clean shutdown requested. Exiting supervisor." >> "$LOG_FILE"
+            break
+        fi
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] [SUPERVISOR WARN] Node process terminated (exit code: $EXIT_CODE). Respawning in 3s..." >> "$LOG_FILE"
+        sleep 3
+    done
+    rm -f "$SUP_PID_FILE"
+}
+
 start() {
     echo -n "Starting $DESC... "
-    if [ -f "$PID_FILE" ] && kill -0 $(cat "$PID_FILE") 2>/dev/null; then
-        echo "already running."
+    if [ -f "$SUP_PID_FILE" ] && kill -0 $(cat "$SUP_PID_FILE") 2>/dev/null; then
+        echo "already running (Supervisor PID: $(cat $SUP_PID_FILE))."
         return 0
     fi
 
@@ -29,35 +51,58 @@ start() {
 
     # Ensure overcommit memory is enabled for V8 engine
     echo 1 > /proc/sys/vm/overcommit_memory
+    # Disable USB flash swap to prevent catastrophic kernel D-state stalls
+    swapoff -a 2>/dev/null
     mkdir -p /opt/var/run
 
     export PATH=/opt/bin:/opt/sbin:$PATH
     cd $APP_DIR
-    nohup env LD_PRELOAD=/opt/lib/libfixmadvise.so /opt/bin/node index.js >> $LOG_FILE 2>&1 &
-    PID=$!
-    echo $PID > "$PID_FILE"
-    echo "done (PID: $PID)."
+
+    # Initialize supervisor PID file
+    echo $$ > "$SUP_PID_FILE"
+    supervisor_loop &
+    SUP_PID=$!
+    echo $SUP_PID > "$SUP_PID_FILE"
+
+    # Give Node a brief moment to start and write PID
+    sleep 1
+    if [ -f "$PID_FILE" ]; then
+        echo "done (Supervisor: $SUP_PID, Node: $(cat $PID_FILE))."
+    else
+        echo "done (Supervisor: $SUP_PID)."
+    fi
 }
 
 stop() {
     echo -n "Stopping $DESC... "
-    if [ -f "$PID_FILE" ]; then
-        PID=$(cat "$PID_FILE")
-        kill $PID 2>/dev/null
-        rm -f "$PID_FILE"
-        echo "done."
-    else
-        killall node 2>/dev/null
-        echo "done."
+    # 1. Stop supervisor loop first so it will not respawn Node
+    if [ -f "$SUP_PID_FILE" ]; then
+        SUP_PID=$(cat "$SUP_PID_FILE")
+        rm -f "$SUP_PID_FILE"
+        kill $SUP_PID 2>/dev/null
     fi
+    # 2. Stop Node process
+    if [ -f "$PID_FILE" ]; then
+        NODE_PID=$(cat "$PID_FILE")
+        kill $NODE_PID 2>/dev/null
+        rm -f "$PID_FILE"
+    fi
+    # 3. Fallback cleanup for orphaned node processes
+    killall node 2>/dev/null
+    echo "done."
 }
 
 status() {
-    if [ -f "$PID_FILE" ] && kill -0 $(cat "$PID_FILE") 2>/dev/null; then
-        echo "$DESC is running (PID: $(cat $PID_FILE))."
+    if [ -f "$SUP_PID_FILE" ] && kill -0 $(cat "$SUP_PID_FILE") 2>/dev/null; then
+        SUP_PID=$(cat "$SUP_PID_FILE")
+        if [ -f "$PID_FILE" ] && kill -0 $(cat "$PID_FILE") 2>/dev/null; then
+            echo "$DESC is running (Supervisor PID: $SUP_PID, Node PID: $(cat $PID_FILE))."
+        else
+            echo "$DESC supervisor is running (PID: $SUP_PID), waiting for node process."
+        fi
         return 0
     elif pidof node >/dev/null 2>&1; then
-        echo "$DESC node process is running (PID: $(pidof node))."
+        echo "$DESC unmanaged node process is running (PID: $(pidof node))."
         return 0
     else
         echo "$DESC is stopped."
