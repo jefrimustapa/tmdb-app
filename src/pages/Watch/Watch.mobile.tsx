@@ -574,7 +574,6 @@ export const Watch: React.FC = () => {
                   }
                 }}
                 className="p-2 rounded-full bg-black/60 hover:bg-black/90 text-white/90 hover:text-white border border-white/15 transition active:scale-95 hover:scale-105 flex-shrink-0 tv-focus-target focus:outline-none focus:border-hbo-cyan focus:ring-2 focus:ring-hbo-cyan shadow-sm"
-                title="Go Back"
               >
                 <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5" />
               </button>
@@ -592,7 +591,6 @@ export const Watch: React.FC = () => {
                 id="watch-cast-btn"
                 data-watch-header-item="true"
                 aria-label="Cast to TV"
-                title="Cast Watch Page to TV"
                 tabIndex={0}
                 onKeyDown={(e) => {
                   if (e.key === 'ArrowRight') {
@@ -617,7 +615,6 @@ export const Watch: React.FC = () => {
                 id="watch-settings-btn"
                 data-watch-header-item="true"
                 aria-label="Playback Settings"
-                title="Playback Settings (Subtitles & Server)"
                 tabIndex={0}
                 onKeyDown={(e) => {
                   if (e.key === 'ArrowLeft') {
@@ -674,7 +671,6 @@ export const Watch: React.FC = () => {
                     onClick={handlePrevEpisode}
                     id="watch-prev-ep-btn"
                     data-watch-header-item="true"
-                    title={`Previous: S${prevEpisodeInfo.season} E${prevEpisodeInfo.episode}${prevEpisodeInfo.title ? ` - ${prevEpisodeInfo.title}` : ''}`}
                     aria-label={`Previous Episode: S${prevEpisodeInfo.season} E${prevEpisodeInfo.episode}`}
                     className="flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-full bg-black/60 hover:bg-white/15 text-white/80 hover:text-white border border-white/15 text-xs font-semibold shadow-sm transition active:scale-95 hover:scale-105"
                   >
@@ -689,7 +685,6 @@ export const Watch: React.FC = () => {
                     onClick={handleNextEpisode}
                     id="watch-next-ep-btn"
                     data-watch-header-item="true"
-                    title={`Next: S${nextEpisodeInfo.season} E${nextEpisodeInfo.episode}${nextEpisodeInfo.title ? ` - ${nextEpisodeInfo.title}` : ''}`}
                     aria-label={`Next Episode: S${nextEpisodeInfo.season} E${nextEpisodeInfo.episode}`}
                     className="flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-full bg-black/60 hover:bg-white/15 text-white/80 hover:text-white border border-white/15 text-xs font-semibold shadow-sm transition active:scale-95 hover:scale-105"
                   >

@@ -815,7 +815,6 @@ export const Watch: React.FC = () => {
                 aria-label="Back"
                 tabIndex={0}
                 className="p-2.5 rounded-full bg-black/70 hover:bg-black text-white border border-white/20 backdrop-blur-md transition hover:scale-110 flex-shrink-0 tv-focus-target focus:outline-none focus:border-hbo-cyan focus:ring-2 focus:ring-hbo-cyan"
-                title="Go Back"
               >
                 <ArrowLeft className="w-5 h-5" />
               </button>
@@ -836,7 +835,6 @@ export const Watch: React.FC = () => {
                 id="watch-settings-btn"
                 data-watch-header-item="true"
                 aria-label="Playback Settings"
-                title="Playback Settings (Subtitles & Server)"
                 tabIndex={0}
                 className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/70 hover:bg-black text-white border border-white/20 backdrop-blur-md transition hover:scale-105 flex-shrink-0 tv-focus-target focus:outline-none focus:border-hbo-cyan focus:ring-2 focus:ring-hbo-cyan cursor-pointer shadow-md"
               >
@@ -895,7 +893,6 @@ export const Watch: React.FC = () => {
                     id="watch-prev-ep-btn"
                     data-watch-header-item="true"
                     tabIndex={0}
-                    title={`Previous: S${prevEpisodeInfo.season} E${prevEpisodeInfo.episode}${prevEpisodeInfo.title ? ` - ${prevEpisodeInfo.title}` : ''}`}
                     aria-label={`Previous Episode: S${prevEpisodeInfo.season} E${prevEpisodeInfo.episode}`}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/60 hover:bg-white/15 text-white/80 hover:text-white border border-white/15 text-xs font-semibold transition hover:scale-105 tv-focus-target focus:ring-2 focus:ring-hbo-cyan focus:bg-white/20"
                   >
@@ -918,7 +915,6 @@ export const Watch: React.FC = () => {
                     id="watch-next-ep-btn"
                     data-watch-header-item="true"
                     tabIndex={0}
-                    title={`Next: S${nextEpisodeInfo.season} E${nextEpisodeInfo.episode}${nextEpisodeInfo.title ? ` - ${nextEpisodeInfo.title}` : ''}`}
                     aria-label={`Next Episode: S${nextEpisodeInfo.season} E${nextEpisodeInfo.episode}`}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/60 hover:bg-white/15 text-white/80 hover:text-white border border-white/15 text-xs font-semibold transition hover:scale-105 tv-focus-target focus:ring-2 focus:ring-hbo-cyan focus:bg-white/20"
                   >
