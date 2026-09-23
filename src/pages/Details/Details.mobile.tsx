@@ -16,6 +16,23 @@ const pickHeroPath = (item: { backdrop_path?: string | null; poster_path?: strin
   return b || p || null;
 };
 
+const combineRecommendations = (data: TMDBMovieDetails | TMDBTVDetails): TMDBMediaItem[] => {
+  const recs = (data.recommendations?.results || []) as TMDBMediaItem[];
+  const sims = (data.similar?.results || []) as TMDBMediaItem[];
+  const seen = new Set<number>([data.id]);
+  const combined: TMDBMediaItem[] = [];
+
+  for (const item of [...recs, ...sims]) {
+    if (item && item.id && !seen.has(item.id)) {
+      if (item.poster_path || item.backdrop_path) {
+        seen.add(item.id);
+        combined.push(item);
+      }
+    }
+  }
+  return combined;
+};
+
 export const Details: React.FC = () => {
   const { type, id } = useParams<{ type: 'movie' | 'tv'; id: string }>();
   const navigate = useNavigate();
@@ -101,7 +118,7 @@ export const Details: React.FC = () => {
         if (resData) {
           setDetails(resData);
           setRandomHeroPath((prev) => prev || pickHeroPath(resData));
-          const recItems = (resData.similar?.results || resData.recommendations?.results || []) as TMDBMediaItem[];
+          const recItems = combineRecommendations(resData);
           setSimilar(recItems);
 
           // Deep adult filtering in background without delaying details page load
@@ -471,7 +488,7 @@ export const Details: React.FC = () => {
             </div>
 
             <div className="space-y-1">
-              <h1 className="text-2xl sm:text-4xl md:text-5xl lg:text-6xl font-black font-display tracking-tight text-white leading-tight drop-shadow-2xl">
+              <h1 className="text-[clamp(1.2rem,3.5vw,2.25rem)] font-extrabold font-display tracking-tight text-white leading-snug drop-shadow-md">
                 {title}
               </h1>
               {hasAlternativeTitle && (
