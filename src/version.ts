@@ -2,12 +2,13 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20260923-0558';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.fix-mkv-telegram-pla.20260923-0558';
+export const APP_BUILD_NUMBER = '20260923-0740';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-improve-details.20260923-0740';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
-export const APP_BRANCH = 'fix-mkv-telegram-pla';
-export const APP_CHANGELOG = `* fix(watch): eliminate hover tooltip and punch-through splash layer in watch page (#135)
+export const APP_BRANCH = 'feat-improve-details';
+export const APP_CHANGELOG = `* fix(stream): resolve MKV audio silence via real-time audio transcode pipe and fast time-offset seeking (#136)
+* fix(watch): eliminate hover tooltip and punch-through splash layer in watch page (#135)
 * fix: add cursor-pointer to sidebar NavLink for physical mouse on Android TV WebView (#133)
 * fix(msm): resolve pipeline reliability, auto-retry, and player origin settings sync (#132)
 * Merge pull request #131 from jefrimustapa/feat/default-https-julietmike
@@ -20,5 +21,4 @@ export const APP_CHANGELOG = `* fix(watch): eliminate hover tooltip and punch-th
 * feat(settings): add real-time server log viewer web console and in-app diagnostics drawer (#128)
 * fix(msm-getter): add TCP stream backpressure, auto-respawn supervisor, 256MB heap cap, and disable USB swap (#127)
 * feat(settings): set default MSM server to julietmike.net and remove local PC preset (#126)
-* fix(msm-getter): relocate logs to RAM tmpfs, add 5MB auto-rotation, and isolate active streams by clientSession (#125)
-* perf: improve MSM Telegram 1080p stream buffering, seek latency, and router pipeline engine (#124)`;
+* fix(msm-getter): relocate logs to RAM tmpfs, add 5MB auto-rotation, and isolate active streams by clientSession (#125)`;
