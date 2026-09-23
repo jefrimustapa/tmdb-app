@@ -34,6 +34,10 @@ export const Details: React.FC = () => {
   const [isWatchlist, setIsWatchlist] = useState(false);
   const [lastWatched, setLastWatched] = useState<{ season: number; episode: number } | null>(null);
   const [watchProgress, setWatchProgress] = useState<{ timestamp: number; duration: number; progressPercent: number } | null>(null);
+  const [randomHeroPath, setRandomHeroPath] = useState<string | null>(null);
+  const [isBaseHeroLoaded, setIsBaseHeroLoaded] = useState(false);
+  const [activeEpisodeStill, setActiveEpisodeStill] = useState<string | null>(null);
+  const [isEpisodeStillLoaded, setIsEpisodeStillLoaded] = useState(false);
   const [isLoading, setIsLoading] = useState(() => !initialPreview || initialPreview.id !== tmdbId);
 
   useEffect(() => {
@@ -45,6 +49,10 @@ export const Details: React.FC = () => {
     // Reset previous title state immediately so old watch time/likes don't persist
     setWatchProgress(null);
     setLastWatched(null);
+    setRandomHeroPath(null);
+    setIsBaseHeroLoaded(false);
+    setActiveEpisodeStill(null);
+    setIsEpisodeStillLoaded(false);
     setIsLiked(false);
     setIsWatchlist(false);
 
@@ -172,6 +180,60 @@ export const Details: React.FC = () => {
     };
   }, [tmdbId, mediaType]);
 
+  // Flow 1: Pick random between backdrop & poster, with mutual fallback
+  useEffect(() => {
+    setIsBaseHeroLoaded(false);
+    if (!details) {
+      setRandomHeroPath(null);
+      return;
+    }
+    const hasBackdrop = Boolean(details.backdrop_path);
+    const hasPoster = Boolean(details.poster_path);
+
+    if (hasBackdrop && hasPoster) {
+      setRandomHeroPath(Math.random() < 0.5 ? details.backdrop_path : details.poster_path);
+    } else if (hasBackdrop) {
+      setRandomHeroPath(details.backdrop_path);
+    } else if (hasPoster) {
+      setRandomHeroPath(details.poster_path);
+    } else {
+      setRandomHeroPath(null);
+    }
+  }, [details?.id]);
+
+  // Flow 2: For TV series, fetch active episode still ONLY if already watched
+  useEffect(() => {
+    if (mediaType !== 'tv' || !tmdbId || !lastWatched) {
+      setActiveEpisodeStill(null);
+      setIsEpisodeStillLoaded(false);
+      return;
+    }
+
+    let isMounted = true;
+    const targetSeason = lastWatched.season || 1;
+    const targetEpisode = lastWatched.episode || 1;
+
+    setIsEpisodeStillLoaded(false);
+    tmdbApi.getSeasonDetails(tmdbId, targetSeason)
+      .then((seasonData) => {
+        if (!isMounted) return;
+        const ep = seasonData?.episodes?.find((e) => e.episode_number === targetEpisode);
+        if (ep?.still_path) {
+          setActiveEpisodeStill(ep.still_path);
+        } else {
+          setActiveEpisodeStill(null);
+        }
+      })
+      .catch((err) => {
+        console.warn('[Details] Failed to fetch active episode still:', err);
+        if (isMounted) setActiveEpisodeStill(null);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [tmdbId, mediaType, lastWatched?.season, lastWatched?.episode]);
+
   const handleToggleLike = async () => {
     if (!details) return;
     const title = details.title || details.name || 'Untitled';
@@ -295,26 +357,49 @@ export const Details: React.FC = () => {
     originalTitle && originalTitle.trim().toLowerCase() !== title.trim().toLowerCase()
   );
   const isPerfMode = typeof document !== 'undefined' && document.documentElement.getAttribute('data-perf-mode') === 'true';
-  const backdropUrl = tmdbImages.backdrop(details.backdrop_path, isPerfMode ? 'w780' : 'w1280');
+  // Flow 1: Random pick between backdrop and poster (with mutual fallback)
+  const baseHeroPath = randomHeroPath || details.backdrop_path || details.poster_path;
+  const baseHeroUrl = tmdbImages.backdrop(baseHeroPath, isPerfMode ? 'w780' : 'w1280');
+  // Flow 2: Active episode still (only when series is already watched)
+  const activeEpisodeUrl = activeEpisodeStill ? tmdbImages.backdrop(activeEpisodeStill, isPerfMode ? 'w780' : 'w1280') : null;
   const posterUrl = tmdbImages.poster(details.poster_path, 'w500');
   const releaseYear = (details.release_date || details.first_air_date || '').split('-')[0];
   const contentRating = extractContentRating(details);
 
   return (
     <div className="relative min-h-screen bg-hbo-dark text-white pb-28 sm:pb-36 overflow-x-hidden">
-      {/* Top Hero Ambient Backdrop */}
+      {/* Top Hero Ambient Backdrop (Matched with HeroBanner) */}
       <div className="absolute top-0 left-0 right-0 h-[65vh] sm:h-[80vh] lg:h-[90vh] overflow-hidden pointer-events-none z-0">
+        {/* Flow 1: Base Random Hero Image with subtle fade-in */}
         <img
-          src={backdropUrl}
+          src={baseHeroUrl}
           alt={title}
           decoding="async"
+          onLoad={() => setIsBaseHeroLoaded(true)}
           onError={(e) => tmdbImages.handleImgError(e, true)}
-          className="w-full h-full object-cover object-top opacity-45 sm:opacity-55 scale-105 transform"
+          className={`absolute inset-0 w-full h-full object-cover object-top transform transition-all duration-1000 ease-out ${
+            isBaseHeroLoaded ? 'opacity-100 scale-105' : 'opacity-0 scale-100'
+          }`}
         />
-        {/* Full-bleed gradient blending smoothly into bg-hbo-dark with zero cutoff seam */}
-        <div className="absolute inset-0 bg-gradient-to-t from-hbo-dark via-hbo-dark/85 to-transparent" />
-        <div className="absolute inset-0 bg-gradient-to-r from-hbo-dark via-hbo-dark/85 to-transparent/30" />
-        <div className="absolute inset-0 bg-gradient-to-b from-hbo-dark/60 via-transparent to-hbo-dark" />
+
+        {/* Flow 2: Active Episode Still for watched series with subtle smooth crossfade */}
+        {activeEpisodeUrl && (
+          <img
+            src={activeEpisodeUrl}
+            alt={title}
+            decoding="async"
+            onLoad={() => setIsEpisodeStillLoaded(true)}
+            onError={(e) => tmdbImages.handleImgError(e, true)}
+            className={`absolute inset-0 w-full h-full object-cover object-top scale-105 transform transition-opacity duration-1000 ease-in-out ${
+              isEpisodeStillLoaded ? 'opacity-100' : 'opacity-0'
+            }`}
+          />
+        )}
+
+        {/* Cinematic HBO Gradients Layer (Identical to HeroBanner) */}
+        <div className="absolute inset-0 hero-gradient-overlay" />
+        <div className="absolute inset-0 hero-side-gradient hidden sm:block" />
+        <div className="absolute inset-0 bg-gradient-to-t from-transparent via-transparent to-black/40" />
       </div>
 
       {/* Main Content Area */}
@@ -348,16 +433,6 @@ export const Details: React.FC = () => {
 
         {/* Hero Title & Poster Card Header */}
         <div className="flex flex-col sm:flex-row items-center sm:items-end gap-6 sm:gap-8 lg:gap-10 pt-2">
-          {/* Title Poster Card */}
-          <div className="w-36 sm:w-48 md:w-56 lg:w-64 aspect-[2/3] rounded-2xl overflow-hidden border border-white/20 shadow-2xl shadow-black/90 flex-shrink-0 bg-gray-900 group">
-            <img
-              src={posterUrl}
-              alt={title}
-              onError={(e) => tmdbImages.handleImgError(e, false)}
-              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-            />
-          </div>
-
           {/* Title & Metadata & Action Buttons */}
           <div className="flex-1 w-full min-w-0 space-y-3.5 sm:space-y-4.5 text-center sm:text-left flex flex-col items-center sm:items-start">
             <div className="flex items-center justify-center sm:justify-start gap-2 flex-wrap min-h-[26px]">
