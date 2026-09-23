@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import { Play, Heart, Bookmark, Star, ArrowLeft, Plus, Check, RotateCcw, Share2 } from 'lucide-react';
 import type { TMDBMovieDetails, TMDBTVDetails, TMDBMediaItem, TMDBImageItem } from '../../types/tmdb';
@@ -17,7 +17,7 @@ const pickRandomPoster = (
     const idx = Math.floor(Math.random() * posters.length);
     return posters[idx].file_path;
   }
-  return item.poster_path || item.backdrop_path || null;
+  return item.poster_path || null;
 };
 
 const pickRandomBackdrop = (
@@ -419,15 +419,19 @@ export const Details: React.FC = () => {
 
   // Hero background image selection:
   // In Portrait (!isLandscape):
-  //   - Background: single randomly chosen poster from title's available posters pool
+  //   - Background: strictly single randomly chosen poster from title's available posters pool or poster_path. NEVER use backdrop.
   //   - Series: do NOT use active watch episode backdrop
   // In Landscape (isLandscape):
   //   - Watched series: uses active episode backdrop
   //   - Movies / unwatched series: single randomly chosen backdrop from title's backdrops pool
   const heroPath = !isLandscape
-    ? (randomPosterPath || randomBackdropPath)
-    : (activeEpisodeStill || randomBackdropPath || randomPosterPath);
-  const heroUrl = heroPath ? tmdbImages.backdrop(heroPath, isPerfMode ? 'w780' : 'w1280') : null;
+    ? (randomPosterPath || details?.poster_path || null)
+    : (activeEpisodeStill || randomBackdropPath || details?.backdrop_path || null);
+  const heroUrl = heroPath
+    ? (!isLandscape
+        ? tmdbImages.poster(heroPath, isPerfMode ? 'w500' : 'w780')
+        : tmdbImages.backdrop(heroPath, isPerfMode ? 'w780' : 'w1280'))
+    : null;
 
   // Flow 3: Poster card URL (single randomly chosen poster from title's posters pool, used in landscape)
   const posterCardUrl = randomPosterPath ? tmdbImages.poster(randomPosterPath, 'w500') : null;
@@ -440,6 +444,44 @@ export const Details: React.FC = () => {
   useEffect(() => {
     setIsPosterLoaded(false);
   }, [posterCardUrl]);
+
+  // Dynamic alignment for Portrait mode:
+  // Aligns Row 2 buttons exactly 10px above the MobileBottomNav on page load without artificial spacing before Storyline.
+  const [heroPaddingTop, setHeroPaddingTop] = useState<number>(0);
+  const heroPaddingTopRef = useRef<number>(0);
+  const row2Ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (isLandscape || isTV) {
+      setHeroPaddingTop(0);
+      heroPaddingTopRef.current = 0;
+      return;
+    }
+
+    const updateAlignment = () => {
+      if (!row2Ref.current) return;
+      const nav = document.querySelector('nav');
+      const navTop = nav ? nav.getBoundingClientRect().top : (window.innerHeight - 76);
+      const targetBottom = navTop - 10;
+
+      const rect = row2Ref.current.getBoundingClientRect();
+      const naturalBottom = rect.bottom - heroPaddingTopRef.current;
+      const neededPadding = Math.max(0, Math.round(targetBottom - naturalBottom));
+
+      if (neededPadding !== heroPaddingTopRef.current) {
+        heroPaddingTopRef.current = neededPadding;
+        setHeroPaddingTop(neededPadding);
+      }
+    };
+
+    updateAlignment();
+    const rafId = requestAnimationFrame(updateAlignment);
+    window.addEventListener('resize', updateAlignment);
+    return () => {
+      cancelAnimationFrame(rafId);
+      window.removeEventListener('resize', updateAlignment);
+    };
+  }, [isLandscape, isTV, details?.id]);
 
   if (isLoading || !details) {
     return (
@@ -491,47 +533,45 @@ export const Details: React.FC = () => {
         <div className="absolute inset-0 bg-gradient-to-t from-transparent via-transparent to-black/40" />
       </div>
 
-      {/* Hero Viewport Section (Portrait: dynamic 100dvh flex-between; Landscape: standard flow) */}
-      <div
-        className={`relative z-10 max-w-7xl mx-auto px-4 sm:px-8 lg:px-12 ${
-          !isLandscape
-            ? 'min-h-[100dvh] flex flex-col justify-between pb-[calc(66px+max(1rem,env(safe-area-inset-bottom,20px)))] md:pb-[calc(10px+env(safe-area-inset-bottom,0px))]'
-            : 'pt-6 sm:pt-8 space-y-8 sm:space-y-10'
-        }`}
-      >
-        {/* Back Navigation Button */}
-        <div
-          className={`${
-            isTV
-              ? 'pt-2'
-              : 'pt-[max(3.75rem,calc(env(safe-area-inset-top,0px)+3.25rem))]'
-          }`}
-        >
-          <button
-            type="button"
-            onClick={handleBack}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ' || e.keyCode === 13 || e.keyCode === 23 || e.keyCode === 66) {
-                e.preventDefault();
-                e.stopPropagation();
-                handleBack();
-              }
-            }}
-            data-details-back="true"
-            aria-label="Go Back"
-            className="flex items-center gap-2 px-4 py-2 rounded-full bg-black/75 hover:bg-black backdrop-blur-md border border-white/20 hover:border-hbo-cyan text-xs sm:text-sm font-bold text-gray-200 hover:text-white transition hover:scale-105 tv-focus-target shadow-2xl cursor-pointer focus:outline-none focus:ring-2 focus:ring-hbo-cyan w-max"
+      {/* Main Unified Content Area */}
+      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-8 lg:px-12 pt-6 sm:pt-8 space-y-8 sm:space-y-10">
+        <div>
+          {/* Back Navigation Button */}
+          <div
+            className={`${
+              isTV
+                ? 'pt-2'
+                : 'pt-[max(3.75rem,calc(env(safe-area-inset-top,0px)+3.25rem))]'
+            }`}
           >
-            <ArrowLeft className="w-4 h-4 text-hbo-cyan" />
-            <span>Back</span>
-          </button>
-        </div>
+            <button
+              type="button"
+              onClick={handleBack}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ' || e.keyCode === 13 || e.keyCode === 23 || e.keyCode === 66) {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleBack();
+                }
+              }}
+              data-details-back="true"
+              aria-label="Go Back"
+              className="flex items-center gap-2 px-4 py-2 rounded-full bg-black/75 hover:bg-black backdrop-blur-md border border-white/20 hover:border-hbo-cyan text-xs sm:text-sm font-bold text-gray-200 hover:text-white transition hover:scale-105 tv-focus-target shadow-2xl cursor-pointer focus:outline-none focus:ring-2 focus:ring-hbo-cyan w-max"
+            >
+              <ArrowLeft className="w-4 h-4 text-hbo-cyan" />
+              <span>Back</span>
+            </button>
+          </div>
 
-        {/* Hero Title & Poster Card Header */}
-        <div
-          className={`${
-            isLandscape ? 'pt-2' : 'pt-4'
-          } flex flex-col sm:flex-row items-center sm:items-end gap-6 sm:gap-8 lg:gap-10`}
-        >
+          {/* Hero Title & Poster Card Header */}
+          <div
+            style={{
+              paddingTop: !isLandscape && heroPaddingTop > 0 ? `${heroPaddingTop}px` : undefined,
+            }}
+            className={`${
+              isLandscape ? 'pt-2' : 'pt-4'
+            } flex flex-col sm:flex-row items-center sm:items-end gap-6 sm:gap-8 lg:gap-10`}
+          >
           {/* Title Poster Card (Visible in Landscape mode with subtle fade-in) */}
           {isLandscape && (
             <div className="w-36 sm:w-48 md:w-56 lg:w-64 aspect-[2/3] rounded-2xl overflow-hidden border border-white/20 shadow-2xl shadow-black/90 flex-shrink-0 bg-gray-900/60 group relative transition-all duration-500 ease-out">
@@ -673,7 +713,7 @@ export const Details: React.FC = () => {
                   </div>
 
                   {/* Row 2: Secondary circular action buttons */}
-                  <div className="flex items-center justify-center sm:justify-start gap-3.5 sm:gap-4 pt-1 w-full">
+                  <div ref={row2Ref} className="flex items-center justify-center sm:justify-start gap-3.5 sm:gap-4 pt-1 w-full">
                     {isResumable && (
                       <button
                         type="button"
@@ -730,9 +770,6 @@ export const Details: React.FC = () => {
           </div>
         </div>
       </div>
-
-      {/* Main Lower Content Area (Synopsis, Episodes, Cast, Recommendations) */}
-      <div className={`relative z-10 max-w-7xl mx-auto px-4 sm:px-8 lg:px-12 ${!isLandscape ? 'pt-6 sm:pt-8' : 'mt-8 sm:mt-10'} space-y-8 sm:space-y-10`}>
         {/* Synopsis & Tagline */}
         <div className="max-w-3xl space-y-3 pt-2">
           {'tagline' in details && details.tagline && (

@@ -2,12 +2,13 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20260923-1311';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-revise-details-.20260923-1311';
+export const APP_BUILD_NUMBER = '20260923-1453';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-revise-details-.20260923-1453';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
 export const APP_BRANCH = 'feat-revise-details-';
-export const APP_CHANGELOG = `* feat(details): adapt portrait layout to 100dvh flex-between with 10px bottom clearance for buttons
+export const APP_CHANGELOG = `* fix(details): anchor row 2 buttons 10px above mobile bottom nav
+* feat(details): adapt portrait layout to 100dvh flex-between with 10px bottom clearance for buttons
 * fix(details): eliminate image swap by picking single artwork from available pool before subtle fade
 * fix(details): resolve Rule of Hooks crash when navigating without router state
 * feat(ui): add subtle two-layer hero crossfade and gentle image load transitions
@@ -20,5 +21,4 @@ export const APP_CHANGELOG = `* feat(details): adapt portrait layout to 100dvh f
 * fix(watch): eliminate hover tooltip and punch-through splash layer in watch page (#135)
 * fix: add cursor-pointer to sidebar NavLink for physical mouse on Android TV WebView (#133)
 * fix(msm): resolve pipeline reliability, auto-retry, and player origin settings sync (#132)
-* Merge pull request #131 from jefrimustapa/feat/default-https-julietmike
-* feat(msm): use https://www.julietmike.net:3033 as single default preset and remove onrender`;
+* Merge pull request #131 from jefrimustapa/feat/default-https-julietmike`;
