@@ -412,7 +412,7 @@ export const Details: React.FC = () => {
         </div>
 
         {/* Hero Title & Poster Card Header */}
-        <div className="flex flex-col sm:flex-row items-center sm:items-end gap-6 sm:gap-8 lg:gap-10 pt-2">
+        <div className="pt-[28vh] sm:pt-[36vh] lg:pt-[42vh] flex flex-col sm:flex-row items-center sm:items-end gap-6 sm:gap-8 lg:gap-10">
           {/* Title & Metadata & Action Buttons */}
           <div className="flex-1 min-w-0 space-y-3.5 sm:space-y-4.5 text-center sm:text-left">
             <div className="flex items-center justify-center sm:justify-start gap-2 flex-wrap min-h-[26px]">
@@ -442,7 +442,7 @@ export const Details: React.FC = () => {
             </div>
 
             <div className="space-y-1">
-              <h1 className="text-[clamp(1.2rem,3.5vw,2.25rem)] font-extrabold font-display tracking-tight text-white leading-snug drop-shadow-md">
+              <h1 className="text-[25px] sm:text-[30px] md:text-[35px] lg:text-[40px] font-extrabold font-display tracking-tight text-white leading-snug drop-shadow-md">
                 {title}
               </h1>
               {hasAlternativeTitle && (
