@@ -26,6 +26,7 @@ interface CustomDirectPlayerProps {
   mediaType: 'movie' | 'tv';
   providerLabel?: string;
   initialTimestamp?: number;
+  totalDurationSec?: number;
   onProgress?: (currentTime: number, duration: number, isPaused?: boolean) => void;
   onEnded?: () => void;
   onError?: (err: any) => void;
@@ -56,6 +57,7 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
   mediaType,
   providerLabel = 'Telegram (MSM32)',
   initialTimestamp = 0,
+  totalDurationSec,
   onProgress,
   onEnded,
   onError,
@@ -71,13 +73,24 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
   const lastTouchTimeRef = useRef(0);
   const touchStartRef = useRef<{ time: number; x: number; y: number }>({ time: 0, x: 0, y: 0 });
 
+  // Option C: On-demand Audio Transcoding stream state & time offset
+  const isTranscoded = typeof src === 'string' && src.includes('transcode=audio');
+  const baseOffsetRef = useRef<number>(isTranscoded && initialTimestamp > 10 ? Math.floor(initialTimestamp) : 0);
+  const activeSrcRef = useRef<string>('');
+
   // Playback state
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(initialTimestamp || 0);
-  const [duration, setDuration] = useState(0);
+  const [duration, setDuration] = useState(totalDurationSec || 0);
   const [bufferedPercent, setBufferedPercent] = useState(0);
   const [isMuted, setIsMuted] = useState(false);
   const [volume, setVolume] = useState(1);
+
+  useEffect(() => {
+    if (totalDurationSec && totalDurationSec > 0) {
+      setDuration(totalDurationSec);
+    }
+  }, [totalDurationSec]);
 
   // Loading & Buffering states
   const [isInitialLoading, setIsInitialLoading] = useState(true);
@@ -243,7 +256,19 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
       video.muted = false;
       video.volume = 1;
       setIsMuted(false);
-      video.src = src;
+
+      let targetSrc = src;
+      if (isTranscoded && initialTimestamp > 10) {
+        baseOffsetRef.current = Math.floor(initialTimestamp);
+        const urlObj = new URL(src, window.location.href);
+        urlObj.searchParams.set('ss', baseOffsetRef.current.toString());
+        targetSrc = urlObj.toString();
+        hasSeekedInitialRef.current = true;
+      } else {
+        baseOffsetRef.current = 0;
+      }
+      activeSrcRef.current = targetSrc;
+      video.src = targetSrc;
 
       let isCancelled = false;
 
@@ -323,6 +348,34 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
     resetControlsTimer();
   }, [isTV, resetControlsTimer]);
 
+  // Option C: Universal seek execution for both direct and transcoded pipes
+  const performSeek = useCallback((targetTime: number) => {
+    const video = videoRef.current;
+    if (!video) return;
+    const maxDur = duration || (totalDurationSec || 0) || video.duration || 0;
+    const clamped = Math.max(0, maxDur > 0 ? Math.min(maxDur - 0.5, targetTime) : targetTime);
+    const seekSeconds = Math.floor(clamped);
+
+    if (isTranscoded) {
+      baseOffsetRef.current = seekSeconds;
+      const rawSrc = activeSrcRef.current || src;
+      const urlObj = new URL(rawSrc, window.location.href);
+      urlObj.searchParams.set('ss', seekSeconds.toString());
+      const newSrc = urlObj.toString();
+      activeSrcRef.current = newSrc;
+      setIsBuffering(true);
+      video.src = newSrc;
+      video.currentTime = 0;
+      video.play().catch(err => console.warn('[CustomDirectPlayer] Play after seek error:', err));
+      setCurrentTime(clamped);
+      onProgress?.(clamped, maxDur, false);
+    } else {
+      video.currentTime = clamped;
+      setCurrentTime(clamped);
+      onProgress?.(clamped, maxDur, video.paused);
+    }
+  }, [isTranscoded, src, duration, totalDurationSec, onProgress]);
+
   // Handle Relative Seek (+10s or -10s) with 280ms commit debouncing
   // Updates the visual UI & HUD immediately, but debounces the actual hardware seek
   // to avoid flooding the stream with aborted Range requests on rapid skip taps.
@@ -330,8 +383,10 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
     const video = videoRef.current;
     if (!video) return;
 
-    const currentBase = targetSeekTimeRef.current !== null ? targetSeekTimeRef.current : video.currentTime;
-    const newTime = Math.max(0, Math.min(video.duration || 0, currentBase + seconds));
+    const effectiveCurrent = isTranscoded ? (baseOffsetRef.current + video.currentTime) : video.currentTime;
+    const currentBase = targetSeekTimeRef.current !== null ? targetSeekTimeRef.current : effectiveCurrent;
+    const maxDur = duration || (totalDurationSec || 0) || video.duration || 0;
+    const newTime = Math.max(0, maxDur > 0 ? Math.min(maxDur, currentBase + seconds) : currentBase + seconds);
     targetSeekTimeRef.current = newTime;
     setCurrentTime(newTime);
 
@@ -365,14 +420,13 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
     if (pendingSeekTimerRef.current) clearTimeout(pendingSeekTimerRef.current);
     pendingSeekTimerRef.current = setTimeout(() => {
       if (videoRef.current && targetSeekTimeRef.current !== null) {
-        videoRef.current.currentTime = targetSeekTimeRef.current;
-        onProgress?.(targetSeekTimeRef.current, videoRef.current.duration || 0, videoRef.current.paused);
+        performSeek(targetSeekTimeRef.current);
         targetSeekTimeRef.current = null;
       }
     }, 280);
 
     resetControlsTimer();
-  }, [isTV, onProgress, resetControlsTimer]);
+  }, [isTV, isTranscoded, duration, totalDurationSec, performSeek, resetControlsTimer]);
 
   // Handle toggling controls visibility with timer reset
   const handleToggleControls = useCallback(() => {
@@ -448,10 +502,8 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
   };
 
   const handleScrubberCommit = () => {
-    if (videoRef.current && scrubPreviewTime !== null) {
-      videoRef.current.currentTime = scrubPreviewTime;
-      setCurrentTime(scrubPreviewTime);
-      onProgress?.(scrubPreviewTime, videoRef.current.duration || 0, videoRef.current.paused);
+    if (scrubPreviewTime !== null) {
+      performSeek(scrubPreviewTime);
     }
     setIsDraggingScrubber(false);
     setScrubPreviewTime(null);
@@ -598,11 +650,7 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
       if (!video) return;
 
       if (typeof detail.targetTime === 'number') {
-        const maxDur = duration || video.duration || 0;
-        const clamped = Math.max(0, maxDur > 0 ? Math.min(maxDur - 0.5, detail.targetTime) : detail.targetTime);
-        video.currentTime = clamped;
-        setCurrentTime(clamped);
-        onProgress?.(clamped, maxDur, video.paused);
+        performSeek(detail.targetTime);
       } else if (delta !== 0) {
         handleSeekRelative(delta, true);
       }
@@ -690,10 +738,12 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
         className="w-full h-full object-contain bg-black transform-gpu will-change-transform"
         onLoadedMetadata={(e) => {
           const el = e.currentTarget;
-          if (el.duration > 0) {
+          if (totalDurationSec && totalDurationSec > 0) {
+            setDuration(totalDurationSec);
+          } else if (el.duration > 0) {
             setDuration(el.duration);
           }
-          if (initialTimestamp > 10 && !hasSeekedInitialRef.current) {
+          if (initialTimestamp > 10 && !hasSeekedInitialRef.current && !isTranscoded) {
             hasSeekedInitialRef.current = true;
             try {
               el.currentTime = initialTimestamp;
@@ -727,21 +777,25 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
         }}
         onPause={(e) => {
           setIsPlaying(false);
-          onProgress?.(e.currentTarget.currentTime, e.currentTarget.duration, true);
+          const el = e.currentTarget;
+          const effectiveCurrent = isTranscoded ? (baseOffsetRef.current + el.currentTime) : el.currentTime;
+          const effectiveDuration = (totalDurationSec && totalDurationSec > 0) ? totalDurationSec : (duration > 0 ? duration : el.duration);
+          onProgress?.(effectiveCurrent, effectiveDuration, true);
         }}
         onTimeUpdate={(e) => {
           const el = e.currentTarget;
+          const effectiveCurrent = isTranscoded ? (baseOffsetRef.current + el.currentTime) : el.currentTime;
+          const effectiveDuration = (totalDurationSec && totalDurationSec > 0) ? totalDurationSec : (duration > 0 ? duration : el.duration);
           if (!isDraggingScrubber) {
-            setCurrentTime(el.currentTime);
+            setCurrentTime(effectiveCurrent);
           }
           // Compute buffered percentage
-          if (el.buffered.length > 0) {
+          if (el.buffered.length > 0 && effectiveDuration > 0) {
             const bufferedEnd = el.buffered.end(el.buffered.length - 1);
-            if (el.duration > 0) {
-              setBufferedPercent((bufferedEnd / el.duration) * 100);
-            }
+            const totalBuffered = isTranscoded ? (baseOffsetRef.current + bufferedEnd) : bufferedEnd;
+            setBufferedPercent(Math.min(100, (totalBuffered / effectiveDuration) * 100));
           }
-          onProgress?.(el.currentTime, el.duration, el.paused);
+          onProgress?.(effectiveCurrent, effectiveDuration, el.paused);
         }}
         onEnded={() => {
           setIsPlaying(false);

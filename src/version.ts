@@ -2,12 +2,14 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20260922-1106';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.fix-tv-hover-missing.20260922-1106';
+export const APP_BUILD_NUMBER = '20260923-0558';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.fix-mkv-telegram-pla.20260923-0558';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
-export const APP_BRANCH = 'fix-tv-hover-missing';
-export const APP_CHANGELOG = `* fix(msm): resolve pipeline reliability, auto-retry, and player origin settings sync (#132)
+export const APP_BRANCH = 'fix-mkv-telegram-pla';
+export const APP_CHANGELOG = `* fix(watch): eliminate hover tooltip and punch-through splash layer in watch page (#135)
+* fix: add cursor-pointer to sidebar NavLink for physical mouse on Android TV WebView (#133)
+* fix(msm): resolve pipeline reliability, auto-retry, and player origin settings sync (#132)
 * Merge pull request #131 from jefrimustapa/feat/default-https-julietmike
 * feat(msm): use https://www.julietmike.net:3033 as single default preset and remove onrender
 * feat(msm-getter): enable native HTTPS server with Let's Encrypt certificates
@@ -19,6 +21,4 @@ export const APP_CHANGELOG = `* fix(msm): resolve pipeline reliability, auto-ret
 * fix(msm-getter): add TCP stream backpressure, auto-respawn supervisor, 256MB heap cap, and disable USB swap (#127)
 * feat(settings): set default MSM server to julietmike.net and remove local PC preset (#126)
 * fix(msm-getter): relocate logs to RAM tmpfs, add 5MB auto-rotation, and isolate active streams by clientSession (#125)
-* perf: improve MSM Telegram 1080p stream buffering, seek latency, and router pipeline engine (#124)
-* fix(tv): fix D-pad remote navigation for all MSM32bot settings menus (#123)
-* feat(filter): include standalone word 'sex' in adult title filtering (#122)`;
+* perf: improve MSM Telegram 1080p stream buffering, seek latency, and router pipeline engine (#124)`;

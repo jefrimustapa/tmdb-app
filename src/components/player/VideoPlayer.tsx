@@ -437,10 +437,23 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           }
 
           if (msmRes && msmRes.streamUrl) {
-            console.log('[Resolver] ✅ Playing via Telegram Direct Stream:', msmRes.streamUrl);
+            // Check if stream is an MKV container or has Dolby / surround audio cues (e.g. DDP5.1, EAC3, AC3, Atmos)
+            // On Android Chromium / WebView, Dolby codecs lack software decoders and produce silent audio.
+            // Option C: Request real-time audio transcoding (?transcode=audio)
+            const isMkv = msmRes.filename ? msmRes.filename.toLowerCase().endsWith('.mkv') : false;
+            const isDolbyAudio = msmRes.filename ? /(ddp|ac3|eac3|atmos|dts)/i.test(msmRes.filename) : false;
+            let finalUrl = msmRes.streamUrl;
+            if (isMkv || isDolbyAudio) {
+              const sep = finalUrl.includes('?') ? '&' : '?';
+              finalUrl = `${finalUrl}${sep}transcode=audio`;
+              console.log('[Resolver] 🔊 Detected MKV/Dolby audio in Telegram stream. Enabling AAC audio transcode pipe:', finalUrl);
+            } else {
+              console.log('[Resolver] ✅ Playing via Telegram Direct Stream:', finalUrl);
+            }
+
             setResolvingStatus('Connected to Telegram Stream');
-            setResolvedMsm32Url(msmRes.streamUrl);
-            setDirectStreamUrl(msmRes.streamUrl);
+            setResolvedMsm32Url(finalUrl);
+            setDirectStreamUrl(finalUrl);
             setDirectStreamLabel('Telegram (MSM32)');
             setPlayerMode('direct');
             setIsExtracting(false);
@@ -1973,6 +1986,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           mediaType={mediaType}
           providerLabel={directStreamLabel || provider.name}
           initialTimestamp={currentTimeRef.current || initialTimestamp}
+          totalDurationSec={((episodeRuntimeMinutes || details?.runtime || 0) * 60)}
           isFullscreen={isFullscreen}
           onToggleFullscreen={handleToggleFullscreen}
           onProgress={(current, dur, isPaused) => {
