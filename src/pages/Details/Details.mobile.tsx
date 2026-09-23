@@ -462,7 +462,7 @@ export const Details: React.FC = () => {
   return (
     <div className="relative min-h-screen bg-hbo-dark text-white pb-28 sm:pb-36 overflow-x-hidden">
       {/* Top Hero Ambient Backdrop (Matched with HeroBanner) */}
-      <div className="absolute top-0 left-0 right-0 h-[65vh] sm:h-[80vh] lg:h-[90vh] overflow-hidden pointer-events-none z-0">
+      <div className={`absolute top-0 left-0 right-0 ${!isLandscape ? 'h-[100dvh]' : 'h-[65vh] sm:h-[80vh] lg:h-[90vh]'} overflow-hidden pointer-events-none z-0`}>
         {heroUrl && (
           <img
             key={heroUrl}
@@ -491,8 +491,14 @@ export const Details: React.FC = () => {
         <div className="absolute inset-0 bg-gradient-to-t from-transparent via-transparent to-black/40" />
       </div>
 
-      {/* Main Content Area */}
-      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-8 lg:px-12 pt-6 sm:pt-8 space-y-8 sm:space-y-10">
+      {/* Hero Viewport Section (Portrait: dynamic 100dvh flex-between; Landscape: standard flow) */}
+      <div
+        className={`relative z-10 max-w-7xl mx-auto px-4 sm:px-8 lg:px-12 ${
+          !isLandscape
+            ? 'min-h-[100dvh] flex flex-col justify-between pb-[calc(10px+env(safe-area-inset-bottom,0px))]'
+            : 'pt-6 sm:pt-8 space-y-8 sm:space-y-10'
+        }`}
+      >
         {/* Back Navigation Button */}
         <div
           className={`${
@@ -523,7 +529,7 @@ export const Details: React.FC = () => {
         {/* Hero Title & Poster Card Header */}
         <div
           className={`${
-            isLandscape ? 'pt-2' : 'pt-[28vh] sm:pt-[36vh] lg:pt-[42vh]'
+            isLandscape ? 'pt-2' : 'pt-4'
           } flex flex-col sm:flex-row items-center sm:items-end gap-6 sm:gap-8 lg:gap-10`}
         >
           {/* Title Poster Card (Visible in Landscape mode with subtle fade-in) */}
@@ -723,7 +729,10 @@ export const Details: React.FC = () => {
             })()}
           </div>
         </div>
+      </div>
 
+      {/* Main Lower Content Area (Synopsis, Episodes, Cast, Recommendations) */}
+      <div className={`relative z-10 max-w-7xl mx-auto px-4 sm:px-8 lg:px-12 ${!isLandscape ? 'pt-6 sm:pt-8' : 'mt-8 sm:mt-10'} space-y-8 sm:space-y-10`}>
         {/* Synopsis & Tagline */}
         <div className="max-w-3xl space-y-3 pt-2">
           {'tagline' in details && details.tagline && (
