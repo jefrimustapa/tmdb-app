@@ -2,12 +2,13 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20260923-1035';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-details-title-f.20260923-1035';
+export const APP_BUILD_NUMBER = '20260923-1220';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-revise-details-.20260923-1220';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
-export const APP_BRANCH = 'feat-details-title-f';
-export const APP_CHANGELOG = `* feat(details): prioritize collaborative recommendations and refine title font sizing (#139)
+export const APP_BRANCH = 'feat-revise-details-';
+export const APP_CHANGELOG = `* feat(details): apply custom responsive title scale and shift info to Stage 3 (#140)
+* feat(details): prioritize collaborative recommendations and refine title font sizing (#139)
 * fix(details): resolve background image loading failure and cache race condition (#138)
 * feat(details): enhance hero appearance and subtle loading transitions (#137)
 * fix(stream): resolve MKV audio silence via real-time audio transcode pipe and fast time-offset seeking (#136)
@@ -20,5 +21,4 @@ export const APP_CHANGELOG = `* feat(details): prioritize collaborative recommen
 * Revert "Merge pull request #130 from jefrimustapa/fix/msm-stream-resolution"
 * Merge pull request #130 from jefrimustapa/fix/msm-stream-resolution
 * fix(msm): prevent false sequel penalties and handle bot message metadata in stream resolution
-* fix(msm): fix sequel stream matching, remove client cache, and auto-refresh expired telegram file references (#129)
-* feat(settings): add real-time server log viewer web console and in-app diagnostics drawer (#128)`;
+* fix(msm): fix sequel stream matching, remove client cache, and auto-refresh expired telegram file references (#129)`;

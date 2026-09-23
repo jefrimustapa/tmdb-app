@@ -49,6 +49,11 @@ export interface TMDBMovieDetails extends TMDBMediaItem {
       release_dates: { certification: string; type?: number }[];
     }[];
   };
+  images?: {
+    backdrops: TMDBImageItem[];
+    posters: TMDBImageItem[];
+    logos?: TMDBImageItem[];
+  };
 }
 
 export interface TMDBTVDetails extends TMDBMediaItem {
@@ -78,6 +83,21 @@ export interface TMDBTVDetails extends TMDBMediaItem {
       rating: string;
     }[];
   };
+  images?: {
+    backdrops: TMDBImageItem[];
+    posters: TMDBImageItem[];
+    logos?: TMDBImageItem[];
+  };
+}
+
+export interface TMDBImageItem {
+  aspect_ratio: number;
+  height: number;
+  iso_639_1: string | null;
+  file_path: string;
+  vote_average: number;
+  vote_count: number;
+  width: number;
 }
 
 export interface TMDBSeasonSummary {

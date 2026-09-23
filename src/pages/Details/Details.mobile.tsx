@@ -1,19 +1,35 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import { Play, Heart, Bookmark, Star, ArrowLeft, Plus, Check, RotateCcw, Share2 } from 'lucide-react';
-import type { TMDBMovieDetails, TMDBTVDetails, TMDBMediaItem } from '../../types/tmdb';
+import type { TMDBMovieDetails, TMDBTVDetails, TMDBMediaItem, TMDBImageItem } from '../../types/tmdb';
 import { tmdbApi, tmdbImages, extractContentRating, resolveGenresFromIds, isExplicitAdultCertification } from '../../services/tmdb';
 import { dbService } from '../../services/db';
 import { MediaRow } from '../../components/common/MediaRow';
 import { EpisodeGrid } from '../../components/player/EpisodeGrid';
 import { useDevice } from '../../hooks/useDevice';
 
-const pickHeroPath = (item: { backdrop_path?: string | null; poster_path?: string | null } | null): string | null => {
+const pickRandomPoster = (
+  item: { poster_path?: string | null; backdrop_path?: string | null; images?: { posters?: TMDBImageItem[] } } | null
+): string | null => {
   if (!item) return null;
-  const b = item.backdrop_path;
-  const p = item.poster_path;
-  if (b && p) return Math.random() < 0.5 ? b : p;
-  return b || p || null;
+  const posters = item.images?.posters?.filter((p) => Boolean(p.file_path));
+  if (posters && posters.length > 0) {
+    const idx = Math.floor(Math.random() * posters.length);
+    return posters[idx].file_path;
+  }
+  return item.poster_path || item.backdrop_path || null;
+};
+
+const pickRandomBackdrop = (
+  item: { backdrop_path?: string | null; poster_path?: string | null; images?: { backdrops?: TMDBImageItem[] } } | null
+): string | null => {
+  if (!item) return null;
+  const backdrops = item.images?.backdrops?.filter((b) => Boolean(b.file_path));
+  if (backdrops && backdrops.length > 0) {
+    const idx = Math.floor(Math.random() * backdrops.length);
+    return backdrops[idx].file_path;
+  }
+  return item.backdrop_path || item.poster_path || null;
 };
 
 const combineRecommendations = (data: TMDBMovieDetails | TMDBTVDetails): TMDBMediaItem[] => {
@@ -39,6 +55,23 @@ export const Details: React.FC = () => {
   const location = useLocation();
   const { isTV } = useDevice();
 
+  // Dynamic orientation detection for responsive mobile/tablet layout
+  const [isLandscape, setIsLandscape] = useState(() =>
+    typeof window !== 'undefined' ? window.innerWidth > window.innerHeight : false
+  );
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsLandscape(window.innerWidth > window.innerHeight);
+    };
+    window.addEventListener('resize', handleResize);
+    window.addEventListener('orientationchange', handleResize);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('orientationchange', handleResize);
+    };
+  }, []);
+
   const tmdbId = parseInt(id || '0', 10);
   const mediaType: 'movie' | 'tv' = (type === 'tv' ? 'tv' : 'movie');
 
@@ -59,9 +92,15 @@ export const Details: React.FC = () => {
   const [isWatchlist, setIsWatchlist] = useState(false);
   const [lastWatched, setLastWatched] = useState<{ season: number; episode: number } | null>(null);
   const [watchProgress, setWatchProgress] = useState<{ timestamp: number; duration: number; progressPercent: number } | null>(null);
-  const [randomHeroPath, setRandomHeroPath] = useState<string | null>(() => {
+  const [randomPosterPath, setRandomPosterPath] = useState<string | null>(() => {
     if (initialPreview && initialPreview.id === tmdbId) {
-      return pickHeroPath(initialPreview);
+      return pickRandomPoster(initialPreview);
+    }
+    return null;
+  });
+  const [randomBackdropPath, setRandomBackdropPath] = useState<string | null>(() => {
+    if (initialPreview && initialPreview.id === tmdbId) {
+      return pickRandomBackdrop(initialPreview);
     }
     return null;
   });
@@ -87,7 +126,8 @@ export const Details: React.FC = () => {
 
     const preview = (location.state as { item?: TMDBMediaItem } | null)?.item;
     if (preview && preview.id === tmdbId) {
-      setRandomHeroPath(pickHeroPath(preview));
+      setRandomPosterPath(pickRandomPoster(preview));
+      setRandomBackdropPath(pickRandomBackdrop(preview));
       setDetails({
         ...preview,
         genres: resolveGenresFromIds(preview.genre_ids),
@@ -95,7 +135,8 @@ export const Details: React.FC = () => {
       } as unknown as (TMDBMovieDetails | TMDBTVDetails));
       setIsLoading(false);
     } else {
-      setRandomHeroPath(null);
+      setRandomPosterPath(null);
+      setRandomBackdropPath(null);
       setDetails(null);
       setIsLoading(true);
     }
@@ -117,7 +158,8 @@ export const Details: React.FC = () => {
 
         if (resData) {
           setDetails(resData);
-          setRandomHeroPath((prev) => prev || pickHeroPath(resData));
+          setRandomPosterPath(pickRandomPoster(resData));
+          setRandomBackdropPath(pickRandomBackdrop(resData));
           const recItems = combineRecommendations(resData);
           setSimilar(recItems);
 
@@ -212,9 +254,9 @@ export const Details: React.FC = () => {
     };
   }, [tmdbId, mediaType]);
 
-  // Flow 2: For TV series, fetch active episode still ONLY if already watched
+  // Flow 2: For TV series in landscape mode, fetch active episode still ONLY if already watched
   useEffect(() => {
-    if (mediaType !== 'tv' || !tmdbId || !lastWatched) {
+    if (mediaType !== 'tv' || !tmdbId || !lastWatched || !isLandscape) {
       setActiveEpisodeStill(null);
       setIsEpisodeStillLoaded(false);
       return;
@@ -243,7 +285,7 @@ export const Details: React.FC = () => {
     return () => {
       isMounted = false;
     };
-  }, [tmdbId, mediaType, lastWatched?.season, lastWatched?.episode]);
+  }, [tmdbId, mediaType, lastWatched?.season, lastWatched?.episode, isLandscape]);
 
   const handleToggleLike = async () => {
     if (!details) return;
@@ -368,12 +410,29 @@ export const Details: React.FC = () => {
     originalTitle && originalTitle.trim().toLowerCase() !== title.trim().toLowerCase()
   );
   const isPerfMode = typeof document !== 'undefined' && document.documentElement.getAttribute('data-perf-mode') === 'true';
-  // Flow 1: Random pick between backdrop and poster (with mutual fallback)
-  const baseHeroPath = randomHeroPath || details.backdrop_path || details.poster_path;
+
+  // Hero background image selection:
+  // In Portrait (!isLandscape):
+  //   - Background: pick multiple posters from TMDB, randomly switch on load.
+  //   - Series: do NOT use active watch episode backdrop.
+  // In Landscape (isLandscape):
+  //   - Movies: pick multiple backdrops, randomly switch on load.
+  //   - Series: check if watched -> YES: use active episode backdrop; NO: pick multiple backdrops randomly.
+  const isSeriesWatched = mediaType === 'tv' && Boolean(lastWatched);
+  const baseHeroPath = !isLandscape
+    ? (randomPosterPath || details.poster_path || details.backdrop_path)
+    : (randomBackdropPath || details.backdrop_path || details.poster_path);
   const baseHeroUrl = tmdbImages.backdrop(baseHeroPath, isPerfMode ? 'w780' : 'w1280');
-  // Flow 2: Active episode still (only when series is already watched)
-  const activeEpisodeUrl = activeEpisodeStill ? tmdbImages.backdrop(activeEpisodeStill, isPerfMode ? 'w780' : 'w1280') : null;
-  const posterUrl = tmdbImages.poster(details.poster_path, 'w500');
+
+  // Flow 2: Active episode still is ONLY rendered in landscape mode for watched series
+  const activeEpisodeUrl = (isLandscape && isSeriesWatched && activeEpisodeStill)
+    ? tmdbImages.backdrop(activeEpisodeStill, isPerfMode ? 'w780' : 'w1280')
+    : null;
+
+  // Poster card URL (used in landscape mode): multiple posters randomly switched
+  const posterCardPath = randomPosterPath || details.poster_path || details.backdrop_path;
+  const posterCardUrl = tmdbImages.poster(posterCardPath, 'w500');
+
   const releaseYear = (details.release_date || details.first_air_date || '').split('-')[0];
   const contentRating = extractContentRating(details);
 
@@ -458,9 +517,25 @@ export const Details: React.FC = () => {
         </div>
 
         {/* Hero Title & Poster Card Header */}
-        <div className="pt-[28vh] sm:pt-[36vh] lg:pt-[42vh] flex flex-col sm:flex-row items-center sm:items-end gap-6 sm:gap-8 lg:gap-10">
+        <div
+          className={`${
+            isLandscape ? 'pt-2' : 'pt-[28vh] sm:pt-[36vh] lg:pt-[42vh]'
+          } flex flex-col sm:flex-row items-center sm:items-end gap-6 sm:gap-8 lg:gap-10`}
+        >
+          {/* Title Poster Card (Visible in Landscape mode) */}
+          {isLandscape && (
+            <div className="w-36 sm:w-48 md:w-56 lg:w-64 aspect-[2/3] rounded-2xl overflow-hidden border border-white/20 shadow-2xl shadow-black/90 flex-shrink-0 bg-gray-900 group">
+              <img
+                src={posterCardUrl}
+                alt={title}
+                onError={(e) => tmdbImages.handleImgError(e, false)}
+                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+              />
+            </div>
+          )}
+
           {/* Title & Metadata & Action Buttons */}
-          <div className="flex-1 w-full min-w-0 space-y-3.5 sm:space-y-4.5 text-center sm:text-left flex flex-col items-center sm:items-start">
+          <div className={`flex-1 w-full min-w-0 space-y-3.5 sm:space-y-4.5 ${isLandscape ? 'text-left items-start' : 'text-center sm:text-left items-center sm:items-start'} flex flex-col`}>
             <div className="flex items-center justify-center sm:justify-start gap-2 flex-wrap min-h-[26px]">
               <span className="px-3 py-0.5 rounded-full bg-hbo-purple/70 text-white border border-hbo-purple-light text-xs font-black uppercase tracking-wider backdrop-blur-md">
                 {mediaType === 'movie' ? 'FILM' : 'SERIES'}
