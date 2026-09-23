@@ -8,6 +8,14 @@ import { MediaRow } from '../../components/common/MediaRow';
 import { EpisodeGrid } from '../../components/player/EpisodeGrid';
 import { useDevice } from '../../hooks/useDevice';
 
+const pickHeroPath = (item: { backdrop_path?: string | null; poster_path?: string | null } | null): string | null => {
+  if (!item) return null;
+  const b = item.backdrop_path;
+  const p = item.poster_path;
+  if (b && p) return Math.random() < 0.5 ? b : p;
+  return b || p || null;
+};
+
 export const Details: React.FC = () => {
   const { type, id } = useParams<{ type: 'movie' | 'tv'; id: string }>();
   const navigate = useNavigate();
@@ -34,7 +42,12 @@ export const Details: React.FC = () => {
   const [isWatchlist, setIsWatchlist] = useState(false);
   const [lastWatched, setLastWatched] = useState<{ season: number; episode: number } | null>(null);
   const [watchProgress, setWatchProgress] = useState<{ timestamp: number; duration: number; progressPercent: number } | null>(null);
-  const [randomHeroPath, setRandomHeroPath] = useState<string | null>(null);
+  const [randomHeroPath, setRandomHeroPath] = useState<string | null>(() => {
+    if (initialPreview && initialPreview.id === tmdbId) {
+      return pickHeroPath(initialPreview);
+    }
+    return null;
+  });
   const [isBaseHeroLoaded, setIsBaseHeroLoaded] = useState(false);
   const [activeEpisodeStill, setActiveEpisodeStill] = useState<string | null>(null);
   const [isEpisodeStillLoaded, setIsEpisodeStillLoaded] = useState(false);
@@ -49,7 +62,6 @@ export const Details: React.FC = () => {
     // Reset previous title state immediately so old watch time/likes don't persist
     setWatchProgress(null);
     setLastWatched(null);
-    setRandomHeroPath(null);
     setIsBaseHeroLoaded(false);
     setActiveEpisodeStill(null);
     setIsEpisodeStillLoaded(false);
@@ -58,6 +70,7 @@ export const Details: React.FC = () => {
 
     const preview = (location.state as { item?: TMDBMediaItem } | null)?.item;
     if (preview && preview.id === tmdbId) {
+      setRandomHeroPath(pickHeroPath(preview));
       setDetails({
         ...preview,
         genres: resolveGenresFromIds(preview.genre_ids),
@@ -65,6 +78,7 @@ export const Details: React.FC = () => {
       } as unknown as (TMDBMovieDetails | TMDBTVDetails));
       setIsLoading(false);
     } else {
+      setRandomHeroPath(null);
       setDetails(null);
       setIsLoading(true);
     }
@@ -86,6 +100,7 @@ export const Details: React.FC = () => {
 
         if (resData) {
           setDetails(resData);
+          setRandomHeroPath((prev) => prev || pickHeroPath(resData));
           const recItems = (resData.similar?.results || resData.recommendations?.results || []) as TMDBMediaItem[];
           setSimilar(recItems);
 
@@ -181,27 +196,6 @@ export const Details: React.FC = () => {
       window.removeEventListener('focus', updateLastWatched);
     };
   }, [tmdbId, mediaType]);
-
-  // Flow 1: Pick random between backdrop & poster, with mutual fallback
-  useEffect(() => {
-    setIsBaseHeroLoaded(false);
-    if (!details) {
-      setRandomHeroPath(null);
-      return;
-    }
-    const hasBackdrop = Boolean(details.backdrop_path);
-    const hasPoster = Boolean(details.poster_path);
-
-    if (hasBackdrop && hasPoster) {
-      setRandomHeroPath(Math.random() < 0.5 ? details.backdrop_path : details.poster_path);
-    } else if (hasBackdrop) {
-      setRandomHeroPath(details.backdrop_path);
-    } else if (hasPoster) {
-      setRandomHeroPath(details.poster_path);
-    } else {
-      setRandomHeroPath(null);
-    }
-  }, [details?.id]);
 
   // Flow 2: For TV series, fetch active episode still ONLY if already watched
   useEffect(() => {
@@ -324,13 +318,22 @@ export const Details: React.FC = () => {
     <div className="relative min-h-screen bg-hbo-dark text-white pb-28 sm:pb-36 overflow-x-hidden">
       {/* Top Hero Ambient Backdrop (Matched with HeroBanner) */}
       <div className="absolute top-0 left-0 right-0 h-[65vh] sm:h-[80vh] lg:h-[90vh] overflow-hidden pointer-events-none z-0">
-        {/* Flow 1: Base Random Hero Image with subtle fade-in */}
+        {/* Flow 1: Base Random Hero Image with subtle fade-in and instant cache detection */}
         <img
+          key={baseHeroUrl}
+          ref={(img) => {
+            if (img && img.complete && img.naturalWidth > 0 && !isBaseHeroLoaded) {
+              setIsBaseHeroLoaded(true);
+            }
+          }}
           src={baseHeroUrl}
           alt={title}
           decoding="async"
           onLoad={() => setIsBaseHeroLoaded(true)}
-          onError={(e) => tmdbImages.handleImgError(e, true)}
+          onError={(e) => {
+            tmdbImages.handleImgError(e, true);
+            setIsBaseHeroLoaded(true);
+          }}
           className={`absolute inset-0 w-full h-full object-cover object-top transform transition-all duration-1000 ease-out ${
             isBaseHeroLoaded ? 'opacity-100 scale-105' : 'opacity-0 scale-100'
           }`}
@@ -339,6 +342,12 @@ export const Details: React.FC = () => {
         {/* Flow 2: Active Episode Still for watched series with subtle smooth crossfade */}
         {activeEpisodeUrl && (
           <img
+            key={activeEpisodeUrl}
+            ref={(img) => {
+              if (img && img.complete && img.naturalWidth > 0 && !isEpisodeStillLoaded) {
+                setIsEpisodeStillLoaded(true);
+              }
+            }}
             src={activeEpisodeUrl}
             alt={title}
             decoding="async"
