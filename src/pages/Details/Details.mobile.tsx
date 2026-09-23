@@ -495,7 +495,7 @@ export const Details: React.FC = () => {
       <div
         className={`relative z-10 max-w-7xl mx-auto px-4 sm:px-8 lg:px-12 ${
           !isLandscape
-            ? 'min-h-[100dvh] flex flex-col justify-between pb-[calc(10px+env(safe-area-inset-bottom,0px))]'
+            ? 'min-h-[100dvh] flex flex-col justify-between pb-[calc(66px+max(1rem,env(safe-area-inset-bottom,20px)))] md:pb-[calc(10px+env(safe-area-inset-bottom,0px))]'
             : 'pt-6 sm:pt-8 space-y-8 sm:space-y-10'
         }`}
       >
