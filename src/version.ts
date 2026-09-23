@@ -2,12 +2,13 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20260923-1002';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-improve-more-li.20260923-1002';
+export const APP_BUILD_NUMBER = '20260923-1035';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-details-title-f.20260923-1035';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
-export const APP_BRANCH = 'feat-improve-more-li';
-export const APP_CHANGELOG = `* fix(details): resolve background image loading failure and cache race condition (#138)
+export const APP_BRANCH = 'feat-details-title-f';
+export const APP_CHANGELOG = `* feat(details): prioritize collaborative recommendations and refine title font sizing (#139)
+* fix(details): resolve background image loading failure and cache race condition (#138)
 * feat(details): enhance hero appearance and subtle loading transitions (#137)
 * fix(stream): resolve MKV audio silence via real-time audio transcode pipe and fast time-offset seeking (#136)
 * fix(watch): eliminate hover tooltip and punch-through splash layer in watch page (#135)
@@ -20,5 +21,4 @@ export const APP_CHANGELOG = `* fix(details): resolve background image loading f
 * Merge pull request #130 from jefrimustapa/fix/msm-stream-resolution
 * fix(msm): prevent false sequel penalties and handle bot message metadata in stream resolution
 * fix(msm): fix sequel stream matching, remove client cache, and auto-refresh expired telegram file references (#129)
-* feat(settings): add real-time server log viewer web console and in-app diagnostics drawer (#128)
-* fix(msm-getter): add TCP stream backpressure, auto-respawn supervisor, 256MB heap cap, and disable USB swap (#127)`;
+* feat(settings): add real-time server log viewer web console and in-app diagnostics drawer (#128)`;
