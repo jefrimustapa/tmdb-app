@@ -346,20 +346,6 @@ export const Details: React.FC = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  if (isLoading || !details) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-hbo-dark">
-        <div className="w-12 h-12 border-4 border-hbo-purple border-t-hbo-cyan rounded-full animate-spin shadow-hbo-glow mb-4" />
-        <h2 className="text-sm font-bold font-display text-white tracking-widest">LOADING TITLE...</h2>
-      </div>
-    );
-  }
-
-  const title = details.title || details.name || 'Untitled';
-  const originalTitle = details.original_title || details.original_name;
-  const hasAlternativeTitle = Boolean(
-    originalTitle && originalTitle.trim().toLowerCase() !== title.trim().toLowerCase()
-  );
   const isPerfMode = typeof document !== 'undefined' && document.documentElement.getAttribute('data-perf-mode') === 'true';
 
   // Hero background image selection:
@@ -367,8 +353,12 @@ export const Details: React.FC = () => {
   //   - Movies: pick multiple backdrops, randomly switch on load.
   //   - Series: check if watched -> YES: use active episode backdrop; NO: pick multiple backdrops randomly.
   const isSeriesWatched = mediaType === 'tv' && Boolean(lastWatched);
-  const baseHeroPath = randomBackdropPath || details.backdrop_path || details.poster_path;
-  const baseHeroUrl = tmdbImages.backdrop(baseHeroPath, isPerfMode ? 'w780' : 'w1280');
+  const baseHeroPath = randomBackdropPath || details?.backdrop_path || details?.poster_path || null;
+  const baseHeroUrl = baseHeroPath ? tmdbImages.backdrop(baseHeroPath, isPerfMode ? 'w780' : 'w1280') : null;
+
+  // Flow 3: Poster card URL (random poster from title's posters)
+  const posterCardPath = randomPosterPath || details?.poster_path || details?.backdrop_path || null;
+  const posterCardUrl = posterCardPath ? tmdbImages.poster(posterCardPath, 'w500') : '';
 
   // Subtle hero cross-dissolve manager:
   // When baseHeroUrl changes, incomingHeroUrl is queued. Once loaded, it dissolves smoothly over displayedHeroUrl.
@@ -384,14 +374,25 @@ export const Details: React.FC = () => {
     }
   }, [baseHeroUrl, displayedHeroUrl, incomingHeroUrl]);
 
-  // Flow 3: Poster card URL (random poster from title's posters)
-  const posterCardPath = randomPosterPath || details.poster_path || details.backdrop_path;
-  const posterCardUrl = tmdbImages.poster(posterCardPath, 'w500');
-
   // Reset poster loaded flag when poster path changes to enable smooth fade-in
   useEffect(() => {
     setIsPosterLoaded(false);
   }, [posterCardUrl]);
+
+  if (isLoading || !details) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-hbo-dark">
+        <div className="w-12 h-12 border-4 border-hbo-purple border-t-hbo-cyan rounded-full animate-spin shadow-hbo-glow mb-4" />
+        <h2 className="text-sm font-bold font-display text-white tracking-widest">LOADING TITLE...</h2>
+      </div>
+    );
+  }
+
+  const title = details.title || details.name || 'Untitled';
+  const originalTitle = details.original_title || details.original_name;
+  const hasAlternativeTitle = Boolean(
+    originalTitle && originalTitle.trim().toLowerCase() !== title.trim().toLowerCase()
+  );
 
   // Flow 2: Active episode still (only when series is already watched)
   const activeEpisodeUrl = (isSeriesWatched && activeEpisodeStill)
