@@ -11,6 +11,7 @@ import { ConnectionTCPObfuscated } from 'telegram/network/connection/TCPObfuscat
 import bigInt from 'big-integer';
 import axios from 'axios';
 import fs from 'fs';
+import { spawn } from 'child_process';
 import { db } from './db.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -24,6 +25,7 @@ app.use(cors());
 app.use(express.json());
 
 const port = process.env.PORT || 3033;
+const INTERNAL_HTTP_PORT = parseInt(process.env.INTERNAL_PORT || '3034', 10);
 const apiId = parseInt(process.env.TG_API_ID, 10);
 const apiHash = process.env.TG_API_HASH;
 let session = process.env.TG_SESSION || '';
@@ -1661,8 +1663,16 @@ const BLOCK_CACHE_MAX_ENTRIES = 16; // 16 x 512KB = 8 MB
 const globalBlockCache = new Map();
 const activeStreams = new Map(); // key: docId -> { abort: Function }
 
+// Pinned cache for container headers (first 2 blocks: 0, 1) and tail cues (last 2 blocks)
+// These blocks (<= 2 MB total) are NEVER evicted by sequential playback pipelines,
+// eliminating 5 out of 6 remote Telegram round-trips on every seek!
+const pinnedHeaderCache = new Map(); // key: `${docId}:${blockIdx}` -> Buffer
+
 function getCachedBlock(docId, blockIdx) {
   const key = `${docId}:${blockIdx}`;
+  if (pinnedHeaderCache.has(key)) {
+    return pinnedHeaderCache.get(key);
+  }
   if (globalBlockCache.has(key)) {
     const data = globalBlockCache.get(key);
     globalBlockCache.delete(key);
@@ -1672,9 +1682,17 @@ function getCachedBlock(docId, blockIdx) {
   return null;
 }
 
-function setCachedBlock(docId, blockIdx, data) {
+function setCachedBlock(docId, blockIdx, data, isPinned = false) {
   if (!data || data.length === 0) return;
   const key = `${docId}:${blockIdx}`;
+  if (isPinned) {
+    if (pinnedHeaderCache.size > 12) {
+      const oldestKey = pinnedHeaderCache.keys().next().value;
+      pinnedHeaderCache.delete(oldestKey);
+    }
+    pinnedHeaderCache.set(key, data);
+    return;
+  }
   if (globalBlockCache.has(key)) {
     globalBlockCache.delete(key);
   } else if (globalBlockCache.size >= BLOCK_CACHE_MAX_ENTRIES) {
@@ -1818,6 +1836,11 @@ async function streamTelegramPipelined(client, targetDoc, startByte, endByte, re
     CONCURRENCY = customConcurrency;
   }
 
+  const isInternal = req?.headers?.['x-internal-transcoder'] === '1' || req?.query?.direct === '1';
+  if (isInternal) {
+    CONCURRENCY = 1; // Prevent MTProto pipeline lookahead congestion during demuxer probe
+  }
+
   let dcId = targetDoc.dcId || 2;
   let sender = await client.getSender(dcId);
   const fileRef = Buffer.isBuffer(targetDoc.fileReference)
@@ -1861,12 +1884,15 @@ async function streamTelegramPipelined(client, targetDoc, startByte, endByte, re
       limit: CHUNK_SIZE,
     });
 
+    const totalDocBlocks = Math.ceil(Number(targetDoc.size) / CHUNK_SIZE);
+    const isPinnedBlock = blockIdx <= 1 || blockIdx >= totalDocBlocks - 2;
+
     try {
       sender = await client.getSender(sender?.dcId || dcId);
       const result = await client.invokeWithSender(request, sender);
       const bytes = result.bytes;
       if (bytes && bytes.length > 0) {
-        setCachedBlock(targetDoc.id.toString(), blockIdx, bytes);
+        setCachedBlock(targetDoc.id.toString(), blockIdx, bytes, isPinnedBlock);
       }
       return bytes;
     } catch (err) {
@@ -1881,7 +1907,7 @@ async function streamTelegramPipelined(client, targetDoc, startByte, endByte, re
         const result = await client.invokeWithSender(request, sender);
         const bytes = result.bytes;
         if (bytes && bytes.length > 0) {
-          setCachedBlock(targetDoc.id.toString(), blockIdx, bytes);
+          setCachedBlock(targetDoc.id.toString(), blockIdx, bytes, isPinnedBlock);
         }
         return bytes;
       }
@@ -1899,7 +1925,7 @@ async function streamTelegramPipelined(client, targetDoc, startByte, endByte, re
           const result = await client.invokeWithSender(request, sender);
           const bytes = result.bytes;
           if (bytes && bytes.length > 0) {
-            setCachedBlock(targetDoc.id.toString(), blockIdx, bytes);
+            setCachedBlock(targetDoc.id.toString(), blockIdx, bytes, isPinnedBlock);
           }
           return bytes;
         }
@@ -1932,7 +1958,9 @@ async function streamTelegramPipelined(client, targetDoc, startByte, endByte, re
   let nextBlockToFetch = startBlock;
   const inFlight = new Map();
 
-  const clientSession = req?.headers?.['x-client-id'] || req?.ip || req?.socket?.remoteAddress || 'client';
+  const clientSession = isInternal
+    ? `internal-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`
+    : (req?.headers?.['x-client-id'] || req?.ip || req?.socket?.remoteAddress || 'client');
   const streamKey = `${clientSession}:${targetDoc.id}`;
   activeStreams.set(streamKey, {
     abort: () => {
@@ -2103,9 +2131,14 @@ app.get('/stream/:docId', async (req, res) => {
 
     // Instantly terminate any previous in-flight stream pipeline for this document for the same client session (e.g. user seeked forward)
     // to free 100% of the router's MTProto download bandwidth for the new seek position immediately.
-    const clientSession = req.headers['x-client-id'] || req.ip || req.socket.remoteAddress || 'client';
+    // Internal transcoder sessions are uniquely keyed so they never self-abort or abort other streams.
+    const isInternalTranscoder = req.headers['x-internal-transcoder'] === '1' || req.query.direct === '1';
+    const clientSession = isInternalTranscoder
+      ? `internal-${docId}-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`
+      : (req.headers['x-client-id'] || req.ip || req.socket.remoteAddress || 'client');
     const streamSessionKey = `${clientSession}:${docId}`;
-    if (activeStreams.has(streamSessionKey)) {
+
+    if (!isInternalTranscoder && activeStreams.has(streamSessionKey)) {
       console.log(`[STREAM CANCEL] Terminating previous in-flight stream for client ${clientSession} doc ${docId} on new seek.`);
       try { activeStreams.get(streamSessionKey).abort(); } catch {}
       activeStreams.delete(streamSessionKey);
@@ -2153,6 +2186,100 @@ app.get('/stream/:docId', async (req, res) => {
 
     if (!targetDoc || !targetMedia) {
       return res.status(404).send('Media document not found or expired from recent bot messages');
+    }
+
+    // OPTION C: On-demand Audio Transcoding Pipe (?transcode=audio&ss=<timestamp>)
+    // Streams Matroska with video copied 1:1 and audio transcoded to stereo AAC directly via pipe:1
+    if (req.query.transcode === 'audio') {
+      const seekSec = Math.max(0, parseFloat(req.query.ss) || 0);
+      console.log(`[TRANSCODE AUDIO] Starting audio transcode for doc ${docId} (${filename}) at ${seekSec}s...`);
+
+      if (req.method === 'HEAD') {
+        res.writeHead(200, {
+          'Content-Type': 'video/x-matroska',
+          'Accept-Ranges': 'none',
+          'Connection': 'keep-alive',
+          'Access-Control-Allow-Origin': '*',
+        });
+        return res.end();
+      }
+
+      const ffmpegBin = process.env.FFMPEG_PATH || (fs.existsSync('/opt/bin/ffmpeg') ? '/opt/bin/ffmpeg' : 'ffmpeg');
+      const ffmpegArgs = [
+        '-loglevel', 'error',
+        '-noaccurate_seek',
+        ...(seekSec > 0 ? ['-ss', seekSec.toString()] : []),
+        '-headers', 'x-internal-transcoder: 1\r\n',
+        '-probesize', '262144',
+        '-analyzeduration', '0',
+        '-fflags', '+nobuffer+fastseek+flush_packets',
+        '-flags', 'low_delay',
+        '-i', `http://127.0.0.1:${INTERNAL_HTTP_PORT}/stream/${docId}?direct=1`,
+        '-map', '0:v:0',
+        '-map', '0:a:0?',
+        '-c:v', 'copy',
+        '-c:a', 'aac',
+        '-ac', '2',
+        '-b:a', '192k',
+        '-cluster_time_limit', '250',
+        '-cluster_size_limit', '65536',
+        '-f', 'matroska',
+        'pipe:1',
+      ];
+
+      res.writeHead(200, {
+        'Content-Type': 'video/x-matroska',
+        'Transfer-Encoding': 'chunked',
+        'Connection': 'keep-alive',
+        'Cache-Control': 'no-cache, no-store',
+        'Access-Control-Allow-Origin': '*',
+        'Content-Disposition': `inline; filename="transcoded_${docId}.mkv"`,
+      });
+
+      const ffmpegProc = spawn(ffmpegBin, ffmpegArgs, { stdio: ['ignore', 'pipe', 'pipe'] });
+
+      activeStreams.set(streamSessionKey, {
+        abort: () => {
+          console.log(`[TRANSCODE ABORT] Killing ffmpeg process for doc ${docId}`);
+          try { ffmpegProc.kill('SIGKILL'); } catch {}
+        }
+      });
+
+      const cleanupFfmpeg = () => {
+        if (activeStreams.get(streamSessionKey)) {
+          activeStreams.delete(streamSessionKey);
+        }
+        if (!ffmpegProc.killed) {
+          try { ffmpegProc.kill('SIGKILL'); } catch {}
+        }
+      };
+
+      req.on('close', cleanupFfmpeg);
+      res.on('finish', cleanupFfmpeg);
+
+      ffmpegProc.stderr.on('data', (data) => {
+        const msg = data.toString().trim();
+        if (msg) console.warn(`[FFMPEG ${docId}]`, msg);
+      });
+
+      ffmpegProc.on('error', (err) => {
+        console.error(`[FFMPEG ERROR ${docId}]`, err);
+        cleanupFfmpeg();
+        if (!res.headersSent) res.status(500).send('Transcoding process error');
+      });
+
+      ffmpegProc.on('exit', (code, signal) => {
+        cleanupFfmpeg();
+        if (code !== 0 && code !== null && signal !== 'SIGKILL') {
+          console.warn(`[FFMPEG EXIT ${docId}] exited with code ${code}, signal ${signal}`);
+        }
+        if (!res.writableEnded) {
+          try { res.end(); } catch {}
+        }
+      });
+
+      ffmpegProc.stdout.pipe(res);
+      return;
     }
 
     // Handle HEAD probe requests instantly (critical for Android WebView & ExoPlayer probe)
@@ -2258,7 +2385,7 @@ if (sslCertFile && sslKeyFile) {
     console.error('[SERVER SSL ERROR] Failed to initialize HTTPS server, falling back to HTTP:', sslErr);
     serverInstance = http.createServer(app);
     serverInstance.listen(port, async () => {
-      console.log(`[SERVER] MSM Getter microservice fallback listening on HTTP port ${port}`);
+      console.log(`[SERVER] MSM Getter microservice listening on HTTP port ${port}`);
       try {
         await initTelegram();
       } catch (err) {
@@ -2276,4 +2403,17 @@ if (sslCertFile && sslKeyFile) {
       console.warn(`[SERVER] Telegram not connected on startup (${err.message}). Web auth portal ready at /auth.`);
     }
   });
+}
+
+// Start dedicated internal loopback HTTP listener on 127.0.0.1:3034
+// Bypasses TLS overhead completely for local ffmpeg transcode demuxer
+if (port !== INTERNAL_HTTP_PORT) {
+  try {
+    const internalServer = http.createServer(app);
+    internalServer.listen(INTERNAL_HTTP_PORT, '127.0.0.1', () => {
+      console.log(`[SERVER] Internal loopback HTTP listener active on http://127.0.0.1:${INTERNAL_HTTP_PORT} (0% TLS overhead for ffmpeg)`);
+    });
+  } catch (internalErr) {
+    console.warn('[SERVER] Could not bind internal HTTP listener:', internalErr.message);
+  }
 }
