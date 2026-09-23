@@ -105,6 +105,19 @@ export const Details: React.FC = () => {
     return null;
   });
   const [isBaseHeroLoaded, setIsBaseHeroLoaded] = useState(false);
+  const [displayedHeroUrl, setDisplayedHeroUrl] = useState<string | null>(() => {
+    if (initialPreview && initialPreview.id === tmdbId) {
+      const isInitialLandscape = typeof window !== 'undefined' ? window.innerWidth > window.innerHeight : false;
+      const initialHero = !isInitialLandscape
+        ? (initialPreview.poster_path || initialPreview.backdrop_path)
+        : (initialPreview.backdrop_path || initialPreview.poster_path);
+      return initialHero ? tmdbImages.backdrop(initialHero, 'w1280') : null;
+    }
+    return null;
+  });
+  const [incomingHeroUrl, setIncomingHeroUrl] = useState<string | null>(null);
+  const [isIncomingLoaded, setIsIncomingLoaded] = useState(false);
+  const [isPosterLoaded, setIsPosterLoaded] = useState(false);
   const [activeEpisodeStill, setActiveEpisodeStill] = useState<string | null>(null);
   const [isEpisodeStillLoaded, setIsEpisodeStillLoaded] = useState(false);
   const [isLoading, setIsLoading] = useState(() => !initialPreview || initialPreview.id !== tmdbId);
@@ -119,6 +132,10 @@ export const Details: React.FC = () => {
     setWatchProgress(null);
     setLastWatched(null);
     setIsBaseHeroLoaded(false);
+    setDisplayedHeroUrl(null);
+    setIncomingHeroUrl(null);
+    setIsIncomingLoaded(false);
+    setIsPosterLoaded(false);
     setActiveEpisodeStill(null);
     setIsEpisodeStillLoaded(false);
     setIsLiked(false);
@@ -424,14 +441,33 @@ export const Details: React.FC = () => {
     : (randomBackdropPath || details.backdrop_path || details.poster_path);
   const baseHeroUrl = tmdbImages.backdrop(baseHeroPath, isPerfMode ? 'w780' : 'w1280');
 
-  // Flow 2: Active episode still is ONLY rendered in landscape mode for watched series
-  const activeEpisodeUrl = (isLandscape && isSeriesWatched && activeEpisodeStill)
-    ? tmdbImages.backdrop(activeEpisodeStill, isPerfMode ? 'w780' : 'w1280')
-    : null;
+  // Subtle hero cross-dissolve manager:
+  // When baseHeroUrl changes, incomingHeroUrl is queued. Once loaded, it dissolves smoothly over displayedHeroUrl.
+  useEffect(() => {
+    if (!baseHeroUrl) return;
+    if (!displayedHeroUrl) {
+      setDisplayedHeroUrl(baseHeroUrl);
+      return;
+    }
+    if (baseHeroUrl !== displayedHeroUrl && baseHeroUrl !== incomingHeroUrl) {
+      setIncomingHeroUrl(baseHeroUrl);
+      setIsIncomingLoaded(false);
+    }
+  }, [baseHeroUrl, displayedHeroUrl, incomingHeroUrl]);
 
   // Poster card URL (used in landscape mode): multiple posters randomly switched
   const posterCardPath = randomPosterPath || details.poster_path || details.backdrop_path;
   const posterCardUrl = tmdbImages.poster(posterCardPath, 'w500');
+
+  // Reset poster loaded flag when poster path changes to enable smooth fade-in
+  useEffect(() => {
+    setIsPosterLoaded(false);
+  }, [posterCardUrl]);
+
+  // Flow 2: Active episode still is ONLY rendered in landscape mode for watched series
+  const activeEpisodeUrl = (isLandscape && isSeriesWatched && activeEpisodeStill)
+    ? tmdbImages.backdrop(activeEpisodeStill, isPerfMode ? 'w780' : 'w1280')
+    : null;
 
   const releaseYear = (details.release_date || details.first_air_date || '').split('-')[0];
   const contentRating = extractContentRating(details);
@@ -440,26 +476,54 @@ export const Details: React.FC = () => {
     <div className="relative min-h-screen bg-hbo-dark text-white pb-28 sm:pb-36 overflow-x-hidden">
       {/* Top Hero Ambient Backdrop (Matched with HeroBanner) */}
       <div className="absolute top-0 left-0 right-0 h-[65vh] sm:h-[80vh] lg:h-[90vh] overflow-hidden pointer-events-none z-0">
-        {/* Flow 1: Base Random Hero Image with subtle fade-in and instant cache detection */}
-        <img
-          key={baseHeroUrl}
-          ref={(img) => {
-            if (img && img.complete && img.naturalWidth > 0 && !isBaseHeroLoaded) {
+        {/* Layer 1: Base Displayed Hero Image (remains solid while incoming loads to prevent black flashes) */}
+        {displayedHeroUrl && (
+          <img
+            key={displayedHeroUrl}
+            ref={(img) => {
+              if (img && img.complete && img.naturalWidth > 0 && !isBaseHeroLoaded) {
+                setIsBaseHeroLoaded(true);
+              }
+            }}
+            src={displayedHeroUrl}
+            alt={title}
+            decoding="async"
+            onLoad={() => setIsBaseHeroLoaded(true)}
+            onError={(e) => {
+              tmdbImages.handleImgError(e, true);
               setIsBaseHeroLoaded(true);
-            }
-          }}
-          src={baseHeroUrl}
-          alt={title}
-          decoding="async"
-          onLoad={() => setIsBaseHeroLoaded(true)}
-          onError={(e) => {
-            tmdbImages.handleImgError(e, true);
-            setIsBaseHeroLoaded(true);
-          }}
-          className={`absolute inset-0 w-full h-full object-cover object-top transform transition-all duration-1000 ease-out ${
-            isBaseHeroLoaded ? 'opacity-100 scale-105' : 'opacity-0 scale-100'
-          }`}
-        />
+            }}
+            className={`absolute inset-0 w-full h-full object-cover object-top scale-105 transform-gpu will-change-[opacity] transition-opacity duration-700 ease-in-out ${
+              isBaseHeroLoaded ? 'opacity-100' : 'opacity-0'
+            }`}
+          />
+        )}
+
+        {/* Layer 2: Incoming Hero Image (smoothly cross-fades over displayedHeroUrl) */}
+        {incomingHeroUrl && (
+          <img
+            key={incomingHeroUrl}
+            src={incomingHeroUrl}
+            alt={title}
+            decoding="async"
+            onLoad={() => {
+              setIsIncomingLoaded(true);
+              setTimeout(() => {
+                setDisplayedHeroUrl(incomingHeroUrl);
+                setIncomingHeroUrl(null);
+                setIsIncomingLoaded(false);
+              }, 700);
+            }}
+            onError={(e) => {
+              tmdbImages.handleImgError(e, true);
+              setDisplayedHeroUrl(incomingHeroUrl);
+              setIncomingHeroUrl(null);
+            }}
+            className={`absolute inset-0 w-full h-full object-cover object-top scale-105 transform-gpu will-change-[opacity] transition-opacity duration-700 ease-in-out ${
+              isIncomingLoaded ? 'opacity-100' : 'opacity-0'
+            }`}
+          />
+        )}
 
         {/* Flow 2: Active Episode Still for watched series with subtle smooth crossfade */}
         {activeEpisodeUrl && (
@@ -475,7 +539,7 @@ export const Details: React.FC = () => {
             decoding="async"
             onLoad={() => setIsEpisodeStillLoaded(true)}
             onError={(e) => tmdbImages.handleImgError(e, true)}
-            className={`absolute inset-0 w-full h-full object-cover object-top scale-105 transform transition-opacity duration-1000 ease-in-out ${
+            className={`absolute inset-0 w-full h-full object-cover object-top scale-105 transform-gpu will-change-[opacity] transition-opacity duration-700 ease-in-out ${
               isEpisodeStillLoaded ? 'opacity-100' : 'opacity-0'
             }`}
           />
@@ -522,14 +586,27 @@ export const Details: React.FC = () => {
             isLandscape ? 'pt-2' : 'pt-[28vh] sm:pt-[36vh] lg:pt-[42vh]'
           } flex flex-col sm:flex-row items-center sm:items-end gap-6 sm:gap-8 lg:gap-10`}
         >
-          {/* Title Poster Card (Visible in Landscape mode) */}
+          {/* Title Poster Card (Visible in Landscape mode with subtle fade-in) */}
           {isLandscape && (
-            <div className="w-36 sm:w-48 md:w-56 lg:w-64 aspect-[2/3] rounded-2xl overflow-hidden border border-white/20 shadow-2xl shadow-black/90 flex-shrink-0 bg-gray-900 group">
+            <div className="w-36 sm:w-48 md:w-56 lg:w-64 aspect-[2/3] rounded-2xl overflow-hidden border border-white/20 shadow-2xl shadow-black/90 flex-shrink-0 bg-gray-900/60 group relative transition-all duration-500 ease-out">
               <img
+                key={posterCardUrl}
+                ref={(img) => {
+                  if (img && img.complete && img.naturalWidth > 0 && !isPosterLoaded) {
+                    setIsPosterLoaded(true);
+                  }
+                }}
                 src={posterCardUrl}
                 alt={title}
-                onError={(e) => tmdbImages.handleImgError(e, false)}
-                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                decoding="async"
+                onLoad={() => setIsPosterLoaded(true)}
+                onError={(e) => {
+                  tmdbImages.handleImgError(e, false);
+                  setIsPosterLoaded(true);
+                }}
+                className={`w-full h-full object-cover group-hover:scale-105 transition-all duration-700 ease-out ${
+                  isPosterLoaded ? 'opacity-100' : 'opacity-0'
+                }`}
               />
             </div>
           )}

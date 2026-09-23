@@ -386,8 +386,20 @@ const MediaCardComponent: React.FC<MediaCardProps> = ({
             loading="lazy"
             decoding="async"
             draggable={false}
-            onError={(e) => tmdbImages.handleImgError(e, isLandscape)}
-            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 pointer-events-none select-none"
+            ref={(img) => {
+              if (img && img.complete && img.naturalWidth > 0) {
+                img.style.opacity = '1';
+              }
+            }}
+            onLoad={(e) => {
+              e.currentTarget.style.opacity = '1';
+            }}
+            onError={(e) => {
+              tmdbImages.handleImgError(e, isLandscape);
+              e.currentTarget.style.opacity = '1';
+            }}
+            style={{ opacity: 0 }}
+            className="w-full h-full object-cover transition-opacity duration-500 ease-out group-hover:scale-105 pointer-events-none select-none"
           />
 
           {/* Pure Play Icon on Bottom-Left Corner for Landscape Continue Watching Cards */}
