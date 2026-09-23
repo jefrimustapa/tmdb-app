@@ -319,17 +319,18 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ items }) => {
 
           <Link
             to={`/details/${mediaType}/${currentFeatured.id}`}
+            state={{ item: currentFeatured }}
             data-hero-btn="details"
             data-hero-index={currentIndex}
             tabIndex={0}
             onClick={(e) => {
               e.preventDefault();
-              navigate(`/details/${mediaType}/${currentFeatured.id}`);
+              navigate(`/details/${mediaType}/${currentFeatured.id}`, { state: { item: currentFeatured } });
             }}
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
                 e.preventDefault();
-                navigate(`/details/${mediaType}/${currentFeatured.id}`);
+                navigate(`/details/${mediaType}/${currentFeatured.id}`, { state: { item: currentFeatured } });
               }
             }}
             className="flex items-center gap-2 px-4 sm:px-5 py-2 rounded-xl bg-white/20 hover:bg-white/30 text-white font-semibold text-xs sm:text-sm border border-white/25 transition-all hover:scale-105 tv-focus-target"

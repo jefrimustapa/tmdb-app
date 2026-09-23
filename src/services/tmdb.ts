@@ -438,7 +438,10 @@ export const tmdbApi = {
     return res;
   },
   getMovieDetails: (id: number) =>
-    tmdbFetch<TMDBMovieDetails>(`/movie/${id}`, { append_to_response: 'credits,videos,similar,recommendations,release_dates' }),
+    tmdbFetch<TMDBMovieDetails>(`/movie/${id}`, {
+      append_to_response: 'credits,videos,similar,recommendations,release_dates,images',
+      include_image_language: 'en,null',
+    }),
 
   // TV Shows
   getPopularTV: (page = 1) =>
@@ -448,7 +451,10 @@ export const tmdbApi = {
   getOnTheAirTV: (page = 1) =>
     tmdbFetch<TMDBResponse<TMDBMediaItem>>('/tv/on_the_air', { page }),
   getTVDetails: (id: number) =>
-    tmdbFetch<TMDBTVDetails>(`/tv/${id}`, { append_to_response: 'credits,videos,similar,recommendations,content_ratings' }),
+    tmdbFetch<TMDBTVDetails>(`/tv/${id}`, {
+      append_to_response: 'credits,videos,similar,recommendations,content_ratings,images',
+      include_image_language: 'en,null',
+    }),
   getSeasonDetails: (tvId: number, seasonNumber: number) =>
     tmdbFetch<TMDBSeasonDetails>(`/tv/${tvId}/season/${seasonNumber}`),
 
