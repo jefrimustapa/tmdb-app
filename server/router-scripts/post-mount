@@ -1,0 +1,17 @@
+#!/bin/sh
+# Disable swap to avoid USB lockup and ext4 corruption
+swapoff -a 2>/dev/null
+
+[ -f /jffs/addons/amtm/mount-entware.mod ] && . /jffs/addons/amtm/mount-entware.mod
+
+# Fallback ensure /tmp/opt is reliably linked
+if [ -f /tmp/mnt/Entware/entware/bin/opkg ] && [ ! -L /tmp/opt ]; then
+    logger -t "post-mount" "Fallback: linking /tmp/opt to /tmp/mnt/Entware/entware"
+    ln -nsf /tmp/mnt/Entware/entware /tmp/opt
+    [ -x /opt/etc/init.d/rc.unslung ] && /opt/etc/init.d/rc.unslung start
+fi
+
+# Ensure S99msm-getter is actively running
+if [ -x /opt/etc/init.d/S99msm-getter ]; then
+    /opt/etc/init.d/S99msm-getter status >/dev/null 2>&1 || /opt/etc/init.d/S99msm-getter start
+fi

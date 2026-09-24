@@ -1,0 +1,10 @@
+#!/bin/sh
+
+if [ -b "$1" ]; then
+    if /usr/sbin/tune2fs -l "$1" >/dev/null 2>&1; then
+        logger -t "pre-mount" "Checking ext filesystem on $1..."
+        /usr/sbin/e2fsck -p "$1" 2>&1 | logger -t "pre-mount"
+        FSCK_EXIT=$?
+        logger -t "pre-mount" "e2fsck on $1 finished with exit code $FSCK_EXIT"
+    fi
+fi
