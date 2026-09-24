@@ -207,6 +207,14 @@ export const Details: React.FC = () => {
       })
       .catch((err) => {
         console.error('Failed to load details in parallel:', err);
+        // Fallback: If network/details fetch fails, use preview artwork so page still displays
+        if (isMounted) {
+          const preview = (location.state as { item?: TMDBMediaItem } | null)?.item;
+          if (preview) {
+            setRandomPosterPath((prev) => prev || preview.poster_path || null);
+            setRandomBackdropPath((prev) => prev || preview.backdrop_path || null);
+          }
+        }
       })
       .finally(() => {
         if (isMounted) {
@@ -410,7 +418,7 @@ export const Details: React.FC = () => {
               tmdbImages.handleImgError(e, true);
               setIsHeroLoaded(true);
             }}
-            className={`absolute inset-0 w-full h-full object-cover object-top scale-105 transform-gpu will-change-[opacity] transition-opacity duration-700 ease-in-out ${
+            className={`absolute inset-0 w-full h-full object-cover object-top transform-gpu will-change-[opacity] transition-opacity duration-700 ease-in-out ${
               isHeroLoaded ? 'opacity-100' : 'opacity-0'
             }`}
           />
