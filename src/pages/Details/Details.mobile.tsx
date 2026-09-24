@@ -225,6 +225,14 @@ export const Details: React.FC = () => {
       })
       .catch((err) => {
         console.error('Failed to load details in parallel:', err);
+        // Fallback: If network/details fetch fails, use preview artwork so page still displays
+        if (isMounted) {
+          const preview = (location.state as { item?: TMDBMediaItem } | null)?.item;
+          if (preview) {
+            setRandomPosterPath((prev) => prev || preview.poster_path || null);
+            setRandomBackdropPath((prev) => prev || preview.backdrop_path || null);
+          }
+        }
       })
       .finally(() => {
         if (isMounted) {
@@ -419,14 +427,14 @@ export const Details: React.FC = () => {
 
   // Hero background image selection:
   // In Portrait (!isLandscape):
-  //   - Background: strictly single randomly chosen poster from title's available posters pool or poster_path. NEVER use backdrop.
+  //   - Background: strictly single randomly chosen poster from title's available posters pool. NEVER load premature preview backdrop or poster to prevent swapping.
   //   - Series: do NOT use active watch episode backdrop
   // In Landscape (isLandscape):
   //   - Watched series: uses active episode backdrop
   //   - Movies / unwatched series: single randomly chosen backdrop from title's backdrops pool
   const heroPath = !isLandscape
-    ? (randomPosterPath || details?.poster_path || null)
-    : (activeEpisodeStill || randomBackdropPath || details?.backdrop_path || null);
+    ? randomPosterPath
+    : (activeEpisodeStill || randomBackdropPath);
   const heroUrl = heroPath
     ? (!isLandscape
         ? tmdbImages.poster(heroPath, isPerfMode ? 'w500' : 'w780')

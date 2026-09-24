@@ -207,6 +207,14 @@ export const Details: React.FC = () => {
       })
       .catch((err) => {
         console.error('Failed to load details in parallel:', err);
+        // Fallback: If network/details fetch fails, use preview artwork so page still displays
+        if (isMounted) {
+          const preview = (location.state as { item?: TMDBMediaItem } | null)?.item;
+          if (preview) {
+            setRandomPosterPath((prev) => prev || preview.poster_path || null);
+            setRandomBackdropPath((prev) => prev || preview.backdrop_path || null);
+          }
+        }
       })
       .finally(() => {
         if (isMounted) {
