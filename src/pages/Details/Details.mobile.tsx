@@ -474,8 +474,14 @@ export const Details: React.FC = () => {
 
   return (
     <div className="relative min-h-screen bg-hbo-dark text-white pb-28 sm:pb-36 overflow-x-hidden">
-      {/* Top Hero Ambient Backdrop (Matched with HeroBanner) */}
-      <div className={`absolute top-0 left-0 right-0 ${!isLandscape ? 'h-[100dvh]' : 'h-[65vh] sm:h-[80vh] lg:h-[90vh]'} overflow-hidden pointer-events-none z-0`}>
+      {/* Top Hero Ambient Backdrop */}
+      <div
+        className={`absolute top-0 left-0 right-0 ${
+          !isLandscape
+            ? 'w-full'
+            : 'h-[65vh] sm:h-[80vh] lg:h-[90vh]'
+        } overflow-hidden pointer-events-none z-0`}
+      >
         {heroUrl && (
           <img
             key={heroUrl}
@@ -492,7 +498,11 @@ export const Details: React.FC = () => {
               tmdbImages.handleImgError(e, true);
               setIsHeroLoaded(true);
             }}
-            className={`absolute inset-0 w-full h-full object-cover object-top transform-gpu will-change-[opacity] transition-opacity duration-700 ease-in-out ${
+            className={`${
+              !isLandscape
+                ? 'w-full h-auto block'
+                : 'absolute inset-0 w-full h-full object-cover object-top'
+            } transform-gpu will-change-[opacity] transition-opacity duration-700 ease-in-out ${
               isHeroLoaded ? 'opacity-100' : 'opacity-0'
             }`}
           />
@@ -502,6 +512,9 @@ export const Details: React.FC = () => {
         <div className="absolute inset-0 hero-gradient-overlay" />
         <div className="absolute inset-0 hero-side-gradient hidden sm:block" />
         <div className="absolute inset-0 bg-gradient-to-t from-transparent via-transparent to-black/40" />
+        {!isLandscape && (
+          <div className="absolute inset-x-0 bottom-0 h-44 bg-gradient-to-t from-hbo-dark via-hbo-dark/85 to-transparent" />
+        )}
       </div>
 
       {/* Hero Viewport Section (Portrait: dynamic flex-between anchored 15px above bottom nav; Landscape: standard flow) */}
