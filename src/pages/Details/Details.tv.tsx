@@ -418,7 +418,7 @@ export const Details: React.FC = () => {
               tmdbImages.handleImgError(e, true);
               setIsHeroLoaded(true);
             }}
-            className={`absolute inset-0 w-full h-full object-cover object-top scale-105 transform-gpu will-change-[opacity] transition-opacity duration-700 ease-in-out ${
+            className={`absolute inset-0 w-full h-full object-cover object-top scale-[1.01] transform-gpu will-change-[opacity] transition-opacity duration-700 ease-in-out ${
               isHeroLoaded ? 'opacity-100' : 'opacity-0'
             }`}
           />

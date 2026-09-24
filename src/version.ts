@@ -2,12 +2,13 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20260924-2043';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.fix-single-artwork-s.20260924-2043';
+export const APP_BUILD_NUMBER = '20260924-2050';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.fix-single-artwork-s.20260924-2050';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
 export const APP_BRANCH = 'fix-single-artwork-s';
-export const APP_CHANGELOG = `* feat(details): portrait background poster enforcement and adaptive button alignment (#141)
+export const APP_CHANGELOG = `* fix(details): eliminate artwork swapping by loading single chosen poster and backdrop directly
+* feat(details): portrait background poster enforcement and adaptive button alignment (#141)
 * feat(details): apply custom responsive title scale and shift info to Stage 3 (#140)
 * feat(details): prioritize collaborative recommendations and refine title font sizing (#139)
 * fix(details): resolve background image loading failure and cache race condition (#138)
@@ -20,5 +21,4 @@ export const APP_CHANGELOG = `* feat(details): portrait background poster enforc
 * feat(msm): use https://www.julietmike.net:3033 as single default preset and remove onrender
 * feat(msm-getter): enable native HTTPS server with Let's Encrypt certificates
 * Revert "Merge pull request #130 from jefrimustapa/fix/msm-stream-resolution"
-* Merge pull request #130 from jefrimustapa/fix/msm-stream-resolution
-* fix(msm): prevent false sequel penalties and handle bot message metadata in stream resolution`;
+* Merge pull request #130 from jefrimustapa/fix/msm-stream-resolution`;
