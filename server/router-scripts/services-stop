@@ -1,0 +1,23 @@
+#!/bin/sh
+logger -t "services-stop" "Gracefully stopping Entware services and flushing disk cache..."
+swapoff -a 2>/dev/null
+
+if [ -x /opt/etc/init.d/S99msm-getter ]; then
+    /opt/etc/init.d/S99msm-getter stop
+fi
+
+if [ -x /opt/etc/init.d/rc.unslung ]; then
+    /opt/etc/init.d/rc.unslung stop
+fi
+
+# Allow in-flight worker processes time to finish
+sleep 2
+
+# Terminate any remaining node processes cleanly
+killall node 2>/dev/null
+
+# Flush all dirty filesystem buffers and commit ext4 journal
+sync
+sync
+sleep 1
+logger -t "services-stop" "Entware services stopped and caches flushed."
