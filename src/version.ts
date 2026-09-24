@@ -2,18 +2,15 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20260923-1459';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-revise-details-.20260923-1459';
+export const APP_BUILD_NUMBER = '20260924-2100';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.fix-single-artwork-s.20260924-2100';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
-export const APP_BRANCH = 'feat-revise-details-';
-export const APP_CHANGELOG = `* fix(details): strictly use poster image in portrait and eliminate gap before storyline
-* fix(details): anchor row 2 buttons 10px above mobile bottom nav
-* feat(details): adapt portrait layout to 100dvh flex-between with 10px bottom clearance for buttons
-* fix(details): eliminate image swap by picking single artwork from available pool before subtle fade
-* fix(details): resolve Rule of Hooks crash when navigating without router state
-* feat(ui): add subtle two-layer hero crossfade and gentle image load transitions
-* feat(details): add portrait and landscape adaptive background and poster presentation
+export const APP_BRANCH = 'fix-single-artwork-s';
+export const APP_CHANGELOG = `* style(details): set background image zoom to 0% (natural 1.0x scale)
+* style(details): adjust background image scale to 101% (1% subtle zoom)
+* fix(details): eliminate artwork swapping by loading single chosen poster and backdrop directly
+* feat(details): portrait background poster enforcement and adaptive button alignment (#141)
 * feat(details): apply custom responsive title scale and shift info to Stage 3 (#140)
 * feat(details): prioritize collaborative recommendations and refine title font sizing (#139)
 * fix(details): resolve background image loading failure and cache race condition (#138)
@@ -21,4 +18,7 @@ export const APP_CHANGELOG = `* fix(details): strictly use poster image in portr
 * fix(stream): resolve MKV audio silence via real-time audio transcode pipe and fast time-offset seeking (#136)
 * fix(watch): eliminate hover tooltip and punch-through splash layer in watch page (#135)
 * fix: add cursor-pointer to sidebar NavLink for physical mouse on Android TV WebView (#133)
-* fix(msm): resolve pipeline reliability, auto-retry, and player origin settings sync (#132)`;
+* fix(msm): resolve pipeline reliability, auto-retry, and player origin settings sync (#132)
+* Merge pull request #131 from jefrimustapa/feat/default-https-julietmike
+* feat(msm): use https://www.julietmike.net:3033 as single default preset and remove onrender
+* feat(msm-getter): enable native HTTPS server with Let's Encrypt certificates`;
