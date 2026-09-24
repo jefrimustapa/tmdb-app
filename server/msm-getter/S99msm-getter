@@ -20,21 +20,49 @@ rotate_log() {
 
 supervisor_loop() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] [SUPERVISOR] Starting supervisor loop (PID $$)..." >> "$LOG_FILE"
+    CRASH_COUNT=0
     while [ -f "$SUP_PID_FILE" ]; do
         rotate_log
+
+        # Verify node binary and index.js exist before attempting spawn
+        if [ ! -x "/opt/bin/node" ] || [ ! -f "$APP_DIR/index.js" ]; then
+            echo "[$(date '+%Y-%m-%d %H:%M:%S')] [SUPERVISOR ERROR] /opt/bin/node or $APP_DIR/index.js missing. Backing off 30s..." >> "$LOG_FILE"
+            sleep 30
+            continue
+        fi
+
         echo "[$(date '+%Y-%m-%d %H:%M:%S')] [SUPERVISOR] Spawning node with 256MB heap limit..." >> "$LOG_FILE"
+        START_TIME=$(date +%s)
         env LD_PRELOAD=/opt/lib/libfixmadvise.so /opt/bin/node --max-old-space-size=256 index.js >> "$LOG_FILE" 2>&1 &
         NODE_PID=$!
         echo $NODE_PID > "$PID_FILE"
         wait $NODE_PID
         EXIT_CODE=$?
+        END_TIME=$(date +%s)
+        RUNTIME=$((END_TIME - START_TIME))
         rm -f "$PID_FILE"
         if [ ! -f "$SUP_PID_FILE" ]; then
             echo "[$(date '+%Y-%m-%d %H:%M:%S')] [SUPERVISOR] Clean shutdown requested. Exiting supervisor." >> "$LOG_FILE"
             break
         fi
-        echo "[$(date '+%Y-%m-%d %H:%M:%S')] [SUPERVISOR WARN] Node process terminated (exit code: $EXIT_CODE). Respawning in 3s..." >> "$LOG_FILE"
-        sleep 3
+
+        # Track rapid crashes to prevent thrashing flash disk / CPU
+        if [ "$RUNTIME" -lt 15 ]; then
+            CRASH_COUNT=$((CRASH_COUNT + 1))
+        else
+            CRASH_COUNT=0
+        fi
+
+        if [ "$CRASH_COUNT" -gt 5 ]; then
+            BACKOFF=60
+        elif [ "$CRASH_COUNT" -gt 2 ]; then
+            BACKOFF=15
+        else
+            BACKOFF=3
+        fi
+
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] [SUPERVISOR WARN] Node process terminated (exit: $EXIT_CODE, runtime: ${RUNTIME}s, crashes: $CRASH_COUNT). Respawning in ${BACKOFF}s..." >> "$LOG_FILE"
+        sleep $BACKOFF
     done
     rm -f "$SUP_PID_FILE"
 }
@@ -81,10 +109,20 @@ stop() {
         rm -f "$SUP_PID_FILE"
         kill $SUP_PID 2>/dev/null
     fi
-    # 2. Stop Node process
+    # 2. Gracefully signal Node process
     if [ -f "$PID_FILE" ]; then
         NODE_PID=$(cat "$PID_FILE")
-        kill $NODE_PID 2>/dev/null
+        kill -TERM $NODE_PID 2>/dev/null
+        # Wait up to 5 seconds for node to finish and exit
+        for i in 1 2 3 4 5; do
+            if kill -0 $NODE_PID 2>/dev/null; then
+                sleep 1
+            else
+                break
+            fi
+        done
+        # Force kill if still lingering
+        kill -9 $NODE_PID 2>/dev/null
         rm -f "$PID_FILE"
     fi
     # 3. Fallback cleanup for orphaned node processes
