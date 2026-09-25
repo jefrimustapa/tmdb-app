@@ -50,9 +50,13 @@ let client = new TelegramClient(new StringSession(session), apiId, apiHash, {
 
 let isConnected = false;
 let authError = null;
+let initPromise = null;
 
 async function initTelegram() {
-  if (!isConnected) {
+  if (isConnected && client?.connected) return;
+  if (initPromise) return await initPromise;
+
+  initPromise = (async () => {
     if (!session && !client?.session?.authKey) {
       authError = 'No active session. Please authenticate via Web Portal at /auth.';
       throw new Error(authError);
@@ -75,7 +79,11 @@ async function initTelegram() {
       }
       throw err;
     }
-  }
+  })().finally(() => {
+    initPromise = null;
+  });
+
+  return await initPromise;
 }
 
 function checkFfmpeg() {
@@ -648,11 +656,20 @@ app.get('/api/logs/stream', (req, res) => {
       if (!fs.existsSync(logPath)) return;
       const curSize = fs.statSync(logPath).size;
       if (curSize > lastSize) {
-        const readLen = curSize - lastSize;
+        // Cap chunk read size to 64KB max to prevent OOM spikes on large log file changes
+        const maxChunk = 64 * 1024;
+        const readLen = Math.min(curSize - lastSize, maxChunk);
+        const startPos = curSize - readLen;
         const buf = Buffer.alloc(readLen);
-        const fd = fs.openSync(logPath, 'r');
-        fs.readSync(fd, buf, 0, readLen, lastSize);
-        fs.closeSync(fd);
+        let fd;
+        try {
+          fd = fs.openSync(logPath, 'r');
+          fs.readSync(fd, buf, 0, readLen, startPos);
+        } finally {
+          if (fd !== undefined) {
+            try { fs.closeSync(fd); } catch {}
+          }
+        }
         lastSize = curSize;
 
         const newText = buf.toString('utf8');
@@ -1730,7 +1747,13 @@ function setCachedBlock(docId, blockIdx, data, isPinned = false) {
  */
 function writeWithBackpressure(res, chunk) {
   if (res.destroyed || res.writableEnded) return Promise.resolve();
-  if (res.write(chunk)) return Promise.resolve();
+  let ok = false;
+  try {
+    ok = res.write(chunk);
+  } catch (err) {
+    return Promise.resolve();
+  }
+  if (ok) return Promise.resolve();
   return new Promise((resolve) => {
     const onDrain = () => { cleanup(); resolve(); };
     const onClose = () => { cleanup(); resolve(); };
@@ -1883,7 +1906,18 @@ async function streamTelegramPipelined(client, targetDoc, startByte, endByte, re
 
   activeStreams.set(streamKey, { abort: abortPipeline });
 
+  const onReqClose = () => {
+    abortPipeline();
+    cleanupStream();
+    console.log(`[PIPELINE CLOSED by client] active: block ${activeBlock}/${endBlock}, aborted remaining blocks.`);
+  };
+  const onResFinish = () => {
+    cleanupStream();
+  };
+
   const cleanupStream = () => {
+    req.off('close', onReqClose);
+    res.off('finish', onResFinish);
     if (activeStreams.get(streamKey)) {
       activeStreams.delete(streamKey);
     }
@@ -1893,12 +1927,8 @@ async function streamTelegramPipelined(client, targetDoc, startByte, endByte, re
   const endBlock = Math.floor(endByte / CHUNK_SIZE);
   let activeBlock = startBlock;
 
-  req.on('close', () => {
-    abortPipeline();
-    cleanupStream();
-    console.log(`[PIPELINE CLOSED by client] active: block ${activeBlock}/${endBlock}, aborted remaining blocks.`);
-  });
-  res.on('finish', cleanupStream);
+  req.on('close', onReqClose);
+  res.on('finish', onResFinish);
 
   let dcId = targetDoc.dcId || 2;
   let sender = await client.getSender(dcId);
@@ -2146,13 +2176,17 @@ app.post('/api/github-webhook', async (req, res) => {
         console.log(`[AUTO-DEPLOY] Downloading latest index.js from ${rawBase}/index.js...`);
         const idxRes = await axios.get(`${rawBase}/index.js`, { responseType: 'text', timeout: 15000 });
         if (idxRes.data && idxRes.data.length > 1000) {
-          fs.writeFileSync(path.join(__dirname, 'index.js'), idxRes.data, 'utf-8');
+          const tmpPath = path.join(__dirname, 'index.js.tmp');
+          fs.writeFileSync(tmpPath, idxRes.data, 'utf-8');
+          fs.renameSync(tmpPath, path.join(__dirname, 'index.js'));
         }
 
         console.log(`[AUTO-DEPLOY] Downloading latest db.js from ${rawBase}/db.js...`);
         const dbRes = await axios.get(`${rawBase}/db.js`, { responseType: 'text', timeout: 15000 }).catch(() => null);
         if (dbRes?.data && dbRes.data.length > 200) {
-          fs.writeFileSync(path.join(__dirname, 'db.js'), dbRes.data, 'utf-8');
+          const tmpPath = path.join(__dirname, 'db.js.tmp');
+          fs.writeFileSync(tmpPath, dbRes.data, 'utf-8');
+          fs.renameSync(tmpPath, path.join(__dirname, 'db.js'));
         }
 
         console.log('[AUTO-DEPLOY] Code updated successfully! Exiting process for supervisor respawn in 1s...');
@@ -2310,6 +2344,8 @@ app.get('/stream/:docId', async (req, res) => {
       });
 
       const cleanupFfmpeg = () => {
+        req.off('close', cleanupFfmpeg);
+        res.off('finish', cleanupFfmpeg);
         if (activeStreams.get(streamSessionKey)) {
           activeStreams.delete(streamSessionKey);
         }
@@ -2327,11 +2363,32 @@ app.get('/stream/:docId', async (req, res) => {
       });
 
       ffmpegProc.stdout.on('data', (chunk) => {
+        if (res.destroyed || res.writableEnded) {
+          cleanupFfmpeg();
+          return;
+        }
         if (!firstChunkReceived) {
           firstChunkReceived = true;
           sendTranscodeHeaders();
         }
-        res.write(chunk);
+        try {
+          const ok = res.write(chunk);
+          if (!ok) {
+            ffmpegProc.stdout.pause();
+            res.once('drain', () => {
+              if (!ffmpegProc.killed) {
+                try { ffmpegProc.stdout.resume(); } catch {}
+              }
+            });
+          }
+        } catch (err) {
+          cleanupFfmpeg();
+        }
+      });
+
+      ffmpegProc.stdout.on('error', (err) => {
+        console.warn(`[FFMPEG STDOUT ${docId}] Error:`, err.message);
+        cleanupFfmpeg();
       });
 
       ffmpegProc.on('error', (err) => {
@@ -2412,12 +2469,30 @@ app.get('/stream/:docId', async (req, res) => {
     }
     if (!res.headersSent) {
       res.status(500).json({ error: err.message });
+    } else if (!res.writableEnded) {
+      try { res.destroy(); } catch {}
     }
   }
 });
 
 process.on('uncaughtException', (err) => {
-  if (err.code === 'ECONNRESET' || err.code === 'EPIPE' || err.code === 'ERR_STREAM_WRITE_AFTER_END') return;
+  const code = err?.code || '';
+  const msg = err?.message || '';
+  if (
+    code === 'ECONNRESET' ||
+    code === 'EPIPE' ||
+    code === 'ERR_STREAM_WRITE_AFTER_END' ||
+    code === 'ERR_STREAM_PREMATURE_CLOSE' ||
+    code === 'ECANCELED' ||
+    code === 'ETIMEDOUT' ||
+    code === 'ENETUNREACH' ||
+    code === 'EHOSTUNREACH' ||
+    code === 'ECONNREFUSED' ||
+    msg.includes('socket hang up') ||
+    msg.includes('Connection closed')
+  ) {
+    return;
+  }
   console.error('[FATAL EXCEPTION]', err);
 });
 
