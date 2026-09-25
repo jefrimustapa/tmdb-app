@@ -113,9 +113,17 @@ const inFlightResolutions = new Map();
 
 // Sequential FIFO mutex queue for Telegram bot operations
 let resolveMutex = Promise.resolve();
+let pendingTelegramTasks = 0;
+
 function queueTelegramTask(taskFn) {
+  pendingTelegramTasks++;
   const next = resolveMutex.then(taskFn, taskFn);
-  resolveMutex = next.catch(() => {});
+  resolveMutex = next.catch(() => {}).finally(() => {
+    pendingTelegramTasks--;
+    if (pendingTelegramTasks === 0) {
+      resolveMutex = Promise.resolve(); // Sever chain to allow GC of completed promises and closures
+    }
+  });
   return next;
 }
 
@@ -611,9 +619,15 @@ app.get('/api/logs', (req, res) => {
     const startPos = Math.max(0, stat.size - maxReadBytes);
     const readLength = stat.size - startPos;
     const buffer = Buffer.alloc(readLength);
-    const fd = fs.openSync(logPath, 'r');
-    fs.readSync(fd, buffer, 0, readLength, startPos);
-    fs.closeSync(fd);
+    let fd;
+    try {
+      fd = fs.openSync(logPath, 'r');
+      fs.readSync(fd, buffer, 0, readLength, startPos);
+    } finally {
+      if (fd !== undefined) {
+        try { fs.closeSync(fd); } catch {}
+      }
+    }
 
     const text = buffer.toString('utf8');
     const allLines = text.split(/\r?\n/).filter(l => l.trim().length > 0);
@@ -1700,7 +1714,19 @@ app.get('/api/resolve', async (req, res) => {
 // Caches up to 16 blocks (8 MB RAM) to eliminate seek latency while protecting router RAM from exhaustion.
 const BLOCK_CACHE_MAX_ENTRIES = 16; // 16 x 512KB = 8 MB
 const globalBlockCache = new Map();
-const activeStreams = new Map(); // key: docId -> { abort: Function }
+const activeStreams = new Map(); // key: streamSessionKey -> { abort: Function, createdAt: number }
+
+// Automated garbage collector for orphaned stream handles (stale entries older than 4 hours)
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, entry] of activeStreams.entries()) {
+    if (now - (entry.createdAt || now) > 4 * 3600 * 1000) {
+      console.warn(`[STREAM GC] Evicting orphaned activeStream: ${key}`);
+      try { entry.abort(); } catch {}
+      activeStreams.delete(key);
+    }
+  }
+}, 10 * 60 * 1000).unref();
 
 // Pinned cache for container headers (first 2 blocks: 0, 1) and tail cues (last 2 blocks)
 // These blocks (<= 2 MB total per doc) are NEVER evicted by sequential playback pipelines,
@@ -1725,7 +1751,9 @@ function setCachedBlock(docId, blockIdx, data, isPinned = false) {
   if (!data || data.length === 0) return;
   const key = `${docId}:${blockIdx}`;
   if (isPinned) {
-    if (pinnedHeaderCache.size >= 24) {
+    if (pinnedHeaderCache.has(key)) {
+      pinnedHeaderCache.delete(key);
+    } else if (pinnedHeaderCache.size >= 24) {
       const oldestKey = pinnedHeaderCache.keys().next().value;
       pinnedHeaderCache.delete(oldestKey);
     }
@@ -1904,7 +1932,7 @@ async function streamTelegramPipelined(client, targetDoc, startByte, endByte, re
     inFlight.clear();
   };
 
-  activeStreams.set(streamKey, { abort: abortPipeline });
+  activeStreams.set(streamKey, { abort: abortPipeline, createdAt: Date.now() });
 
   const onReqClose = () => {
     abortPipeline();
@@ -1930,12 +1958,12 @@ async function streamTelegramPipelined(client, targetDoc, startByte, endByte, re
   req.on('close', onReqClose);
   res.on('finish', onResFinish);
 
-  let dcId = targetDoc.dcId || 2;
-  let sender = await client.getSender(dcId);
-  if (aborted) {
-    cleanupStream();
-    return;
-  }
+  try {
+    let dcId = targetDoc.dcId || 2;
+    let sender = await client.getSender(dcId);
+    if (aborted) {
+      return;
+    }
 
   const fileRef = Buffer.isBuffer(targetDoc.fileReference)
     ? targetDoc.fileReference
@@ -2058,14 +2086,13 @@ async function streamTelegramPipelined(client, targetDoc, startByte, endByte, re
   // 1. First-Chunk Express Delivery:
   // Immediately fetch & send the first block alone with 100% bandwidth.
   // This allows the video decoder to display frames instantly (< 300ms) after seek without waiting for parallel chunks.
-  const firstBlockData = await fetchBlockWithRetry(startBlock);
+  let firstBlockData = await fetchBlockWithRetry(startBlock);
   if (aborted || res.destroyed || res.writableEnded) {
-    cleanupStream();
+    firstBlockData = null;
     return;
   }
   if (!firstBlockData || firstBlockData.length === 0) {
-    if (!res.writableEnded) res.end();
-    cleanupStream();
+    firstBlockData = null;
     return;
   }
 
@@ -2075,10 +2102,9 @@ async function streamTelegramPipelined(client, targetDoc, startByte, endByte, re
   if (firstSliceStart < firstSliceEnd) {
     await writeWithBackpressure(res, firstBlockData.subarray(firstSliceStart, firstSliceEnd));
   }
+  firstBlockData = null; // Explicitly release 512KB buffer immediately for GC
 
   if (startBlock === endBlock) {
-    if (!res.writableEnded) res.end();
-    cleanupStream();
     return;
   }
 
@@ -2120,9 +2146,11 @@ async function streamTelegramPipelined(client, targetDoc, startByte, endByte, re
     }
   }
 
-  cleanupStream();
-  if (!res.writableEnded) {
-    res.end();
+  } finally {
+    cleanupStream();
+    if (!res.writableEnded) {
+      try { res.end(); } catch {}
+    }
   }
 }
 
@@ -2340,7 +2368,8 @@ app.get('/stream/:docId', async (req, res) => {
         abort: () => {
           console.log(`[TRANSCODE ABORT] Killing ffmpeg process for doc ${docId}`);
           try { ffmpegProc.kill('SIGKILL'); } catch {}
-        }
+        },
+        createdAt: Date.now(),
       });
 
       const cleanupFfmpeg = () => {

@@ -106,6 +106,14 @@ class CentralDatabase {
       createdAt: data.createdAt || Date.now(),
     };
 
+    // Prevent unbounded memory/disk growth by evicting oldest record if cap is reached
+    if (this.byDocId.size >= 2000 && !this.byDocId.has(String(data.docId))) {
+      const oldestDocId = this.byDocId.keys().next().value;
+      const oldestRecord = this.byDocId.get(oldestDocId);
+      this.byDocId.delete(oldestDocId);
+      if (oldestRecord?.queryKey) this.byQuery.delete(oldestRecord.queryKey);
+    }
+
     if (queryKey) this.byQuery.set(queryKey, record);
     this.byDocId.set(String(data.docId), record);
     this.save();
