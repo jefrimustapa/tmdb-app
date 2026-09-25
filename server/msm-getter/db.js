@@ -16,6 +16,9 @@ class CentralDatabase {
   constructor() {
     this.byQuery = new Map(); // queryKey -> record
     this.byDocId = new Map(); // docId -> record
+    this.saveTimer = null;
+    this.isSaving = false;
+    this.needsSaveAgain = false;
     this.load();
   }
 
@@ -36,13 +39,48 @@ class CentralDatabase {
   }
 
   save() {
+    if (this.saveTimer) clearTimeout(this.saveTimer);
+    this.saveTimer = setTimeout(() => {
+      this.saveAsync().catch(err => {
+        console.error('[DB ERROR] Failed to persist streams.json async:', err.message);
+      });
+    }, 300);
+  }
+
+  async saveAsync() {
+    if (this.isSaving) {
+      this.needsSaveAgain = true;
+      return;
+    }
+    this.isSaving = true;
+    try {
+      const records = Array.from(this.byDocId.values());
+      const tmpFile = `${DB_FILE}.tmp`;
+      await fs.promises.writeFile(tmpFile, JSON.stringify(records, null, 2), 'utf-8');
+      await fs.promises.rename(tmpFile, DB_FILE);
+    } catch (err) {
+      console.error('[DB ERROR] Failed to persist streams.json:', err.message);
+    } finally {
+      this.isSaving = false;
+      if (this.needsSaveAgain) {
+        this.needsSaveAgain = false;
+        this.save();
+      }
+    }
+  }
+
+  saveSync() {
+    if (this.saveTimer) {
+      clearTimeout(this.saveTimer);
+      this.saveTimer = null;
+    }
     try {
       const records = Array.from(this.byDocId.values());
       const tmpFile = `${DB_FILE}.tmp`;
       fs.writeFileSync(tmpFile, JSON.stringify(records, null, 2), 'utf-8');
       fs.renameSync(tmpFile, DB_FILE);
     } catch (err) {
-      console.error('[DB ERROR] Failed to persist streams.json:', err.message);
+      console.error('[DB ERROR] Failed to persist streams.json synchronously:', err.message);
     }
   }
 
@@ -67,6 +105,14 @@ class CentralDatabase {
       date: data.date || Math.floor(Date.now() / 1000),
       createdAt: data.createdAt || Date.now(),
     };
+
+    // Prevent unbounded memory/disk growth by evicting oldest record if cap is reached
+    if (this.byDocId.size >= 2000 && !this.byDocId.has(String(data.docId))) {
+      const oldestDocId = this.byDocId.keys().next().value;
+      const oldestRecord = this.byDocId.get(oldestDocId);
+      this.byDocId.delete(oldestDocId);
+      if (oldestRecord?.queryKey) this.byQuery.delete(oldestRecord.queryKey);
+    }
 
     if (queryKey) this.byQuery.set(queryKey, record);
     this.byDocId.set(String(data.docId), record);
