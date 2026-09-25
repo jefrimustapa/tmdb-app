@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Search as SearchIcon, X, Clock, Trash2 } from 'lucide-react';
+import { Search as SearchIcon, X, Clock, Trash2, Mic } from 'lucide-react';
+import clsx from 'clsx';
 import { tmdbApi, ANIME_GENRE_ID, UNIFIED_GENRES, COUNTRY_TO_LANGUAGES } from '../../services/tmdb';
 import type { TMDBMediaItem, TMDBGenre } from '../../types/tmdb';
 import { MediaCard } from '../../components/common/MediaCard';
@@ -11,6 +12,7 @@ import {
   removeRecentSearch,
   clearRecentSearches
 } from '../../services/searchHistoryService';
+import { useVoiceSearch } from '../../hooks/useVoiceSearch';
 
 export const Search: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -271,6 +273,22 @@ export const Search: React.FC = () => {
     }
   };
 
+  const handleVoiceResult = (spokenQuery: string) => {
+    const trimmed = spokenQuery.trim();
+    if (!trimmed) return;
+    if (searchDebounceTimerRef.current) {
+      clearTimeout(searchDebounceTimerRef.current);
+    }
+    setQuery(trimmed);
+    setSearchParams({ q: trimmed });
+    const updated = addRecentSearch(trimmed);
+    setRecentSearches(updated);
+  };
+
+  const { isListening, isSupported: isVoiceSupported, toggleListening } = useVoiceSearch({
+    onResult: handleVoiceResult,
+  });
+
   const handleClear = () => {
     if (searchDebounceTimerRef.current) {
       clearTimeout(searchDebounceTimerRef.current);
@@ -460,24 +478,47 @@ export const Search: React.FC = () => {
             value={query}
             onChange={handleInputChange}
             onKeyDown={handleKeyDown}
-            placeholder="Search by movie, TV show, anime, or director..."
+            placeholder={isListening ? "Listening... speak now" : "Search by movie, TV show, anime, or director..."}
             autoFocus
-            className="w-full pl-14 pr-12 py-4 bg-hbo-card/90 border-2 border-hbo-border rounded-2xl text-base sm:text-lg text-white placeholder-gray-400 focus:outline-none focus:border-hbo-purple-light focus:shadow-hbo-glow transition-all tv-focus-target"
+            className={clsx(
+              "w-full pl-14 py-4 bg-hbo-card/90 border-2 rounded-2xl text-base sm:text-lg text-white placeholder-gray-400 focus:outline-none transition-all tv-focus-target",
+              isListening
+                ? "border-rose-500 shadow-[0_0_20px_rgba(244,63,94,0.5)]"
+                : "border-hbo-border focus:border-hbo-purple-light focus:shadow-hbo-glow",
+              query && isVoiceSupported ? "pr-24" : query || isVoiceSupported ? "pr-14" : "pr-6"
+            )}
           />
           <div className="absolute left-4 top-0 bottom-0 flex items-center pointer-events-none">
             <SearchIcon className="w-6 h-6 text-hbo-cyan" />
           </div>
-          {query && (
-            <div className="absolute right-3 top-0 bottom-0 flex items-center">
+          <div className="absolute right-3 top-0 bottom-0 flex items-center gap-1.5">
+            {query && (
               <button
+                type="button"
                 onClick={handleClear}
                 className="p-2 rounded-full hover:bg-white/10 text-gray-400 hover:text-white flex items-center justify-center transition tv-focus-target"
                 aria-label="Clear search"
               >
                 <X className="w-5 h-5" />
               </button>
-            </div>
-          )}
+            )}
+            {isVoiceSupported && (
+              <button
+                type="button"
+                onClick={toggleListening}
+                className={clsx(
+                  "p-2 rounded-full flex items-center justify-center transition tv-focus-target cursor-pointer",
+                  isListening
+                    ? "bg-rose-500/30 text-rose-400 ring-2 ring-rose-500 animate-pulse"
+                    : "hover:bg-white/10 text-gray-400 hover:text-hbo-cyan"
+                )}
+                aria-label={isListening ? "Listening... click to stop" : "Voice search"}
+                title={isListening ? "Listening... click to stop" : "Search by voice"}
+              >
+                <Mic className={clsx("w-5 h-5", isListening && "animate-bounce text-rose-400")} />
+              </button>
+            )}
+          </div>
         </div>
 
         {/* 1-Row Recent Searches History Strip (Only shown when query is empty) */}

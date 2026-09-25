@@ -42,7 +42,13 @@ import java.net.URL;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.List;
+import java.util.ArrayList;
 import java.util.concurrent.Executors;
+import android.Manifest;
+import android.speech.RecognizerIntent;
+import android.webkit.PermissionRequest;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
 import com.getcapacitor.BridgeActivity;
 import com.getcapacitor.BridgeWebViewClient;
 
@@ -57,6 +63,8 @@ public class MainActivity extends BridgeActivity {
     private OrientationEventListener orientationListener;
     private static long sPrevAppCpuTime = 0;
     private static long sPrevAppUptime = 0;
+    private static final int REQUEST_CODE_VOICE_SEARCH = 4101;
+    private static final int REQUEST_CODE_RECORD_AUDIO = 4102;
 
     private static final String[] AD_BLOCK_PATTERNS = new String[] {
         "propellerads", "adsterra", "monetag", "exoclick", "popcash", "popads",
@@ -879,10 +887,54 @@ public class MainActivity extends BridgeActivity {
                         return "{\"error\":\"" + e.getMessage() + "\"}";
                     }
                 }
+
+                @JavascriptInterface
+                public boolean isVoiceSearchSupported() {
+                    try {
+                        Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
+                        PackageManager pm = getPackageManager();
+                        return intent.resolveActivity(pm) != null;
+                    } catch (Exception e) {
+                        return false;
+                    }
+                }
+
+                @JavascriptInterface
+                public void startVoiceSearch() {
+                    runOnUiThread(() -> {
+                        try {
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                                if (ContextCompat.checkSelfPermission(MainActivity.this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+                                    ActivityCompat.requestPermissions(MainActivity.this, new String[]{Manifest.permission.RECORD_AUDIO}, REQUEST_CODE_RECORD_AUDIO);
+                                }
+                            }
+                            Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
+                            intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
+                            intent.putExtra(RecognizerIntent.EXTRA_PROMPT, "Speak to search movies, TV shows, anime...");
+                            intent.putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1);
+                            startActivityForResult(intent, REQUEST_CODE_VOICE_SEARCH);
+                        } catch (Exception e) {
+                            Log.e("TMDB_APP", "Failed to launch voice search intent", e);
+                            WebView wv = bridge != null ? bridge.getWebView() : null;
+                            if (wv != null) {
+                                wv.post(() -> {
+                                    wv.evaluateJavascript("window.dispatchEvent(new CustomEvent('tmdb_voice_search_error', { detail: { error: 'Voice search not available on this device' } }));", null);
+                                });
+                            }
+                        }
+                    });
+                }
             }, "AndroidBridge");
 
             // Handle alert, confirm, and multi-window popups
             webView.setWebChromeClient(new WebChromeClient() {
+                @Override
+                public void onPermissionRequest(final PermissionRequest request) {
+                    if (request != null) {
+                        runOnUiThread(() -> request.grant(request.getResources()));
+                    }
+                }
+
                 @Override
                 public android.graphics.Bitmap getDefaultVideoPoster() {
                     // Eradicate default Android distorted black circle/grey box placeholder
@@ -2638,6 +2690,53 @@ public class MainActivity extends BridgeActivity {
             uriStr.replace("'", "\\'")
         );
         wv.evaluateJavascript(jsDispatch, null);
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == REQUEST_CODE_RECORD_AUDIO) {
+            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                Log.i("TMDB_APP", "RECORD_AUDIO permission granted by user");
+            } else {
+                Log.w("TMDB_APP", "RECORD_AUDIO permission denied by user");
+            }
+        }
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == REQUEST_CODE_VOICE_SEARCH) {
+            WebView wv = this.bridge != null ? this.bridge.getWebView() : null;
+            if (wv == null) return;
+
+            if (resultCode == RESULT_OK && data != null) {
+                ArrayList<String> matches = data.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS);
+                if (matches != null && !matches.isEmpty()) {
+                    String recognizedText = matches.get(0);
+                    if (recognizedText != null && !recognizedText.trim().isEmpty()) {
+                        final String safeQuery = recognizedText.replace("\\", "\\\\")
+                                                               .replace("'", "\\'")
+                                                               .replace("\"", "\\\"")
+                                                               .replace("\n", " ")
+                                                               .replace("\r", "")
+                                                               .trim();
+                        wv.post(() -> {
+                            String js = String.format(
+                                "window.dispatchEvent(new CustomEvent('tmdb_voice_search_result', { detail: { query: '%s' } }));",
+                                safeQuery
+                            );
+                            wv.evaluateJavascript(js, null);
+                        });
+                        return;
+                    }
+                }
+            }
+            wv.post(() -> {
+                wv.evaluateJavascript("window.dispatchEvent(new CustomEvent('tmdb_voice_search_end'));", null);
+            });
+        }
     }
 
     @Override
