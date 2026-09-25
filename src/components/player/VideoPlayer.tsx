@@ -437,18 +437,17 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           }
 
           if (msmRes && msmRes.streamUrl) {
-            // Check if stream is an MKV container or has Dolby / surround audio cues (e.g. DDP5.1, EAC3, AC3, Atmos)
-            // On Android Chromium / WebView, Dolby codecs lack software decoders and produce silent audio.
-            // Option C: Request real-time audio transcoding (?transcode=audio)
-            const isMkv = msmRes.filename ? msmRes.filename.toLowerCase().endsWith('.mkv') : false;
-            const isDolbyAudio = msmRes.filename ? /(ddp|ac3|eac3|atmos|dts)/i.test(msmRes.filename) : false;
+            // Only request real-time audio transcoding (?transcode=audio) if the stream explicitly has Dolby / surround audio cues
+            // (e.g. DDP5.1, EAC3, AC3, Atmos, DTS, TrueHD) which lack decoders on Android Chromium / WebView.
+            // Standard stereo MKVs play directly without invoking FFmpeg on the router.
+            const isDolbyAudio = msmRes.filename ? /(ddp|ac3|eac3|atmos|dts|truehd|5\.1|7\.1)/i.test(msmRes.filename) : false;
             let finalUrl = msmRes.streamUrl;
-            if (isMkv || isDolbyAudio) {
+            if (isDolbyAudio) {
               const sep = finalUrl.includes('?') ? '&' : '?';
               finalUrl = `${finalUrl}${sep}transcode=audio`;
-              console.log('[Resolver] 🔊 Detected MKV/Dolby audio in Telegram stream. Enabling AAC audio transcode pipe:', finalUrl);
+              console.log('[Resolver] 🔊 Detected Dolby/surround audio in Telegram stream. Enabling AAC audio transcode pipe:', finalUrl);
             } else {
-              console.log('[Resolver] ✅ Playing via Telegram Direct Stream:', finalUrl);
+              console.log('[Resolver] ✅ Playing via Telegram Direct Stream (native stream):', finalUrl);
             }
 
             setResolvingStatus('Connected to Telegram Stream');
@@ -2010,6 +2009,15 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             }
           }}
           onError={() => {
+            // If playing a Telegram direct stream without transcode and direct playback errors out (e.g. unsupported audio codec), retry once with transcode=audio!
+            if (directStreamUrl && !directStreamUrl.includes('transcode=audio')) {
+              const sep = directStreamUrl.includes('?') ? '&' : '?';
+              const transcodedUrl = `${directStreamUrl}${sep}transcode=audio`;
+              console.log('[DirectStream] Direct playback failed. Retrying with AAC audio transcode pipe:', transcodedUrl);
+              setDirectStreamUrl(transcodedUrl);
+              setResolvedMsm32Url(transcodedUrl);
+              return;
+            }
             if (enabledResolvers.includes('embed')) {
               console.log('[DirectStream] Playback error on direct stream. Fallback to embed.');
               setPlayerMode('embed');
