@@ -501,7 +501,7 @@ export const Details: React.FC = () => {
             className={`${
               !isLandscape
                 ? 'w-full h-auto block'
-                : 'absolute inset-0 w-full h-full object-cover object-top'
+                : 'absolute inset-0 w-full h-full object-cover object-center'
             } transform-gpu will-change-[opacity] transition-opacity duration-700 ease-in-out ${
               isHeroLoaded ? 'opacity-100' : 'opacity-0'
             }`}
