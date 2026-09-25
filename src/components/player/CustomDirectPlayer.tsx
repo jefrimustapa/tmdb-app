@@ -192,21 +192,25 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
   }, []);
 
   const attemptInitialSeek = useCallback((el: HTMLVideoElement) => {
-    if (initialTimestamp > 5 && !hasSeekedInitialRef.current && !isTranscoded) {
-      try {
-        const canSeek = (el.duration > 0 && isFinite(el.duration)) || (totalDurationSec && totalDurationSec > 0) || el.readyState >= 1;
-        if (canSeek) {
-          console.log(`[CustomDirectPlayer] Seeking to resume timestamp: ${initialTimestamp}s (current: ${el.currentTime}s, duration: ${el.duration}s, readyState: ${el.readyState})`);
-          el.currentTime = initialTimestamp;
-          if (Math.abs(el.currentTime - initialTimestamp) < 5 || el.currentTime >= initialTimestamp - 5) {
-            hasSeekedInitialRef.current = true;
-          }
-        }
-      } catch (err) {
-        console.warn('[CustomDirectPlayer] Initial seek error:', err);
-      }
+    if (initialTimestamp <= 5 || hasSeekedInitialRef.current || isTranscoded) return;
+
+    // In Matroska (MKV), the Cues (seek index) are at the END of the container.
+    // At readyState 1 (HAVE_METADATA), the browser has only parsed the header.
+    // readyState must be >= 2 (HAVE_CURRENT_DATA) so Chromium's demuxer has loaded the cues.
+    if (el.readyState < 2) {
+      console.log(`[CustomDirectPlayer] Deferring initial seek to ${initialTimestamp}s: readyState is ${el.readyState} (< 2)`);
+      return;
     }
-  }, [initialTimestamp, isTranscoded, totalDurationSec]);
+
+    try {
+      console.log(`[CustomDirectPlayer] Executing initial seek to ${initialTimestamp}s (current: ${el.currentTime}s, duration: ${el.duration}s, readyState: ${el.readyState})`);
+      el.currentTime = initialTimestamp;
+      setCurrentTime(initialTimestamp);
+      hasSeekedInitialRef.current = true;
+    } catch (err) {
+      console.warn('[CustomDirectPlayer] Initial seek error:', err);
+    }
+  }, [initialTimestamp, isTranscoded]);
 
   // Video Source Attachment (HLS or Native MP4/MKV)
   useEffect(() => {
@@ -760,7 +764,7 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
           } else if (el.duration > 0) {
             setDuration(el.duration);
           }
-          attemptInitialSeek(el);
+          // Do not seek here: MKV cues are at the end of the container and not yet parsed
           setIsInitialLoading(false);
           setIsBuffering(false);
         }}
@@ -774,6 +778,14 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
           const el = e.currentTarget;
           attemptInitialSeek(el);
           setIsInitialLoading(false);
+          setIsBuffering(false);
+        }}
+        onSeeked={(e) => {
+          const el = e.currentTarget;
+          if (initialTimestamp > 5 && Math.abs(el.currentTime - initialTimestamp) < 5) {
+            console.log(`[CustomDirectPlayer] Initial seek confirmed at ${el.currentTime}s`);
+            hasSeekedInitialRef.current = true;
+          }
           setIsBuffering(false);
         }}
         onWaiting={(e) => {
@@ -804,6 +816,9 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
         }}
         onTimeUpdate={(e) => {
           const el = e.currentTarget;
+          if (!hasSeekedInitialRef.current && initialTimestamp > 5 && el.currentTime < 2 && el.readyState >= 2) {
+            attemptInitialSeek(el);
+          }
           const effectiveCurrent = isTranscoded ? (baseOffsetRef.current + el.currentTime) : el.currentTime;
           const effectiveDuration = (totalDurationSec && totalDurationSec > 0) ? totalDurationSec : (duration > 0 ? duration : el.duration);
           if (!isDraggingScrubber) {
