@@ -113,8 +113,8 @@ export const EpisodeGrid: React.FC<EpisodeGridProps> = ({
               : 'Air Date TBD';
 
             const epHistory = historyMap.get(`s${selectedSeason}e${ep.episode_number}`);
-            const isCompleted = Boolean(epHistory && epHistory.progressPercent >= 90);
-            const isResumable = Boolean(epHistory && epHistory.progressPercent > 3 && epHistory.progressPercent < 90);
+            const isCompleted = Boolean(epHistory && epHistory.progressPercent >= 96);
+            const isResumable = Boolean(epHistory && epHistory.progressPercent > 3 && epHistory.progressPercent < 96);
             const epProgress = epHistory ? epHistory.progressPercent : 0;
 
             return (

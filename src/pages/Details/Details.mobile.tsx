@@ -661,7 +661,7 @@ export const Details: React.FC = () => {
 
             {/* Primary Action Buttons */}
             {(() => {
-              const isResumable = watchProgress && (watchProgress.timestamp > 15 || watchProgress.progressPercent > 1) && watchProgress.progressPercent < 90;
+              const isResumable = watchProgress && (watchProgress.timestamp > 15 || watchProgress.progressPercent > 1) && watchProgress.progressPercent < 96;
               const minsLeft = watchProgress && watchProgress.duration > watchProgress.timestamp
                 ? Math.max(1, Math.round((watchProgress.duration - watchProgress.timestamp) / 60))
                 : 0;
@@ -782,7 +782,8 @@ export const Details: React.FC = () => {
               hasWatchedHistory={Boolean(lastWatched)}
               onSelectEpisode={async (s, e) => {
                 const epHistory = await dbService.getHistoryItem(tmdbId, 'tv', s, e);
-                const epTime = (epHistory && epHistory.timestamp > 15) ? epHistory.timestamp : 0;
+                const isEpCompleted = Boolean(epHistory && epHistory.progressPercent >= 96);
+                const epTime = (epHistory && epHistory.timestamp > 15 && !isEpCompleted) ? epHistory.timestamp : 0;
                 setLastWatched({ season: s, episode: e });
                 navigate(`/watch/tv/${tmdbId}?s=${s}&e=${e}${epTime > 0 ? `&t=${epTime}` : ''}`);
               }}
