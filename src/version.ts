@@ -2,12 +2,15 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20260925-1042';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.fix-mkv-playback-cra.20260925-1042';
+export const APP_BUILD_NUMBER = '20260925-1257';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.fix-msm-getter-crash.20260925-1257';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
-export const APP_BRANCH = 'fix-mkv-playback-cra';
-export const APP_CHANGELOG = `* fix(details): center landscape hero backdrop using object-center matching HeroBanner (#145)
+export const APP_BRANCH = 'fix-msm-getter-crash';
+export const APP_CHANGELOG = `* fix(player): defer initial seek until container cues are parsed (readyState >= 2)
+* fix(player): resolve msm-getter pipeline crash and fix direct MKV resume seek
+* fix(player): prevent router OOM by avoiding forced transcoding on standard MKVs with audio fallback (#146)
+* fix(details): center landscape hero backdrop using object-center matching HeroBanner (#145)
 * fix(msm-getter): add startup ffmpeg verification and deferred fallback for audio transcoding (#144)
 * fix(msm-getter): harden boot lifecycle, supervisor backoff, and pre-mount ext4 fsck (#143)
 * fix(details): eliminate artwork swapping and fit full poster width without horizontal cropping (#142)
@@ -18,7 +21,4 @@ export const APP_CHANGELOG = `* fix(details): center landscape hero backdrop usi
 * feat(details): enhance hero appearance and subtle loading transitions (#137)
 * fix(stream): resolve MKV audio silence via real-time audio transcode pipe and fast time-offset seeking (#136)
 * fix(watch): eliminate hover tooltip and punch-through splash layer in watch page (#135)
-* fix: add cursor-pointer to sidebar NavLink for physical mouse on Android TV WebView (#133)
-* fix(msm): resolve pipeline reliability, auto-retry, and player origin settings sync (#132)
-* Merge pull request #131 from jefrimustapa/feat/default-https-julietmike
-* feat(msm): use https://www.julietmike.net:3033 as single default preset and remove onrender`;
+* fix: add cursor-pointer to sidebar NavLink for physical mouse on Android TV WebView (#133)`;
