@@ -191,6 +191,23 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
     };
   }, []);
 
+  const attemptInitialSeek = useCallback((el: HTMLVideoElement) => {
+    if (initialTimestamp > 5 && !hasSeekedInitialRef.current && !isTranscoded) {
+      try {
+        const canSeek = (el.duration > 0 && isFinite(el.duration)) || (totalDurationSec && totalDurationSec > 0) || el.readyState >= 1;
+        if (canSeek) {
+          console.log(`[CustomDirectPlayer] Seeking to resume timestamp: ${initialTimestamp}s (current: ${el.currentTime}s, duration: ${el.duration}s, readyState: ${el.readyState})`);
+          el.currentTime = initialTimestamp;
+          if (Math.abs(el.currentTime - initialTimestamp) < 5 || el.currentTime >= initialTimestamp - 5) {
+            hasSeekedInitialRef.current = true;
+          }
+        }
+      } catch (err) {
+        console.warn('[CustomDirectPlayer] Initial seek error:', err);
+      }
+    }
+  }, [initialTimestamp, isTranscoded, totalDurationSec]);
+
   // Video Source Attachment (HLS or Native MP4/MKV)
   useEffect(() => {
     const video = videoRef.current;
@@ -743,20 +760,19 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
           } else if (el.duration > 0) {
             setDuration(el.duration);
           }
-          if (initialTimestamp > 10 && !hasSeekedInitialRef.current && !isTranscoded) {
-            hasSeekedInitialRef.current = true;
-            try {
-              el.currentTime = initialTimestamp;
-            } catch {}
-          }
+          attemptInitialSeek(el);
           setIsInitialLoading(false);
           setIsBuffering(false);
         }}
-        onCanPlay={() => {
+        onCanPlay={(e) => {
+          const el = e.currentTarget;
+          attemptInitialSeek(el);
           setIsInitialLoading(false);
           setIsBuffering(false);
         }}
-        onLoadedData={() => {
+        onLoadedData={(e) => {
+          const el = e.currentTarget;
+          attemptInitialSeek(el);
           setIsInitialLoading(false);
           setIsBuffering(false);
         }}
@@ -770,7 +786,11 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
           const el = e.currentTarget;
           console.warn(`[DirectPlayer] Stream stalled at ${el.currentTime.toFixed(1)}s`);
         }}
-        onPlaying={() => {
+        onPlaying={(e) => {
+          const el = e.currentTarget;
+          if (!hasSeekedInitialRef.current && initialTimestamp > 5 && el.currentTime < 2) {
+            attemptInitialSeek(el);
+          }
           setIsInitialLoading(false);
           setIsBuffering(false);
           setIsPlaying(true);
