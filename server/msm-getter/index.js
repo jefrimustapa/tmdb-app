@@ -78,6 +78,28 @@ async function initTelegram() {
   }
 }
 
+function checkFfmpeg() {
+  const ffmpegBin = process.env.FFMPEG_PATH || (fs.existsSync('/opt/bin/ffmpeg') ? '/opt/bin/ffmpeg' : 'ffmpeg');
+  try {
+    const proc = spawn(ffmpegBin, ['-version']);
+    let versionStr = '';
+    proc.stdout.on('data', (d) => { versionStr += d.toString(); });
+    proc.on('close', (code) => {
+      if (code === 0) {
+        const firstLine = versionStr.split('\n')[0] || '';
+        console.log(`[FFMPEG] Ready: ${firstLine}`);
+      } else {
+        console.warn(`[FFMPEG WARN] ffmpeg returned exit code ${code}. Audio transcoding may fail.`);
+      }
+    });
+    proc.on('error', (err) => {
+      console.warn(`[FFMPEG WARN] ffmpeg not executable (${err.message}). Audio transcoding disabled.`);
+    });
+  } catch (err) {
+    console.warn(`[FFMPEG WARN] Could not check ffmpeg: ${err.message}`);
+  }
+}
+
 // In-flight request deduplication map: key = cacheKey -> Promise
 const inFlightResolutions = new Map();
 
@@ -2227,14 +2249,22 @@ app.get('/stream/:docId', async (req, res) => {
         'pipe:1',
       ];
 
-      res.writeHead(200, {
-        'Content-Type': 'video/x-matroska',
-        'Transfer-Encoding': 'chunked',
-        'Connection': 'keep-alive',
-        'Cache-Control': 'no-cache, no-store',
-        'Access-Control-Allow-Origin': '*',
-        'Content-Disposition': `inline; filename="transcoded_${docId}.mkv"`,
-      });
+      let headersSent = false;
+      let firstChunkReceived = false;
+
+      const sendTranscodeHeaders = () => {
+        if (!headersSent && !res.headersSent) {
+          headersSent = true;
+          res.writeHead(200, {
+            'Content-Type': 'video/x-matroska',
+            'Transfer-Encoding': 'chunked',
+            'Connection': 'keep-alive',
+            'Cache-Control': 'no-cache, no-store',
+            'Access-Control-Allow-Origin': '*',
+            'Content-Disposition': `inline; filename="transcoded_${docId}.mkv"`,
+          });
+        }
+      };
 
       const ffmpegProc = spawn(ffmpegBin, ffmpegArgs, { stdio: ['ignore', 'pipe', 'pipe'] });
 
@@ -2262,9 +2292,21 @@ app.get('/stream/:docId', async (req, res) => {
         if (msg) console.warn(`[FFMPEG ${docId}]`, msg);
       });
 
+      ffmpegProc.stdout.on('data', (chunk) => {
+        if (!firstChunkReceived) {
+          firstChunkReceived = true;
+          sendTranscodeHeaders();
+        }
+        res.write(chunk);
+      });
+
       ffmpegProc.on('error', (err) => {
         console.error(`[FFMPEG ERROR ${docId}]`, err);
         cleanupFfmpeg();
+        if (!headersSent && !res.headersSent) {
+          console.warn(`[TRANSCODE FALLBACK] ffmpeg spawn error (${err.message}). Redirecting to direct stream for doc ${docId}...`);
+          return res.redirect(`/stream/${docId}?direct=1`);
+        }
         if (!res.headersSent) res.status(500).send('Transcoding process error');
       });
 
@@ -2272,13 +2314,16 @@ app.get('/stream/:docId', async (req, res) => {
         cleanupFfmpeg();
         if (code !== 0 && code !== null && signal !== 'SIGKILL') {
           console.warn(`[FFMPEG EXIT ${docId}] exited with code ${code}, signal ${signal}`);
+          if (!firstChunkReceived && !headersSent && !res.headersSent) {
+            console.warn(`[TRANSCODE FALLBACK] ffmpeg exited before producing stream. Redirecting to direct stream for doc ${docId}...`);
+            return res.redirect(`/stream/${docId}?direct=1`);
+          }
         }
         if (!res.writableEnded) {
           try { res.end(); } catch {}
         }
       });
 
-      ffmpegProc.stdout.pipe(res);
       return;
     }
 
@@ -2375,6 +2420,7 @@ if (sslCertFile && sslKeyFile) {
     serverInstance = https.createServer(sslOptions, app);
     serverInstance.listen(port, async () => {
       console.log(`[SERVER] MSM Getter microservice listening securely on HTTPS port ${port} (cert: ${sslCertFile})`);
+      checkFfmpeg();
       try {
         await initTelegram();
       } catch (err) {
@@ -2386,6 +2432,7 @@ if (sslCertFile && sslKeyFile) {
     serverInstance = http.createServer(app);
     serverInstance.listen(port, async () => {
       console.log(`[SERVER] MSM Getter microservice listening on HTTP port ${port}`);
+      checkFfmpeg();
       try {
         await initTelegram();
       } catch (err) {
@@ -2397,6 +2444,7 @@ if (sslCertFile && sslKeyFile) {
   serverInstance = http.createServer(app);
   serverInstance.listen(port, async () => {
     console.log(`[SERVER] MSM Getter microservice listening on HTTP port ${port}`);
+    checkFfmpeg();
     try {
       await initTelegram();
     } catch (err) {
