@@ -50,9 +50,13 @@ let client = new TelegramClient(new StringSession(session), apiId, apiHash, {
 
 let isConnected = false;
 let authError = null;
+let initPromise = null;
 
 async function initTelegram() {
-  if (!isConnected) {
+  if (isConnected && client?.connected) return;
+  if (initPromise) return await initPromise;
+
+  initPromise = (async () => {
     if (!session && !client?.session?.authKey) {
       authError = 'No active session. Please authenticate via Web Portal at /auth.';
       throw new Error(authError);
@@ -75,7 +79,11 @@ async function initTelegram() {
       }
       throw err;
     }
-  }
+  })().finally(() => {
+    initPromise = null;
+  });
+
+  return await initPromise;
 }
 
 function checkFfmpeg() {
@@ -105,9 +113,17 @@ const inFlightResolutions = new Map();
 
 // Sequential FIFO mutex queue for Telegram bot operations
 let resolveMutex = Promise.resolve();
+let pendingTelegramTasks = 0;
+
 function queueTelegramTask(taskFn) {
+  pendingTelegramTasks++;
   const next = resolveMutex.then(taskFn, taskFn);
-  resolveMutex = next.catch(() => {});
+  resolveMutex = next.catch(() => {}).finally(() => {
+    pendingTelegramTasks--;
+    if (pendingTelegramTasks === 0) {
+      resolveMutex = Promise.resolve(); // Sever chain to allow GC of completed promises and closures
+    }
+  });
   return next;
 }
 
@@ -603,9 +619,15 @@ app.get('/api/logs', (req, res) => {
     const startPos = Math.max(0, stat.size - maxReadBytes);
     const readLength = stat.size - startPos;
     const buffer = Buffer.alloc(readLength);
-    const fd = fs.openSync(logPath, 'r');
-    fs.readSync(fd, buffer, 0, readLength, startPos);
-    fs.closeSync(fd);
+    let fd;
+    try {
+      fd = fs.openSync(logPath, 'r');
+      fs.readSync(fd, buffer, 0, readLength, startPos);
+    } finally {
+      if (fd !== undefined) {
+        try { fs.closeSync(fd); } catch {}
+      }
+    }
 
     const text = buffer.toString('utf8');
     const allLines = text.split(/\r?\n/).filter(l => l.trim().length > 0);
@@ -648,11 +670,20 @@ app.get('/api/logs/stream', (req, res) => {
       if (!fs.existsSync(logPath)) return;
       const curSize = fs.statSync(logPath).size;
       if (curSize > lastSize) {
-        const readLen = curSize - lastSize;
+        // Cap chunk read size to 64KB max to prevent OOM spikes on large log file changes
+        const maxChunk = 64 * 1024;
+        const readLen = Math.min(curSize - lastSize, maxChunk);
+        const startPos = curSize - readLen;
         const buf = Buffer.alloc(readLen);
-        const fd = fs.openSync(logPath, 'r');
-        fs.readSync(fd, buf, 0, readLen, lastSize);
-        fs.closeSync(fd);
+        let fd;
+        try {
+          fd = fs.openSync(logPath, 'r');
+          fs.readSync(fd, buf, 0, readLen, startPos);
+        } finally {
+          if (fd !== undefined) {
+            try { fs.closeSync(fd); } catch {}
+          }
+        }
         lastSize = curSize;
 
         const newText = buf.toString('utf8');
@@ -1683,10 +1714,22 @@ app.get('/api/resolve', async (req, res) => {
 // Caches up to 16 blocks (8 MB RAM) to eliminate seek latency while protecting router RAM from exhaustion.
 const BLOCK_CACHE_MAX_ENTRIES = 16; // 16 x 512KB = 8 MB
 const globalBlockCache = new Map();
-const activeStreams = new Map(); // key: docId -> { abort: Function }
+const activeStreams = new Map(); // key: streamSessionKey -> { abort: Function, createdAt: number }
+
+// Automated garbage collector for orphaned stream handles (stale entries older than 4 hours)
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, entry] of activeStreams.entries()) {
+    if (now - (entry.createdAt || now) > 4 * 3600 * 1000) {
+      console.warn(`[STREAM GC] Evicting orphaned activeStream: ${key}`);
+      try { entry.abort(); } catch {}
+      activeStreams.delete(key);
+    }
+  }
+}, 10 * 60 * 1000).unref();
 
 // Pinned cache for container headers (first 2 blocks: 0, 1) and tail cues (last 2 blocks)
-// These blocks (<= 2 MB total) are NEVER evicted by sequential playback pipelines,
+// These blocks (<= 2 MB total per doc) are NEVER evicted by sequential playback pipelines,
 // eliminating 5 out of 6 remote Telegram round-trips on every seek!
 const pinnedHeaderCache = new Map(); // key: `${docId}:${blockIdx}` -> Buffer
 
@@ -1708,7 +1751,9 @@ function setCachedBlock(docId, blockIdx, data, isPinned = false) {
   if (!data || data.length === 0) return;
   const key = `${docId}:${blockIdx}`;
   if (isPinned) {
-    if (pinnedHeaderCache.size > 12) {
+    if (pinnedHeaderCache.has(key)) {
+      pinnedHeaderCache.delete(key);
+    } else if (pinnedHeaderCache.size >= 24) {
       const oldestKey = pinnedHeaderCache.keys().next().value;
       pinnedHeaderCache.delete(oldestKey);
     }
@@ -1730,7 +1775,13 @@ function setCachedBlock(docId, blockIdx, data, isPinned = false) {
  */
 function writeWithBackpressure(res, chunk) {
   if (res.destroyed || res.writableEnded) return Promise.resolve();
-  if (res.write(chunk)) return Promise.resolve();
+  let ok = false;
+  try {
+    ok = res.write(chunk);
+  } catch (err) {
+    return Promise.resolve();
+  }
+  if (ok) return Promise.resolve();
   return new Promise((resolve) => {
     const onDrain = () => { cleanup(); resolve(); };
     const onClose = () => { cleanup(); resolve(); };
@@ -1846,7 +1897,7 @@ async function refreshDocumentFileReference(client, targetDoc) {
 async function streamTelegramPipelined(client, targetDoc, startByte, endByte, res, req, customChunkSize, customConcurrency, passedStreamKey) {
   // Map requested chunkSize to MTProto block size and concurrency
   let CHUNK_SIZE = 512 * 1024; // 512KB: Native Telegram MTProto block limit
-  let CONCURRENCY = 2;         // Default: 2 concurrent chunks (1MB sliding window, safe for router RAM)
+  let CONCURRENCY = 3;         // Default: 3 concurrent chunks (1.5MB sliding window, safe for router RAM and jitter-free)
 
   if (customChunkSize === 262144) {
     CHUNK_SIZE = 256 * 1024;
@@ -1881,9 +1932,20 @@ async function streamTelegramPipelined(client, targetDoc, startByte, endByte, re
     inFlight.clear();
   };
 
-  activeStreams.set(streamKey, { abort: abortPipeline });
+  activeStreams.set(streamKey, { abort: abortPipeline, createdAt: Date.now() });
+
+  const onReqClose = () => {
+    abortPipeline();
+    cleanupStream();
+    console.log(`[PIPELINE CLOSED by client] active: block ${activeBlock}/${endBlock}, aborted remaining blocks.`);
+  };
+  const onResFinish = () => {
+    cleanupStream();
+  };
 
   const cleanupStream = () => {
+    req.off('close', onReqClose);
+    res.off('finish', onResFinish);
     if (activeStreams.get(streamKey)) {
       activeStreams.delete(streamKey);
     }
@@ -1893,19 +1955,15 @@ async function streamTelegramPipelined(client, targetDoc, startByte, endByte, re
   const endBlock = Math.floor(endByte / CHUNK_SIZE);
   let activeBlock = startBlock;
 
-  req.on('close', () => {
-    abortPipeline();
-    cleanupStream();
-    console.log(`[PIPELINE CLOSED by client] active: block ${activeBlock}/${endBlock}, aborted remaining blocks.`);
-  });
-  res.on('finish', cleanupStream);
+  req.on('close', onReqClose);
+  res.on('finish', onResFinish);
 
-  let dcId = targetDoc.dcId || 2;
-  let sender = await client.getSender(dcId);
-  if (aborted) {
-    cleanupStream();
-    return;
-  }
+  try {
+    let dcId = targetDoc.dcId || 2;
+    let sender = await client.getSender(dcId);
+    if (aborted) {
+      return;
+    }
 
   const fileRef = Buffer.isBuffer(targetDoc.fileReference)
     ? targetDoc.fileReference
@@ -1923,8 +1981,10 @@ async function streamTelegramPipelined(client, targetDoc, startByte, endByte, re
   async function fetchBlock(blockIdx) {
     if (aborted) return null;
 
+    const docIdStr = targetDoc.id.toString();
+
     // 1. Check in-memory LRU cache (0ms instant lookup)
-    const cached = getCachedBlock(targetDoc.id.toString(), blockIdx);
+    const cached = getCachedBlock(docIdStr, blockIdx);
     if (cached) {
       return cached;
     }
@@ -1943,13 +2003,15 @@ async function streamTelegramPipelined(client, targetDoc, startByte, endByte, re
 
     try {
       if (aborted) return null;
-      sender = await client.getSender(sender?.dcId || dcId);
+      if (!sender) {
+        sender = await client.getSender(dcId);
+      }
       if (aborted) return null;
       const result = await client.invokeWithSender(request, sender);
       if (aborted) return null;
       const bytes = result.bytes;
       if (bytes && bytes.length > 0) {
-        setCachedBlock(targetDoc.id.toString(), blockIdx, bytes, isPinnedBlock);
+        setCachedBlock(docIdStr, blockIdx, bytes, isPinnedBlock);
       }
       return bytes;
     } catch (err) {
@@ -1968,7 +2030,7 @@ async function streamTelegramPipelined(client, targetDoc, startByte, endByte, re
         if (aborted) return null;
         const bytes = result.bytes;
         if (bytes && bytes.length > 0) {
-          setCachedBlock(targetDoc.id.toString(), blockIdx, bytes, isPinnedBlock);
+          setCachedBlock(docIdStr, blockIdx, bytes, isPinnedBlock);
         }
         return bytes;
       }
@@ -1983,13 +2045,13 @@ async function streamTelegramPipelined(client, targetDoc, startByte, endByte, re
           request.location.fileReference = freshRef;
           console.log(`[STREAM RECOVERY] Successfully swapped fresh fileReference. Retrying block ${blockIdx}...`);
           if (aborted) return null;
-          sender = await client.getSender(sender?.dcId || dcId);
+          if (!sender) sender = await client.getSender(dcId);
           if (aborted) return null;
           const result = await client.invokeWithSender(request, sender);
           if (aborted) return null;
           const bytes = result.bytes;
           if (bytes && bytes.length > 0) {
-            setCachedBlock(targetDoc.id.toString(), blockIdx, bytes, isPinnedBlock);
+            setCachedBlock(docIdStr, blockIdx, bytes, isPinnedBlock);
           }
           return bytes;
         }
@@ -2024,14 +2086,13 @@ async function streamTelegramPipelined(client, targetDoc, startByte, endByte, re
   // 1. First-Chunk Express Delivery:
   // Immediately fetch & send the first block alone with 100% bandwidth.
   // This allows the video decoder to display frames instantly (< 300ms) after seek without waiting for parallel chunks.
-  const firstBlockData = await fetchBlockWithRetry(startBlock);
+  let firstBlockData = await fetchBlockWithRetry(startBlock);
   if (aborted || res.destroyed || res.writableEnded) {
-    cleanupStream();
+    firstBlockData = null;
     return;
   }
   if (!firstBlockData || firstBlockData.length === 0) {
-    if (!res.writableEnded) res.end();
-    cleanupStream();
+    firstBlockData = null;
     return;
   }
 
@@ -2041,10 +2102,9 @@ async function streamTelegramPipelined(client, targetDoc, startByte, endByte, re
   if (firstSliceStart < firstSliceEnd) {
     await writeWithBackpressure(res, firstBlockData.subarray(firstSliceStart, firstSliceEnd));
   }
+  firstBlockData = null; // Explicitly release 512KB buffer immediately for GC
 
   if (startBlock === endBlock) {
-    if (!res.writableEnded) res.end();
-    cleanupStream();
     return;
   }
 
@@ -2086,9 +2146,11 @@ async function streamTelegramPipelined(client, targetDoc, startByte, endByte, re
     }
   }
 
-  cleanupStream();
-  if (!res.writableEnded) {
-    res.end();
+  } finally {
+    cleanupStream();
+    if (!res.writableEnded) {
+      try { res.end(); } catch {}
+    }
   }
 }
 
@@ -2142,13 +2204,17 @@ app.post('/api/github-webhook', async (req, res) => {
         console.log(`[AUTO-DEPLOY] Downloading latest index.js from ${rawBase}/index.js...`);
         const idxRes = await axios.get(`${rawBase}/index.js`, { responseType: 'text', timeout: 15000 });
         if (idxRes.data && idxRes.data.length > 1000) {
-          fs.writeFileSync(path.join(__dirname, 'index.js'), idxRes.data, 'utf-8');
+          const tmpPath = path.join(__dirname, 'index.js.tmp');
+          fs.writeFileSync(tmpPath, idxRes.data, 'utf-8');
+          fs.renameSync(tmpPath, path.join(__dirname, 'index.js'));
         }
 
         console.log(`[AUTO-DEPLOY] Downloading latest db.js from ${rawBase}/db.js...`);
         const dbRes = await axios.get(`${rawBase}/db.js`, { responseType: 'text', timeout: 15000 }).catch(() => null);
         if (dbRes?.data && dbRes.data.length > 200) {
-          fs.writeFileSync(path.join(__dirname, 'db.js'), dbRes.data, 'utf-8');
+          const tmpPath = path.join(__dirname, 'db.js.tmp');
+          fs.writeFileSync(tmpPath, dbRes.data, 'utf-8');
+          fs.renameSync(tmpPath, path.join(__dirname, 'db.js'));
         }
 
         console.log('[AUTO-DEPLOY] Code updated successfully! Exiting process for supervisor respawn in 1s...');
@@ -2172,6 +2238,14 @@ app.get('/stream/:docId', async (req, res) => {
     await initTelegram();
     const docId = req.params.docId;
     const rangeHeader = req.headers.range;
+
+    // Zero Nagle buffering delay and keep connection active for fast range requests
+    if (req.socket) {
+      try {
+        req.socket.setNoDelay(true);
+        req.socket.setKeepAlive(true, 15000);
+      } catch {}
+    }
 
     // Instantly terminate any previous in-flight stream pipeline for this document for the same client session (e.g. user seeked forward)
     // to free 100% of the router's MTProto download bandwidth for the new seek position immediately.
@@ -2199,18 +2273,18 @@ app.get('/stream/:docId', async (req, res) => {
     if (dbRecord && dbRecord.accessHash) {
       console.log(`[STREAM] Serving from Central DB: ${dbRecord.filename} (Doc ID: ${docId})`);
       targetDoc = new Api.Document({
-        id: bigInt(dbRecord.docId),
-        accessHash: bigInt(dbRecord.accessHash),
-        fileReference: Buffer.from(dbRecord.fileReference, 'hex'),
+        id: bigInt(dbRecord.docId || docId),
+        accessHash: bigInt(dbRecord.accessHash || '0'),
+        fileReference: Buffer.from(String(dbRecord.fileReference || ''), 'hex'),
         date: dbRecord.date || Math.floor(Date.now() / 1000),
         mimeType: dbRecord.mimeType || 'video/mp4',
-        size: bigInt(dbRecord.size),
+        size: bigInt(dbRecord.size || '0'),
         dcId: dbRecord.dcId || 2,
-        attributes: [new Api.DocumentAttributeFilename({ fileName: dbRecord.filename })],
+        attributes: [new Api.DocumentAttributeFilename({ fileName: dbRecord.filename || filename })],
       });
       targetMedia = new Api.MessageMediaDocument({ document: targetDoc });
-      filename = dbRecord.filename;
-      fileSize = Number(dbRecord.size);
+      filename = dbRecord.filename || filename;
+      fileSize = Number(dbRecord.size || 0);
       mimeType = dbRecord.mimeType || 'video/mp4';
     } else {
       // 2. Fallback: Search recent bot messages
@@ -2221,15 +2295,15 @@ app.get('/stream/:docId', async (req, res) => {
           targetMedia = m.media;
           const fnAttr = targetDoc.attributes?.find(a => a.className === 'DocumentAttributeFilename');
           if (fnAttr) filename = fnAttr.fileName;
-          fileSize = Number(targetDoc.size);
+          fileSize = Number(targetDoc.size || 0);
           mimeType = targetDoc.mimeType || 'video/mp4';
           break;
         }
       }
     }
 
-    if (!targetDoc || !targetMedia) {
-      return res.status(404).send('Media document not found or expired from recent bot messages');
+    if (!targetDoc || !targetMedia || fileSize <= 0) {
+      return res.status(404).send('Media document not found or invalid media size');
     }
 
     // OPTION C: On-demand Audio Transcoding Pipe (?transcode=audio&ss=<timestamp>)
@@ -2294,10 +2368,13 @@ app.get('/stream/:docId', async (req, res) => {
         abort: () => {
           console.log(`[TRANSCODE ABORT] Killing ffmpeg process for doc ${docId}`);
           try { ffmpegProc.kill('SIGKILL'); } catch {}
-        }
+        },
+        createdAt: Date.now(),
       });
 
       const cleanupFfmpeg = () => {
+        req.off('close', cleanupFfmpeg);
+        res.off('finish', cleanupFfmpeg);
         if (activeStreams.get(streamSessionKey)) {
           activeStreams.delete(streamSessionKey);
         }
@@ -2315,11 +2392,32 @@ app.get('/stream/:docId', async (req, res) => {
       });
 
       ffmpegProc.stdout.on('data', (chunk) => {
+        if (res.destroyed || res.writableEnded) {
+          cleanupFfmpeg();
+          return;
+        }
         if (!firstChunkReceived) {
           firstChunkReceived = true;
           sendTranscodeHeaders();
         }
-        res.write(chunk);
+        try {
+          const ok = res.write(chunk);
+          if (!ok) {
+            ffmpegProc.stdout.pause();
+            res.once('drain', () => {
+              if (!ffmpegProc.killed) {
+                try { ffmpegProc.stdout.resume(); } catch {}
+              }
+            });
+          }
+        } catch (err) {
+          cleanupFfmpeg();
+        }
+      });
+
+      ffmpegProc.stdout.on('error', (err) => {
+        console.warn(`[FFMPEG STDOUT ${docId}] Error:`, err.message);
+        cleanupFfmpeg();
       });
 
       ffmpegProc.on('error', (err) => {
@@ -2373,14 +2471,35 @@ app.get('/stream/:docId', async (req, res) => {
       });
       await streamTelegramPipelined(client, targetDoc, 0, fileSize - 1, res, req, downloadChunkSize, undefined, streamSessionKey);
     } else {
-      const parts = rangeHeader.replace(/bytes=/, '').split('-');
-      const start = parseInt(parts[0], 10);
-      const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
+      const rangeMatch = rangeHeader.match(/bytes=(\d*)-(\d*)/);
+      let start;
+      let end;
 
-      if (start >= fileSize || end >= fileSize) {
+      if (!rangeMatch) {
         res.writeHead(416, { 'Content-Range': `bytes */${fileSize}` });
         return res.end();
       }
+
+      if (rangeMatch[1] === '' && rangeMatch[2] !== '') {
+        // Suffix range: bytes=-500 (requesting last 500 bytes)
+        const suffixLen = parseInt(rangeMatch[2], 10);
+        if (isNaN(suffixLen) || suffixLen <= 0) {
+          res.writeHead(416, { 'Content-Range': `bytes */${fileSize}` });
+          return res.end();
+        }
+        start = Math.max(0, fileSize - suffixLen);
+        end = fileSize - 1;
+      } else {
+        start = parseInt(rangeMatch[1], 10);
+        end = rangeMatch[2] ? parseInt(rangeMatch[2], 10) : fileSize - 1;
+      }
+
+      if (isNaN(start) || isNaN(end) || start < 0 || start > end || start >= fileSize) {
+        res.writeHead(416, { 'Content-Range': `bytes */${fileSize}` });
+        return res.end();
+      }
+
+      end = Math.min(end, fileSize - 1);
 
       const chunkSize = (end - start) + 1;
       console.log(`[STREAM REQ] ${req.method} Range: "${rangeHeader}" -> start: ${start}, end: ${end} (${chunkSize} bytes, chunkParam: ${req.query.chunkSize || 'default'})`);
@@ -2400,12 +2519,30 @@ app.get('/stream/:docId', async (req, res) => {
     }
     if (!res.headersSent) {
       res.status(500).json({ error: err.message });
+    } else if (!res.writableEnded) {
+      try { res.destroy(); } catch {}
     }
   }
 });
 
 process.on('uncaughtException', (err) => {
-  if (err.code === 'ECONNRESET' || err.code === 'EPIPE' || err.code === 'ERR_STREAM_WRITE_AFTER_END') return;
+  const code = err?.code || '';
+  const msg = err?.message || '';
+  if (
+    code === 'ECONNRESET' ||
+    code === 'EPIPE' ||
+    code === 'ERR_STREAM_WRITE_AFTER_END' ||
+    code === 'ERR_STREAM_PREMATURE_CLOSE' ||
+    code === 'ECANCELED' ||
+    code === 'ETIMEDOUT' ||
+    code === 'ENETUNREACH' ||
+    code === 'EHOSTUNREACH' ||
+    code === 'ECONNREFUSED' ||
+    msg.includes('socket hang up') ||
+    msg.includes('Connection closed')
+  ) {
+    return;
+  }
   console.error('[FATAL EXCEPTION]', err);
 });
 
@@ -2431,6 +2568,16 @@ const keyCandidates = [
 const sslCertFile = certCandidates.find(p => fs.existsSync(p));
 const sslKeyFile = keyCandidates.find(p => fs.existsSync(p));
 
+function attachServerErrorHandler(server, name, sPort) {
+  server.on('error', (err) => {
+    if (err.code === 'EADDRINUSE') {
+      console.error(`[SERVER FATAL] ${name} port ${sPort} is already in use (EADDRINUSE). Another instance may be running.`);
+    } else {
+      console.error(`[SERVER ERROR] ${name} listener error:`, err);
+    }
+  });
+}
+
 let serverInstance;
 
 if (sslCertFile && sslKeyFile) {
@@ -2440,6 +2587,7 @@ if (sslCertFile && sslKeyFile) {
       cert: fs.readFileSync(sslCertFile),
     };
     serverInstance = https.createServer(sslOptions, app);
+    attachServerErrorHandler(serverInstance, 'MSM Getter HTTPS', port);
     serverInstance.listen(port, async () => {
       console.log(`[SERVER] MSM Getter microservice listening securely on HTTPS port ${port} (cert: ${sslCertFile})`);
       checkFfmpeg();
@@ -2452,6 +2600,7 @@ if (sslCertFile && sslKeyFile) {
   } catch (sslErr) {
     console.error('[SERVER SSL ERROR] Failed to initialize HTTPS server, falling back to HTTP:', sslErr);
     serverInstance = http.createServer(app);
+    attachServerErrorHandler(serverInstance, 'MSM Getter HTTP (Fallback)', port);
     serverInstance.listen(port, async () => {
       console.log(`[SERVER] MSM Getter microservice listening on HTTP port ${port}`);
       checkFfmpeg();
@@ -2464,6 +2613,7 @@ if (sslCertFile && sslKeyFile) {
   }
 } else {
   serverInstance = http.createServer(app);
+  attachServerErrorHandler(serverInstance, 'MSM Getter HTTP', port);
   serverInstance.listen(port, async () => {
     console.log(`[SERVER] MSM Getter microservice listening on HTTP port ${port}`);
     checkFfmpeg();
@@ -2480,6 +2630,7 @@ if (sslCertFile && sslKeyFile) {
 if (port !== INTERNAL_HTTP_PORT) {
   try {
     const internalServer = http.createServer(app);
+    attachServerErrorHandler(internalServer, 'Internal Transcoder Loopback', INTERNAL_HTTP_PORT);
     internalServer.listen(INTERNAL_HTTP_PORT, '127.0.0.1', () => {
       console.log(`[SERVER] Internal loopback HTTP listener active on http://127.0.0.1:${INTERNAL_HTTP_PORT} (0% TLS overhead for ffmpeg)`);
     });
