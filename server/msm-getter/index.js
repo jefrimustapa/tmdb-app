@@ -1685,8 +1685,12 @@ const BLOCK_CACHE_MAX_ENTRIES = 16; // 16 x 512KB = 8 MB
 const globalBlockCache = new Map();
 const activeStreams = new Map(); // key: docId -> { abort: Function }
 
+// Global in-flight MTProto block requests map: key: `${docId}:${blockIdx}` -> Promise<Buffer>
+// Coalesces concurrent range requests targeting identical blocks (e.g. metadata probes, tail cues)
+const globalInFlightBlocks = new Map();
+
 // Pinned cache for container headers (first 2 blocks: 0, 1) and tail cues (last 2 blocks)
-// These blocks (<= 2 MB total) are NEVER evicted by sequential playback pipelines,
+// These blocks (<= 2 MB total per doc) are NEVER evicted by sequential playback pipelines,
 // eliminating 5 out of 6 remote Telegram round-trips on every seek!
 const pinnedHeaderCache = new Map(); // key: `${docId}:${blockIdx}` -> Buffer
 
@@ -1708,7 +1712,7 @@ function setCachedBlock(docId, blockIdx, data, isPinned = false) {
   if (!data || data.length === 0) return;
   const key = `${docId}:${blockIdx}`;
   if (isPinned) {
-    if (pinnedHeaderCache.size > 12) {
+    if (pinnedHeaderCache.size >= 24) {
       const oldestKey = pinnedHeaderCache.keys().next().value;
       pinnedHeaderCache.delete(oldestKey);
     }
@@ -1728,13 +1732,16 @@ function setCachedBlock(docId, blockIdx, data, isPinned = false) {
  * Write a buffer chunk to the HTTP response with strict TCP backpressure.
  * Pauses upstream fetching if the client's network buffer is full.
  */
-function writeWithBackpressure(res, chunk) {
+function writeWithBackpressure(res, chunk, onBackpressureChange) {
   if (res.destroyed || res.writableEnded) return Promise.resolve();
-  if (res.write(chunk)) return Promise.resolve();
+  const ok = res.write(chunk);
+  if (ok) return Promise.resolve();
+  if (onBackpressureChange) onBackpressureChange(true);
   return new Promise((resolve) => {
     const onDrain = () => { cleanup(); resolve(); };
     const onClose = () => { cleanup(); resolve(); };
     const cleanup = () => {
+      if (onBackpressureChange) onBackpressureChange(false);
       res.off('drain', onDrain);
       res.off('close', onClose);
     };
@@ -1920,13 +1927,29 @@ async function streamTelegramPipelined(client, targetDoc, startByte, endByte, re
 
   console.log(`[PIPELINE START] blocks ${startBlock}..${endBlock} (${endBlock - startBlock + 1} blocks), concurrency: ${CONCURRENCY}, chunkSize: ${CHUNK_SIZE / 1024}KB`);
 
+  let isBackpressured = false;
+  const onBackpressureChange = (val) => {
+    isBackpressured = val;
+    if (!val && !aborted) {
+      fillPipeline();
+    }
+  };
+
   async function fetchBlock(blockIdx) {
     if (aborted) return null;
 
+    const docIdStr = targetDoc.id.toString();
+
     // 1. Check in-memory LRU cache (0ms instant lookup)
-    const cached = getCachedBlock(targetDoc.id.toString(), blockIdx);
+    const cached = getCachedBlock(docIdStr, blockIdx);
     if (cached) {
       return cached;
+    }
+
+    // 2. Cross-request in-flight coalescing (reuse ongoing MTProto RPC)
+    const inFlightKey = `${docIdStr}:${blockIdx}`;
+    if (globalInFlightBlocks.has(inFlightKey)) {
+      return await globalInFlightBlocks.get(inFlightKey);
     }
 
     const offset = blockIdx * CHUNK_SIZE;
@@ -1941,62 +1964,72 @@ async function streamTelegramPipelined(client, targetDoc, startByte, endByte, re
     const totalDocBlocks = Math.ceil(Number(targetDoc.size) / CHUNK_SIZE);
     const isPinnedBlock = blockIdx <= 1 || blockIdx >= totalDocBlocks - 2;
 
-    try {
-      if (aborted) return null;
-      sender = await client.getSender(sender?.dcId || dcId);
-      if (aborted) return null;
-      const result = await client.invokeWithSender(request, sender);
-      if (aborted) return null;
-      const bytes = result.bytes;
-      if (bytes && bytes.length > 0) {
-        setCachedBlock(targetDoc.id.toString(), blockIdx, bytes, isPinnedBlock);
-      }
-      return bytes;
-    } catch (err) {
-      if (aborted) return null;
-      const msg = `${err.errorMessage || ''} ${err.message || ''}`;
-      const dcMatch = msg.match(/(?:FILE_MIGRATE_|stored in DC\s*)(\d+)/i);
-      const newDc = err.newDc || err.dc || (dcMatch ? parseInt(dcMatch[1], 10) : null);
-      if (newDc) {
-        console.log(`[STREAM MIGRATE] Document lives on DC ${newDc} (was ${dcId}). Re-routing...`);
-        dcId = newDc;
-        targetDoc.dcId = newDc;
+    const executeFetch = async () => {
+      try {
         if (aborted) return null;
-        sender = await client.getSender(newDc);
+        if (!sender) {
+          sender = await client.getSender(dcId);
+        }
         if (aborted) return null;
         const result = await client.invokeWithSender(request, sender);
         if (aborted) return null;
         const bytes = result.bytes;
         if (bytes && bytes.length > 0) {
-          setCachedBlock(targetDoc.id.toString(), blockIdx, bytes, isPinnedBlock);
+          setCachedBlock(docIdStr, blockIdx, bytes, isPinnedBlock);
         }
         return bytes;
-      }
-
-      // Automatically recover from expired Telegram file references (HMAC token expiry)
-      if (msg.includes('FILE_REFERENCE') || err.errorMessage === 'FILE_REFERENCE_EXPIRED') {
-        console.warn(`[STREAM WARN] File reference expired on Doc ${targetDoc.id}. Auto-refreshing...`);
-        const freshRef = await refreshDocumentFileReference(client, targetDoc);
-        if (freshRef) {
-          targetDoc.fileReference = freshRef;
-          location.fileReference = freshRef;
-          request.location.fileReference = freshRef;
-          console.log(`[STREAM RECOVERY] Successfully swapped fresh fileReference. Retrying block ${blockIdx}...`);
+      } catch (err) {
+        if (aborted) return null;
+        const msg = `${err.errorMessage || ''} ${err.message || ''}`;
+        const dcMatch = msg.match(/(?:FILE_MIGRATE_|stored in DC\s*)(\d+)/i);
+        const newDc = err.newDc || err.dc || (dcMatch ? parseInt(dcMatch[1], 10) : null);
+        if (newDc) {
+          console.log(`[STREAM MIGRATE] Document lives on DC ${newDc} (was ${dcId}). Re-routing...`);
+          dcId = newDc;
+          targetDoc.dcId = newDc;
           if (aborted) return null;
-          sender = await client.getSender(sender?.dcId || dcId);
+          sender = await client.getSender(newDc);
           if (aborted) return null;
           const result = await client.invokeWithSender(request, sender);
           if (aborted) return null;
           const bytes = result.bytes;
           if (bytes && bytes.length > 0) {
-            setCachedBlock(targetDoc.id.toString(), blockIdx, bytes, isPinnedBlock);
+            setCachedBlock(docIdStr, blockIdx, bytes, isPinnedBlock);
           }
           return bytes;
         }
-      }
 
-      throw err;
-    }
+        // Automatically recover from expired Telegram file references (HMAC token expiry)
+        if (msg.includes('FILE_REFERENCE') || err.errorMessage === 'FILE_REFERENCE_EXPIRED') {
+          console.warn(`[STREAM WARN] File reference expired on Doc ${targetDoc.id}. Auto-refreshing...`);
+          const freshRef = await refreshDocumentFileReference(client, targetDoc);
+          if (freshRef) {
+            targetDoc.fileReference = freshRef;
+            location.fileReference = freshRef;
+            request.location.fileReference = freshRef;
+            console.log(`[STREAM RECOVERY] Successfully swapped fresh fileReference. Retrying block ${blockIdx}...`);
+            if (aborted) return null;
+            if (!sender) sender = await client.getSender(dcId);
+            if (aborted) return null;
+            const result = await client.invokeWithSender(request, sender);
+            if (aborted) return null;
+            const bytes = result.bytes;
+            if (bytes && bytes.length > 0) {
+              setCachedBlock(docIdStr, blockIdx, bytes, isPinnedBlock);
+            }
+            return bytes;
+          }
+        }
+
+        throw err;
+      }
+    };
+
+    const fetchPromise = executeFetch().finally(() => {
+      globalInFlightBlocks.delete(inFlightKey);
+    });
+    globalInFlightBlocks.set(inFlightKey, fetchPromise);
+    return await fetchPromise;
   }
 
   async function fetchBlockWithRetry(blockIdx, retries = 3) {
@@ -2039,7 +2072,7 @@ async function streamTelegramPipelined(client, targetDoc, startByte, endByte, re
   const firstSliceStart = Math.max(0, startByte - firstBlockStart);
   const firstSliceEnd = Math.min(firstBlockData.length, (endByte - firstBlockStart) + 1);
   if (firstSliceStart < firstSliceEnd) {
-    await writeWithBackpressure(res, firstBlockData.subarray(firstSliceStart, firstSliceEnd));
+    await writeWithBackpressure(res, firstBlockData.subarray(firstSliceStart, firstSliceEnd), onBackpressureChange);
   }
 
   if (startBlock === endBlock) {
@@ -2052,7 +2085,7 @@ async function streamTelegramPipelined(client, targetDoc, startByte, endByte, re
   nextBlockToFetch = startBlock + 1;
 
   function fillPipeline() {
-    while (!aborted && inFlight.size < CONCURRENCY && nextBlockToFetch <= endBlock) {
+    while (!aborted && !isBackpressured && inFlight.size < CONCURRENCY && nextBlockToFetch <= endBlock) {
       const idx = nextBlockToFetch++;
       const p = fetchBlockWithRetry(idx).catch(err => {
         if (!aborted) console.warn(`[STREAM PIPE WARN] Block ${idx} fetch error: ${err.message}`);
@@ -2082,7 +2115,7 @@ async function streamTelegramPipelined(client, targetDoc, startByte, endByte, re
 
     if (sliceStart < sliceEnd) {
       const slice = buffer.subarray(sliceStart, sliceEnd);
-      await writeWithBackpressure(res, slice);
+      await writeWithBackpressure(res, slice, onBackpressureChange);
     }
   }
 
@@ -2172,6 +2205,14 @@ app.get('/stream/:docId', async (req, res) => {
     await initTelegram();
     const docId = req.params.docId;
     const rangeHeader = req.headers.range;
+
+    // Zero Nagle buffering delay and keep connection active for fast range requests
+    if (req.socket) {
+      try {
+        req.socket.setNoDelay(true);
+        req.socket.setKeepAlive(true, 15000);
+      } catch {}
+    }
 
     // Instantly terminate any previous in-flight stream pipeline for this document for the same client session (e.g. user seeked forward)
     // to free 100% of the router's MTProto download bandwidth for the new seek position immediately.

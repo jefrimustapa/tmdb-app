@@ -16,6 +16,9 @@ class CentralDatabase {
   constructor() {
     this.byQuery = new Map(); // queryKey -> record
     this.byDocId = new Map(); // docId -> record
+    this.saveTimer = null;
+    this.isSaving = false;
+    this.needsSaveAgain = false;
     this.load();
   }
 
@@ -36,13 +39,48 @@ class CentralDatabase {
   }
 
   save() {
+    if (this.saveTimer) clearTimeout(this.saveTimer);
+    this.saveTimer = setTimeout(() => {
+      this.saveAsync().catch(err => {
+        console.error('[DB ERROR] Failed to persist streams.json async:', err.message);
+      });
+    }, 300);
+  }
+
+  async saveAsync() {
+    if (this.isSaving) {
+      this.needsSaveAgain = true;
+      return;
+    }
+    this.isSaving = true;
+    try {
+      const records = Array.from(this.byDocId.values());
+      const tmpFile = `${DB_FILE}.tmp`;
+      await fs.promises.writeFile(tmpFile, JSON.stringify(records, null, 2), 'utf-8');
+      await fs.promises.rename(tmpFile, DB_FILE);
+    } catch (err) {
+      console.error('[DB ERROR] Failed to persist streams.json:', err.message);
+    } finally {
+      this.isSaving = false;
+      if (this.needsSaveAgain) {
+        this.needsSaveAgain = false;
+        this.save();
+      }
+    }
+  }
+
+  saveSync() {
+    if (this.saveTimer) {
+      clearTimeout(this.saveTimer);
+      this.saveTimer = null;
+    }
     try {
       const records = Array.from(this.byDocId.values());
       const tmpFile = `${DB_FILE}.tmp`;
       fs.writeFileSync(tmpFile, JSON.stringify(records, null, 2), 'utf-8');
       fs.renameSync(tmpFile, DB_FILE);
     } catch (err) {
-      console.error('[DB ERROR] Failed to persist streams.json:', err.message);
+      console.error('[DB ERROR] Failed to persist streams.json synchronously:', err.message);
     }
   }
 
