@@ -2,13 +2,14 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20260925-1257';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.fix-msm-getter-crash.20260925-1257';
+export const APP_BUILD_NUMBER = '20260926-0047';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.refactor-standardize.20260926-0047';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
-export const APP_BRANCH = 'fix-msm-getter-crash';
-export const APP_CHANGELOG = `* fix(player): defer initial seek until container cues are parsed (readyState >= 2)
-* fix(player): resolve msm-getter pipeline crash and fix direct MKV resume seek
+export const APP_BRANCH = 'refactor-standardize';
+export const APP_CHANGELOG = `* feat(msm-getter): improve search accuracy, filter junk trailers, and enforce size thresholds (#150)
+* perf(msm-getter): optimize MTProto sender reuse, in-flight coalescing, TCP socket options, and async persistence (#149)
+* fix(player): resolve msm-getter pipeline crash and fix MKV resume seeking (#148)
 * fix(player): prevent router OOM by avoiding forced transcoding on standard MKVs with audio fallback (#146)
 * fix(details): center landscape hero backdrop using object-center matching HeroBanner (#145)
 * fix(msm-getter): add startup ffmpeg verification and deferred fallback for audio transcoding (#144)
@@ -20,5 +21,4 @@ export const APP_CHANGELOG = `* fix(player): defer initial seek until container 
 * fix(details): resolve background image loading failure and cache race condition (#138)
 * feat(details): enhance hero appearance and subtle loading transitions (#137)
 * fix(stream): resolve MKV audio silence via real-time audio transcode pipe and fast time-offset seeking (#136)
-* fix(watch): eliminate hover tooltip and punch-through splash layer in watch page (#135)
-* fix: add cursor-pointer to sidebar NavLink for physical mouse on Android TV WebView (#133)`;
+* fix(watch): eliminate hover tooltip and punch-through splash layer in watch page (#135)`;
