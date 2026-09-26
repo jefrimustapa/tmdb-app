@@ -183,6 +183,58 @@ function extractTitleTokens(str) {
   });
 }
 
+// Junk blacklist: trailers, teasers, samples, promos, soundtracks, behind-the-scenes
+const JUNK_MEDIA_REGEX = /\b(trailer|teaser|sample|clip|promo|ost|soundtrack|behind\s*the\s*scenes|bts|interview|preview|pendek|short)\b/i;
+
+// Stopwords for title coverage calculations
+const STOPWORDS = new Set(['the', 'a', 'an', 'dan', 'di', 'ke', 'yang', 'si', 'pada', 'dari', 'of', 'in', 'on', 'at', 'to', 'for', 'with', 'by']);
+
+function isJunkMedia(text) {
+  if (!text) return false;
+  return JUNK_MEDIA_REGEX.test(text);
+}
+
+function parseSizeFromText(text) {
+  if (!text) return null;
+  const m = text.match(/(\d+(?:\.\d+)?)\s*(mb|gb)\b/i);
+  if (!m) return null;
+  const val = parseFloat(m[1]);
+  if (isNaN(val)) return null;
+  return m[2].toLowerCase() === 'gb' ? val * 1024 : val;
+}
+
+// Clean title for bot searches (strips punctuation, colons, quotes, dashes, parentheticals)
+function cleanSearchTitle(str) {
+  if (!str) return '';
+  return str
+    .replace(/\s*\([^)]*\)/g, ' ') // remove (2024), (US), etc.
+    .replace(/\s*\[[^\]]*\]/g, ' ')
+    .replace(/[:\-–—'"`!?&]/g, ' ') // replace punctuation with space
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+// Extract primary keywords excluding common stopwords for strict coverage validation
+function extractSignificantTokens(str) {
+  const norm = normalizeTitle(str);
+  return norm.split(' ').filter(t => {
+    if (!t) return false;
+    if (STOPWORDS.has(t)) return false;
+    if (/^\d+$/.test(t)) return true; // keep digits: 2, 3, 4
+    if (/^(ii|iii|iv|v|vi)$/i.test(t)) return true; // keep roman numerals
+    return t.length >= 2;
+  });
+}
+
+// Calculate coverage ratio (0.0 to 1.0) of significant tokens found in candidate text
+function calculateTitleCoverage(significantTokens, text) {
+  if (!significantTokens || significantTokens.length === 0) return 1.0;
+  if (!text) return 0.0;
+  const norm = normalizeTitle(text);
+  const matched = significantTokens.filter(t => norm.includes(t));
+  return matched.length / significantTokens.length;
+}
+
 // Web Auth State in RAM
 let pendingAuth = {
   client: null,
@@ -1125,22 +1177,62 @@ app.get('/api/resolve', async (req, res) => {
       }
     }
 
-    // Check if matching document was recently delivered in chat
-    const recentMsgs = await client.getMessages('msm32bot', { limit: 25 });
+    // Check if matching document was delivered in chat (combining recent messages + Telegram server-side document search)
+    const recentMsgs = await client.getMessages('msm32bot', { limit: 30 });
+    const cleanTitle = cleanSearchTitle(title);
+    const candidateMsgs = [...recentMsgs];
+
+    // Search historical chat messages on Telegram servers for matching documents
+    try {
+      const serverDocs = await client.getMessages('msm32bot', {
+        search: cleanTitle,
+        limit: 20,
+        filter: new Api.InputMessagesFilterDocument(),
+      });
+      if (serverDocs && serverDocs.length > 0) {
+        const seenIds = new Set(candidateMsgs.map(m => m.id));
+        for (const sm of serverDocs) {
+          if (!seenIds.has(sm.id)) {
+            candidateMsgs.push(sm);
+            seenIds.add(sm.id);
+          }
+        }
+      }
+    } catch (sErr) {
+      console.warn('[SEARCH SERVER] MTProto document search warning:', sErr.message);
+    }
+
     const titleTokens = extractTitleTokens(title);
+    const significantTokens = extractSignificantTokens(title);
     const targetSequel = extractSequelInfo(title);
     const targetYear = parseInt(year, 10) || extractYear(title);
     const matchingRecentDocs = [];
 
-    for (const msg of recentMsgs) {
+    for (const msg of candidateMsgs) {
       if (msg.media?.document) {
         const doc = msg.media.document;
         const fnAttr = doc.attributes?.find(a => a.className === 'DocumentAttributeFilename');
         const filename = fnAttr ? fnAttr.fileName : msg.message;
         const normFn = normalizeTitle(filename);
 
-        const matchesAllTokens = titleTokens.length > 0 && titleTokens.every(t => normFn.includes(t));
-        let matchesCandidate = matchesAllTokens;
+        // 1. Instantly reject junk media (trailers, teasers, samples, promos, ost)
+        if (isJunkMedia(filename) || isJunkMedia(msg.message)) {
+          continue;
+        }
+
+        // 2. Minimum media file size check (reject clips and trailers under threshold)
+        const docSizeMB = Number(doc.size || 0) / (1024 * 1024);
+        if (isTv ? docSizeMB < 70 : docSizeMB < 100) {
+          continue;
+        }
+
+        // 3. Strict Title Token Coverage check
+        const coverage = calculateTitleCoverage(significantTokens, filename);
+        if (significantTokens.length <= 2 ? coverage < 1.0 : coverage < 0.70) {
+          continue;
+        }
+
+        let matchesCandidate = true;
 
         if (isTv) {
           const epKeywords = [
@@ -1246,33 +1338,35 @@ app.get('/api/resolve', async (req, res) => {
       }
     }
 
-    // Prepare prioritized search queries
-    // For series: specific episode tags first to get clean 1-page results without pagination clutter
+    // Prepare prioritized search queries using clean, unpunctuated titles
+    const cleanT = cleanSearchTitle(title);
     const searchQueries = [];
     if (isTv) {
       if (sNum > 1) {
-        searchQueries.push(`${title} Season ${sNum}`);
-        searchQueries.push(`${title} S${sNum}E${epPadded}`);
-        searchQueries.push(`${title} S${sPadded}E${epPadded}`);
-        searchQueries.push(`${title} S${sNum}`);
-        searchQueries.push(`${title} S${sPadded}`);
-        searchQueries.push(`${title} EP${epPadded}`);
-        searchQueries.push(`${title} Musim ${sNum}`);
-        searchQueries.push(title);
+        searchQueries.push(`${cleanT} Season ${sNum}`);
+        searchQueries.push(`${cleanT} S${sNum}E${epPadded}`);
+        searchQueries.push(`${cleanT} S${sPadded}E${epPadded}`);
+        searchQueries.push(`${cleanT} EP${epPadded}`);
+        searchQueries.push(`${cleanT} Musim ${sNum}`);
+        searchQueries.push(cleanT);
+        if (cleanT !== title) searchQueries.push(title);
       } else {
-        // Season 1 or single-season series: specific episode queries first
-        searchQueries.push(`${title} EP${epPadded}`);
-        searchQueries.push(`${title} Episod ${eNum}`);
-        searchQueries.push(`${title} Episod ${epPadded}`);
-        searchQueries.push(`${title} S01E${epPadded}`);
-        searchQueries.push(`${title} E${epPadded}`);
-        searchQueries.push(`${title} Season 1`);
-        searchQueries.push(title);
-        if (year) searchQueries.push(`${title} ${year}`);
+        searchQueries.push(`${cleanT} EP${epPadded}`);
+        searchQueries.push(`${cleanT} Episod ${eNum}`);
+        searchQueries.push(`${cleanT} Episod ${epPadded}`);
+        searchQueries.push(`${cleanT} S01E${epPadded}`);
+        searchQueries.push(`${cleanT} Season 1`);
+        searchQueries.push(cleanT);
+        if (year) searchQueries.push(`${cleanT} ${year}`);
+        if (cleanT !== title) searchQueries.push(title);
       }
     } else {
-      if (year) searchQueries.push(`${title} ${year}`);
-      searchQueries.push(title);
+      if (year) searchQueries.push(`${cleanT} ${year}`);
+      searchQueries.push(cleanT);
+      if (cleanT !== title) {
+        if (year) searchQueries.push(`${title} ${year}`);
+        searchQueries.push(title);
+      }
     }
 
     let targetMsgId = null;
@@ -1290,7 +1384,40 @@ app.get('/api/resolve', async (req, res) => {
       const normMsgText = normalizeTitle(msgText);
       const combinedNorm = `${normMsgText} ${normBtnText}`;
 
+      // 1. Immediately disqualify junk media (trailers, teasers, samples, promos, ost)
+      if (isJunkMedia(btnText) || isJunkMedia(msgText)) {
+        return -999;
+      }
+
+      // 2. Minimum file size sanity check (trailers/clips are typically < 100MB)
+      const btnSizeMB = parseSizeFromText(btn.text) || parseSizeFromText(msg.message);
+      if (btnSizeMB !== null) {
+        if (isTv) {
+          if (btnSizeMB < 70) return -999; // Disqualify tiny clips / trailers
+          if (btnSizeMB < 120) return -600; // Suspect low size for full episode
+        } else {
+          if (btnSizeMB < 100) return -999; // Disqualify trailers
+          if (btnSizeMB < 250) return -600; // Suspect low size for full movie
+        }
+      }
+
+      // 3. Strict Title Token Coverage check
+      if (significantTokens.length > 0) {
+        const coverage = calculateTitleCoverage(significantTokens, combinedNorm);
+        if (significantTokens.length <= 2 && coverage < 1.0) {
+          return -999; // 1- or 2-word titles MUST match all words (prevents "One Piece" matching "One Cent")
+        }
+        if (coverage < 0.70) {
+          return -999; // Unrelated content: less than 70% of significant title words match
+        }
+      }
+
       let score = 0;
+
+      if (significantTokens.length > 0) {
+        const coverage = calculateTitleCoverage(significantTokens, combinedNorm);
+        score += Math.round(coverage * 80);
+      }
 
       if (isTv) {
         const epKeywords = [
@@ -1367,16 +1494,6 @@ app.get('/api/resolve', async (req, res) => {
         }
       }
 
-      // Title relevance check: award bonus if title tokens appear in message caption or button
-      if (titleTokens.length > 0) {
-        const matchingTokens = titleTokens.filter(t => combinedNorm.includes(t));
-        if (matchingTokens.length > 0) {
-          score += Math.min(60, matchingTokens.length * 20);
-        } else {
-          score -= 300;
-        }
-      }
-
       // Quality preference
       if (targetQuality <= 720) {
         if (btnText.includes('720p') || btnText.includes('720')) score += 50;
@@ -1424,8 +1541,8 @@ app.get('/api/resolve', async (req, res) => {
 
       let noResults = false;
 
-      for (let i = 0; i < 5; i++) {
-        await new Promise(r => setTimeout(r, 1500));
+      for (let poll = 0; poll < 8; poll++) {
+        await new Promise(r => setTimeout(r, 400));
         const msgs = await client.getMessages('msm32bot', { limit: 5 });
         const candidates = [];
 
@@ -1444,7 +1561,7 @@ app.get('/api/resolve', async (req, res) => {
             if (m.replyMarkup?.rows) {
               let currentMsg = m;
               let pageCount = 0;
-              const MAX_PAGES = 3;
+              const MAX_PAGES = isTv ? 6 : 3;
 
               while (currentMsg && pageCount < MAX_PAGES) {
                 pageCount++;
