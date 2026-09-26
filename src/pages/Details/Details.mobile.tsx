@@ -2,8 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import { Play, Heart, Bookmark, Star, ArrowLeft, Plus, Check, RotateCcw, Share2 } from 'lucide-react';
 import type { TMDBMovieDetails, TMDBTVDetails, TMDBMediaItem, TMDBImageItem } from '../../types/tmdb';
+import type { WatchHistoryItem } from '../../types/db';
 import { tmdbApi, tmdbImages, extractContentRating, resolveGenresFromIds, isExplicitAdultCertification } from '../../services/tmdb';
 import { dbService } from '../../services/db';
+import { resolveSeriesPlaybackTarget, type SeriesPlaybackTarget } from '../../services/seriesProgress';
 import { MediaRow } from '../../components/common/MediaRow';
 import { EpisodeGrid } from '../../components/player/EpisodeGrid';
 import { useDevice } from '../../hooks/useDevice';
@@ -92,6 +94,7 @@ export const Details: React.FC = () => {
   const [isWatchlist, setIsWatchlist] = useState(false);
   const [lastWatched, setLastWatched] = useState<{ season: number; episode: number } | null>(null);
   const [watchProgress, setWatchProgress] = useState<{ timestamp: number; duration: number; progressPercent: number } | null>(null);
+  const [tvHistory, setTvHistory] = useState<WatchHistoryItem[]>([]);
   const [randomPosterPath, setRandomPosterPath] = useState<string | null>(null);
   const [randomBackdropPath, setRandomBackdropPath] = useState<string | null>(null);
   const [activeEpisodeStill, setActiveEpisodeStill] = useState<string | null>(null);
@@ -108,6 +111,7 @@ export const Details: React.FC = () => {
     // Reset previous title state immediately so old watch time/likes don't persist
     setWatchProgress(null);
     setLastWatched(null);
+    setTvHistory([]);
     setRandomPosterPath(null);
     setRandomBackdropPath(null);
     setActiveEpisodeStill(null);
@@ -137,7 +141,8 @@ export const Details: React.FC = () => {
     const dbPromise = Promise.allSettled([
       dbService.isLiked(tmdbId, mediaType),
       dbService.isWatchlisted(tmdbId, mediaType),
-      dbService.getHistoryItem(tmdbId, mediaType)
+      dbService.getHistoryItem(tmdbId, mediaType),
+      mediaType === 'tv' ? dbService.getTVShowHistory(tmdbId) : Promise.resolve([])
     ]);
 
     Promise.all([detailsPromise, dbPromise])
@@ -159,28 +164,33 @@ export const Details: React.FC = () => {
           }
         }
 
-        const [liked, watchlisted, historyItem] = dbResults;
+        const [liked, watchlisted, historyItem, tvHistoryRes] = dbResults;
         if (liked.status === 'fulfilled') setIsLiked(liked.value);
         if (watchlisted.status === 'fulfilled') setIsWatchlist(watchlisted.value);
 
-        let watchedSeason: number | null = null;
-        let watchedEpisode: number | null = null;
+        const currentTvHistory = (tvHistoryRes?.status === 'fulfilled' && Array.isArray(tvHistoryRes.value))
+          ? (tvHistoryRes.value as WatchHistoryItem[])
+          : [];
+        setTvHistory(currentTvHistory);
+
+        let initialLastWatched: { season: number; episode: number } | null = null;
+        let initialWatchProgress: { timestamp: number; duration: number; progressPercent: number } | null = null;
 
         if (historyItem.status === 'fulfilled' && historyItem.value) {
           const item = historyItem.value;
           if (item.season && item.episode) {
-            watchedSeason = item.season;
-            watchedEpisode = item.episode;
-            setLastWatched({ season: item.season, episode: item.episode });
+            initialLastWatched = { season: item.season, episode: item.episode };
+            setLastWatched(initialLastWatched);
           } else {
             setLastWatched(null);
           }
           if (item.timestamp > 0) {
-            setWatchProgress({
+            initialWatchProgress = {
               timestamp: item.timestamp,
               duration: item.duration,
               progressPercent: item.progressPercent
-            });
+            };
+            setWatchProgress(initialWatchProgress);
           } else {
             setWatchProgress(null);
           }
@@ -196,16 +206,21 @@ export const Details: React.FC = () => {
           setRandomPosterPath(pickedPoster);
 
           // 2. Backdrop:
-          // For series: check if already watched -> YES: use active episode backdrop
-          // Else -> look for available backdrops & pick ONE randomly
-          const isSeriesWatched = mediaType === 'tv' && Boolean(watchedSeason && watchedEpisode);
+          // For series: resolve target episode (next episode if completed)
           let episodeStillResolved = false;
 
-          if (isSeriesWatched && watchedSeason && watchedEpisode) {
+          if (mediaType === 'tv' && initialLastWatched) {
+            const initialTarget = resolveSeriesPlaybackTarget(
+              resData as TMDBTVDetails,
+              initialLastWatched,
+              initialWatchProgress,
+              currentTvHistory
+            );
+
             try {
-              const seasonData = await tmdbApi.getSeasonDetails(tmdbId, watchedSeason);
+              const seasonData = await tmdbApi.getSeasonDetails(tmdbId, initialTarget.season);
               if (isMounted) {
-                const ep = seasonData?.episodes?.find((e) => e.episode_number === watchedEpisode);
+                const ep = seasonData?.episodes?.find((e) => e.episode_number === initialTarget.episode);
                 if (ep?.still_path) {
                   setActiveEpisodeStill(ep.still_path);
                   episodeStillResolved = true;
@@ -258,7 +273,13 @@ export const Details: React.FC = () => {
   useEffect(() => {
     const updateLastWatched = async () => {
       if (tmdbId) {
-        const historyItem = await dbService.getHistoryItem(tmdbId, mediaType);
+        const [historyItem, historyList] = await Promise.all([
+          dbService.getHistoryItem(tmdbId, mediaType),
+          mediaType === 'tv' ? dbService.getTVShowHistory(tmdbId) : Promise.resolve([])
+        ]);
+        if (historyList) {
+          setTvHistory(historyList);
+        }
         if (historyItem) {
           if (historyItem.season && historyItem.episode) {
             setLastWatched({ season: historyItem.season, episode: historyItem.episode });
@@ -288,15 +309,28 @@ export const Details: React.FC = () => {
     };
   }, [tmdbId, mediaType]);
 
-  // Flow 2: For TV series, update active episode still when lastWatched changes
+  // Resolve playback target for series (advances to next episode if completed)
+  const playbackTarget: SeriesPlaybackTarget = mediaType === 'tv'
+    ? resolveSeriesPlaybackTarget(details as TMDBTVDetails, lastWatched, watchProgress, tvHistory)
+    : {
+        season: 1,
+        episode: 1,
+        isResumable: Boolean(watchProgress && (watchProgress.timestamp > 15 || watchProgress.progressPercent > 1) && watchProgress.progressPercent < 92),
+        isNextEpisode: false,
+        timestamp: watchProgress?.timestamp || 0,
+        duration: watchProgress?.duration || 0,
+        progressPercent: watchProgress?.progressPercent || 0,
+      };
+
+  // Flow 2: For TV series, update active episode still when playback target changes
   useEffect(() => {
     if (mediaType !== 'tv' || !tmdbId || !lastWatched) {
       return;
     }
 
     let isMounted = true;
-    const targetSeason = lastWatched.season || 1;
-    const targetEpisode = lastWatched.episode || 1;
+    const targetSeason = playbackTarget.season || 1;
+    const targetEpisode = playbackTarget.episode || 1;
 
     tmdbApi.getSeasonDetails(tmdbId, targetSeason)
       .then((seasonData) => {
@@ -313,7 +347,7 @@ export const Details: React.FC = () => {
     return () => {
       isMounted = false;
     };
-  }, [tmdbId, mediaType, lastWatched?.season, lastWatched?.episode]);
+  }, [tmdbId, mediaType, playbackTarget.season, playbackTarget.episode, Boolean(lastWatched)]);
 
   const handleToggleLike = async () => {
     if (!details) return;
@@ -661,19 +695,19 @@ export const Details: React.FC = () => {
 
             {/* Primary Action Buttons */}
             {(() => {
-              const isResumable = watchProgress && (watchProgress.timestamp > 15 || watchProgress.progressPercent > 1) && watchProgress.progressPercent < 96;
-              const minsLeft = watchProgress && watchProgress.duration > watchProgress.timestamp
-                ? Math.max(1, Math.round((watchProgress.duration - watchProgress.timestamp) / 60))
+              const isResumable = playbackTarget.isResumable;
+              const minsLeft = playbackTarget.duration > playbackTarget.timestamp
+                ? Math.max(1, Math.round((playbackTarget.duration - playbackTarget.timestamp) / 60))
                 : 0;
 
-              const targetResumeTime = isResumable ? (watchProgress?.timestamp || 0) : 0;
+              const targetResumeTime = isResumable ? playbackTarget.timestamp : 0;
 
               const watchUrl = mediaType === 'tv'
-                ? `/watch/tv/${tmdbId}?s=${lastWatched?.season || 1}&e=${lastWatched?.episode || 1}${targetResumeTime > 0 ? `&t=${targetResumeTime}` : ''}`
+                ? `/watch/tv/${tmdbId}?s=${playbackTarget.season}&e=${playbackTarget.episode}${targetResumeTime > 0 ? `&t=${targetResumeTime}` : ''}`
                 : `/watch/movie/${tmdbId}${targetResumeTime > 0 ? `?t=${targetResumeTime}` : ''}`;
 
               const restartUrl = mediaType === 'tv'
-                ? `/watch/tv/${tmdbId}?s=${lastWatched?.season || 1}&e=${lastWatched?.episode || 1}&t=0`
+                ? `/watch/tv/${tmdbId}?s=${playbackTarget.season}&e=${playbackTarget.episode}&t=0`
                 : `/watch/movie/${tmdbId}?t=0`;
 
               return (
@@ -688,11 +722,11 @@ export const Details: React.FC = () => {
                       <Play className="w-5 h-5 fill-current flex-shrink-0" />
                       <span className="truncate">
                         {isResumable
-                          ? (mediaType === 'tv' && lastWatched
-                              ? `Resume S${lastWatched.season} E${lastWatched.episode}${minsLeft > 0 ? ` (${minsLeft}m left)` : ''}`
+                          ? (mediaType === 'tv'
+                              ? `Resume S${playbackTarget.season} E${playbackTarget.episode}${minsLeft > 0 ? ` (${minsLeft}m left)` : ''}`
                               : `Resume${minsLeft > 0 ? ` (${minsLeft}m left)` : ''}`)
-                          : (mediaType === 'tv' && lastWatched
-                              ? `Play S${lastWatched.season} E${lastWatched.episode}`
+                          : (mediaType === 'tv' && (lastWatched || playbackTarget.isNextEpisode)
+                              ? `Play S${playbackTarget.season} E${playbackTarget.episode}`
                               : 'Watch Now')}
                       </span>
                     </Link>
@@ -717,13 +751,13 @@ export const Details: React.FC = () => {
                       onClick={handleToggleWatchlist}
                       className={`tv-focus-target group relative w-11 h-11 sm:w-12 sm:h-12 rounded-full border backdrop-blur-md transition-all duration-200 active:scale-95 flex items-center justify-center flex-shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-hbo-cyan shadow-sm ${
                         isWatchlist
-                          ? 'border-hbo-cyan ring-2 ring-hbo-cyan bg-hbo-purple/40 text-hbo-cyan'
+                          ? 'border-hbo-purple-light ring-2 ring-hbo-purple/50 bg-hbo-purple/40 text-hbo-purple-light'
                           : 'border-white/20 bg-white/[0.08] hover:bg-white/[0.15] text-white/90 hover:text-white hover:border-white/40'
                       }`}
                       title={isWatchlist ? 'In Watchlist' : 'Add to Watchlist'}
                       aria-label={isWatchlist ? 'In Watchlist' : 'Add to Watchlist'}
                     >
-                      <Bookmark className={`w-5 h-5 transition-transform group-hover:scale-110 ${isWatchlist ? 'fill-current text-hbo-cyan' : 'text-gray-200 group-hover:text-white'}`} />
+                      <Bookmark className={`w-5 h-5 transition-transform group-hover:scale-110 ${isWatchlist ? 'fill-current text-hbo-purple-light' : 'text-gray-200 group-hover:text-white'}`} />
                     </button>
 
                     <button
@@ -731,13 +765,13 @@ export const Details: React.FC = () => {
                       onClick={handleToggleLike}
                       className={`tv-focus-target group relative w-11 h-11 sm:w-12 sm:h-12 rounded-full border backdrop-blur-md transition-all duration-200 active:scale-95 flex items-center justify-center flex-shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-hbo-cyan shadow-sm ${
                         isLiked
-                          ? 'border-hbo-cyan ring-2 ring-hbo-cyan bg-hbo-purple/40 text-hbo-cyan'
+                          ? 'border-red-500/60 ring-2 ring-red-500/40 bg-red-500/20 text-red-400'
                           : 'border-white/20 bg-white/[0.08] hover:bg-white/[0.15] text-white/90 hover:text-white hover:border-white/40'
                       }`}
                       title={isLiked ? 'Liked' : 'Like'}
                       aria-label={isLiked ? 'Liked' : 'Like'}
                     >
-                      <Heart className={`w-5 h-5 transition-transform group-hover:scale-110 ${isLiked ? 'fill-current text-hbo-cyan' : 'text-gray-200 group-hover:text-white'}`} />
+                      <Heart className={`w-5 h-5 transition-transform group-hover:scale-110 ${isLiked ? 'fill-current text-red-400' : 'text-gray-200 group-hover:text-white'}`} />
                     </button>
 
                     <button
@@ -777,12 +811,12 @@ export const Details: React.FC = () => {
           <div className="-mx-4 sm:-mx-8 lg:-mx-12 px-4 sm:px-8 lg:px-12">
             <EpisodeGrid
               tvDetails={details as TMDBTVDetails}
-              currentSeason={lastWatched?.season || 1}
-              currentEpisode={lastWatched?.episode || 1}
+              currentSeason={playbackTarget.season}
+              currentEpisode={playbackTarget.episode}
               hasWatchedHistory={Boolean(lastWatched)}
               onSelectEpisode={async (s, e) => {
                 const epHistory = await dbService.getHistoryItem(tmdbId, 'tv', s, e);
-                const isEpCompleted = Boolean(epHistory && epHistory.progressPercent >= 96);
+                const isEpCompleted = Boolean(epHistory && epHistory.progressPercent >= 92);
                 const epTime = (epHistory && epHistory.timestamp > 15 && !isEpCompleted) ? epHistory.timestamp : 0;
                 setLastWatched({ season: s, episode: e });
                 navigate(`/watch/tv/${tmdbId}?s=${s}&e=${e}${epTime > 0 ? `&t=${epTime}` : ''}`);
