@@ -389,16 +389,35 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           }
           const telegramSearchTitles: string[] = Array.from(candidateSet);
 
+          // Compute total seasons for series
+          const effectiveTotalSeasons = mediaType === 'tv'
+            ? (details?.number_of_seasons || (details?.seasons ? details.seasons.filter((s: any) => s.season_number > 0).length : undefined))
+            : undefined;
+
+          // For TV, resolve the specific season's release year if available (e.g. S1 = 2022, S2 = 2025)
+          let effectiveSeasonYear = releaseYear;
+          if (mediaType === 'tv' && details?.seasons && Array.isArray(details.seasons)) {
+            const currentSeasonObj = details.seasons.find((s: any) => s.season_number === season);
+            if (currentSeasonObj?.air_date) {
+              const parsedYear = new Date(currentSeasonObj.air_date).getFullYear();
+              if (!isNaN(parsedYear) && parsedYear > 1900) {
+                effectiveSeasonYear = parsedYear;
+              }
+            }
+          }
+
           let msmRes: Msm32ResolveResult | null = null;
           for (const searchTitle of telegramSearchTitles) {
             if (!isMounted || abortController.signal.aborted) return;
             console.log(`[Resolver] Telegram Provider (${provider.name}) searching for "${searchTitle}"...`);
             const res = await msm32Service.resolveStream(
               searchTitle,
-              releaseYear,
+              effectiveSeasonYear,
               mediaType === 'tv' ? season : undefined,
               mediaType === 'tv' ? episode : undefined,
-              abortController.signal
+              abortController.signal,
+              false,
+              effectiveTotalSeasons
             );
 
             if (!isMounted || abortController.signal.aborted) return;
