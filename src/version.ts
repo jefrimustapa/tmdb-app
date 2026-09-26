@@ -2,12 +2,13 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20260926-0047';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.refactor-standardize.20260926-0047';
+export const APP_BUILD_NUMBER = '20260926-0239';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-improve-app-vis.20260926-0239';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
-export const APP_BRANCH = 'refactor-standardize';
-export const APP_CHANGELOG = `* feat(msm-getter): improve search accuracy, filter junk trailers, and enforce size thresholds (#150)
+export const APP_BRANCH = 'feat-improve-app-vis';
+export const APP_CHANGELOG = `* refactor(ui): standardize media tag badge from FILM to MOVIE (#151)
+* feat(msm-getter): improve search accuracy, filter junk trailers, and enforce size thresholds (#150)
 * perf(msm-getter): optimize MTProto sender reuse, in-flight coalescing, TCP socket options, and async persistence (#149)
 * fix(player): resolve msm-getter pipeline crash and fix MKV resume seeking (#148)
 * fix(player): prevent router OOM by avoiding forced transcoding on standard MKVs with audio fallback (#146)
@@ -20,5 +21,4 @@ export const APP_CHANGELOG = `* feat(msm-getter): improve search accuracy, filte
 * feat(details): prioritize collaborative recommendations and refine title font sizing (#139)
 * fix(details): resolve background image loading failure and cache race condition (#138)
 * feat(details): enhance hero appearance and subtle loading transitions (#137)
-* fix(stream): resolve MKV audio silence via real-time audio transcode pipe and fast time-offset seeking (#136)
-* fix(watch): eliminate hover tooltip and punch-through splash layer in watch page (#135)`;
+* fix(stream): resolve MKV audio silence via real-time audio transcode pipe and fast time-offset seeking (#136)`;
