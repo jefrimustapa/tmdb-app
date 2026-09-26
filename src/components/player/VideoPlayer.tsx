@@ -456,15 +456,19 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           }
 
           if (msmRes && msmRes.streamUrl) {
-            // Only request real-time audio transcoding (?transcode=audio) if the stream explicitly has Dolby / surround audio cues
-            // (e.g. DDP5.1, EAC3, AC3, Atmos, DTS, TrueHD) which lack decoders on Android Chromium / WebView.
-            // Standard stereo MKVs play directly without invoking FFmpeg on the router.
-            const isDolbyAudio = msmRes.filename ? /(ddp|ac3|eac3|atmos|dts|truehd|5\.1|7\.1)/i.test(msmRes.filename) : false;
+            // Request real-time audio transcoding (?transcode=audio) if the stream has multi-channel surround sound
+            // (6CH, 8CH, 5.1, 7.1, 5CH, 4CH) or Dolby/DTS/Atmos codecs.
+            // Android Chromium/WebView does not downmix 6CH/surround to 2CH stereo, dropping the Center channel (dialogue).
+            // FFmpeg downmixes multi-channel audio to 2-channel stereo AAC with crisp dialogue at negligible CPU cost.
+            // Standard 2CH stereo files play directly without invoking FFmpeg on the router.
+            const isSurroundOrDolbyAudio = msmRes.filename
+              ? /(ddp|dd\+|ac3|ac-3|eac3|e-ac-3|atmos|dts|truehd|thd|5[._-]1|7[._-]1|[345678]ch|surround)/i.test(msmRes.filename)
+              : false;
             let finalUrl = msmRes.streamUrl;
-            if (isDolbyAudio) {
+            if (isSurroundOrDolbyAudio) {
               const sep = finalUrl.includes('?') ? '&' : '?';
               finalUrl = `${finalUrl}${sep}transcode=audio`;
-              console.log('[Resolver] 🔊 Detected Dolby/surround audio in Telegram stream. Enabling AAC audio transcode pipe:', finalUrl);
+              console.log('[Resolver] 🔊 Detected multi-channel surround/Dolby audio in Telegram stream. Enabling stereo AAC downmix pipe:', finalUrl);
             } else {
               console.log('[Resolver] ✅ Playing via Telegram Direct Stream (native stream):', finalUrl);
             }
