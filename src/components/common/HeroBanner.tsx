@@ -278,7 +278,7 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ items }) => {
         {/* Brand Tag & Meta (0ms delay) */}
         <div className="flex items-center gap-2.5 mb-2 flex-wrap animate-hero-badge">
           <span className="px-2.5 py-0.5 rounded-full bg-hbo-purple/90 border border-hbo-purple-light text-white text-xs font-bold uppercase tracking-wider">
-            {mediaType === 'movie' ? 'FILM' : 'SERIES'}
+            {mediaType === 'movie' ? 'MOVIE' : 'SERIES'}
           </span>
           <RatingBadge score={currentFeatured.vote_average} size="md" />
           <span className="text-sm font-medium text-gray-300">{releaseYear}</span>
