@@ -2,12 +2,14 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20260926-0239';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-improve-app-vis.20260926-0239';
+export const APP_BUILD_NUMBER = '20260926-0346';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-series-next-epi.20260926-0346';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
-export const APP_BRANCH = 'feat-improve-app-vis';
-export const APP_CHANGELOG = `* refactor(ui): standardize media tag badge from FILM to MOVIE (#151)
+export const APP_BRANCH = 'feat-series-next-epi';
+export const APP_CHANGELOG = `* Merge pull request #152 from jefrimustapa/feat/improve-app-visuals
+* feat(visuals): standardize purple selection rings, fix placeholder aspect ratios, and optimize TV search card grid
+* refactor(ui): standardize media tag badge from FILM to MOVIE (#151)
 * feat(msm-getter): improve search accuracy, filter junk trailers, and enforce size thresholds (#150)
 * perf(msm-getter): optimize MTProto sender reuse, in-flight coalescing, TCP socket options, and async persistence (#149)
 * fix(player): resolve msm-getter pipeline crash and fix MKV resume seeking (#148)
@@ -19,6 +21,4 @@ export const APP_CHANGELOG = `* refactor(ui): standardize media tag badge from F
 * feat(details): portrait background poster enforcement and adaptive button alignment (#141)
 * feat(details): apply custom responsive title scale and shift info to Stage 3 (#140)
 * feat(details): prioritize collaborative recommendations and refine title font sizing (#139)
-* fix(details): resolve background image loading failure and cache race condition (#138)
-* feat(details): enhance hero appearance and subtle loading transitions (#137)
-* fix(stream): resolve MKV audio silence via real-time audio transcode pipe and fast time-offset seeking (#136)`;
+* fix(details): resolve background image loading failure and cache race condition (#138)`;
