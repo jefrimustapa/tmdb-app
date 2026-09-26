@@ -317,11 +317,11 @@ export const SearchFilterBar: React.FC<SearchFilterBarProps> = ({
               }}
               className={`flex items-center gap-1.5 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl text-xs sm:text-sm font-bold border transition-all shadow-sm flex-shrink-0 tv-focus-target cursor-pointer ${
                 openDropdown === 'sort'
-                  ? 'bg-hbo-cyan text-black border-white shadow-[0_0_15px_rgba(0,210,255,0.4)] ring-2 ring-hbo-cyan/50'
+                  ? 'bg-hbo-purple text-white border-hbo-purple-light shadow-[0_0_12px_rgba(144,85,255,0.4)] ring-1 ring-hbo-purple/40'
                   : 'bg-hbo-card text-gray-200 border-hbo-border hover:border-hbo-cyan hover:text-white'
               }`}
             >
-              <ArrowUpDown className={`w-3.5 h-3.5 ${openDropdown === 'sort' ? 'text-black' : 'text-hbo-cyan'}`} />
+              <ArrowUpDown className={`w-3.5 h-3.5 ${openDropdown === 'sort' ? 'text-white' : 'text-hbo-cyan'}`} />
               <span className="text-gray-400 font-normal">Sort:</span>
               <span>{selectedSortObj.label}</span>
               <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${openDropdown === 'sort' ? 'rotate-180' : ''}`} />
@@ -337,11 +337,11 @@ export const SearchFilterBar: React.FC<SearchFilterBarProps> = ({
               }}
               className={`flex items-center gap-1.5 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl text-xs sm:text-sm font-bold border transition-all shadow-sm flex-shrink-0 tv-focus-target cursor-pointer ${
                 selectedType !== 'title' || openDropdown === 'type'
-                  ? 'bg-hbo-cyan text-black border-white shadow-[0_0_15px_rgba(0,210,255,0.4)] ring-2 ring-hbo-cyan/50'
+                  ? 'bg-hbo-purple text-white border-hbo-purple-light shadow-[0_0_12px_rgba(144,85,255,0.4)] ring-1 ring-hbo-purple/40'
                   : 'bg-hbo-card text-gray-300 border-hbo-border hover:text-white hover:border-hbo-purple-light hover:bg-hbo-hover'
               }`}
             >
-              <Film className={`w-3.5 h-3.5 ${selectedType !== 'title' || openDropdown === 'type' ? 'text-black' : 'text-hbo-cyan'}`} />
+              <Film className={`w-3.5 h-3.5 ${selectedType !== 'title' || openDropdown === 'type' ? 'text-white' : 'text-hbo-cyan'}`} />
               <span className="text-gray-400 font-normal">Search by:</span>
               <span>{selectedTypeObj.label}</span>
               <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${openDropdown === 'type' ? 'rotate-180' : ''}`} />
@@ -357,11 +357,11 @@ export const SearchFilterBar: React.FC<SearchFilterBarProps> = ({
               }}
               className={`flex items-center gap-1.5 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl text-xs sm:text-sm font-bold border transition-all shadow-sm flex-shrink-0 tv-focus-target cursor-pointer ${
                 selectedMediaType !== 'all' || openDropdown === 'media'
-                  ? 'bg-hbo-cyan text-black border-white shadow-[0_0_15px_rgba(0,210,255,0.4)] ring-2 ring-hbo-cyan/50'
+                  ? 'bg-hbo-purple text-white border-hbo-purple-light shadow-[0_0_12px_rgba(144,85,255,0.4)] ring-1 ring-hbo-purple/40'
                   : 'bg-hbo-card text-gray-300 border-hbo-border hover:text-white hover:border-hbo-purple-light hover:bg-hbo-hover'
               }`}
             >
-              <Layers className={`w-3.5 h-3.5 ${selectedMediaType !== 'all' || openDropdown === 'media' ? 'text-black' : 'text-hbo-cyan'}`} />
+              <Layers className={`w-3.5 h-3.5 ${selectedMediaType !== 'all' || openDropdown === 'media' ? 'text-white' : 'text-hbo-cyan'}`} />
               <span className="text-gray-400 font-normal">Title:</span>
               <span>{selectedMediaObj.label}</span>
               <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${openDropdown === 'media' ? 'rotate-180' : ''}`} />
@@ -489,7 +489,7 @@ export const SearchFilterBar: React.FC<SearchFilterBarProps> = ({
                           sortBtnRef.current?.focus();
                         }}
                         className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold text-left transition tv-focus-target cursor-pointer ${
-                          isSelected ? 'bg-hbo-cyan text-black font-extrabold' : 'text-gray-300 hover:bg-white/10 hover:text-white'
+                          isSelected ? 'bg-hbo-purple text-white font-extrabold border border-hbo-purple-light/40 shadow-sm' : 'text-gray-300 hover:bg-white/10 hover:text-white'
                         }`}
                       >
                         <span>{opt.label}</span>
@@ -519,7 +519,7 @@ export const SearchFilterBar: React.FC<SearchFilterBarProps> = ({
                           typeBtnRef.current?.focus();
                         }}
                         className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold text-left transition tv-focus-target cursor-pointer ${
-                          isSelected ? 'bg-hbo-cyan text-black font-extrabold' : 'text-gray-300 hover:bg-white/10 hover:text-white'
+                          isSelected ? 'bg-hbo-purple text-white font-extrabold border border-hbo-purple-light/40 shadow-sm' : 'text-gray-300 hover:bg-white/10 hover:text-white'
                         }`}
                       >
                         <span>{t.label}</span>
@@ -549,7 +549,7 @@ export const SearchFilterBar: React.FC<SearchFilterBarProps> = ({
                           mediaBtnRef.current?.focus();
                         }}
                         className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold text-left transition tv-focus-target cursor-pointer ${
-                          isSelected ? 'bg-hbo-cyan text-black font-extrabold' : 'text-gray-300 hover:bg-white/10 hover:text-white'
+                          isSelected ? 'bg-hbo-purple text-white font-extrabold border border-hbo-purple-light/40 shadow-sm' : 'text-gray-300 hover:bg-white/10 hover:text-white'
                         }`}
                       >
                         <span>{m.label}</span>
@@ -706,7 +706,7 @@ export const SearchFilterBar: React.FC<SearchFilterBarProps> = ({
                 <button
                   type="button"
                   onClick={() => onSelectType('title')}
-                  className="flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-hbo-cyan/20 text-hbo-cyan border border-hbo-cyan/40 hover:bg-hbo-cyan/30 transition flex-shrink-0 cursor-pointer tv-focus-target"
+                  className="flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-hbo-purple/30 text-hbo-purple-light border border-hbo-purple/40 hover:bg-hbo-purple/40 transition flex-shrink-0 cursor-pointer tv-focus-target"
                 >
                   <span>Search: {selectedTypeObj.label}</span>
                   <X className="w-3 h-3" />
@@ -718,7 +718,7 @@ export const SearchFilterBar: React.FC<SearchFilterBarProps> = ({
                 <button
                   type="button"
                   onClick={() => onSelectMediaType?.('all')}
-                  className="flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-hbo-cyan/20 text-hbo-cyan border border-hbo-cyan/40 hover:bg-hbo-cyan/30 transition flex-shrink-0 cursor-pointer tv-focus-target"
+                  className="flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-hbo-purple/30 text-hbo-purple-light border border-hbo-purple/40 hover:bg-hbo-purple/40 transition flex-shrink-0 cursor-pointer tv-focus-target"
                 >
                   <span>Title: {selectedMediaObj.label}</span>
                   <X className="w-3 h-3" />

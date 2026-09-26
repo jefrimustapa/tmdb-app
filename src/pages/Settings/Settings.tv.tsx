@@ -2524,7 +2524,7 @@ export const Settings: React.FC = () => {
                       }}
                       className={`w-full flex items-center justify-between gap-3 p-3 rounded-xl text-left transition-all tv-focus-target border ${
                         isSelected
-                          ? 'bg-hbo-purple/40 border-hbo-cyan text-white shadow-hbo-glow ring-1 ring-hbo-cyan/50'
+                          ? 'bg-hbo-purple/40 border-hbo-purple-light text-white ring-1 ring-hbo-purple/50 shadow-[0_0_12px_rgba(144,85,255,0.35)]'
                           : 'bg-black/30 border-white/5 text-gray-300 hover:bg-hbo-hover hover:border-white/20'
                       }`}
                     >
@@ -2532,7 +2532,7 @@ export const Settings: React.FC = () => {
                         <div className="flex items-center justify-between gap-2 mb-0.5">
                           <span className="font-bold text-xs sm:text-sm text-white truncate">{provider.name}</span>
                           {isSelected && (
-                            <div className="flex items-center gap-1 text-[11px] font-bold text-hbo-cyan">
+                            <div className="flex items-center gap-1 text-[11px] font-bold text-hbo-purple-light">
                               <Check className="w-3.5 h-3.5 stroke-[2.5]" />
                               <span>Current</span>
                             </div>
@@ -2651,17 +2651,17 @@ export const Settings: React.FC = () => {
                         isFirst ? 'mt-1' : ''
                       } ${isLast ? 'mb-1' : ''} ${
                         isSelected
-                          ? 'bg-hbo-purple/40 border-hbo-cyan text-white shadow-hbo-glow ring-1 ring-hbo-cyan/50'
+                          ? 'bg-hbo-purple/40 border-hbo-purple-light text-white ring-1 ring-hbo-purple/50 shadow-[0_0_12px_rgba(144,85,255,0.35)]'
                           : 'bg-black/30 border-white/5 text-gray-300 hover:bg-hbo-hover hover:border-white/20'
                       }`}
                     >
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center justify-between gap-2 mb-0.5">
-                          <span className={`font-bold text-xs sm:text-sm ${isSelected ? 'text-hbo-cyan' : 'text-white'}`}>
+                          <span className={`font-bold text-xs sm:text-sm ${isSelected ? 'text-hbo-purple-light' : 'text-white'}`}>
                             {opt.label}
                           </span>
                           {isSelected && (
-                            <div className="flex items-center gap-1 text-[11px] font-bold text-hbo-cyan">
+                            <div className="flex items-center gap-1 text-[11px] font-bold text-hbo-purple-light">
                               <Check className="w-3.5 h-3.5 stroke-[2.5]" />
                               <span>Selected</span>
                             </div>
@@ -2763,17 +2763,17 @@ export const Settings: React.FC = () => {
                         isFirst ? 'mt-1' : ''
                       } ${isLast ? 'mb-1' : ''} ${
                         isSelected
-                          ? 'bg-hbo-purple/40 border-hbo-cyan text-white shadow-hbo-glow ring-1 ring-hbo-cyan/50'
+                          ? 'bg-hbo-purple/40 border-hbo-purple-light text-white ring-1 ring-hbo-purple/50 shadow-[0_0_12px_rgba(144,85,255,0.35)]'
                           : 'bg-black/30 border-white/5 text-gray-300 hover:bg-hbo-hover hover:border-white/20'
                       }`}
                     >
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center justify-between gap-2 mb-0.5">
-                          <span className={`font-bold text-xs sm:text-sm ${isSelected ? 'text-hbo-cyan' : 'text-white'}`}>
+                          <span className={`font-bold text-xs sm:text-sm ${isSelected ? 'text-hbo-purple-light' : 'text-white'}`}>
                             {opt.label}
                           </span>
                           {isSelected && (
-                            <div className="flex items-center gap-1 text-[11px] font-bold text-hbo-cyan">
+                            <div className="flex items-center gap-1 text-[11px] font-bold text-hbo-purple-light">
                               <Check className="w-3.5 h-3.5 stroke-[2.5]" />
                               <span>Selected</span>
                             </div>
@@ -3026,17 +3026,17 @@ export const Settings: React.FC = () => {
                         isFirst ? 'mt-1' : ''
                       } ${isLast ? 'mb-1' : ''} ${
                         isSelected
-                          ? 'bg-hbo-purple/40 border-hbo-cyan text-white shadow-hbo-glow ring-1 ring-hbo-cyan/50'
+                          ? 'bg-hbo-purple/40 border-hbo-purple-light text-white ring-1 ring-hbo-purple/50 shadow-[0_0_12px_rgba(144,85,255,0.35)]'
                           : 'bg-black/30 border-white/5 text-gray-300 hover:bg-hbo-hover hover:border-white/20'
                       }`}
                     >
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center justify-between gap-2 mb-0.5">
-                          <span className={`font-bold text-xs sm:text-sm ${isSelected ? 'text-hbo-cyan' : 'text-white'}`}>
+                          <span className={`font-bold text-xs sm:text-sm ${isSelected ? 'text-hbo-purple-light' : 'text-white'}`}>
                             {opt.label}
                           </span>
                           {isSelected && (
-                            <div className="flex items-center gap-1 text-[11px] font-bold text-hbo-cyan">
+                            <div className="flex items-center gap-1 text-[11px] font-bold text-hbo-purple-light">
                               <Check className="w-3.5 h-3.5 stroke-[2.5]" />
                               <span>Selected</span>
                             </div>
@@ -3144,17 +3144,17 @@ export const Settings: React.FC = () => {
                         isFirst ? 'mt-1' : ''
                       } ${isLast ? 'mb-1' : ''} ${
                         isSelected
-                          ? 'bg-hbo-purple/40 border-hbo-cyan text-white shadow-hbo-glow ring-1 ring-hbo-cyan/50'
+                          ? 'bg-hbo-purple/40 border-hbo-purple-light text-white ring-1 ring-hbo-purple/50 shadow-[0_0_12px_rgba(144,85,255,0.35)]'
                           : 'bg-black/30 border-white/5 text-gray-300 hover:bg-hbo-hover hover:border-white/20'
                       }`}
                     >
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center justify-between gap-2 mb-0.5">
-                          <span className={`font-bold text-xs sm:text-sm ${isSelected ? 'text-hbo-cyan' : 'text-white'}`}>
+                          <span className={`font-bold text-xs sm:text-sm ${isSelected ? 'text-hbo-purple-light' : 'text-white'}`}>
                             {opt.label}
                           </span>
                           {isSelected && (
-                            <div className="flex items-center gap-1 text-[11px] font-bold text-hbo-cyan">
+                            <div className="flex items-center gap-1 text-[11px] font-bold text-hbo-purple-light">
                               <Check className="w-3.5 h-3.5 stroke-[2.5]" />
                               <span>Selected</span>
                             </div>
@@ -4497,7 +4497,7 @@ export const Settings: React.FC = () => {
                       }}
                       className={`w-full p-4 rounded-xl border text-left transition-all tv-focus-target flex items-center justify-between ${
                         isEmbedEnabled
-                          ? 'bg-hbo-purple/30 border-hbo-cyan text-white shadow-hbo-glow ring-1 ring-hbo-cyan/40'
+                          ? 'bg-hbo-purple/30 border-hbo-purple-light text-white ring-1 ring-hbo-purple/50 shadow-[0_0_12px_rgba(144,85,255,0.35)]'
                           : 'bg-black/30 border-hbo-border hover:border-gray-600 text-gray-400'
                       }`}
                     >
@@ -4867,17 +4867,17 @@ export const Settings: React.FC = () => {
                       }}
                       className={`w-full p-4 rounded-xl border text-left transition-all tv-focus-target flex items-center justify-between gap-3 ${
                         isSelected
-                          ? 'bg-hbo-purple/30 border-hbo-cyan text-white shadow-hbo-glow ring-1 ring-hbo-cyan/40'
+                          ? 'bg-hbo-purple/30 border-hbo-purple-light text-white ring-1 ring-hbo-purple/50 shadow-[0_0_12px_rgba(144,85,255,0.35)]'
                           : 'bg-black/30 border-hbo-border hover:border-gray-600 text-gray-300'
                       }`}
                     >
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center justify-between gap-2 mb-0.5">
-                          <span className={`font-bold text-xs sm:text-sm ${isSelected ? 'text-hbo-cyan' : 'text-white'}`}>
+                          <span className={`font-bold text-xs sm:text-sm ${isSelected ? 'text-hbo-purple-light' : 'text-white'}`}>
                             {opt.label}
                           </span>
                           {isSelected && (
-                            <div className="flex items-center gap-1 text-[11px] font-bold text-hbo-cyan">
+                            <div className="flex items-center gap-1 text-[11px] font-bold text-hbo-purple-light">
                               <Check className="w-3.5 h-3.5 stroke-[2.5]" />
                               <span>Selected</span>
                             </div>
@@ -4969,17 +4969,17 @@ export const Settings: React.FC = () => {
                       }}
                       className={`w-full p-4 rounded-xl border text-left transition-all tv-focus-target flex items-center justify-between gap-3 ${
                         isSelected
-                          ? 'bg-hbo-purple/30 border-hbo-cyan text-white shadow-hbo-glow ring-1 ring-hbo-cyan/40'
+                          ? 'bg-hbo-purple/30 border-hbo-purple-light text-white ring-1 ring-hbo-purple/50 shadow-[0_0_12px_rgba(144,85,255,0.35)]'
                           : 'bg-black/30 border-hbo-border hover:border-gray-600 text-gray-300'
                       }`}
                     >
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center justify-between gap-2 mb-0.5">
-                          <span className={`font-bold text-xs sm:text-sm ${isSelected ? 'text-hbo-cyan' : 'text-white'}`}>
+                          <span className={`font-bold text-xs sm:text-sm ${isSelected ? 'text-hbo-purple-light' : 'text-white'}`}>
                             {opt.label}
                           </span>
                           {isSelected && (
-                            <div className="flex items-center gap-1 text-[11px] font-bold text-hbo-cyan">
+                            <div className="flex items-center gap-1 text-[11px] font-bold text-hbo-purple-light">
                               <Check className="w-3.5 h-3.5 stroke-[2.5]" />
                               <span>Selected</span>
                             </div>
@@ -5244,17 +5244,17 @@ export const Settings: React.FC = () => {
                       }}
                       className={`w-full p-4 rounded-xl border text-left transition-all tv-focus-target flex items-center justify-between gap-3 ${
                         isSelected
-                          ? 'bg-hbo-purple/30 border-hbo-cyan text-white shadow-hbo-glow ring-1 ring-hbo-cyan/40'
+                          ? 'bg-hbo-purple/30 border-hbo-purple-light text-white ring-1 ring-hbo-purple/50 shadow-[0_0_12px_rgba(144,85,255,0.35)]'
                           : 'bg-black/30 border-hbo-border hover:border-gray-600 text-gray-300'
                       }`}
                     >
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center justify-between gap-2 mb-0.5">
-                          <span className={`font-bold text-xs sm:text-sm ${isSelected ? 'text-hbo-cyan' : 'text-white'}`}>
+                          <span className={`font-bold text-xs sm:text-sm ${isSelected ? 'text-hbo-purple-light' : 'text-white'}`}>
                             {opt.label}
                           </span>
                           {isSelected && (
-                            <div className="flex items-center gap-1 text-[11px] font-bold text-hbo-cyan">
+                            <div className="flex items-center gap-1 text-[11px] font-bold text-hbo-purple-light">
                               <Check className="w-3.5 h-3.5 stroke-[2.5]" />
                               <span>Selected</span>
                             </div>
@@ -5346,17 +5346,17 @@ export const Settings: React.FC = () => {
                       }}
                       className={`w-full p-4 rounded-xl border text-left transition-all tv-focus-target flex items-center justify-between gap-3 ${
                         isSelected
-                          ? 'bg-hbo-purple/30 border-hbo-cyan text-white shadow-hbo-glow ring-1 ring-hbo-cyan/40'
+                          ? 'bg-hbo-purple/30 border-hbo-purple-light text-white ring-1 ring-hbo-purple/50 shadow-[0_0_12px_rgba(144,85,255,0.35)]'
                           : 'bg-black/30 border-hbo-border hover:border-gray-600 text-gray-300'
                       }`}
                     >
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center justify-between gap-2 mb-0.5">
-                          <span className={`font-bold text-xs sm:text-sm ${isSelected ? 'text-hbo-cyan' : 'text-white'}`}>
+                          <span className={`font-bold text-xs sm:text-sm ${isSelected ? 'text-hbo-purple-light' : 'text-white'}`}>
                             {opt.label}
                           </span>
                           {isSelected && (
-                            <div className="flex items-center gap-1 text-[11px] font-bold text-hbo-cyan">
+                            <div className="flex items-center gap-1 text-[11px] font-bold text-hbo-purple-light">
                               <Check className="w-3.5 h-3.5 stroke-[2.5]" />
                               <span>Selected</span>
                             </div>
@@ -5451,17 +5451,17 @@ export const Settings: React.FC = () => {
                       }}
                       className={`w-full p-4 rounded-xl border text-left transition-all tv-focus-target flex items-center justify-between gap-3 ${
                         isSelected
-                          ? 'bg-hbo-purple/30 border-hbo-cyan text-white shadow-hbo-glow ring-1 ring-hbo-cyan/40'
+                          ? 'bg-hbo-purple/30 border-hbo-purple-light text-white ring-1 ring-hbo-purple/50 shadow-[0_0_12px_rgba(144,85,255,0.35)]'
                           : 'bg-black/30 border-hbo-border hover:border-gray-600 text-gray-300'
                       }`}
                     >
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center justify-between gap-2 mb-0.5">
-                          <span className={`font-bold text-xs sm:text-sm ${isSelected ? 'text-hbo-cyan' : 'text-white'}`}>
+                          <span className={`font-bold text-xs sm:text-sm ${isSelected ? 'text-hbo-purple-light' : 'text-white'}`}>
                             {opt.label}
                           </span>
                           {isSelected && (
-                            <div className="flex items-center gap-1 text-[11px] font-bold text-hbo-cyan">
+                            <div className="flex items-center gap-1 text-[11px] font-bold text-hbo-purple-light">
                               <Check className="w-3.5 h-3.5 stroke-[2.5]" />
                               <span>Selected</span>
                             </div>
