@@ -396,10 +396,14 @@ const MediaCardComponent: React.FC<MediaCardProps> = ({
             }}
             onError={(e) => {
               tmdbImages.handleImgError(e, isLandscape);
+              e.currentTarget.classList.remove('object-cover');
+              e.currentTarget.classList.add('object-contain', 'p-2');
               e.currentTarget.style.opacity = '1';
             }}
             style={{ opacity: 0 }}
-            className="w-full h-full object-cover transition-opacity duration-500 ease-out group-hover:scale-105 pointer-events-none select-none"
+            className={`w-full h-full ${
+              imageUrl.includes('placeholder') ? 'object-contain p-2' : 'object-cover'
+            } transition-opacity duration-500 ease-out group-hover:scale-105 pointer-events-none select-none`}
           />
 
           {/* Pure Play Icon on Bottom-Left Corner for Landscape Continue Watching Cards */}
@@ -443,14 +447,16 @@ const MediaCardComponent: React.FC<MediaCardProps> = ({
 
         {/* Title & Metadata Footer */}
         <div className="p-2.5">
-          <h4 className="text-xs sm:text-sm font-bold text-white line-clamp-1 group-hover:text-hbo-cyan transition-colors" title={hasAlternativeTitle ? `${title} (${originalTitle})` : title}>
-            {title}
-          </h4>
-          {hasAlternativeTitle && (
-            <p className="text-[10px] sm:text-[11px] text-gray-400 line-clamp-1 italic mt-0.5">
-              {originalTitle}
-            </p>
-          )}
+          <div className="min-h-[36px] sm:min-h-[40px] flex flex-col justify-center">
+            <h4 className="text-xs sm:text-sm font-bold text-white line-clamp-1 group-hover:text-hbo-cyan transition-colors" title={hasAlternativeTitle ? `${title} (${originalTitle})` : title}>
+              {title}
+            </h4>
+            {hasAlternativeTitle && (
+              <p className="text-[10px] sm:text-[11px] text-gray-400 line-clamp-1 italic mt-0.5">
+                {originalTitle}
+              </p>
+            )}
+          </div>
           {isLandscape ? (
             <div className="flex items-center gap-1.5 mt-0.5">
               <p className="text-[11px] sm:text-xs text-gray-400 truncate flex-1 min-w-0">

@@ -82,7 +82,7 @@ export const EpisodeGrid: React.FC<EpisodeGridProps> = ({
               onClick={() => setSelectedSeason(season.season_number)}
               className={`px-5 py-2 rounded-full text-xs sm:text-sm font-bold whitespace-nowrap transition-all border tv-focus-target cursor-pointer flex-shrink-0 ${
                 season.season_number === selectedSeason
-                  ? 'bg-gradient-to-r from-hbo-purple to-hbo-purple-light text-white border-hbo-cyan/60 ring-2 ring-hbo-cyan/40 shadow-lg shadow-hbo-purple/50'
+                  ? 'bg-gradient-to-r from-hbo-purple to-hbo-purple-light text-white border-hbo-purple-light ring-2 ring-hbo-purple/40 shadow-lg shadow-hbo-purple/50'
                   : 'bg-hbo-card/90 text-gray-300 border-hbo-border/80 hover:text-white hover:border-gray-400 hover:bg-hbo-hover'
               }`}
             >
@@ -123,7 +123,7 @@ export const EpisodeGrid: React.FC<EpisodeGridProps> = ({
                 onClick={() => onSelectEpisode(selectedSeason, ep.episode_number, ep.name)}
                 className={`flex text-left gap-3.5 p-3 rounded-xl border transition-all duration-200 tv-focus-target group ${
                   isPlaying
-                    ? 'bg-gradient-to-r from-hbo-purple/30 to-hbo-cyan/10 border-hbo-cyan shadow-hbo-cyan-glow ring-1 ring-hbo-cyan/50'
+                    ? 'bg-gradient-to-r from-hbo-purple/40 to-hbo-purple/20 border-hbo-purple-light shadow-[0_0_12px_rgba(144,85,255,0.35)] ring-1 ring-hbo-purple/50'
                     : isUnaired
                     ? 'bg-hbo-dark/40 border-hbo-border/30 opacity-80 hover:opacity-100 hover:bg-hbo-hover hover:border-hbo-border'
                     : 'bg-hbo-dark/60 border-hbo-border/40 hover:bg-hbo-hover hover:border-hbo-purple/60'
@@ -146,10 +146,14 @@ export const EpisodeGrid: React.FC<EpisodeGridProps> = ({
                     }}
                     onError={(e) => {
                       tmdbImages.handleImgError(e, true);
+                      e.currentTarget.classList.remove('object-cover');
+                      e.currentTarget.classList.add('object-contain', 'p-1');
                       e.currentTarget.style.opacity = '1';
                     }}
                     style={{ opacity: 0 }}
-                    className={`w-full h-full object-cover group-hover:scale-105 transition-opacity duration-500 ease-out ${
+                    className={`w-full h-full ${
+                      stillUrl.includes('placeholder') ? 'object-contain p-1' : 'object-cover'
+                    } group-hover:scale-105 transition-opacity duration-500 ease-out ${
                       isUnaired ? 'grayscale contrast-75 brightness-75 opacity-60' : ''
                     }`}
                   />
