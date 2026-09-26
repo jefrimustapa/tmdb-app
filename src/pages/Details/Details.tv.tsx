@@ -490,7 +490,7 @@ export const Details: React.FC = () => {
           <div className="flex-1 min-w-0 space-y-3.5 sm:space-y-4.5 text-center sm:text-left">
             <div className="flex items-center justify-center sm:justify-start gap-2 flex-wrap min-h-[26px]">
               <span className="px-3 py-0.5 rounded-full bg-hbo-purple/70 text-white border border-hbo-purple-light text-xs font-black uppercase tracking-wider backdrop-blur-md">
-                {mediaType === 'movie' ? 'FILM' : 'SERIES'}
+                {mediaType === 'movie' ? 'MOVIE' : 'SERIES'}
               </span>
               {contentRating ? (
                 <>
