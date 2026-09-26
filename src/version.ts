@@ -2,12 +2,14 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20260926-0956';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-improve-msm-get.20260926-0956';
+export const APP_BUILD_NUMBER = '20260926-1341';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.fix-the-agency-dialo.20260926-1341';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
-export const APP_BRANCH = 'feat-improve-msm-get';
-export const APP_CHANGELOG = `* Merge pull request #153 from jefrimustapa/feat/series-next-episode-playback
+export const APP_BRANCH = 'fix-the-agency-dialo';
+export const APP_CHANGELOG = `* Merge pull request #154 from jefrimustapa/feat/improve-msm-getter-series-search
+* fix(series-search): pass totalSeasons and season-specific year to msm-getter resolver
+* Merge pull request #153 from jefrimustapa/feat/series-next-episode-playback
 * feat(series): auto-advance play button to next episode when previous episode is completed
 * Merge pull request #152 from jefrimustapa/feat/improve-app-visuals
 * feat(visuals): standardize purple selection rings, fix placeholder aspect ratios, and optimize TV search card grid
@@ -19,6 +21,4 @@ export const APP_CHANGELOG = `* Merge pull request #153 from jefrimustapa/feat/s
 * fix(details): center landscape hero backdrop using object-center matching HeroBanner (#145)
 * fix(msm-getter): add startup ffmpeg verification and deferred fallback for audio transcoding (#144)
 * fix(msm-getter): harden boot lifecycle, supervisor backoff, and pre-mount ext4 fsck (#143)
-* fix(details): eliminate artwork swapping and fit full poster width without horizontal cropping (#142)
-* feat(details): portrait background poster enforcement and adaptive button alignment (#141)
-* feat(details): apply custom responsive title scale and shift info to Stage 3 (#140)`;
+* fix(details): eliminate artwork swapping and fit full poster width without horizontal cropping (#142)`;
