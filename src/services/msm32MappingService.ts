@@ -94,7 +94,8 @@ class Msm32MappingService {
     season?: number,
     episode?: number,
     signal?: AbortSignal,
-    force?: boolean
+    force?: boolean,
+    totalSeasons?: number
   ): Promise<Msm32ResolveResult | null> {
     if (signal?.aborted) {
       console.log(`[MSM32] Resolution aborted prior to request for "${title}"`);
@@ -125,6 +126,7 @@ class Msm32MappingService {
       if (year) params.append('year', String(year));
       if (typeof season === 'number' && !isNaN(season)) params.append('season', String(season));
       if (typeof episode === 'number' && !isNaN(episode)) params.append('episode', String(episode));
+      if (typeof totalSeasons === 'number' && !isNaN(totalSeasons)) params.append('totalSeasons', String(totalSeasons));
       params.append('maxQuality', maxQuality);
       if (force) params.append('force', 'true');
 

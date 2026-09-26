@@ -2,12 +2,14 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20260926-0346';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-series-next-epi.20260926-0346';
+export const APP_BUILD_NUMBER = '20260926-0956';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-improve-msm-get.20260926-0956';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
-export const APP_BRANCH = 'feat-series-next-epi';
-export const APP_CHANGELOG = `* Merge pull request #152 from jefrimustapa/feat/improve-app-visuals
+export const APP_BRANCH = 'feat-improve-msm-get';
+export const APP_CHANGELOG = `* Merge pull request #153 from jefrimustapa/feat/series-next-episode-playback
+* feat(series): auto-advance play button to next episode when previous episode is completed
+* Merge pull request #152 from jefrimustapa/feat/improve-app-visuals
 * feat(visuals): standardize purple selection rings, fix placeholder aspect ratios, and optimize TV search card grid
 * refactor(ui): standardize media tag badge from FILM to MOVIE (#151)
 * feat(msm-getter): improve search accuracy, filter junk trailers, and enforce size thresholds (#150)
@@ -19,6 +21,4 @@ export const APP_CHANGELOG = `* Merge pull request #152 from jefrimustapa/feat/i
 * fix(msm-getter): harden boot lifecycle, supervisor backoff, and pre-mount ext4 fsck (#143)
 * fix(details): eliminate artwork swapping and fit full poster width without horizontal cropping (#142)
 * feat(details): portrait background poster enforcement and adaptive button alignment (#141)
-* feat(details): apply custom responsive title scale and shift info to Stage 3 (#140)
-* feat(details): prioritize collaborative recommendations and refine title font sizing (#139)
-* fix(details): resolve background image loading failure and cache race condition (#138)`;
+* feat(details): apply custom responsive title scale and shift info to Stage 3 (#140)`;
