@@ -196,6 +196,49 @@ export function useTVNavigation(isEnabled = true) {
         ? (document.activeElement as HTMLElement)
         : null;
 
+      // When user is typing in text inputs (e.g. search bar, input fields, textareas):
+      const isInput = currentFocused && (
+        currentFocused.tagName === 'INPUT' ||
+        currentFocused.tagName === 'TEXTAREA' ||
+        currentFocused.isContentEditable
+      );
+
+      if (isInput) {
+        // Native text editing navigation:
+        // Left/Right arrow keys MUST move text cursor within the input field.
+        // NEVER steal focus to sidebar or trigger spatial navigation!
+        if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+          return;
+        }
+
+        // Down arrow: allow moving focus down from search input to filter chips or search results
+        if (e.key === 'ArrowDown') {
+          const nextTarget = document.querySelector<HTMLElement>('[data-tv-filter-section="true"] button.tv-focus-target') ||
+                             document.querySelector<HTMLElement>('[data-tv-filter-section="true"] .tv-focus-target') ||
+                             document.querySelector<HTMLElement>('main [role="button"].tv-focus-target') ||
+                             document.querySelector<HTMLElement>('main a.tv-focus-target') ||
+                             document.querySelector<HTMLElement>('main .tv-focus-target:not(input)');
+          if (nextTarget) {
+            e.preventDefault();
+            currentFocused.blur();
+            nextTarget.focus();
+            nextTarget.scrollIntoView({ behavior: getScrollBehavior(), block: 'nearest', inline: 'center' });
+            return;
+          }
+        }
+
+        // Up arrow: lock at top (do not escape input)
+        if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          return;
+        }
+
+        // Enter: allow the input's native form submission / onKeyDown search handler to execute
+        if (e.key === 'Enter') {
+          return;
+        }
+      }
+
       // =========================================================================
       // ULTRA FAST-PATH: HERO BANNER, SIDEBAR & HORIZONTAL RAILS (0ms LATENCY)
       // Execute before ANY querySelectorAll('.tv-focus-target') or .offsetParent
@@ -1246,8 +1289,11 @@ export function useTVNavigation(isEnabled = true) {
             currentFocused.dispatchEvent(new CustomEvent('tv_long_press', { bubbles: true }));
           }
         } else {
-          // Trigger click on the focused button / link if Enter is pressed
+          // Trigger click on the focused button / link if Enter is pressed (skip inputs)
           if (currentFocused && typeof currentFocused.click === 'function') {
+            if (currentFocused.tagName === 'INPUT' || currentFocused.tagName === 'TEXTAREA' || currentFocused.isContentEditable) {
+              return;
+            }
             e.preventDefault();
             currentFocused.click();
           }

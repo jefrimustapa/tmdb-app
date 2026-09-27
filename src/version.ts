@@ -2,12 +2,14 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20260927-0013';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-improve-app-vis.20260927-0013';
+export const APP_BUILD_NUMBER = '20260927-0145';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.fix-unstable-keyboar.20260927-0145';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
-export const APP_BRANCH = 'feat-improve-app-vis';
-export const APP_CHANGELOG = `* fix(visuals): eliminate search bar splash bleed, fix card full-bleed fill, and replace placeholder SVGs with inline fallbacks
+export const APP_BRANCH = 'fix-unstable-keyboar';
+export const APP_CHANGELOG = `* Merge pull request #156 from jefrimustapa/feat/improve-app-visuals
+* feat(ui): use favicon.svg for poster/still fallback with seamless dark gradient background
+* fix(visuals): eliminate search bar splash bleed, fix card full-bleed fill, and replace placeholder SVGs with inline fallbacks
 * fix(player): expand surround and multi-channel audio detection to downmix 6CH/surround streams to stereo (#155)
 * Merge pull request #154 from jefrimustapa/feat/improve-msm-getter-series-search
 * fix(series-search): pass totalSeasons and season-specific year to msm-getter resolver
@@ -19,6 +21,4 @@ export const APP_CHANGELOG = `* fix(visuals): eliminate search bar splash bleed,
 * feat(msm-getter): improve search accuracy, filter junk trailers, and enforce size thresholds (#150)
 * perf(msm-getter): optimize MTProto sender reuse, in-flight coalescing, TCP socket options, and async persistence (#149)
 * fix(player): resolve msm-getter pipeline crash and fix MKV resume seeking (#148)
-* fix(player): prevent router OOM by avoiding forced transcoding on standard MKVs with audio fallback (#146)
-* fix(details): center landscape hero backdrop using object-center matching HeroBanner (#145)
-* fix(msm-getter): add startup ffmpeg verification and deferred fallback for audio transcoding (#144)`;
+* fix(player): prevent router OOM by avoiding forced transcoding on standard MKVs with audio fallback (#146)`;
