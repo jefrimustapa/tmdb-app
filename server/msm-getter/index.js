@@ -2582,6 +2582,99 @@ app.post('/api/github-webhook', async (req, res) => {
   }
 });
 
+// Cache for probed audio track stream specifiers per docId (capped to prevent memory growth)
+const docAudioTrackCache = new Map();
+
+async function resolveBestAudioTrack(docId) {
+  if (docAudioTrackCache.has(docId)) {
+    return docAudioTrackCache.get(docId);
+  }
+
+  const ffprobeBin = process.env.FFPROBE_PATH || (fs.existsSync('/opt/bin/ffprobe') ? '/opt/bin/ffprobe' : 'ffprobe');
+  const probeArgs = [
+    '-v', 'error',
+    '-headers', 'x-internal-transcoder: 1\r\n',
+    '-probesize', '262144',
+    '-analyzeduration', '0',
+    '-show_entries', 'stream=index,codec_type,codec_name:stream_tags=language,title',
+    '-of', 'json',
+    `http://127.0.0.1:${INTERNAL_HTTP_PORT}/stream/${docId}?direct=1`,
+  ];
+
+  try {
+    const specifier = await new Promise((resolve, reject) => {
+      let stdout = '';
+      let proc = null;
+      try {
+        proc = spawn(ffprobeBin, probeArgs);
+      } catch (e) {
+        return reject(e);
+      }
+
+      const timer = setTimeout(() => {
+        try { proc.kill('SIGKILL'); } catch {}
+        reject(new Error('ffprobe timeout after 10s'));
+      }, 10000);
+
+      proc.stdout.on('data', (d) => { stdout += d.toString(); });
+      proc.on('close', (code) => {
+        clearTimeout(timer);
+        if (code !== 0) return reject(new Error(`ffprobe exited with code ${code}`));
+        try {
+          const data = JSON.parse(stdout);
+          const audioStreams = data.streams?.filter(s => s.codec_type === 'audio') || [];
+          if (audioStreams.length === 0) return resolve('0:a:0');
+          if (audioStreams.length === 1) return resolve(`0:${audioStreams[0].index}`);
+
+          // Prioritize English audio track (isolated to avoid layered commentary/dub tracks)
+          const engStream = audioStreams.find(s => {
+            const lang = String(s.tags?.language || '').toLowerCase();
+            const title = String(s.tags?.title || '').toLowerCase();
+            return /^(en|eng|english)$/.test(lang) || /\b(eng|english|original|orig)\b/.test(title);
+          });
+
+          if (engStream) {
+            console.log(`[AUDIO TRACK] Selected English track (stream ${engStream.index}, lang: ${engStream.tags?.language || 'unknown'}, title: "${engStream.tags?.title || ''}") for doc ${docId}`);
+            return resolve(`0:${engStream.index}`);
+          }
+
+          // If no explicit English, check for original / undetermined track
+          const origStream = audioStreams.find(s => {
+            const lang = String(s.tags?.language || '').toLowerCase();
+            const title = String(s.tags?.title || '').toLowerCase();
+            return /^(und|qaa)$/.test(lang) || /\b(orig|original)\b/.test(title);
+          });
+          if (origStream) {
+            console.log(`[AUDIO TRACK] Selected original/und track (stream ${origStream.index}) for doc ${docId}`);
+            return resolve(`0:${origStream.index}`);
+          }
+
+          // Fallback to the first audio stream
+          console.log(`[AUDIO TRACK] Fallback to primary audio track (stream ${audioStreams[0].index}) for doc ${docId}`);
+          return resolve(`0:${audioStreams[0].index}`);
+        } catch (err) {
+          reject(err);
+        }
+      });
+
+      proc.on('error', (err) => {
+        clearTimeout(timer);
+        reject(err);
+      });
+    });
+
+    if (docAudioTrackCache.size > 500) {
+      const firstKey = docAudioTrackCache.keys().next().value;
+      docAudioTrackCache.delete(firstKey);
+    }
+    docAudioTrackCache.set(docId, specifier);
+    return specifier;
+  } catch (err) {
+    console.warn(`[AUDIO TRACK WARN] Failed to resolve track for doc ${docId} (${err.message}). Using fallback 0:a:0 without caching.`);
+    return '0:a:0';
+  }
+}
+
 // Stream endpoint with HTTP 206 Partial Content Range support
 app.get('/stream/:docId', async (req, res) => {
   try {
@@ -2672,6 +2765,19 @@ app.get('/stream/:docId', async (req, res) => {
         return res.end();
       }
 
+      // Isolate preferred single audio track (default: English) so client doesn't play layered multi-language dubs
+      const requestedTrack = req.query.audio || req.query.track;
+      let audioMapSpecifier = '0:a:0';
+      if (requestedTrack && requestedTrack !== 'auto') {
+        audioMapSpecifier = requestedTrack.startsWith('0:') ? requestedTrack : `0:${requestedTrack}`;
+      } else {
+        try {
+          audioMapSpecifier = await resolveBestAudioTrack(docId);
+        } catch (err) {
+          audioMapSpecifier = '0:a:0';
+        }
+      }
+
       const ffmpegBin = process.env.FFMPEG_PATH || (fs.existsSync('/opt/bin/ffmpeg') ? '/opt/bin/ffmpeg' : 'ffmpeg');
       const ffmpegArgs = [
         '-loglevel', 'error',
@@ -2684,7 +2790,7 @@ app.get('/stream/:docId', async (req, res) => {
         '-flags', 'low_delay',
         '-i', `http://127.0.0.1:${INTERNAL_HTTP_PORT}/stream/${docId}?direct=1`,
         '-map', '0:v:0',
-        '-map', '0:a?',
+        '-map', audioMapSpecifier,
         '-c:v', 'copy',
         '-c:a', 'aac',
         '-ac', '2',
