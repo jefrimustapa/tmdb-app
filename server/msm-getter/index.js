@@ -2272,9 +2272,10 @@ async function streamTelegramPipelined(client, targetDoc, startByte, endByte, re
     CONCURRENCY = Math.min(3, customConcurrency);
   }
 
+  const isProbe = req?.headers?.['x-internal-probe'] === '1' || req?.query?.probe === '1' || (endByte - startByte <= 1048576 && req?.headers?.['x-internal-transcoder'] !== '1');
   const isInternal = req?.headers?.['x-internal-transcoder'] === '1' || req?.query?.direct === '1';
-  if (isInternal) {
-    CONCURRENCY = 1; // Prevent MTProto pipeline lookahead congestion during demuxer probe
+  if (isProbe) {
+    CONCURRENCY = 1; // Prevent MTProto pipeline lookahead congestion during demuxer / metadata probe
   }
 
   const streamKey = passedStreamKey || `${isInternal ? 'internal-' + Date.now() : (req?.headers?.['x-client-id'] || req?.ip || req?.socket?.remoteAddress || 'client')}:${targetDoc.id}`;
@@ -2603,12 +2604,12 @@ async function resolveBestAudioTrack(docId) {
   const ffprobeBin = process.env.FFPROBE_PATH || (fs.existsSync('/opt/bin/ffprobe') ? '/opt/bin/ffprobe' : 'ffprobe');
   const probeArgs = [
     '-v', 'error',
-    '-headers', 'x-internal-transcoder: 1\r\n',
+    '-headers', 'x-internal-probe: 1\r\n',
     '-probesize', '262144',
     '-analyzeduration', '0',
     '-show_entries', 'stream=index,codec_type,codec_name:stream_tags=language,title',
     '-of', 'json',
-    `http://127.0.0.1:${INTERNAL_HTTP_PORT}/stream/${docId}?direct=1`,
+    `http://127.0.0.1:${INTERNAL_HTTP_PORT}/stream/${docId}?direct=1&probe=1`,
   ];
 
   try {
@@ -2794,7 +2795,10 @@ app.get('/stream/:docId', async (req, res) => {
         '-noaccurate_seek',
         ...(seekSec > 0 ? ['-ss', seekSec.toString()] : []),
         '-headers', 'x-internal-transcoder: 1\r\n',
-        '-probesize', '262144',
+        '-reconnect', '1',
+        '-reconnect_streamed', '1',
+        '-reconnect_delay_max', '2',
+        '-probesize', '393216',
         '-analyzeduration', '0',
         '-fflags', '+nobuffer+fastseek+flush_packets',
         '-flags', 'low_delay',
@@ -2807,8 +2811,8 @@ app.get('/stream/:docId', async (req, res) => {
         '-b:a', '192k',
         '-avoid_negative_ts', 'make_zero',
         '-flush_packets', '1',
-        '-cluster_time_limit', '250',
-        '-cluster_size_limit', '65536',
+        '-cluster_time_limit', '1000',
+        '-cluster_size_limit', '524288',
         '-f', 'matroska',
         'pipe:1',
       ];
