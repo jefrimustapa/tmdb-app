@@ -165,11 +165,127 @@ function extractSequelInfo(str) {
   return null;
 }
 
-// Helper: Extract 4-digit release year from a string
-function extractYear(str) {
+// Helper: Extract 4-digit release year from a string, protecting numbers that are part of title tokens
+function extractYear(str, titleTokens = []) {
   if (!str) return null;
-  const m = str.match(/\b(19\d\d|20[0-3]\d)\b/);
-  return m ? parseInt(m[1], 10) : null;
+  const titleTokenSet = new Set((titleTokens || []).map(t => String(t).toLowerCase()));
+
+  // 1. Prefer year in parentheses or brackets: "(2026)", "[2026]"
+  const parenMatch = str.match(/[\(\[]\s*((?:19|20)\d\d)\s*[\)\]]/);
+  if (parenMatch) {
+    const yr = parseInt(parenMatch[1], 10);
+    if (!titleTokenSet.has(String(yr))) return yr;
+  }
+
+  // 2. Year formatted as isolated dot/space/dash delimited release year: ".2026.", " 2026 ", "- 2026 -"
+  const allYears = Array.from(str.matchAll(/\b((?:19[7-9]\d|20[0-3]\d))\b/g))
+    .map(m => parseInt(m[1], 10))
+    .filter(yr => !titleTokenSet.has(String(yr)));
+  if (allYears.length > 0) {
+    return allYears[allYears.length - 1];
+  }
+
+  // 3. Fallback: any 4-digit year not matching title tokens
+  const fallbackMatch = str.match(/\b((?:19\d\d|20[0-3]\d))\b/);
+  if (fallbackMatch) {
+    const yr = parseInt(fallbackMatch[1], 10);
+    if (!titleTokenSet.has(String(yr))) return yr;
+  }
+
+  return null;
+}
+
+// Helper: Convert number to Roman numeral (for seasons, e.g. 2 -> II, 3 -> III)
+function toRoman(num) {
+  const map = { 1: 'I', 2: 'II', 3: 'III', 4: 'IV', 5: 'V', 6: 'VI', 7: 'VII', 8: 'VIII', 9: 'IX', 10: 'X' };
+  return map[num] || String(num);
+}
+
+// Generate TV series prioritized search queries according to rule-msm-series-search
+function generateSeriesSearchQueries(cleanT, sNum, eNum, totalSeasons, year) {
+  const isMultiSeason = totalSeasons > 1 || sNum > 1;
+  const s2 = String(sNum).padStart(2, '0');
+  const s1 = String(sNum);
+  const e2 = String(eNum).padStart(2, '0');
+  const e1 = String(eNum);
+
+  const queries = [];
+  const addQuery = (q) => {
+    const trimmed = (q || '').trim();
+    if (trimmed && !queries.includes(trimmed)) {
+      queries.push(trimmed);
+    }
+  };
+
+  if (!isMultiSeason) {
+    // 1. Siri SATU season saja (mengikut turutan tepat dist/rule-msm-series-search)
+    addQuery(`${cleanT} E${e2}`);
+    addQuery(`${cleanT} EP${e2}`);
+    addQuery(`${cleanT} E${e1}`);
+    addQuery(`${cleanT} EP${e1}`);
+    addQuery(`${cleanT} Episod${e2}`);
+    addQuery(`${cleanT} Episod ${e2}`);
+    addQuery(`${cleanT} Episod${e1}`);
+    addQuery(`${cleanT} Episod ${e1}`);
+    addQuery(`${cleanT} Episode${e2}`);
+    addQuery(`${cleanT} Episode ${e2}`);
+    addQuery(`${cleanT} Episode${e1}`);
+    addQuery(`${cleanT} Episode ${e1}`);
+    addQuery(`${cleanT} S${s2}E${e2}`);
+    addQuery(`${cleanT} S${s2}EP${e2}`);
+    addQuery(`${cleanT} S${s2} E${e2}`);
+    addQuery(`${cleanT} S${s2} EP${e2}`);
+    addQuery(`${cleanT} S${s1}E${e1}`);
+    addQuery(`${cleanT} S${s1}EP${e1}`);
+    addQuery(`${cleanT} S${s1} E${e1}`);
+    addQuery(`${cleanT} S${s1} EP${e1}`);
+    addQuery(`${cleanT} Season ${s2} EP${e2}`);
+    addQuery(`${cleanT} Season ${s2} Episod${e2}`);
+    addQuery(`${cleanT} Season ${s2} Episod ${e2}`);
+    addQuery(`${cleanT} Season ${s2} Episode${e2}`);
+    addQuery(`${cleanT} Season ${s2} Episode ${e2}`);
+    addQuery(`${cleanT} Season ${s1} EP${e1}`);
+    addQuery(`${cleanT} Season ${s1} Episod${e1}`);
+    addQuery(`${cleanT} Season ${s1} Episod ${e1}`);
+    addQuery(`${cleanT} Season ${s1} Episode${e1}`);
+    addQuery(`${cleanT} Season ${s1} Episode ${e1}`);
+    if (year) addQuery(`${cleanT} ${year}`);
+    addQuery(cleanT);
+  } else {
+    // 2. Siri MULTI season (mengikut turutan tepat dist/rule-msm-series-search)
+    addQuery(`${cleanT} S${s2}E${e2}`);
+    addQuery(`${cleanT} S${s2}EP${e2}`);
+    addQuery(`${cleanT} S${s2} E${e2}`);
+    addQuery(`${cleanT} S${s2} EP${e2}`);
+    addQuery(`${cleanT} S${s1}E${e1}`);
+    addQuery(`${cleanT} S${s1}EP${e1}`);
+    addQuery(`${cleanT} S${s1} E${e1}`);
+    addQuery(`${cleanT} S${s1} EP${e1}`);
+    addQuery(`${cleanT} Season ${s2} EP${e2}`);
+    addQuery(`${cleanT} Season ${s2} Episode${e2}`);
+    addQuery(`${cleanT} Season ${s2} Episode ${e2}`);
+    addQuery(`${cleanT} Season ${s1} EP${e1}`);
+    addQuery(`${cleanT} Season ${s1} Episod${e1}`);
+    addQuery(`${cleanT} Season ${s1} Episod ${e1}`);
+    addQuery(`${cleanT} Season ${s1} Episode${e1}`);
+    addQuery(`${cleanT} Season ${s1} Episode ${e1}`);
+    if (year) {
+      addQuery(`${cleanT} ${year} EP${e2}`);
+      addQuery(`${cleanT} ${year}`);
+    }
+    const roman = toRoman(sNum);
+    if (roman !== s1) {
+      addQuery(`${cleanT} Season ${roman} EP${e2}`);
+      addQuery(`${cleanT} Musim ${roman} EP${e2}`);
+      addQuery(`${cleanT} Season ${roman}`);
+      addQuery(`${cleanT} Musim ${roman}`);
+    }
+    addQuery(`${cleanT} Musim ${s1} EP${e2}`);
+    addQuery(`${cleanT} Season ${s1}`);
+    addQuery(cleanT);
+  }
+
+  return queries;
 }
 
 // Helper: Extract significant search tokens from title (retaining digits, roman numerals, and words >= 2 chars)
@@ -1086,7 +1202,7 @@ app.get('/api/cache/evict', (req, res) => {
 
 // Resolver endpoint: /api/resolve?title=Kelas+Cikgu+Hiragi&season=1&episode=1
 app.get('/api/resolve', async (req, res) => {
-  const { title, year, season, episode, maxQuality = '720', force, refresh } = req.query;
+  const { title, year, season, episode, totalSeasons: totalSeasonsQuery, maxQuality = '720', force, refresh } = req.query;
   if (!title) {
     return res.status(400).json({ success: false, error: 'Missing title query parameter' });
   }
@@ -1095,6 +1211,7 @@ app.get('/api/resolve', async (req, res) => {
   const targetQuality = parseInt(maxQuality, 10) || 720;
   const sNum = season ? parseInt(season, 10) : NaN;
   const eNum = episode ? parseInt(episode, 10) : NaN;
+  const totalSeasons = totalSeasonsQuery ? parseInt(totalSeasonsQuery, 10) : NaN;
   const isTv = !isNaN(sNum) && !isNaN(eNum);
   const sPadded = isTv ? String(sNum).padStart(2, '0') : '';
   const epPadded = isTv ? String(eNum).padStart(2, '0') : '';
@@ -1106,6 +1223,16 @@ app.get('/api/resolve', async (req, res) => {
   const cacheKey = `${baseCacheKey}${qualitySuffix}`;
 
   console.log(`[RESOLVE] Request: "${queryTitle}" (isTv: ${isTv}, maxQuality: ${targetQuality}, bypassCache: ${shouldBypassCache}, cacheKey: "${cacheKey}")`);
+
+  let isAborted = false;
+  const onClientClose = () => {
+    if (!res.writableEnded) {
+      isAborted = true;
+      console.log(`[RESOLVE] Client disconnected / aborted for "${queryTitle}"`);
+      inFlightResolutions.delete(cacheKey);
+    }
+  };
+  req.on('close', onClientClose);
 
   // 1. Check Central Database first (Instant < 1ms response, 0 bot queries)
   let cached = shouldBypassCache ? null : db.get(cacheKey);
@@ -1135,6 +1262,7 @@ app.get('/api/resolve', async (req, res) => {
 
   if (cached) {
     console.log(`[RESOLVE] Central DB Cache HIT for "${cacheKey}" -> Doc ID: ${cached.docId} (${cached.filename})`);
+    req.off('close', onClientClose);
     const host = req.get('host');
     const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'https';
     return res.json({
@@ -1151,6 +1279,8 @@ app.get('/api/resolve', async (req, res) => {
     console.log(`[RESOLVE] In-flight deduplication: attaching to existing resolution for "${cacheKey}"`);
     try {
       const result = await inFlightResolutions.get(cacheKey);
+      req.off('close', onClientClose);
+      if (isAborted || res.writableEnded) return;
       const host = req.get('host');
       const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'https';
       return res.json({
@@ -1161,13 +1291,27 @@ app.get('/api/resolve', async (req, res) => {
         size: result.size,
       });
     } catch (err) {
+      req.off('close', onClientClose);
       return res.status(500).json({ success: false, error: err.message });
     }
   }
 
   // 3. Queue resolution through sequential FIFO mutex to prevent Telegram chat interleaving
   const resolvePromise = queueTelegramTask(async () => {
+    if (isAborted || req.destroyed) {
+      console.log(`[RESOLVE] Skipping queued resolution for "${queryTitle}" (client aborted)`);
+      const err = new Error('Client aborted resolution');
+      err.status = 499;
+      throw err;
+    }
+
     await initTelegram();
+
+    if (isAborted || req.destroyed) {
+      const err = new Error('Client aborted resolution');
+      err.status = 499;
+      throw err;
+    }
 
     // Re-check Central DB after waiting in queue
     if (!shouldBypassCache) {
@@ -1205,7 +1349,8 @@ app.get('/api/resolve', async (req, res) => {
     const titleTokens = extractTitleTokens(title);
     const significantTokens = extractSignificantTokens(title);
     const targetSequel = extractSequelInfo(title);
-    const targetYear = parseInt(year, 10) || extractYear(title);
+    const explicitTargetYear = parseInt(year, 10);
+    const targetYear = !isNaN(explicitTargetYear) ? explicitTargetYear : extractYear(title, significantTokens);
     const matchingRecentDocs = [];
 
     for (const msg of candidateMsgs) {
@@ -1237,16 +1382,36 @@ app.get('/api/resolve', async (req, res) => {
         if (isTv) {
           const epKeywords = [
             `s${sPadded}e${epPadded}`,
+            `s${sPadded}ep${epPadded}`,
             `s${sNum}e${epPadded}`,
+            `s${sNum}ep${epPadded}`,
+            `s${sPadded} e${epPadded}`,
+            `s${sPadded} ep${epPadded}`,
+            `s${sNum} e${epPadded}`,
+            `s${sNum} ep${epPadded}`,
             `s${sPadded}e${eNum}`,
+            `s${sPadded}ep${eNum}`,
+            `s${sNum}e${eNum}`,
+            `s${sNum}ep${eNum}`,
+            `s${sPadded} e${eNum}`,
+            `s${sPadded} ep${eNum}`,
+            `s${sNum} e${eNum}`,
+            `s${sNum} ep${eNum}`,
             `ep${epPadded}`,
             `ep ${epPadded}`,
+            `ep${eNum}`,
             `ep ${eNum}`,
-            `episod ${eNum}`,
-            `episod ${epPadded}`,
-            `episode ${eNum}`,
-            `episode ${epPadded}`,
             `e${epPadded}`,
+            `e ${epPadded}`,
+            `e${eNum}`,
+            `episod${epPadded}`,
+            `episod ${epPadded}`,
+            `episod${eNum}`,
+            `episod ${eNum}`,
+            `episode${epPadded}`,
+            `episode ${epPadded}`,
+            `episode${eNum}`,
+            `episode ${eNum}`,
           ];
           const hasTarget = epKeywords.some(kw => normFn.includes(kw));
           if (!hasTarget) {
@@ -1263,14 +1428,23 @@ app.get('/api/resolve', async (req, res) => {
 
           // Season validation: prevent Season 1 files matching Season 2+, and vice-versa
           if (sNum > 1) {
-            const hasSeason1 = normFn.match(/\b(s0?1|season\s*1|musim\s*1)\b/);
-            const hasTargetSeason = normFn.match(new RegExp(`\\b(s0?${sNum}|season\\s*${sNum}|musim\\s*${sNum})\\b`));
+            const roman = toRoman(sNum);
+            const hasSeason1 = normFn.match(/\b(s0?1(?:e\d+|ep\d+)?|season\s*1|musim\s*1)(?=\b|\D|$)/i);
+            const hasTargetSeason = normFn.match(new RegExp(`\\b(s0?${sNum}(?:e\\d+|ep\\d+)?|season\\s*(?:${sNum}|${roman})|musim\\s*(?:${sNum}|${roman})|part\\s*${sNum})(?=\\b|\\D|$)`, 'i'));
             if (hasSeason1 && !hasTargetSeason) {
               matchesCandidate = false;
             }
           } else if (sNum === 1) {
-            const hasHigherSeason = normFn.match(/\b(s0?[2-9]|season\s*[2-9]|musim\s*[2-9])\b/);
+            const hasHigherSeason = normFn.match(/\b(s0?[2-9](?:e\d+|ep\d+)?|season\s*[2-9]|musim\s*[2-9])(?=\b|\D|$)/i);
             if (hasHigherSeason) {
+              matchesCandidate = false;
+            }
+          }
+
+          // Release year validation for TV episodes if target year is provided
+          if (matchesCandidate && targetYear) {
+            const docYear = extractYear(filename, significantTokens);
+            if (docYear && Math.abs(targetYear - docYear) > 1 && !isNaN(explicitTargetYear)) {
               matchesCandidate = false;
             }
           }
@@ -1289,8 +1463,8 @@ app.get('/api/resolve', async (req, res) => {
           }
 
           // Release year validation: reject if filename has an explicit conflicting release year
-          const docYear = extractYear(filename);
-          if (targetYear && docYear && Math.abs(targetYear - docYear) > 1) {
+          const docYear = extractYear(filename, significantTokens);
+          if (targetYear && docYear && Math.abs(targetYear - docYear) > 1 && !isNaN(explicitTargetYear)) {
             matchesCandidate = false;
           }
         }
@@ -1342,23 +1516,9 @@ app.get('/api/resolve', async (req, res) => {
     const cleanT = cleanSearchTitle(title);
     const searchQueries = [];
     if (isTv) {
-      if (sNum > 1) {
-        searchQueries.push(`${cleanT} Season ${sNum}`);
-        searchQueries.push(`${cleanT} S${sNum}E${epPadded}`);
-        searchQueries.push(`${cleanT} S${sPadded}E${epPadded}`);
-        searchQueries.push(`${cleanT} EP${epPadded}`);
-        searchQueries.push(`${cleanT} Musim ${sNum}`);
-        searchQueries.push(cleanT);
-        if (cleanT !== title) searchQueries.push(title);
-      } else {
-        searchQueries.push(`${cleanT} EP${epPadded}`);
-        searchQueries.push(`${cleanT} Episod ${eNum}`);
-        searchQueries.push(`${cleanT} Episod ${epPadded}`);
-        searchQueries.push(`${cleanT} S01E${epPadded}`);
-        searchQueries.push(`${cleanT} Season 1`);
-        searchQueries.push(cleanT);
-        if (year) searchQueries.push(`${cleanT} ${year}`);
-        if (cleanT !== title) searchQueries.push(title);
+      searchQueries.push(...generateSeriesSearchQueries(cleanT, sNum, eNum, totalSeasons, year));
+      if (cleanT !== title) {
+        searchQueries.push(...generateSeriesSearchQueries(title, sNum, eNum, totalSeasons, year));
       }
     } else {
       if (year) searchQueries.push(`${cleanT} ${year}`);
@@ -1422,16 +1582,36 @@ app.get('/api/resolve', async (req, res) => {
       if (isTv) {
         const epKeywords = [
           `s${sPadded}e${epPadded}`,
+          `s${sPadded}ep${epPadded}`,
           `s${sNum}e${epPadded}`,
+          `s${sNum}ep${epPadded}`,
+          `s${sPadded} e${epPadded}`,
+          `s${sPadded} ep${epPadded}`,
+          `s${sNum} e${epPadded}`,
+          `s${sNum} ep${epPadded}`,
           `s${sPadded}e${eNum}`,
+          `s${sPadded}ep${eNum}`,
+          `s${sNum}e${eNum}`,
+          `s${sNum}ep${eNum}`,
+          `s${sPadded} e${eNum}`,
+          `s${sPadded} ep${eNum}`,
+          `s${sNum} e${eNum}`,
+          `s${sNum} ep${eNum}`,
           `ep${epPadded}`,
           `ep ${epPadded}`,
+          `ep${eNum}`,
           `ep ${eNum}`,
-          `episod ${eNum}`,
-          `episod ${epPadded}`,
-          `episode ${eNum}`,
-          `episode ${epPadded}`,
           `e${epPadded}`,
+          `e ${epPadded}`,
+          `e${eNum}`,
+          `episod${epPadded}`,
+          `episod ${epPadded}`,
+          `episod${eNum}`,
+          `episod ${eNum}`,
+          `episode${epPadded}`,
+          `episode ${epPadded}`,
+          `episode${eNum}`,
+          `episode ${eNum}`,
         ];
         const hasTargetEp = epKeywords.some(kw => normBtnText.includes(kw));
 
@@ -1445,23 +1625,47 @@ app.get('/api/resolve', async (req, res) => {
               score -= 500;
             }
           } else {
-            score -= 150;
+            // Check for bare episode number button like "[ 01 ]", "[ 6 ]", "06"
+            const bareMatch = normBtnText.match(/^\[?\s*(\d{1,3})\s*\]?$/);
+            if (bareMatch) {
+              const bNum = parseInt(bareMatch[1], 10);
+              if (bNum === eNum) {
+                score += 80;
+              } else {
+                score -= 500;
+              }
+            } else {
+              score -= 150;
+            }
           }
         }
 
         // Strict Season validation across button and parent message
         if (sNum > 1) {
-          const hasSeason1 = combinedNorm.match(/\b(s0?1|season\s*1|musim\s*1)\b/);
-          const hasTargetSeason = combinedNorm.match(new RegExp(`\\b(s0?${sNum}|season\\s*${sNum}|musim\\s*${sNum})\\b`));
+          const roman = toRoman(sNum);
+          const hasSeason1 = combinedNorm.match(/\b(s0?1(?:e\d+|ep\d+)?|season\s*1|musim\s*1)(?=\b|\D|$)/i);
+          const hasTargetSeason = combinedNorm.match(new RegExp(`\\b(s0?${sNum}(?:e\\d+|ep\\d+)?|season\\s*(?:${sNum}|${roman})|musim\\s*(?:${sNum}|${roman})|part\\s*${sNum})(?=\\b|\\D|$)`, 'i'));
           if (hasSeason1 && !hasTargetSeason) {
             score -= 500;
           } else if (hasTargetSeason) {
             score += 80;
           }
         } else if (sNum === 1) {
-          const hasHigherSeason = combinedNorm.match(/\b(s0?[2-9]|season\s*[2-9]|musim\s*[2-9])\b/);
+          const hasHigherSeason = combinedNorm.match(/\b(s0?[2-9](?:e\d+|ep\d+)?|season\s*[2-9]|musim\s*[2-9])(?=\b|\D|$)/i);
           if (hasHigherSeason) {
             score -= 500;
+          }
+        }
+
+        // Release year validation for TV episodes if target year is provided
+        const explicitTargetYear = parseInt(year, 10);
+        const targetYear = !isNaN(explicitTargetYear) ? explicitTargetYear : extractYear(title, significantTokens);
+        const btnYear = extractYear(btnText, significantTokens) || extractYear(msgText, significantTokens);
+        if (targetYear && btnYear) {
+          if (Math.abs(targetYear - btnYear) <= 1) {
+            score += 60; // Reward matching release year for the season
+          } else if (!isNaN(explicitTargetYear)) {
+            score -= 500; // Heavy penalty only if release year was explicitly provided
           }
         }
       } else {
@@ -1483,13 +1687,14 @@ app.get('/api/resolve', async (req, res) => {
           }
         }
 
-        const targetYear = parseInt(year, 10) || extractYear(title);
-        const btnYear = extractYear(btnText) || extractYear(msgText);
+        const explicitTargetYear = parseInt(year, 10);
+        const targetYear = !isNaN(explicitTargetYear) ? explicitTargetYear : extractYear(title, significantTokens);
+        const btnYear = extractYear(btnText, significantTokens) || extractYear(msgText, significantTokens);
         if (targetYear && btnYear) {
           if (Math.abs(targetYear - btnYear) <= 1) {
             score += 90; // Reward matching release year
-          } else {
-            score -= 450; // Heavy penalty for conflicting release year
+          } else if (!isNaN(explicitTargetYear)) {
+            score -= 450; // Heavy penalty only if release year was explicitly provided
           }
         }
       }
@@ -1535,6 +1740,10 @@ app.get('/api/resolve', async (req, res) => {
     }
 
     for (const sq of searchQueries) {
+      if (isAborted || req.destroyed) {
+        console.log(`[RESOLVE] Aborting search query loop for "${queryTitle}" (client aborted)`);
+        break;
+      }
       console.log(`[RESOLVE] Querying @msm32bot with: "${sq}"...`);
       const sentMsg = await client.sendMessage('msm32bot', { message: sq });
       sentMsgId = sentMsg.id;
@@ -1542,6 +1751,7 @@ app.get('/api/resolve', async (req, res) => {
       let noResults = false;
 
       for (let poll = 0; poll < 8; poll++) {
+        if (isAborted || req.destroyed) break;
         await new Promise(r => setTimeout(r, 400));
         const msgs = await client.getMessages('msm32bot', { limit: 5 });
         const candidates = [];
@@ -1564,6 +1774,7 @@ app.get('/api/resolve', async (req, res) => {
               const MAX_PAGES = isTv ? 6 : 3;
 
               while (currentMsg && pageCount < MAX_PAGES) {
+                if (isAborted || req.destroyed) break;
                 pageCount++;
                 if (currentMsg.replyMarkup?.rows) {
                   for (const row of currentMsg.replyMarkup.rows) {
@@ -1584,7 +1795,7 @@ app.get('/api/resolve', async (req, res) => {
 
                 // Check if we already found an acceptable episode match (score >= 50)
                 const hasGoodMatch = candidates.some(c => c.score >= 50);
-                if (hasGoodMatch || pageCount >= MAX_PAGES) break;
+                if (hasGoodMatch || pageCount >= MAX_PAGES || isAborted || req.destroyed) break;
 
                 // Otherwise, check for pagination button to traverse to next page
                 const nextBtn = findNextPageButton(currentMsg.replyMarkup);
@@ -1615,7 +1826,7 @@ app.get('/api/resolve', async (req, res) => {
           }
         }
 
-        if (noResults) break;
+        if (noResults || isAborted || req.destroyed) break;
 
         const valid = candidates.filter(c => c.score >= 0).sort((a, b) => b.score - a.score);
         if (valid.length > 0) {
@@ -1630,7 +1841,13 @@ app.get('/api/resolve', async (req, res) => {
         }
       }
 
-      if (targetButtonId) break;
+      if (targetButtonId || isAborted || req.destroyed) break;
+    }
+
+    if (isAborted || req.destroyed) {
+      const err = new Error('Client aborted resolution');
+      err.status = 499;
+      throw err;
     }
 
     if (!targetButtonId) {
@@ -1769,7 +1986,9 @@ app.get('/api/resolve', async (req, res) => {
     let filename = chosenFilename || queryTitle;
 
     for (let attempt = 0; attempt < 15; attempt++) {
+      if (isAborted || req.destroyed) break;
       await new Promise(r => setTimeout(r, 2000));
+      if (isAborted || req.destroyed) break;
       const incoming = await client.getMessages('msm32bot', { limit: 10 });
       for (const im of incoming) {
         if (im.id > sentMsgId && im.media?.document) {
@@ -1780,6 +1999,12 @@ app.get('/api/resolve', async (req, res) => {
         }
       }
       if (deliveredDoc) break;
+    }
+
+    if (isAborted || req.destroyed) {
+      const err = new Error('Client aborted resolution');
+      err.status = 499;
+      throw err;
     }
 
     if (!deliveredDoc) {
@@ -1808,6 +2033,9 @@ app.get('/api/resolve', async (req, res) => {
   try {
     const result = await resolvePromise;
     inFlightResolutions.delete(cacheKey);
+    req.off('close', onClientClose);
+
+    if (isAborted || res.writableEnded) return;
 
     const host = req.get('host');
     const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'https';
@@ -1821,6 +2049,11 @@ app.get('/api/resolve', async (req, res) => {
     });
   } catch (err) {
     inFlightResolutions.delete(cacheKey);
+    req.off('close', onClientClose);
+    if (err.status === 499 || isAborted || req.destroyed) {
+      console.log(`[RESOLVE] Request cancelled cleanly for "${queryTitle}"`);
+      return;
+    }
     console.error('[RESOLVE ERROR]', err);
     const status = err.status || (err.message?.includes('AUTH_KEY_DUPLICATED') ? 401 : 500);
     return res.status(status).json({ success: false, error: err.message });
