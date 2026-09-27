@@ -321,18 +321,27 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
         });
       };
 
+      let fired = false;
+      const onReadyToPlay = () => {
+        if (fired || isCancelled) return;
+        fired = true;
+        video.removeEventListener('loadeddata', onReadyToPlay);
+        video.removeEventListener('canplay', onReadyToPlay);
+        triggerUnmutedPlay();
+      };
+
       if (video.readyState >= 2) {
         triggerUnmutedPlay();
       } else {
-        video.addEventListener('loadeddata', triggerUnmutedPlay, { once: true });
-        video.addEventListener('canplay', triggerUnmutedPlay, { once: true });
+        video.addEventListener('loadeddata', onReadyToPlay, { once: true });
+        video.addEventListener('canplay', onReadyToPlay, { once: true });
       }
 
       return () => {
         isCancelled = true;
         attachedSrcRef.current = null;
-        video.removeEventListener('loadeddata', triggerUnmutedPlay);
-        video.removeEventListener('canplay', triggerUnmutedPlay);
+        video.removeEventListener('loadeddata', onReadyToPlay);
+        video.removeEventListener('canplay', onReadyToPlay);
         try {
           video.pause();
           video.removeAttribute('src');

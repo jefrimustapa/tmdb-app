@@ -2,12 +2,13 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20260927-1349';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.perf-improve-1080p-m.20260927-1349';
+export const APP_BUILD_NUMBER = '20260927-1400';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.perf-improve-1080p-m.20260927-1400';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
 export const APP_BRANCH = 'perf-improve-1080p-m';
-export const APP_CHANGELOG = `* perf(msm-getter): optimize 1080p streaming concurrency and Matroska clustering (#160)
+export const APP_CHANGELOG = `* fix(player): resolve seek freeze on transcoded 1080p streams with asynchronous resume and cues probe optimization
+* perf(msm-getter): optimize 1080p streaming concurrency and Matroska clustering (#160)
 * Merge pull request #159 from jefrimustapa/fix/msm-getter-no-sound
 * fix(resolver): enforce strict word boundaries, disqualify split archives, and penalize TV episodes on movie searches
 * fix(player): resolve slow seeking and broken scrubber tap/drag for transcoded streams
@@ -20,5 +21,4 @@ export const APP_CHANGELOG = `* perf(msm-getter): optimize 1080p streaming concu
 * feat(ui): use favicon.svg for poster/still fallback with seamless dark gradient background
 * fix(visuals): eliminate search bar splash bleed, fix card full-bleed fill, and replace placeholder SVGs with inline fallbacks
 * fix(player): expand surround and multi-channel audio detection to downmix 6CH/surround streams to stereo (#155)
-* Merge pull request #154 from jefrimustapa/feat/improve-msm-getter-series-search
-* fix(series-search): pass totalSeasons and season-specific year to msm-getter resolver`;
+* Merge pull request #154 from jefrimustapa/feat/improve-msm-getter-series-search`;

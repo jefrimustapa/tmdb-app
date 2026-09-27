@@ -2376,6 +2376,7 @@ async function streamTelegramPipelined(client, targetDoc, startByte, endByte, re
       }
       return bytes;
     } catch (err) {
+      sender = null;
       if (aborted) return null;
       const msg = `${err.errorMessage || ''} ${err.message || ''}`;
       const dcMatch = msg.match(/(?:FILE_MIGRATE_|stored in DC\s*)(\d+)/i);
@@ -2396,6 +2397,32 @@ async function streamTelegramPipelined(client, targetDoc, startByte, endByte, re
         return bytes;
       }
 
+      // Automatically recover from dropped/uninitialized secondary DC connections
+      if (msg.includes('CONNECTION_NOT_INITED') || msg.includes('disconnected')) {
+        console.warn(`[STREAM RECONNECT] Sender connection on DC ${dcId} invalid (${err.errorMessage || err.message}). Re-initializing...`);
+        try {
+          if (client._cleanupExportedSender) {
+            await client._cleanupExportedSender(dcId);
+          }
+        } catch {}
+        sender = null;
+        await new Promise(r => setTimeout(r, 1000));
+        if (aborted) return null;
+        try {
+          sender = await client.getSender(dcId);
+          if (aborted) return null;
+          const result = await client.invokeWithSender(request, sender);
+          if (aborted) return null;
+          const bytes = result.bytes;
+          if (bytes && bytes.length > 0) {
+            setCachedBlock(docIdStr, blockIdx, bytes, isPinnedBlock);
+          }
+          return bytes;
+        } catch (e2) {
+          sender = null;
+        }
+      }
+
       // Automatically recover from expired Telegram file references (HMAC token expiry)
       if (msg.includes('FILE_REFERENCE') || err.errorMessage === 'FILE_REFERENCE_EXPIRED') {
         console.warn(`[STREAM WARN] File reference expired on Doc ${targetDoc.id}. Auto-refreshing...`);
@@ -2406,7 +2433,7 @@ async function streamTelegramPipelined(client, targetDoc, startByte, endByte, re
           request.location.fileReference = freshRef;
           console.log(`[STREAM RECOVERY] Successfully swapped fresh fileReference. Retrying block ${blockIdx}...`);
           if (aborted) return null;
-          if (!sender) sender = await client.getSender(dcId);
+          sender = await client.getSender(dcId);
           if (aborted) return null;
           const result = await client.invokeWithSender(request, sender);
           if (aborted) return null;
@@ -2429,6 +2456,7 @@ async function streamTelegramPipelined(client, targetDoc, startByte, endByte, re
         const bytes = await fetchBlock(blockIdx);
         if (bytes) return bytes;
       } catch (err) {
+        sender = null;
         if (attempt === retries || aborted) throw err;
         const msg = `${err.errorMessage || ''} ${err.message || ''}`;
         if (msg.includes('FILE_REFERENCE')) {
