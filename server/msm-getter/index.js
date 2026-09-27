@@ -1540,6 +1540,8 @@ app.get('/api/resolve', async (req, res) => {
     let fallbackShortcode = null;
     let chosenFilename = null;
     let sentMsgId = 0;
+    let deliveredDoc = null;
+    let resolvedFilename = null;
 
     // Helper: Score a candidate download button
     function scoreButton(btn, msg) {
@@ -1752,6 +1754,32 @@ app.get('/api/resolve', async (req, res) => {
       return null;
     }
 
+    // Execute Ad-Gate HTTP handshake with automatic retry for transient Cloudflare / network timeouts
+    async function axiosWithRetry(fn, desc, maxRetries = 2, delayMs = 1000) {
+      let lastErr;
+      for (let attempt = 1; attempt <= maxRetries + 1; attempt++) {
+        try {
+          return await fn();
+        } catch (err) {
+          lastErr = err;
+          const isNetworkOrTimeout = err.code === 'ECONNABORTED' ||
+                                     err.code === 'ETIMEDOUT' ||
+                                     err.code === 'ECONNRESET' ||
+                                     err.code === 'EAI_AGAIN' ||
+                                     err.code === 'ENOTFOUND' ||
+                                     (err.response && err.response.status >= 500);
+          if (attempt <= maxRetries && isNetworkOrTimeout) {
+            console.warn(`[RESOLVE RETRY] ${desc} attempt ${attempt} failed (${err.code || err.message}). Retrying in ${delayMs}ms...`);
+            await new Promise(r => setTimeout(r, delayMs));
+            delayMs = Math.round(delayMs * 1.5);
+          } else {
+            throw err;
+          }
+        }
+      }
+      throw lastErr;
+    }
+
     for (const sq of searchQueries) {
       if (isAborted || req.destroyed) {
         console.log(`[RESOLVE] Aborting search query loop for "${queryTitle}" (client aborted)`);
@@ -1843,175 +1871,181 @@ app.get('/api/resolve', async (req, res) => {
 
         const valid = candidates.filter(c => c.score >= 0).sort((a, b) => b.score - a.score);
         if (valid.length > 0) {
-          const best = valid[0];
-          targetMsgId = best.msgId;
-          targetButtonId = best.buttonId;
-          chosenFilename = best.text.replace(/^[🔥🎞📎\s]+/, '').replace(/\s+\d+(\.\d+)?\s*(mb|gb).*$/i, '').trim();
-          const linkMatch = best.url.match(/\/link\/([a-zA-Z0-9_-]+)/);
-          if (linkMatch) fallbackShortcode = linkMatch[1];
-          console.log(`[RESOLVE] Selected best button: "${best.text}" (score: ${best.score})`);
-          break;
-        }
-      }
-
-      if (targetButtonId || isAborted || req.destroyed) break;
-    }
-
-    if (isAborted || req.destroyed) {
-      const err = new Error('Client aborted resolution');
-      err.status = 499;
-      throw err;
-    }
-
-    if (!targetButtonId) {
-      if (fallbackCached) {
-        console.log(`[RESOLVE] 720p not found from bot, falling back to cached 1080p stream for "${baseCacheKey}"`);
-        return fallbackCached;
-      }
-      const err = new Error(`No downloadable media found for "${queryTitle}" on @msm32bot`);
-      err.status = 404;
-      throw err;
-    }
-
-    console.log(`[RESOLVE] Authorizing button (msgId: ${targetMsgId}, buttonId: ${targetButtonId})...`);
-    const authRes = await client.invoke(new Api.messages.RequestUrlAuth({
-      peer: 'msm32bot',
-      msgId: targetMsgId,
-      buttonId: targetButtonId,
-    }));
-
-    const authUrl = authRes.url;
-    console.log('[RESOLVE] Authorized URL generated successfully.');
-
-    // Execute Ad-Gate HTTP handshake with automatic retry for transient Cloudflare / network timeouts
-    async function axiosWithRetry(fn, desc, maxRetries = 2, delayMs = 1000) {
-      let lastErr;
-      for (let attempt = 1; attempt <= maxRetries + 1; attempt++) {
-        try {
-          return await fn();
-        } catch (err) {
-          lastErr = err;
-          const isNetworkOrTimeout = err.code === 'ECONNABORTED' ||
-                                     err.code === 'ETIMEDOUT' ||
-                                     err.code === 'ECONNRESET' ||
-                                     err.code === 'EAI_AGAIN' ||
-                                     err.code === 'ENOTFOUND' ||
-                                     (err.response && err.response.status >= 500);
-          if (attempt <= maxRetries && isNetworkOrTimeout) {
-            console.warn(`[RESOLVE RETRY] ${desc} attempt ${attempt} failed (${err.code || err.message}). Retrying in ${delayMs}ms...`);
-            await new Promise(r => setTimeout(r, delayMs));
-            delayMs = Math.round(delayMs * 1.5);
-          } else {
-            throw err;
+          // Deduplicate candidate buttons by buttonId or url
+          const uniqueValid = [];
+          const seenButtons = new Set();
+          for (const c of valid) {
+            const btnKey = c.buttonId || c.url;
+            if (!seenButtons.has(btnKey)) {
+              seenButtons.add(btnKey);
+              uniqueValid.push(c);
+            }
           }
+
+          // Try up to top 4 valid candidates with resilient fallback
+          const candidatesToTry = uniqueValid.slice(0, 4);
+          for (let candIdx = 0; candIdx < candidatesToTry.length; candIdx++) {
+            if (isAborted || req.destroyed) break;
+            const cand = candidatesToTry[candIdx];
+            console.log(`[RESOLVE] Trying candidate (${candIdx + 1}/${candidatesToTry.length}): "${cand.text}" (score: ${cand.score})...`);
+
+            const targetMsgId = cand.msgId;
+            const targetButtonId = cand.buttonId;
+            const candidateFilename = cand.text.replace(/^[🔥🎞📎\s]+/, '').replace(/\s+\d+(\.\d+)?\s*(mb|gb).*$/i, '').trim();
+            const linkMatch = cand.url ? cand.url.match(/\/link\/([a-zA-Z0-9_-]+)/) : null;
+            const candShortcode = linkMatch ? linkMatch[1] : null;
+
+            let authRes;
+            try {
+              console.log(`[RESOLVE] Authorizing button (msgId: ${targetMsgId}, buttonId: ${targetButtonId})...`);
+              authRes = await client.invoke(new Api.messages.RequestUrlAuth({
+                peer: 'msm32bot',
+                msgId: targetMsgId,
+                buttonId: targetButtonId,
+              }));
+            } catch (authErr) {
+              console.warn(`[RESOLVE WARN] RequestUrlAuth failed for "${cand.text}": ${authErr.message}. Trying next candidate...`);
+              continue;
+            }
+
+            const authUrl = authRes.url;
+            console.log('[RESOLVE] Authorized URL generated successfully.');
+
+            const cookieMap = new Map();
+            function processSetCookies(header) {
+              if (!header) return;
+              const list = Array.isArray(header) ? header : [header];
+              for (const item of list) {
+                const pair = item.split(';')[0];
+                const [k, v] = pair.split('=');
+                if (k && v) cookieMap.set(k.trim(), v.trim());
+              }
+            }
+
+            let step1;
+            try {
+              console.log(`[RESOLVE] Stepping through ad-gate: ${authUrl}...`);
+              step1 = await axiosWithRetry(
+                () => axios.get(authUrl, {
+                  maxRedirects: 0,
+                  timeout: 25000,
+                  validateStatus: (s) => s >= 200 && s < 400,
+                  headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
+                }),
+                'Step 1 (ad-gate auth)',
+                2,
+                1000
+              );
+              processSetCookies(step1.headers['set-cookie']);
+            } catch (step1Err) {
+              console.warn(`[RESOLVE WARN] Step 1 ad-gate failed for "${cand.text}": ${step1Err.message}. Trying next candidate...`);
+              continue;
+            }
+
+            const redirectPath = step1.headers['location'] || (authUrl.match(/\/link\/[^\s&?]+/)?.[0] || '/');
+            const targetUrl = new URL(redirectPath, authUrl).toString();
+
+            let step2;
+            try {
+              step2 = await axiosWithRetry(
+                () => axios.get(targetUrl, {
+                  timeout: 25000,
+                  headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                    Cookie: Array.from(cookieMap.entries()).map(([k, v]) => `${k}=${v}`).join('; '),
+                    Referer: authUrl,
+                  },
+                }),
+                'Step 2 (target page)',
+                2,
+                1000
+              );
+              processSetCookies(step2.headers['set-cookie']);
+            } catch (step2Err) {
+              console.warn(`[RESOLVE WARN] Step 2 ad-gate failed for "${cand.text}": ${step2Err.message}. Trying next candidate...`);
+              continue;
+            }
+
+            const html = step2.data || '';
+            const nonceMatch = html.match(/var\s+msmbotGetFileNonce\s*=\s*["']([^"']+)["']/i);
+            const scMatch = html.match(/data-shortcode\s*=\s*["']([^"']+)["']/i) ||
+                            html.match(/messageSent_.*?"([^"]+)".*?"video"/i) ||
+                            html.match(/messageSent_.*?([a-zA-Z0-9_-]{5,20})/i);
+            const shortcode = scMatch ? scMatch[1] : candShortcode;
+
+            if (nonceMatch && shortcode) {
+              console.log(`[RESOLVE] Triggering msmbot_getfile (nonce: ${nonceMatch[1]}, shortcode: ${shortcode})...`);
+              const postData = new URLSearchParams({
+                action: 'msmbot_getfile',
+                _wpnonce: nonceMatch[1],
+                file_shortcode: shortcode,
+              });
+
+              let forwardFailed = false;
+              try {
+                const ajaxRes = await axiosWithRetry(
+                  () => axios.post('https://go.msmbot.club/wp-admin/admin-ajax.php', postData.toString(), {
+                    timeout: 25000,
+                    headers: {
+                      'Content-Type': 'application/x-www-form-urlencoded',
+                      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                      Cookie: Array.from(cookieMap.entries()).map(([k, v]) => `${k}=${v}`).join('; '),
+                      Referer: targetUrl,
+                    },
+                  }),
+                  'msmbot_getfile ajax',
+                  2,
+                  1000
+                );
+                console.log(`[RESOLVE] msmbot_getfile response: ${JSON.stringify(ajaxRes.data || 'ok')}`);
+                if (ajaxRes.data?.data?.description === 'forward_failed' || (ajaxRes.data?.data && ajaxRes.data.data.ok === false)) {
+                  console.warn(`[RESOLVE WARN] Media forward failed on @msm32bot for candidate "${cand.text}" (${ajaxRes.data?.data?.description || 'failed'}). Trying next candidate...`);
+                  forwardFailed = true;
+                }
+              } catch (postErr) {
+                console.warn(`[RESOLVE WARN] msmbot_getfile request issue (${postErr.message}). Checking Telegram chat for delivery anyway...`);
+              }
+
+              if (forwardFailed) {
+                continue;
+              }
+            }
+
+            console.log(`[RESOLVE] Waiting for media delivery from @msm32bot (newer than msgId: ${sentMsgId})...`);
+            let candDeliveredDoc = null;
+            let finalFilename = candidateFilename || queryTitle;
+
+            for (let attempt = 0; attempt < 8; attempt++) {
+              if (isAborted || req.destroyed) break;
+              await new Promise(r => setTimeout(r, 1500));
+              if (isAborted || req.destroyed) break;
+              const incoming = await client.getMessages('msm32bot', { limit: 10 });
+              for (const im of incoming) {
+                if (im.id > sentMsgId && im.media?.document) {
+                  candDeliveredDoc = im.media.document;
+                  const fnAttr = candDeliveredDoc.attributes?.find(a => a.className === 'DocumentAttributeFilename');
+                  if (fnAttr) finalFilename = fnAttr.fileName;
+                  break;
+                }
+              }
+              if (candDeliveredDoc) break;
+            }
+
+            if (candDeliveredDoc) {
+              console.log(`[RESOLVE] Successfully received media document for candidate "${cand.text}"!`);
+              deliveredDoc = candDeliveredDoc;
+              resolvedFilename = finalFilename;
+              break; // Candidate loop succeeded!
+            } else {
+              console.warn(`[RESOLVE WARN] Delivery timeout waiting for candidate "${cand.text}". Trying next candidate...`);
+            }
+          }
+
+          if (deliveredDoc) break; // Exit poll loop
         }
       }
-      throw lastErr;
-    }
 
-    const cookieMap = new Map();
-    function processSetCookies(header) {
-      if (!header) return;
-      const list = Array.isArray(header) ? header : [header];
-      for (const item of list) {
-        const pair = item.split(';')[0];
-        const [k, v] = pair.split('=');
-        if (k && v) cookieMap.set(k.trim(), v.trim());
-      }
-    }
-
-    console.log(`[RESOLVE] Stepping through ad-gate: ${authUrl}...`);
-    const step1 = await axiosWithRetry(
-      () => axios.get(authUrl, {
-        maxRedirects: 0,
-        timeout: 25000,
-        validateStatus: (s) => s >= 200 && s < 400,
-        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
-      }),
-      'Step 1 (ad-gate auth)',
-      2,
-      1000
-    );
-    processSetCookies(step1.headers['set-cookie']);
-
-    const redirectPath = step1.headers['location'] || (authUrl.match(/\/link\/[^\s&?]+/)?.[0] || '/');
-    const targetUrl = new URL(redirectPath, authUrl).toString();
-
-    const step2 = await axiosWithRetry(
-      () => axios.get(targetUrl, {
-        timeout: 25000,
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-          Cookie: Array.from(cookieMap.entries()).map(([k, v]) => `${k}=${v}`).join('; '),
-          Referer: authUrl,
-        },
-      }),
-      'Step 2 (target page)',
-      2,
-      1000
-    );
-    processSetCookies(step2.headers['set-cookie']);
-
-    const html = step2.data || '';
-    const nonceMatch = html.match(/var\s+msmbotGetFileNonce\s*=\s*["']([^"']+)["']/i);
-    const scMatch = html.match(/data-shortcode\s*=\s*["']([^"']+)["']/i) ||
-                    html.match(/messageSent_.*?"([^"]+)".*?"video"/i) ||
-                    html.match(/messageSent_.*?([a-zA-Z0-9_-]{5,20})/i);
-    const shortcode = scMatch ? scMatch[1] : fallbackShortcode;
-
-    if (nonceMatch && shortcode) {
-      console.log(`[RESOLVE] Triggering msmbot_getfile (nonce: ${nonceMatch[1]}, shortcode: ${shortcode})...`);
-      const postData = new URLSearchParams({
-        action: 'msmbot_getfile',
-        _wpnonce: nonceMatch[1],
-        file_shortcode: shortcode,
-      });
-
-      try {
-        const ajaxRes = await axiosWithRetry(
-          () => axios.post('https://go.msmbot.club/wp-admin/admin-ajax.php', postData.toString(), {
-            timeout: 25000,
-            headers: {
-              'Content-Type': 'application/x-www-form-urlencoded',
-              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-              Cookie: Array.from(cookieMap.entries()).map(([k, v]) => `${k}=${v}`).join('; '),
-              Referer: targetUrl,
-            },
-          }),
-          'msmbot_getfile ajax',
-          2,
-          1000
-        );
-        console.log(`[RESOLVE] msmbot_getfile response: ${JSON.stringify(ajaxRes.data || 'ok')}`);
-        if (ajaxRes.data?.data?.description === 'forward_failed' || (ajaxRes.data?.data && ajaxRes.data.data.ok === false)) {
-          const err = new Error(`Media forward failed on @msm32bot for "${queryTitle}" (source file deleted or inaccessible on Telegram)`);
-          err.status = 404;
-          throw err;
-        }
-      } catch (postErr) {
-        if (postErr.status === 404) throw postErr;
-        console.warn(`[RESOLVE WARN] msmbot_getfile request issue (${postErr.message}). Checking Telegram chat for delivery anyway...`);
-      }
-    }
-
-    console.log(`[RESOLVE] Waiting for media delivery from @msm32bot (newer than msgId: ${sentMsgId})...`);
-    let deliveredDoc = null;
-    let filename = chosenFilename || queryTitle;
-
-    for (let attempt = 0; attempt < 15; attempt++) {
-      if (isAborted || req.destroyed) break;
-      await new Promise(r => setTimeout(r, 2000));
-      if (isAborted || req.destroyed) break;
-      const incoming = await client.getMessages('msm32bot', { limit: 10 });
-      for (const im of incoming) {
-        if (im.id > sentMsgId && im.media?.document) {
-          deliveredDoc = im.media.document;
-          const fnAttr = deliveredDoc.attributes?.find(a => a.className === 'DocumentAttributeFilename');
-          if (fnAttr) filename = fnAttr.fileName;
-          break;
-        }
-      }
-      if (deliveredDoc) break;
+      if (deliveredDoc || isAborted || req.destroyed) break; // Exit searchQueries loop
     }
 
     if (isAborted || req.destroyed) {
@@ -2021,12 +2055,17 @@ app.get('/api/resolve', async (req, res) => {
     }
 
     if (!deliveredDoc) {
-      const err = new Error(`Timeout waiting for media delivery from @msm32bot for "${queryTitle}"`);
-      err.status = 504;
+      if (fallbackCached) {
+        console.log(`[RESOLVE] 720p not found from bot, falling back to cached 1080p stream for "${baseCacheKey}"`);
+        return fallbackCached;
+      }
+      const err = new Error(`No downloadable media found for "${queryTitle}" on @msm32bot`);
+      err.status = 404;
       throw err;
     }
 
     const docIdStr = deliveredDoc.id.toString();
+    const filename = resolvedFilename || chosenFilename || queryTitle;
     const resolvedItem = db.set(cacheKey, {
       docId: docIdStr,
       accessHash: deliveredDoc.accessHash?.toString() || '',
