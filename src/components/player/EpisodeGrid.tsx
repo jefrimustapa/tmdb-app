@@ -146,14 +146,10 @@ export const EpisodeGrid: React.FC<EpisodeGridProps> = ({
                     }}
                     onError={(e) => {
                       tmdbImages.handleImgError(e, true);
-                      e.currentTarget.classList.remove('object-cover');
-                      e.currentTarget.classList.add('object-contain', 'p-1');
                       e.currentTarget.style.opacity = '1';
                     }}
                     style={{ opacity: 0 }}
-                    className={`w-full h-full ${
-                      stillUrl.includes('placeholder') ? 'object-contain p-1' : 'object-cover'
-                    } group-hover:scale-105 transition-opacity duration-500 ease-out ${
+                    className={`w-full h-full object-cover group-hover:scale-105 transition-opacity duration-500 ease-out ${
                       isUnaired ? 'grayscale contrast-75 brightness-75 opacity-60' : ''
                     }`}
                   />
