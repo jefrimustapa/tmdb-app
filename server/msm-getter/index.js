@@ -2272,10 +2272,10 @@ async function streamTelegramPipelined(client, targetDoc, startByte, endByte, re
     CONCURRENCY = Math.min(3, customConcurrency);
   }
 
-  const isProbe = req?.headers?.['x-internal-probe'] === '1' || req?.query?.probe === '1' || (endByte - startByte <= 1048576 && req?.headers?.['x-internal-transcoder'] !== '1');
+  const isProbe = req?.headers?.['x-internal-probe'] === '1' || req?.query?.probe === '1' || (endByte - startByte <= 1048576);
   const isInternal = req?.headers?.['x-internal-transcoder'] === '1' || req?.query?.direct === '1';
   if (isProbe) {
-    CONCURRENCY = 1; // Prevent MTProto pipeline lookahead congestion during demuxer / metadata probe
+    CONCURRENCY = 1; // Prevent MTProto pipeline lookahead congestion during demuxer / metadata / cues probe
   }
 
   const streamKey = passedStreamKey || `${isInternal ? 'internal-' + Date.now() : (req?.headers?.['x-client-id'] || req?.ip || req?.socket?.remoteAddress || 'client')}:${targetDoc.id}`;

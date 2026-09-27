@@ -115,6 +115,7 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
   const scrubValueRef = useRef<number | null>(null);
 
   const hasSeekedInitialRef = useRef(false);
+  const seekWatchdogTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const isPlayingRef = useRef(false);
 
@@ -188,6 +189,9 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
       }
       if (pendingSeekTimerRef.current) {
         clearTimeout(pendingSeekTimerRef.current);
+      }
+      if (seekWatchdogTimerRef.current) {
+        clearTimeout(seekWatchdogTimerRef.current);
       }
     };
   }, []);
@@ -379,6 +383,12 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
     const seekSeconds = Math.floor(clamped);
 
     if (isTranscoded) {
+      if (seekWatchdogTimerRef.current) {
+        clearTimeout(seekWatchdogTimerRef.current);
+        seekWatchdogTimerRef.current = null;
+      }
+
+      const wasPlaying = isPlayingRef.current || !video.paused;
       baseOffsetRef.current = seekSeconds;
       const rawSrc = activeSrcRef.current || src;
       const urlObj = new URL(rawSrc, window.location.href);
@@ -386,10 +396,66 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
       const newSrc = urlObj.toString();
       activeSrcRef.current = newSrc;
       setIsBuffering(true);
+
+      let isCurrentSeek = true;
+      const triggerPlayAfterLoad = () => {
+        if (!isCurrentSeek || !video) return;
+        video.muted = false;
+        video.volume = 1;
+        setIsMuted(false);
+        video.play().then(() => {
+          if (!isCurrentSeek) return;
+          setIsPlaying(true);
+          isPlayingRef.current = true;
+          setIsBuffering(false);
+          if (seekWatchdogTimerRef.current) {
+            clearTimeout(seekWatchdogTimerRef.current);
+            seekWatchdogTimerRef.current = null;
+          }
+        }).catch((err) => {
+          if (!isCurrentSeek) return;
+          console.warn('[CustomDirectPlayer] Play after seek error:', err);
+          setIsBuffering(false);
+          setShowControls(true);
+        });
+      };
+
       video.src = newSrc;
-      video.play().catch(err => console.warn('[CustomDirectPlayer] Play after seek error:', err));
+
+      if (wasPlaying) {
+        if (video.readyState >= 2) {
+          triggerPlayAfterLoad();
+        } else {
+          const onReadyToPlay = () => {
+            video.removeEventListener('canplay', onReadyToPlay);
+            video.removeEventListener('loadeddata', onReadyToPlay);
+            triggerPlayAfterLoad();
+          };
+          video.addEventListener('canplay', onReadyToPlay, { once: true });
+          video.addEventListener('loadeddata', onReadyToPlay, { once: true });
+        }
+      } else {
+        const onLoaded = () => {
+          video.removeEventListener('loadeddata', onLoaded);
+          video.removeEventListener('canplay', onLoaded);
+          if (!isCurrentSeek) return;
+          setIsBuffering(false);
+        };
+        video.addEventListener('loadeddata', onLoaded, { once: true });
+        video.addEventListener('canplay', onLoaded, { once: true });
+      }
+
+      // 10s seek watchdog to prevent permanent buffer lock
+      seekWatchdogTimerRef.current = setTimeout(() => {
+        if (isCurrentSeek) {
+          console.warn('[CustomDirectPlayer] Seek response took > 10s, clearing buffering state');
+          setIsBuffering(false);
+          setShowControls(true);
+        }
+      }, 10000);
+
       setCurrentTime(clamped);
-      onProgress?.(clamped, maxDur, false);
+      onProgress?.(clamped, maxDur, !wasPlaying);
     } else {
       video.currentTime = clamped;
       setCurrentTime(clamped);
@@ -825,6 +891,9 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
         }}
         onTimeUpdate={(e) => {
           const el = e.currentTarget;
+          if (isBuffering && !el.paused) {
+            setIsBuffering(false);
+          }
           if (!hasSeekedInitialRef.current && initialTimestamp > 5 && el.currentTime < 2 && el.readyState >= 2) {
             attemptInitialSeek(el);
           }
