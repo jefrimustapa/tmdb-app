@@ -38,53 +38,8 @@ export const TMDB_READ_TOKEN = 'eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiIxYzdiOTdkZDhiMTE
 
 const IMAGE_BASE_URL = 'https://image.tmdb.org/t/p';
 
-export const TMDB_FALLBACK_POSTER = `data:image/svg+xml;utf8,${encodeURIComponent(
-  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 750" width="100%" height="100%" preserveAspectRatio="xMidYMid slice">
-    <defs>
-      <linearGradient id="bgP" x1="0%" y1="0%" x2="100%" y2="100%">
-        <stop offset="0%" stop-color="#0e0e17"/>
-        <stop offset="50%" stop-color="#141424"/>
-        <stop offset="100%" stop-color="#050508"/>
-      </linearGradient>
-      <linearGradient id="glowP" x1="0%" y1="0%" x2="100%" y2="100%">
-        <stop offset="0%" stop-color="#673ab7"/>
-        <stop offset="100%" stop-color="#00d2ff"/>
-      </linearGradient>
-    </defs>
-    <rect width="100%" height="100%" fill="url(#bgP)"/>
-    <g transform="translate(190, 290)">
-      <circle cx="60" cy="60" r="52" fill="#050508" stroke="#23233a" stroke-width="2"/>
-      <circle cx="60" cy="60" r="46" fill="none" stroke="url(#glowP)" stroke-width="2.5" opacity="0.85"/>
-      <path d="M 52 42 L 78 60 L 52 78 Z" fill="url(#glowP)"/>
-    </g>
-    <text x="250" y="475" text-anchor="middle" fill="#9055ff" font-size="20" font-weight="800" font-family="system-ui, -apple-system, sans-serif" letter-spacing="3">TMDB STREAM</text>
-    <text x="250" y="505" text-anchor="middle" fill="#6b7280" font-size="13" font-weight="600" font-family="system-ui, -apple-system, sans-serif" letter-spacing="1.5">PREVIEW UNAVAILABLE</text>
-  </svg>`
-)}`;
-
-export const TMDB_FALLBACK_BACKDROP = `data:image/svg+xml;utf8,${encodeURIComponent(
-  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" width="100%" height="100%" preserveAspectRatio="xMidYMid slice">
-    <defs>
-      <linearGradient id="bgB" x1="0%" y1="0%" x2="100%" y2="100%">
-        <stop offset="0%" stop-color="#0e0e17"/>
-        <stop offset="50%" stop-color="#141424"/>
-        <stop offset="100%" stop-color="#050508"/>
-      </linearGradient>
-      <linearGradient id="glowB" x1="0%" y1="0%" x2="100%" y2="100%">
-        <stop offset="0%" stop-color="#673ab7"/>
-        <stop offset="100%" stop-color="#00d2ff"/>
-      </linearGradient>
-    </defs>
-    <rect width="100%" height="100%" fill="url(#bgB)"/>
-    <g transform="translate(580, 260)">
-      <circle cx="60" cy="60" r="52" fill="#050508" stroke="#23233a" stroke-width="2"/>
-      <circle cx="60" cy="60" r="46" fill="none" stroke="url(#glowB)" stroke-width="2.5" opacity="0.85"/>
-      <path d="M 52 42 L 78 60 L 52 78 Z" fill="url(#glowB)"/>
-    </g>
-    <text x="640" y="445" text-anchor="middle" fill="#9055ff" font-size="22" font-weight="800" font-family="system-ui, -apple-system, sans-serif" letter-spacing="4">TMDB STREAM</text>
-    <text x="640" y="475" text-anchor="middle" fill="#6b7280" font-size="14" font-weight="600" font-family="system-ui, -apple-system, sans-serif" letter-spacing="2">BACKDROP UNAVAILABLE</text>
-  </svg>`
-)}`;
+export const TMDB_FALLBACK_POSTER = `${import.meta.env.BASE_URL}favicon.svg`;
+export const TMDB_FALLBACK_BACKDROP = `${import.meta.env.BASE_URL}favicon.svg`;
 
 export const tmdbImages = {
   poster: (path: string | null, size: 'w92' | 'w154' | 'w185' | 'w342' | 'w500' | 'w780' | 'original' = 'w500') =>
