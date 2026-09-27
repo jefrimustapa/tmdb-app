@@ -377,7 +377,11 @@ const MediaCardComponent: React.FC<MediaCardProps> = ({
               }`
         } ${className}`}
       >
-        <div className={`block relative w-full overflow-hidden bg-gray-900 ${
+        <div className={`block relative w-full overflow-hidden ${
+          !item.poster_path || imageUrl.includes('favicon.svg')
+            ? 'bg-gradient-to-b from-[#1c1c30] via-[#0e0e17] to-[#050508] flex items-center justify-center'
+            : 'bg-hbo-card'
+        } ${
           isLandscape ? 'aspect-video' : 'aspect-[2/3]'
         }`}>
           <img
@@ -396,14 +400,16 @@ const MediaCardComponent: React.FC<MediaCardProps> = ({
             }}
             onError={(e) => {
               tmdbImages.handleImgError(e, isLandscape);
-              e.currentTarget.classList.remove('object-cover');
-              e.currentTarget.classList.add('object-contain', 'p-2');
               e.currentTarget.style.opacity = '1';
+              e.currentTarget.classList.remove('object-cover');
+              e.currentTarget.classList.add('object-contain', isLandscape ? 'p-6' : 'p-8');
             }}
             style={{ opacity: 0 }}
-            className={`w-full h-full ${
-              imageUrl.includes('placeholder') ? 'object-contain p-2' : 'object-cover'
-            } transition-opacity duration-500 ease-out group-hover:scale-105 pointer-events-none select-none`}
+            className={`w-full h-full transition-all duration-500 ease-out group-hover:scale-105 pointer-events-none select-none ${
+              !item.poster_path || imageUrl.includes('favicon.svg')
+                ? `object-contain ${isLandscape ? 'p-6' : 'p-8'}`
+                : 'object-cover'
+            }`}
           />
 
           {/* Pure Play Icon on Bottom-Left Corner for Landscape Continue Watching Cards */}
