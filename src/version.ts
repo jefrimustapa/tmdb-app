@@ -2,12 +2,17 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20260927-1233';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.fix-msm-getter-no-so.20260927-1233';
+export const APP_BUILD_NUMBER = '20260927-1400';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.perf-improve-1080p-m.20260927-1400';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
-export const APP_BRANCH = 'fix-msm-getter-no-so';
-export const APP_CHANGELOG = `* fix(transcode): isolate single English audio track to avoid multi-language dub layering
+export const APP_BRANCH = 'perf-improve-1080p-m';
+export const APP_CHANGELOG = `* fix(player): resolve seek freeze on transcoded 1080p streams with asynchronous resume and cues probe optimization
+* perf(msm-getter): optimize 1080p streaming concurrency and Matroska clustering (#160)
+* Merge pull request #159 from jefrimustapa/fix/msm-getter-no-sound
+* fix(resolver): enforce strict word boundaries, disqualify split archives, and penalize TV episodes on movie searches
+* fix(player): resolve slow seeking and broken scrubber tap/drag for transcoded streams
+* fix(transcode): isolate single English audio track to avoid multi-language dub layering
 * fix(player): enable stereo AAC downmix for MKV and preserve all audio tracks
 * fix(msm-getter): add client abort handling, smart year extraction, and multi-result scoring (#158)
 * Merge pull request #157 from jefrimustapa/fix/unstable-keyboard-issue
@@ -16,9 +21,4 @@ export const APP_CHANGELOG = `* fix(transcode): isolate single English audio tra
 * feat(ui): use favicon.svg for poster/still fallback with seamless dark gradient background
 * fix(visuals): eliminate search bar splash bleed, fix card full-bleed fill, and replace placeholder SVGs with inline fallbacks
 * fix(player): expand surround and multi-channel audio detection to downmix 6CH/surround streams to stereo (#155)
-* Merge pull request #154 from jefrimustapa/feat/improve-msm-getter-series-search
-* fix(series-search): pass totalSeasons and season-specific year to msm-getter resolver
-* Merge pull request #153 from jefrimustapa/feat/series-next-episode-playback
-* feat(series): auto-advance play button to next episode when previous episode is completed
-* Merge pull request #152 from jefrimustapa/feat/improve-app-visuals
-* feat(visuals): standardize purple selection rings, fix placeholder aspect ratios, and optimize TV search card grid`;
+* Merge pull request #154 from jefrimustapa/feat/improve-msm-getter-series-search`;
