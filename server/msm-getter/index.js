@@ -2684,7 +2684,7 @@ app.get('/stream/:docId', async (req, res) => {
         '-flags', 'low_delay',
         '-i', `http://127.0.0.1:${INTERNAL_HTTP_PORT}/stream/${docId}?direct=1`,
         '-map', '0:v:0',
-        '-map', '0:a:0?',
+        '-map', '0:a?',
         '-c:v', 'copy',
         '-c:a', 'aac',
         '-ac', '2',
