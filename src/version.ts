@@ -2,12 +2,17 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20260927-0145';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.fix-unstable-keyboar.20260927-0145';
+export const APP_BUILD_NUMBER = '20260927-1233';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.fix-msm-getter-no-so.20260927-1233';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
-export const APP_BRANCH = 'fix-unstable-keyboar';
-export const APP_CHANGELOG = `* Merge pull request #156 from jefrimustapa/feat/improve-app-visuals
+export const APP_BRANCH = 'fix-msm-getter-no-so';
+export const APP_CHANGELOG = `* fix(transcode): isolate single English audio track to avoid multi-language dub layering
+* fix(player): enable stereo AAC downmix for MKV and preserve all audio tracks
+* fix(msm-getter): add client abort handling, smart year extraction, and multi-result scoring (#158)
+* Merge pull request #157 from jefrimustapa/fix/unstable-keyboard-issue
+* fix(tv): preserve native text cursor navigation on virtual keyboard and guard DPAD_CENTER when typing
+* Merge pull request #156 from jefrimustapa/feat/improve-app-visuals
 * feat(ui): use favicon.svg for poster/still fallback with seamless dark gradient background
 * fix(visuals): eliminate search bar splash bleed, fix card full-bleed fill, and replace placeholder SVGs with inline fallbacks
 * fix(player): expand surround and multi-channel audio detection to downmix 6CH/surround streams to stereo (#155)
@@ -16,9 +21,4 @@ export const APP_CHANGELOG = `* Merge pull request #156 from jefrimustapa/feat/i
 * Merge pull request #153 from jefrimustapa/feat/series-next-episode-playback
 * feat(series): auto-advance play button to next episode when previous episode is completed
 * Merge pull request #152 from jefrimustapa/feat/improve-app-visuals
-* feat(visuals): standardize purple selection rings, fix placeholder aspect ratios, and optimize TV search card grid
-* refactor(ui): standardize media tag badge from FILM to MOVIE (#151)
-* feat(msm-getter): improve search accuracy, filter junk trailers, and enforce size thresholds (#150)
-* perf(msm-getter): optimize MTProto sender reuse, in-flight coalescing, TCP socket options, and async persistence (#149)
-* fix(player): resolve msm-getter pipeline crash and fix MKV resume seeking (#148)
-* fix(player): prevent router OOM by avoiding forced transcoding on standard MKVs with audio fallback (#146)`;
+* feat(visuals): standardize purple selection rings, fix placeholder aspect ratios, and optimize TV search card grid`;

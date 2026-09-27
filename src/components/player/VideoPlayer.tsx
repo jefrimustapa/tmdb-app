@@ -462,7 +462,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             // FFmpeg downmixes multi-channel audio to 2-channel stereo AAC with crisp dialogue at negligible CPU cost.
             // Standard 2CH stereo files play directly without invoking FFmpeg on the router.
             const isSurroundOrDolbyAudio = msmRes.filename
-              ? /(ddp|dd\+|ac3|ac-3|eac3|e-ac-3|atmos|dts|truehd|thd|5[._-]1|7[._-]1|[345678]ch|surround)/i.test(msmRes.filename)
+              ? /(\.mkv$|mkv\b|ddp|dd\+|ac3|ac-3|eac3|e-ac-3|atmos|dts|truehd|thd|5[._-]1|7[._-]1|[345678]ch|surround)/i.test(msmRes.filename)
               : false;
             let finalUrl = msmRes.streamUrl;
             if (isSurroundOrDolbyAudio) {

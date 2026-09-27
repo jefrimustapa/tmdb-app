@@ -112,6 +112,7 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
   const remoteHudTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingSeekTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const targetSeekTimeRef = useRef<number | null>(null);
+  const scrubValueRef = useRef<number | null>(null);
 
   const hasSeekedInitialRef = useRef(false);
 
@@ -386,7 +387,6 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
       activeSrcRef.current = newSrc;
       setIsBuffering(true);
       video.src = newSrc;
-      video.currentTime = 0;
       video.play().catch(err => console.warn('[CustomDirectPlayer] Play after seek error:', err));
       setCurrentTime(clamped);
       onProgress?.(clamped, maxDur, false);
@@ -518,14 +518,23 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
   // Scrubber dragging
   const handleScrubberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newTime = parseFloat(e.target.value);
-    setScrubPreviewTime(newTime);
-    setCurrentTime(newTime);
+    if (!isNaN(newTime)) {
+      scrubValueRef.current = newTime;
+      setScrubPreviewTime(newTime);
+      setCurrentTime(newTime);
+    }
   };
 
-  const handleScrubberCommit = () => {
-    if (scrubPreviewTime !== null) {
-      performSeek(scrubPreviewTime);
+  const handleScrubberCommit = (e?: React.SyntheticEvent<HTMLInputElement>) => {
+    let commitTime = scrubValueRef.current;
+    if ((commitTime === null || isNaN(commitTime)) && e?.currentTarget) {
+      const val = parseFloat(e.currentTarget.value);
+      if (!isNaN(val)) commitTime = val;
     }
+    if (commitTime !== null && !isNaN(commitTime)) {
+      performSeek(commitTime);
+    }
+    scrubValueRef.current = null;
     setIsDraggingScrubber(false);
     setScrubPreviewTime(null);
     resetControlsTimer();
@@ -1076,8 +1085,9 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
               onChange={handleScrubberChange}
               onMouseDown={() => setIsDraggingScrubber(true)}
               onTouchStart={() => setIsDraggingScrubber(true)}
-              onMouseUp={handleScrubberCommit}
-              onTouchEnd={handleScrubberCommit}
+              onMouseUp={(e) => handleScrubberCommit(e)}
+              onTouchEnd={(e) => handleScrubberCommit(e)}
+              onClick={(e) => handleScrubberCommit(e)}
               className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
               aria-label="Seek Slider"
             />
