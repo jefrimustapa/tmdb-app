@@ -123,8 +123,11 @@ public class MainActivity extends BridgeActivity {
             getWindow().getAttributes().layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
         }
 
-        // Set immediate dark neon window and root background to prevent white screen flash
+        // Set immediate dark neon window and root background to prevent white screen flash and eliminate splash leak
         getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(android.graphics.Color.parseColor("#050508")));
+        if (getWindow().getDecorView() != null) {
+            getWindow().getDecorView().setBackgroundColor(android.graphics.Color.parseColor("#050508"));
+        }
 
         // On TV, lock orientation to landscape. On mobile phone, lock to portrait. On tablet, allow unspecified.
         if (isTV()) {
