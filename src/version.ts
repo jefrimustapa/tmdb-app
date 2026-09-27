@@ -2,12 +2,13 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20260927-1400';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.perf-improve-1080p-m.20260927-1400';
+export const APP_BUILD_NUMBER = '20260928-0636';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.fix-msm-getter-search-fail.20260928-0636';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
-export const APP_BRANCH = 'perf-improve-1080p-m';
-export const APP_CHANGELOG = `* fix(player): resolve seek freeze on transcoded 1080p streams with asynchronous resume and cues probe optimization
+export const APP_BRANCH = 'fix/msm-getter-search-fail';
+export const APP_CHANGELOG = `* fix(msm-getter): add resilient multi-candidate fallback loop to recover from forward_failed deleted Telegram links
+* fix(player): resolve seek freeze on transcoded 1080p streams with asynchronous resume and cues probe optimization
 * perf(msm-getter): optimize 1080p streaming concurrency and Matroska clustering (#160)
 * Merge pull request #159 from jefrimustapa/fix/msm-getter-no-sound
 * fix(resolver): enforce strict word boundaries, disqualify split archives, and penalize TV episodes on movie searches
