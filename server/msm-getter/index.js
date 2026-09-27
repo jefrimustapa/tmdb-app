@@ -302,12 +302,15 @@ function extractTitleTokens(str) {
 // Junk blacklist: trailers, teasers, samples, promos, soundtracks, behind-the-scenes
 const JUNK_MEDIA_REGEX = /\b(trailer|teaser|sample|clip|promo|ost|soundtrack|behind\s*the\s*scenes|bts|interview|preview|pendek|short)\b/i;
 
+// Split archives and non-streamable files: .zip, .rar, .7z, .tar, .001, .002, .part1, etc.
+const UNPLAYABLE_ARCHIVE_REGEX = /\.(zip|rar|7z|tar|gz|00[1-9]|part\d+)(\s|\.|$)/i;
+
 // Stopwords for title coverage calculations
 const STOPWORDS = new Set(['the', 'a', 'an', 'dan', 'di', 'ke', 'yang', 'si', 'pada', 'dari', 'of', 'in', 'on', 'at', 'to', 'for', 'with', 'by']);
 
 function isJunkMedia(text) {
   if (!text) return false;
-  return JUNK_MEDIA_REGEX.test(text);
+  return JUNK_MEDIA_REGEX.test(text) || UNPLAYABLE_ARCHIVE_REGEX.test(text);
 }
 
 function parseSizeFromText(text) {
@@ -342,12 +345,15 @@ function extractSignificantTokens(str) {
   });
 }
 
-// Calculate coverage ratio (0.0 to 1.0) of significant tokens found in candidate text
+// Calculate coverage ratio (0.0 to 1.0) of significant tokens found in candidate text using strict word boundaries
 function calculateTitleCoverage(significantTokens, text) {
   if (!significantTokens || significantTokens.length === 0) return 1.0;
   if (!text) return 0.0;
   const norm = normalizeTitle(text);
-  const matched = significantTokens.filter(t => norm.includes(t));
+  const matched = significantTokens.filter(t => {
+    const escaped = t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return new RegExp(`\\b${escaped}\\b`, 'i').test(norm);
+  });
   return matched.length / significantTokens.length;
 }
 
@@ -1669,6 +1675,13 @@ app.get('/api/resolve', async (req, res) => {
           }
         }
       } else {
+        // Movie validation: Heavily penalize TV series candidates (S01E01, episodes) during movie searches
+        const isTvCandidate = /\b(s\d{1,2}e\d{1,2}|s\d{1,2}\s*ep?\s*\d{1,2}|season\s*\d+|episode\s*\d+|ep\d{1,2}|\.end\.)\b/i.test(btnText) ||
+                              /\b(s\d{1,2}e\d{1,2}|s\d{1,2}\s*ep?\s*\d{1,2}|season\s*\d+|episode\s*\d+|ep\d{1,2}|\.end\.)\b/i.test(msgText);
+        if (isTvCandidate) {
+          score -= 700; // Reject TV episodes when searching for a movie
+        }
+
         // Movie validation: Sequel and Release Year Alignment
         const targetSequel = extractSequelInfo(title);
         const btnSequel = extractSequelInfo(btnText);
@@ -2310,10 +2323,7 @@ async function streamTelegramPipelined(client, targetDoc, startByte, endByte, re
 
   try {
     let dcId = targetDoc.dcId || 2;
-    let sender = await client.getSender(dcId);
-    if (aborted) {
-      return;
-    }
+    let sender = null; // Lazily acquired on first network fetch; cached blocks return in 0ms!
 
   const fileRef = Buffer.isBuffer(targetDoc.fileReference)
     ? targetDoc.fileReference
@@ -2349,7 +2359,7 @@ async function streamTelegramPipelined(client, targetDoc, startByte, endByte, re
     });
 
     const totalDocBlocks = Math.ceil(Number(targetDoc.size) / CHUNK_SIZE);
-    const isPinnedBlock = blockIdx <= 1 || blockIdx >= totalDocBlocks - 2;
+    const isPinnedBlock = blockIdx <= 2 || blockIdx >= totalDocBlocks - 3;
 
     try {
       if (aborted) return null;
@@ -2582,6 +2592,99 @@ app.post('/api/github-webhook', async (req, res) => {
   }
 });
 
+// Cache for probed audio track stream specifiers per docId (capped to prevent memory growth)
+const docAudioTrackCache = new Map();
+
+async function resolveBestAudioTrack(docId) {
+  if (docAudioTrackCache.has(docId)) {
+    return docAudioTrackCache.get(docId);
+  }
+
+  const ffprobeBin = process.env.FFPROBE_PATH || (fs.existsSync('/opt/bin/ffprobe') ? '/opt/bin/ffprobe' : 'ffprobe');
+  const probeArgs = [
+    '-v', 'error',
+    '-headers', 'x-internal-transcoder: 1\r\n',
+    '-probesize', '262144',
+    '-analyzeduration', '0',
+    '-show_entries', 'stream=index,codec_type,codec_name:stream_tags=language,title',
+    '-of', 'json',
+    `http://127.0.0.1:${INTERNAL_HTTP_PORT}/stream/${docId}?direct=1`,
+  ];
+
+  try {
+    const specifier = await new Promise((resolve, reject) => {
+      let stdout = '';
+      let proc = null;
+      try {
+        proc = spawn(ffprobeBin, probeArgs);
+      } catch (e) {
+        return reject(e);
+      }
+
+      const timer = setTimeout(() => {
+        try { proc.kill('SIGKILL'); } catch {}
+        reject(new Error('ffprobe timeout after 10s'));
+      }, 10000);
+
+      proc.stdout.on('data', (d) => { stdout += d.toString(); });
+      proc.on('close', (code) => {
+        clearTimeout(timer);
+        if (code !== 0) return reject(new Error(`ffprobe exited with code ${code}`));
+        try {
+          const data = JSON.parse(stdout);
+          const audioStreams = data.streams?.filter(s => s.codec_type === 'audio') || [];
+          if (audioStreams.length === 0) return resolve('0:a:0');
+          if (audioStreams.length === 1) return resolve(`0:${audioStreams[0].index}`);
+
+          // Prioritize English audio track (isolated to avoid layered commentary/dub tracks)
+          const engStream = audioStreams.find(s => {
+            const lang = String(s.tags?.language || '').toLowerCase();
+            const title = String(s.tags?.title || '').toLowerCase();
+            return /^(en|eng|english)$/.test(lang) || /\b(eng|english|original|orig)\b/.test(title);
+          });
+
+          if (engStream) {
+            console.log(`[AUDIO TRACK] Selected English track (stream ${engStream.index}, lang: ${engStream.tags?.language || 'unknown'}, title: "${engStream.tags?.title || ''}") for doc ${docId}`);
+            return resolve(`0:${engStream.index}`);
+          }
+
+          // If no explicit English, check for original / undetermined track
+          const origStream = audioStreams.find(s => {
+            const lang = String(s.tags?.language || '').toLowerCase();
+            const title = String(s.tags?.title || '').toLowerCase();
+            return /^(und|qaa)$/.test(lang) || /\b(orig|original)\b/.test(title);
+          });
+          if (origStream) {
+            console.log(`[AUDIO TRACK] Selected original/und track (stream ${origStream.index}) for doc ${docId}`);
+            return resolve(`0:${origStream.index}`);
+          }
+
+          // Fallback to the first audio stream
+          console.log(`[AUDIO TRACK] Fallback to primary audio track (stream ${audioStreams[0].index}) for doc ${docId}`);
+          return resolve(`0:${audioStreams[0].index}`);
+        } catch (err) {
+          reject(err);
+        }
+      });
+
+      proc.on('error', (err) => {
+        clearTimeout(timer);
+        reject(err);
+      });
+    });
+
+    if (docAudioTrackCache.size > 500) {
+      const firstKey = docAudioTrackCache.keys().next().value;
+      docAudioTrackCache.delete(firstKey);
+    }
+    docAudioTrackCache.set(docId, specifier);
+    return specifier;
+  } catch (err) {
+    console.warn(`[AUDIO TRACK WARN] Failed to resolve track for doc ${docId} (${err.message}). Using fallback 0:a:0 without caching.`);
+    return '0:a:0';
+  }
+}
+
 // Stream endpoint with HTTP 206 Partial Content Range support
 app.get('/stream/:docId', async (req, res) => {
   try {
@@ -2672,6 +2775,19 @@ app.get('/stream/:docId', async (req, res) => {
         return res.end();
       }
 
+      // Isolate preferred single audio track (default: English) so client doesn't play layered multi-language dubs
+      const requestedTrack = req.query.audio || req.query.track;
+      let audioMapSpecifier = '0:a:0';
+      if (requestedTrack && requestedTrack !== 'auto') {
+        audioMapSpecifier = requestedTrack.startsWith('0:') ? requestedTrack : `0:${requestedTrack}`;
+      } else {
+        try {
+          audioMapSpecifier = await resolveBestAudioTrack(docId);
+        } catch (err) {
+          audioMapSpecifier = '0:a:0';
+        }
+      }
+
       const ffmpegBin = process.env.FFMPEG_PATH || (fs.existsSync('/opt/bin/ffmpeg') ? '/opt/bin/ffmpeg' : 'ffmpeg');
       const ffmpegArgs = [
         '-loglevel', 'error',
@@ -2684,11 +2800,13 @@ app.get('/stream/:docId', async (req, res) => {
         '-flags', 'low_delay',
         '-i', `http://127.0.0.1:${INTERNAL_HTTP_PORT}/stream/${docId}?direct=1`,
         '-map', '0:v:0',
-        '-map', '0:a:0?',
+        '-map', audioMapSpecifier,
         '-c:v', 'copy',
         '-c:a', 'aac',
         '-ac', '2',
         '-b:a', '192k',
+        '-avoid_negative_ts', 'make_zero',
+        '-flush_packets', '1',
         '-cluster_time_limit', '250',
         '-cluster_size_limit', '65536',
         '-f', 'matroska',
