@@ -2310,10 +2310,7 @@ async function streamTelegramPipelined(client, targetDoc, startByte, endByte, re
 
   try {
     let dcId = targetDoc.dcId || 2;
-    let sender = await client.getSender(dcId);
-    if (aborted) {
-      return;
-    }
+    let sender = null; // Lazily acquired on first network fetch; cached blocks return in 0ms!
 
   const fileRef = Buffer.isBuffer(targetDoc.fileReference)
     ? targetDoc.fileReference
@@ -2349,7 +2346,7 @@ async function streamTelegramPipelined(client, targetDoc, startByte, endByte, re
     });
 
     const totalDocBlocks = Math.ceil(Number(targetDoc.size) / CHUNK_SIZE);
-    const isPinnedBlock = blockIdx <= 1 || blockIdx >= totalDocBlocks - 2;
+    const isPinnedBlock = blockIdx <= 2 || blockIdx >= totalDocBlocks - 3;
 
     try {
       if (aborted) return null;
@@ -2795,6 +2792,8 @@ app.get('/stream/:docId', async (req, res) => {
         '-c:a', 'aac',
         '-ac', '2',
         '-b:a', '192k',
+        '-avoid_negative_ts', 'make_zero',
+        '-flush_packets', '1',
         '-cluster_time_limit', '250',
         '-cluster_size_limit', '65536',
         '-f', 'matroska',
