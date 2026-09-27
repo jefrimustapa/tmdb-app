@@ -130,7 +130,11 @@ export const EpisodeGrid: React.FC<EpisodeGridProps> = ({
                 }`}
               >
                 {/* Episode Thumbnail */}
-                <div className="relative w-28 sm:w-36 aspect-video flex-shrink-0 rounded-lg overflow-hidden bg-gray-900">
+                <div className={`relative w-28 sm:w-36 aspect-video flex-shrink-0 rounded-lg overflow-hidden ${
+                  !ep.still_path || stillUrl.includes('favicon.svg')
+                    ? 'bg-gradient-to-b from-[#1c1c30] via-[#0e0e17] to-[#050508] flex items-center justify-center'
+                    : 'bg-gray-900'
+                }`}>
                   <img
                     src={stillUrl}
                     alt={ep.name}
@@ -147,9 +151,17 @@ export const EpisodeGrid: React.FC<EpisodeGridProps> = ({
                     onError={(e) => {
                       tmdbImages.handleImgError(e, true);
                       e.currentTarget.style.opacity = '1';
+                      e.currentTarget.classList.remove('object-cover');
+                      e.currentTarget.classList.add('object-contain', 'p-4');
+                      if (e.currentTarget.parentElement) {
+                        e.currentTarget.parentElement.classList.remove('bg-gray-900');
+                        e.currentTarget.parentElement.classList.add('bg-gradient-to-b', 'from-[#1c1c30]', 'via-[#0e0e17]', 'to-[#050508]', 'flex', 'items-center', 'justify-center');
+                      }
                     }}
                     style={{ opacity: 0 }}
-                    className={`w-full h-full object-cover group-hover:scale-105 transition-opacity duration-500 ease-out ${
+                    className={`w-full h-full ${
+                      !ep.still_path || stillUrl.includes('favicon.svg') ? 'object-contain p-4' : 'object-cover'
+                    } group-hover:scale-105 transition-opacity duration-500 ease-out ${
                       isUnaired ? 'grayscale contrast-75 brightness-75 opacity-60' : ''
                     }`}
                   />
