@@ -302,12 +302,15 @@ function extractTitleTokens(str) {
 // Junk blacklist: trailers, teasers, samples, promos, soundtracks, behind-the-scenes
 const JUNK_MEDIA_REGEX = /\b(trailer|teaser|sample|clip|promo|ost|soundtrack|behind\s*the\s*scenes|bts|interview|preview|pendek|short)\b/i;
 
+// Split archives and non-streamable files: .zip, .rar, .7z, .tar, .001, .002, .part1, etc.
+const UNPLAYABLE_ARCHIVE_REGEX = /\.(zip|rar|7z|tar|gz|00[1-9]|part\d+)(\s|\.|$)/i;
+
 // Stopwords for title coverage calculations
 const STOPWORDS = new Set(['the', 'a', 'an', 'dan', 'di', 'ke', 'yang', 'si', 'pada', 'dari', 'of', 'in', 'on', 'at', 'to', 'for', 'with', 'by']);
 
 function isJunkMedia(text) {
   if (!text) return false;
-  return JUNK_MEDIA_REGEX.test(text);
+  return JUNK_MEDIA_REGEX.test(text) || UNPLAYABLE_ARCHIVE_REGEX.test(text);
 }
 
 function parseSizeFromText(text) {
@@ -342,12 +345,15 @@ function extractSignificantTokens(str) {
   });
 }
 
-// Calculate coverage ratio (0.0 to 1.0) of significant tokens found in candidate text
+// Calculate coverage ratio (0.0 to 1.0) of significant tokens found in candidate text using strict word boundaries
 function calculateTitleCoverage(significantTokens, text) {
   if (!significantTokens || significantTokens.length === 0) return 1.0;
   if (!text) return 0.0;
   const norm = normalizeTitle(text);
-  const matched = significantTokens.filter(t => norm.includes(t));
+  const matched = significantTokens.filter(t => {
+    const escaped = t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return new RegExp(`\\b${escaped}\\b`, 'i').test(norm);
+  });
   return matched.length / significantTokens.length;
 }
 
@@ -1669,6 +1675,13 @@ app.get('/api/resolve', async (req, res) => {
           }
         }
       } else {
+        // Movie validation: Heavily penalize TV series candidates (S01E01, episodes) during movie searches
+        const isTvCandidate = /\b(s\d{1,2}e\d{1,2}|s\d{1,2}\s*ep?\s*\d{1,2}|season\s*\d+|episode\s*\d+|ep\d{1,2}|\.end\.)\b/i.test(btnText) ||
+                              /\b(s\d{1,2}e\d{1,2}|s\d{1,2}\s*ep?\s*\d{1,2}|season\s*\d+|episode\s*\d+|ep\d{1,2}|\.end\.)\b/i.test(msgText);
+        if (isTvCandidate) {
+          score -= 700; // Reject TV episodes when searching for a movie
+        }
+
         // Movie validation: Sequel and Release Year Alignment
         const targetSequel = extractSequelInfo(title);
         const btnSequel = extractSequelInfo(btnText);
