@@ -2299,16 +2299,16 @@ async function refreshDocumentFileReference(client, targetDoc) {
 async function streamTelegramPipelined(client, targetDoc, startByte, endByte, res, req, customChunkSize, customConcurrency, passedStreamKey) {
   // Map requested chunkSize to MTProto block size and concurrency
   let CHUNK_SIZE = 512 * 1024; // 512KB: Native Telegram MTProto block limit
-  let CONCURRENCY = 3;         // Default: 3 concurrent chunks (1.5MB sliding window, safe for router RAM and jitter-free)
+  let CONCURRENCY = 4;         // Default: 4 concurrent chunks (2MB sliding window)
 
   if (customChunkSize === 262144) {
     CHUNK_SIZE = 256 * 1024;
     CONCURRENCY = 2; // Eco mode: 512KB sliding window (low bandwidth / mobile)
   } else if (customChunkSize === 1048576) {
     CHUNK_SIZE = 512 * 1024;
-    CONCURRENCY = 3; // Max 1.5MB sliding window
+    CONCURRENCY = 6; // Turbo mode: 3MB sliding window (high-bitrate 1080p)
   } else if (customConcurrency && typeof customConcurrency === 'number') {
-    CONCURRENCY = Math.min(3, customConcurrency);
+    CONCURRENCY = customConcurrency;
   }
 
   const isProbe = req?.headers?.['x-internal-probe'] === '1' || req?.query?.probe === '1' || (endByte - startByte <= 1048576);
@@ -2436,8 +2436,10 @@ async function streamTelegramPipelined(client, targetDoc, startByte, endByte, re
         return bytes;
       }
 
-      // Automatically recover from dropped/uninitialized secondary DC connections
-      if (msg.includes('CONNECTION_NOT_INITED') || msg.includes('disconnected')) {
+      // Automatically recover from dropped/uninitialized secondary DC connections.
+      // Also catches 'Not connected' (GramJS _recvLoop race during internal sender reconnect)
+      // which occurs when the router NAT table silently kills idle DC TCP connections after ~30s.
+      if (msg.includes('CONNECTION_NOT_INITED') || msg.includes('disconnected') || msg.includes('Not connected')) {
         console.warn(`[STREAM RECONNECT] Sender connection on DC ${dcId} invalid (${err.errorMessage || err.message}). Re-initializing...`);
         try {
           if (client._cleanupExportedSender) {
@@ -2445,20 +2447,33 @@ async function streamTelegramPipelined(client, targetDoc, startByte, endByte, re
           }
         } catch {}
         sender = null;
-        await new Promise(r => setTimeout(r, 1000));
+        // Wait 2500ms (up from 1000ms) to let GramJS finish clearing internal
+        // 'hanging states' before re-acquiring the sender, preventing a reconnect race.
+        await new Promise(r => setTimeout(r, 2500));
         if (aborted) return null;
-        try {
-          sender = await client.getSender(dcId);
+
+        let retryDelay = 1000;
+        for (let reconnAttempt = 0; reconnAttempt < 3; reconnAttempt++) {
           if (aborted) return null;
-          const result = await client.invokeWithSender(request, sender);
-          if (aborted) return null;
-          const bytes = result.bytes;
-          if (bytes && bytes.length > 0) {
-            setCachedBlock(docIdStr, blockIdx, bytes, isPinnedBlock);
+          try {
+            sender = await client.getSender(dcId);
+            if (aborted) return null;
+            const result = await client.invokeWithSender(request, sender);
+            if (aborted) return null;
+            const bytes = result.bytes;
+            if (bytes && bytes.length > 0) {
+              setCachedBlock(docIdStr, blockIdx, bytes, isPinnedBlock);
+            }
+            return bytes;
+          } catch (e2) {
+            sender = null;
+            const e2msg = `${e2.errorMessage || ''} ${e2.message || ''}`;
+            console.warn(`[STREAM RECONNECT] Re-init attempt ${reconnAttempt + 1}/3 failed (${e2.message}). Retrying in ${retryDelay}ms...`);
+            if (reconnAttempt < 2) {
+              await new Promise(r => setTimeout(r, retryDelay));
+              retryDelay = Math.round(retryDelay * 1.5);
+            }
           }
-          return bytes;
-        } catch (e2) {
-          sender = null;
         }
       }
 
