@@ -2299,16 +2299,16 @@ async function refreshDocumentFileReference(client, targetDoc) {
 async function streamTelegramPipelined(client, targetDoc, startByte, endByte, res, req, customChunkSize, customConcurrency, passedStreamKey) {
   // Map requested chunkSize to MTProto block size and concurrency
   let CHUNK_SIZE = 512 * 1024; // 512KB: Native Telegram MTProto block limit
-  let CONCURRENCY = 3;         // Default: 3 concurrent chunks (1.5MB sliding window, safe for router RAM and jitter-free)
+  let CONCURRENCY = 4;         // Default: 4 concurrent chunks (2MB sliding window)
 
   if (customChunkSize === 262144) {
     CHUNK_SIZE = 256 * 1024;
     CONCURRENCY = 2; // Eco mode: 512KB sliding window (low bandwidth / mobile)
   } else if (customChunkSize === 1048576) {
     CHUNK_SIZE = 512 * 1024;
-    CONCURRENCY = 3; // Max 1.5MB sliding window
+    CONCURRENCY = 6; // Turbo mode: 3MB sliding window (high-bitrate 1080p)
   } else if (customConcurrency && typeof customConcurrency === 'number') {
-    CONCURRENCY = Math.min(3, customConcurrency);
+    CONCURRENCY = customConcurrency;
   }
 
   const isProbe = req?.headers?.['x-internal-probe'] === '1' || req?.query?.probe === '1' || (endByte - startByte <= 1048576);
