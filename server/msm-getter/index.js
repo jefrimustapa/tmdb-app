@@ -2436,8 +2436,10 @@ async function streamTelegramPipelined(client, targetDoc, startByte, endByte, re
         return bytes;
       }
 
-      // Automatically recover from dropped/uninitialized secondary DC connections
-      if (msg.includes('CONNECTION_NOT_INITED') || msg.includes('disconnected')) {
+      // Automatically recover from dropped/uninitialized secondary DC connections.
+      // Also catches 'Not connected' (GramJS _recvLoop race during internal sender reconnect)
+      // which occurs when the router NAT table silently kills idle DC TCP connections after ~30s.
+      if (msg.includes('CONNECTION_NOT_INITED') || msg.includes('disconnected') || msg.includes('Not connected')) {
         console.warn(`[STREAM RECONNECT] Sender connection on DC ${dcId} invalid (${err.errorMessage || err.message}). Re-initializing...`);
         try {
           if (client._cleanupExportedSender) {
@@ -2445,20 +2447,33 @@ async function streamTelegramPipelined(client, targetDoc, startByte, endByte, re
           }
         } catch {}
         sender = null;
-        await new Promise(r => setTimeout(r, 1000));
+        // Wait 2500ms (up from 1000ms) to let GramJS finish clearing internal
+        // 'hanging states' before re-acquiring the sender, preventing a reconnect race.
+        await new Promise(r => setTimeout(r, 2500));
         if (aborted) return null;
-        try {
-          sender = await client.getSender(dcId);
+
+        let retryDelay = 1000;
+        for (let reconnAttempt = 0; reconnAttempt < 3; reconnAttempt++) {
           if (aborted) return null;
-          const result = await client.invokeWithSender(request, sender);
-          if (aborted) return null;
-          const bytes = result.bytes;
-          if (bytes && bytes.length > 0) {
-            setCachedBlock(docIdStr, blockIdx, bytes, isPinnedBlock);
+          try {
+            sender = await client.getSender(dcId);
+            if (aborted) return null;
+            const result = await client.invokeWithSender(request, sender);
+            if (aborted) return null;
+            const bytes = result.bytes;
+            if (bytes && bytes.length > 0) {
+              setCachedBlock(docIdStr, blockIdx, bytes, isPinnedBlock);
+            }
+            return bytes;
+          } catch (e2) {
+            sender = null;
+            const e2msg = `${e2.errorMessage || ''} ${e2.message || ''}`;
+            console.warn(`[STREAM RECONNECT] Re-init attempt ${reconnAttempt + 1}/3 failed (${e2.message}). Retrying in ${retryDelay}ms...`);
+            if (reconnAttempt < 2) {
+              await new Promise(r => setTimeout(r, retryDelay));
+              retryDelay = Math.round(retryDelay * 1.5);
+            }
           }
-          return bytes;
-        } catch (e2) {
-          sender = null;
         }
       }
 
