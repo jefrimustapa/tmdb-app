@@ -70,6 +70,25 @@ let client = new TelegramClient(new StringSession(session), apiId, apiHash, {
 });
 try { client.setLogLevel('error'); } catch {}
 
+function attachClientErrorHandler(c) {
+  if (!c) return;
+  c.onError = (err) => {
+    const msg = err?.message || String(err || '');
+    if (
+      msg.includes('Not connected') ||
+      msg.includes('Connection closed') ||
+      msg.includes('socket hang up') ||
+      msg.includes('ECONNRESET') ||
+      msg.includes('ETIMEDOUT') ||
+      msg.includes('hanging states')
+    ) {
+      return;
+    }
+    console.error('[TG CLIENT ERROR]', err);
+  };
+}
+attachClientErrorHandler(client);
+
 let isConnected = false;
 let authError = null;
 let initPromise = null;
@@ -444,6 +463,7 @@ app.post('/api/auth/send-code', async (req, res) => {
       baseLogger: new QuietLogger('error'),
     });
     try { tempClient.setLogLevel('error'); } catch {}
+    attachClientErrorHandler(tempClient);
 
     await tempClient.connect();
 
@@ -515,6 +535,8 @@ app.post('/api/auth/verify-code', async (req, res) => {
 
     // Promote newly authorized client to the primary server client in RAM
     client = pendingAuth.client;
+    try { client.setLogLevel('error'); } catch {}
+    attachClientErrorHandler(client);
     session = newSessionString;
     isConnected = true;
     authError = null;
@@ -2386,7 +2408,7 @@ async function streamTelegramPipelined(client, targetDoc, startByte, endByte, re
   res.on('finish', onResFinish);
 
   try {
-    let dcId = targetDoc.dcId || 2;
+    let dcId = targetDoc.dcId || 4;
     let sender = null; // Lazily acquired on first network fetch; cached blocks return in 0ms!
 
   const fileRef = Buffer.isBuffer(targetDoc.fileReference)
