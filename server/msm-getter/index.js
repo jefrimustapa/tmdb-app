@@ -8,11 +8,27 @@ import { fileURLToPath } from 'url';
 import { TelegramClient, Api } from 'telegram';
 import { StringSession } from 'telegram/sessions/index.js';
 import { ConnectionTCPObfuscated } from 'telegram/network/connection/TCPObfuscated.js';
+import { Logger } from 'telegram/extensions/Logger.js';
 import bigInt from 'big-integer';
 import axios from 'axios';
 import fs from 'fs';
 import { spawn } from 'child_process';
 import { db } from './db.js';
+
+class QuietLogger extends Logger {
+  _log(level, message, color) {
+    if (
+      typeof message === 'string' &&
+      (message.includes('WebSocket connection failed') ||
+       message.includes('Connection closed') ||
+       message.includes('Not connected') ||
+       message.includes('hanging states'))
+    ) {
+      return;
+    }
+    super._log(level, message, color);
+  }
+}
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -42,11 +58,17 @@ if (!apiId || !apiHash) {
 }
 
 let client = new TelegramClient(new StringSession(session), apiId, apiHash, {
-  connectionRetries: 5,
+  connection: ConnectionTCPObfuscated,
+  connectionRetries: 10,
+  retryDelay: 1000,
+  autoReconnect: true,
+  timeout: 30,
   deviceModel: 'MSM Getter Server',
   appVersion: '1.0.0',
   systemVersion: 'Linux/ASUS',
+  baseLogger: new QuietLogger('error'),
 });
+try { client.setLogLevel('error'); } catch {}
 
 let isConnected = false;
 let authError = null;
@@ -419,7 +441,9 @@ app.post('/api/auth/send-code', async (req, res) => {
       deviceModel: 'MSM Getter Server',
       appVersion: '1.0.0',
       systemVersion: 'Linux/Docker',
+      baseLogger: new QuietLogger('error'),
     });
+    try { tempClient.setLogLevel('error'); } catch {}
 
     await tempClient.connect();
 
@@ -2442,17 +2466,17 @@ async function streamTelegramPipelined(client, targetDoc, startByte, endByte, re
       if (msg.includes('CONNECTION_NOT_INITED') || msg.includes('disconnected') || msg.includes('Not connected')) {
         console.warn(`[STREAM RECONNECT] Sender connection on DC ${dcId} invalid (${err.errorMessage || err.message}). Re-initializing...`);
         try {
-          if (client._cleanupExportedSender) {
-            await client._cleanupExportedSender(dcId);
+          if (sender) {
+            await sender.disconnect().catch(() => {});
           }
         } catch {}
+        if (client._exportedSenderPromises?.has(dcId)) {
+          client._exportedSenderPromises.delete(dcId);
+        }
         sender = null;
-        // Wait 2500ms (up from 1000ms) to let GramJS finish clearing internal
-        // 'hanging states' before re-acquiring the sender, preventing a reconnect race.
-        await new Promise(r => setTimeout(r, 2500));
         if (aborted) return null;
 
-        let retryDelay = 1000;
+        let retryDelay = 250;
         for (let reconnAttempt = 0; reconnAttempt < 3; reconnAttempt++) {
           if (aborted) return null;
           try {
@@ -2467,11 +2491,14 @@ async function streamTelegramPipelined(client, targetDoc, startByte, endByte, re
             return bytes;
           } catch (e2) {
             sender = null;
+            if (client._exportedSenderPromises?.has(dcId)) {
+              client._exportedSenderPromises.delete(dcId);
+            }
             const e2msg = `${e2.errorMessage || ''} ${e2.message || ''}`;
             console.warn(`[STREAM RECONNECT] Re-init attempt ${reconnAttempt + 1}/3 failed (${e2.message}). Retrying in ${retryDelay}ms...`);
             if (reconnAttempt < 2) {
               await new Promise(r => setTimeout(r, retryDelay));
-              retryDelay = Math.round(retryDelay * 1.5);
+              retryDelay = Math.round(retryDelay * 2);
             }
           }
         }
@@ -3093,7 +3120,9 @@ process.on('uncaughtException', (err) => {
     code === 'EHOSTUNREACH' ||
     code === 'ECONNREFUSED' ||
     msg.includes('socket hang up') ||
-    msg.includes('Connection closed')
+    msg.includes('Connection closed') ||
+    msg.includes('Not connected') ||
+    msg.includes('disconnected')
   ) {
     return;
   }
@@ -3101,6 +3130,16 @@ process.on('uncaughtException', (err) => {
 });
 
 process.on('unhandledRejection', (reason) => {
+  const msg = reason?.message || String(reason || '');
+  if (
+    msg.includes('Not connected') ||
+    msg.includes('Connection closed') ||
+    msg.includes('socket hang up') ||
+    msg.includes('ECONNRESET') ||
+    msg.includes('ETIMEDOUT')
+  ) {
+    return;
+  }
   console.error('[UNHANDLED REJECTION]', reason);
 });
 
