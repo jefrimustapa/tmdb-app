@@ -2,12 +2,13 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20261001-2122';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.fix-msm-getter-searc.20261001-2122';
+export const APP_BUILD_NUMBER = '20261001-2135';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.fix-msm-getter-searc.20261001-2135';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
 export const APP_BRANCH = 'fix-msm-getter-searc';
-export const APP_CHANGELOG = `* Merge pull request #165 from jefrimustapa/msm-getter-streams
+export const APP_CHANGELOG = `* fix(msm-getter): isolate search title matching to button text and add persistent stream cache manager
+* Merge pull request #165 from jefrimustapa/msm-getter-streams
 * fix(android): enable opening external browser URLs via AndroidBridge native intent
 * refactor(logs): remove redundant active streams card from web console and in-app drawer
 * feat(settings): display active streaming clients and devices in in-app log dashboard
@@ -20,5 +21,4 @@ export const APP_CHANGELOG = `* Merge pull request #165 from jefrimustapa/msm-ge
 * perf(msm-getter): restore original pipeline concurrency tiers (Eco=2, Standard=4, Turbo=6)
 * Merge pull request #162 from jefrimustapa/fix/msm-getter-search-fail
 * fix(msm-getter): add resilient multi-candidate fallback loop to recover from forward_failed deleted Telegram links
-* fix(player): improve play & seek on 1080p transcoded MSM streams (#161)
-* perf(msm-getter): optimize 1080p streaming concurrency and Matroska clustering (#160)`;
+* fix(player): improve play & seek on 1080p transcoded MSM streams (#161)`;
