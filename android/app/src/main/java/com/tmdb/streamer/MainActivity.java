@@ -258,6 +258,23 @@ public class MainActivity extends BridgeActivity {
                 }
 
                 @JavascriptInterface
+                public void openBrowser(String url) {
+                    if (url == null || url.trim().isEmpty()) return;
+                    runOnUiThread(() -> {
+                        try {
+                            Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url.trim()));
+                            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                            startActivity(intent);
+                        } catch (Exception e) {
+                            Log.e("TMDB_APP", "Failed to open browser URL: " + e.getMessage(), e);
+                            try {
+                                android.widget.Toast.makeText(MainActivity.this, "Unable to open browser: " + e.getMessage(), android.widget.Toast.LENGTH_SHORT).show();
+                            } catch (Exception ignored) {}
+                        }
+                    });
+                }
+
+                @JavascriptInterface
                 public void openScreenMirror() {
                     runOnUiThread(() -> {
                         // 1. Try Samsung Smart View directly
