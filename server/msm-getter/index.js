@@ -374,11 +374,46 @@ function cleanSearchTitle(str) {
     .trim();
 }
 
+// Whitelist legitimate release metadata tokens that can directly follow a single-word movie title
+function isAllowedTitleSuffix(word) {
+  if (!word) return true;
+  const w = word.toLowerCase();
+  // Pure digits: 4-digit years (1990-2030), resolution heights, channel digits, part numbers
+  if (/^\d+$/.test(w)) return true;
+  // Resolution patterns: 1080p, 720p, 4k, 2160p, etc.
+  if (/^\d+(p|k)$/.test(w)) return true;
+  // Disc/part patterns: cd1, cd2, pt1, part1, etc.
+  if (/^(?:cd|pt|part)\d+$/.test(w)) return true;
+
+  const allowed = new Set([
+    // Resolutions & standards
+    'p', 'k', 'hd', 'fhd', 'uhd', 'sd', 'hdr', 'hdr10', 'sdr', 'dovi', 'dv',
+    // Media sources
+    'bluray', 'blu', 'ray', 'webdl', 'webrip', 'web', 'hdrip', 'hdtv', 'dvdrip', 'brrip', 'remux', 'dvd', 'tvrip',
+    // Video codecs
+    'x264', 'x265', 'h264', 'h265', 'hevc', 'avc', 'av1', '10bit', '8bit',
+    // Audio codecs & channels
+    'aac', 'ac3', 'eac3', 'dts', 'ddp', 'ddp5', 'mp3', 'flac', 'atmos', 'truehd', 'opus',
+    // Containers
+    'mkv', 'mp4', 'avi',
+    // Languages & subtitles
+    'malay', 'malaysub', 'sub', 'subs', 'subtitle', 'subtitles', 'eng', 'engsub', 'indo', 'indosub', 'tam', 'tamil', 'multi', 'dual', 'dub', 'dubbed',
+    // Release descriptors
+    'movie', 'film', 'part', 'pt', 'vol', 'volume', 'complete', 'repack', 'proper', 'extended', 'unrated', 'directors', 'cut', 'edition', 'version', 'remastered', 'imax', 'internal'
+  ]);
+
+  return allowed.has(w);
+}
+
 // Extract primary keywords excluding common stopwords for strict coverage validation
 function extractSignificantTokens(str) {
   const norm = normalizeTitle(str);
-  return norm.split(' ').filter(t => {
+  const rawTokens = norm.split(' ').filter(Boolean);
+  const hasLeadingArticle = rawTokens.length <= 2 && /^(the|a|an)$/i.test(rawTokens[0]);
+
+  return rawTokens.filter((t, idx) => {
     if (!t) return false;
+    if (idx === 0 && hasLeadingArticle) return true; // Keep leading article for short 1-2 word titles like "The Runner"
     if (STOPWORDS.has(t)) return false;
     if (/^\d+$/.test(t)) return true; // keep digits: 2, 3, 4
     if (/^(ii|iii|iv|v|vi)$/i.test(t)) return true; // keep roman numerals
@@ -396,6 +431,25 @@ function calculateTitleCoverage(significantTokens, text) {
     return new RegExp(`\\b${escaped}\\b`, 'i').test(norm);
   });
   return matched.length / significantTokens.length;
+}
+
+// Helper: Check if a button text is bare (e.g. only resolution, episode tag, numbers, or action verbs)
+function isBareButton(text) {
+  if (!text) return true;
+  const clean = text
+    .toLowerCase()
+    .replace(/[\[\]\(\)\{\}\-_:\|]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  const tokens = clean.split(' ').filter(Boolean);
+  if (tokens.length === 0) return true;
+  const bareKeywords = new Set([
+    '720p', '1080p', '480p', '540p', '360p', '2160p', '4k', 'hd', 'fhd', 'sd',
+    'ep', 'eps', 'episodes', 'episode', 'episod', 'e', 's', 'season', 'musim',
+    'download', 'muat', 'turun', 'stream', 'play', 'server', 'fast', 'direct',
+    'link', 'watch', 'mb', 'gb', 'mp4', 'mkv', 'avi'
+  ]);
+  return tokens.every(t => /^\d+$/.test(t) || bareKeywords.has(t));
 }
 
 // Web Auth State in RAM
@@ -886,19 +940,31 @@ function resolveClientIdentity(rawIp, req) {
     if (ip === '::1') ip = '127.0.0.1';
   }
 
-  const queryClient = req?.query?.clientName || req?.query?.client || req?.headers?.['x-client-name'];
-  if (queryClient) {
-    return { ip, name: String(queryClient).trim() };
-  }
-
   if (ip === '127.0.0.1' || ip === 'localhost') {
     return { ip, name: 'Internal Transcoder' };
   }
 
+  const isExternal = !/^(10\.|172\.(1[6-9]|2[0-9]|3[0-1])\.|192\.168\.|127\.|localhost)/.test(ip);
+
+  // 1. Prioritize Router DHCP leases and Asuswrt custom_clientlist (for LAN devices)
   const map = refreshClientMap();
   if (map.has(ip)) {
     const entry = map.get(ip);
-    return { ip, name: entry.name, mac: entry.mac };
+    if (entry.name && entry.name !== ip && entry.name !== '*') {
+      return { ip, name: entry.name, mac: entry.mac };
+    }
+  }
+
+  // 2. Fallback to clientName query param / header (e.g. remote connections, WAN, or native app model)
+  const queryClient = req?.query?.clientName || req?.query?.client || req?.headers?.['x-client-name'];
+  if (queryClient && !['Client', 'undefined', 'null'].includes(String(queryClient).trim())) {
+    const cleanName = String(queryClient).trim();
+    return { ip, name: isExternal ? `${cleanName} (WAN)` : cleanName };
+  }
+
+  // 3. Fallback for external connections without clientName
+  if (isExternal) {
+    return { ip, name: `External (${ip})` };
   }
 
   const ua = req?.headers?.['user-agent'] || '';
@@ -1084,6 +1150,11 @@ app.get('/api/logs/download', (req, res) => {
 
 // Dedicated Web Log Viewer GUI
 app.get('/logs', (req, res) => {
+  res.set({
+    'Cache-Control': 'no-cache, no-store, must-revalidate',
+    'Pragma': 'no-cache',
+    'Expires': '0',
+  });
   res.send(`<!DOCTYPE html>
 <html lang="en" class="dark">
 <head>
@@ -1192,6 +1263,25 @@ app.get('/logs', (req, res) => {
     </div>
   </div>
 
+  <!-- Persistent Stream Cache Panel -->
+  <div id="cachePanel" class="p-4 rounded-xl bg-slate-900 border border-slate-800/80 space-y-3">
+    <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 pb-2 border-b border-slate-800/60">
+      <div class="flex items-center gap-2">
+        <span class="text-sm">💾</span>
+        <span class="text-xs font-bold text-white uppercase tracking-wider">Persistent Stream Cache (Central DB)</span>
+        <span id="cacheCountBadge" class="text-[10px] font-mono font-bold bg-sky-500/10 text-sky-400 px-2 py-0.5 rounded border border-sky-500/20">-- items</span>
+      </div>
+      <div class="flex items-center gap-2 w-full sm:w-auto">
+        <input id="cacheSearch" type="text" placeholder="Search cached video / key..." class="bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-sky-500/50 w-full sm:w-64" oninput="loadCacheList()" />
+        <button onclick="loadCacheList()" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-medium text-slate-300 border border-slate-700 shrink-0">Refresh</button>
+        <button onclick="clearAllCache()" class="px-2.5 py-1 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 text-xs font-medium shrink-0">Clear All</button>
+      </div>
+    </div>
+    <div id="cacheListContainer" class="max-h-60 overflow-y-auto space-y-1.5 font-mono text-xs">
+      <div class="text-slate-500 italic py-2">Loading persistent cache...</div>
+    </div>
+  </div>
+
   <!-- Terminal Window -->
   <div class="relative flex-1 bg-slate-950 border border-slate-800/80 rounded-2xl overflow-hidden shadow-2xl glow-box flex flex-col min-h-[500px]">
     <div class="bg-slate-900/90 border-b border-slate-800/80 px-4 py-2 flex items-center justify-between">
@@ -1224,8 +1314,17 @@ app.get('/logs', (req, res) => {
     const autoScrollCheck = document.getElementById('autoScroll');
     const searchInput = document.getElementById('searchInput');
 
+    function escapeHtml(str) {
+      return String(str || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
     function formatLine(line) {
-      const escaped = line.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      const escaped = escapeHtml(line);
       if (line.includes('[ERROR]') || line.includes('[FATAL]') || line.includes('Error:')) {
         return '<div class="text-rose-400 bg-rose-500/5 px-1 rounded">' + escaped + '</div>';
       } else if (line.includes('[WARN]')) {
@@ -1344,10 +1443,10 @@ app.get('/logs', (req, res) => {
             for (let i = 0; i < clients.length; i++) {
               const c = clients[i];
               rowsHtml += '<tr class="text-slate-300 hover:bg-slate-800/40 transition">' +
-                '<td class="py-1.5 px-2 font-bold text-sky-400 font-sans flex items-center gap-1.5">📺 ' + (c.clientName || 'Client') + '</td>' +
-                '<td class="py-1.5 px-2 text-slate-400 font-mono">' + (c.ip || '') + '</td>' +
-                '<td class="py-1.5 px-2 text-slate-200 truncate max-w-xs font-sans" title="' + (c.filename || '') + '">' + (c.filename || '') + '</td>' +
-                '<td class="py-1.5 px-2 text-emerald-400 font-sans text-[11px]">' + (c.mode || '') + '</td>' +
+                '<td class="py-1.5 px-2 font-bold text-sky-400 font-sans flex items-center gap-1.5">📺 ' + escapeHtml(c.clientName || 'Client') + '</td>' +
+                '<td class="py-1.5 px-2 text-slate-400 font-mono">' + escapeHtml(c.ip || '') + '</td>' +
+                '<td class="py-1.5 px-2 text-slate-200 truncate max-w-xs font-sans" title="' + escapeHtml(c.filename || '') + '">' + escapeHtml(c.filename || '') + '</td>' +
+                '<td class="py-1.5 px-2 text-emerald-400 font-sans text-[11px]">' + escapeHtml(c.mode || '') + '</td>' +
                 '<td class="py-1.5 px-2 text-slate-400 text-right font-mono">' + (c.connectedSec || 0) + 's</td>' +
               '</tr>';
             }
@@ -1365,9 +1464,80 @@ app.get('/logs', (req, res) => {
       } catch {}
     }
 
+    async function loadCacheList() {
+      const searchEl = document.getElementById('cacheSearch');
+      const q = searchEl ? searchEl.value : '';
+      try {
+        const res = await fetch('/api/cache?search=' + encodeURIComponent(q));
+        const data = await res.json();
+        const container = document.getElementById('cacheListContainer');
+        const badge = document.getElementById('cacheCountBadge');
+        if (badge) {
+          const totalSizeMB = data.totalSizeBytes ? (data.totalSizeBytes / (1024 * 1024)).toFixed(1) + ' MB' : '0 MB';
+          badge.textContent = (data.total || 0) + ' videos (' + totalSizeMB + ')';
+        }
+        if (!container) return;
+        if (!data.items || data.items.length === 0) {
+          container.innerHTML = '<div class="text-slate-500 italic py-2">No cached records found.</div>';
+          return;
+        }
+        container.innerHTML = data.items.map(function(item) {
+          return '<div class="flex items-center justify-between p-2 rounded-lg bg-slate-950/60 border border-slate-800/40 hover:border-slate-700/60 transition gap-2">' +
+            '<div class="min-w-0 flex-1">' +
+              '<div class="flex items-center gap-1.5 truncate">' +
+                '<span class="text-slate-400 text-[10px]">🎬</span>' +
+                '<span class="text-white font-semibold truncate text-[11px]">' + escapeHtml(item.filename || item.queryKey) + '</span>' +
+              '</div>' +
+              '<div class="text-[10px] text-slate-400 truncate flex items-center gap-2 mt-0.5">' +
+                '<span class="text-sky-400 font-bold">' + escapeHtml(item.sizeFormatted) + '</span>' +
+                '<span>Key: ' + escapeHtml(item.queryKey) + '</span>' +
+                '<span>Doc: ' + escapeHtml(item.docId) + '</span>' +
+              '</div>' +
+            '</div>' +
+            '<button data-key="' + encodeURIComponent(item.queryKey || '') + '" data-doc="' + encodeURIComponent(item.docId || '') + '" class="evict-cache-btn px-2 py-1 rounded bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 text-[10px] shrink-0 font-sans font-semibold transition">Evict</button>' +
+          '</div>';
+        }).join('');
+      } catch (err) {
+        console.error('Failed to load cache:', err);
+      }
+    }
+
+    const cacheContainerEl = document.getElementById('cacheListContainer');
+    if (cacheContainerEl) {
+      cacheContainerEl.addEventListener('click', function(e) {
+        const btn = e.target.closest('.evict-cache-btn');
+        if (btn) {
+          const k = decodeURIComponent(btn.getAttribute('data-key') || '');
+          const d = decodeURIComponent(btn.getAttribute('data-doc') || '');
+          evictCacheRecord(k, d);
+        }
+      });
+    }
+
+    async function evictCacheRecord(key, docId) {
+      if (!confirm('Evict this video stream from persistent cache?')) return;
+      try {
+        await fetch('/api/cache?key=' + encodeURIComponent(key) + '&docId=' + encodeURIComponent(docId), { method: 'DELETE' });
+        loadCacheList();
+      } catch (err) {
+        alert('Evict failed: ' + err.message);
+      }
+    }
+
+    async function clearAllCache() {
+      if (!confirm('DANGER: Clear ALL stream cache records from server?')) return;
+      try {
+        await fetch('/api/cache/clear', { method: 'POST' });
+        loadCacheList();
+      } catch (err) {
+        alert('Clear failed: ' + err.message);
+      }
+    }
+
     fetchInitialLogs();
     connectSSE();
     pollMetrics();
+    loadCacheList();
     setInterval(pollMetrics, 3000);
   </script>
 </body>
@@ -1414,6 +1584,50 @@ app.get('/api/debug-search', async (req, res) => {
 });
 
 // Cache management endpoints
+app.get('/api/cache', (req, res) => {
+  const { search = '' } = req.query;
+  const items = db.getAll(search);
+  const totalSizeBytes = db.getTotalSizeBytes();
+
+  const formattedItems = items.map(item => {
+    const bytes = parseInt(item.size, 10);
+    let sizeFormatted = '0 B';
+    if (!isNaN(bytes) && bytes > 0) {
+      if (bytes >= 1024 * 1024 * 1024) {
+        sizeFormatted = `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+      } else {
+        sizeFormatted = `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+      }
+    }
+    return {
+      queryKey: item.queryKey,
+      docId: item.docId,
+      filename: item.filename,
+      size: !isNaN(bytes) ? bytes : 0,
+      sizeFormatted,
+      mimeType: item.mimeType || 'video/mp4',
+      dcId: item.dcId || 4,
+      createdAt: item.createdAt || (item.date ? item.date * 1000 : 0),
+    };
+  });
+
+  return res.json({
+    success: true,
+    total: formattedItems.length,
+    totalSizeBytes,
+    items: formattedItems,
+  });
+});
+
+app.delete('/api/cache', (req, res) => {
+  const key = req.query.key || req.body?.key;
+  const docId = req.query.docId || req.body?.docId;
+  let evicted = false;
+  if (key) evicted = db.delete(key) || evicted;
+  if (docId) evicted = db.deleteByDocId(docId) || evicted;
+  return res.json({ success: true, evicted, key, docId });
+});
+
 app.post('/api/cache/clear', (req, res) => {
   db.clear();
   return res.json({ success: true, message: 'Central database cache cleared' });
@@ -1676,6 +1890,41 @@ app.get('/api/resolve', async (req, res) => {
             }
           }
         } else {
+          // Movie validation: Instantly reject any TV series/episode candidates during movie searches
+          const isTvDoc = /\b(s\d{1,2}e\d{1,2}|s\d{1,2}\s*ep?\s*\d{1,2}|season\s*\d+|musim\s*\d+|episode\s*\d+|episod\s*\d+|ep\s*\d+|\.end\.)\b/i.test(filename) ||
+                          /\b(s\d{1,2}e\d{1,2}|s\d{1,2}\s*ep?\s*\d{1,2}|season\s*\d+|musim\s*\d+|episode\s*\d+|episod\s*\d+|ep\s*\d+|\.end\.)\b/i.test(msg.message || '');
+          if (isTvDoc) {
+            matchesCandidate = false;
+          }
+
+          // Single-word title collision guard: reject "Gold Digger" or "Runner Runner" when searching for "Digger" / "Runner"
+          if (matchesCandidate && significantTokens.length === 1) {
+            const singleWord = significantTokens[0];
+            const prefixMatch = normFn.match(new RegExp(`\\b([a-z0-9]+)\\s+${singleWord}\\b`, 'i'));
+            if (prefixMatch) {
+              const prefixWord = prefixMatch[1].toLowerCase();
+              const targetHasArticle = /^(the|a|an)\b/i.test(title.trim());
+              const ignorePrefixes = new Set(['movie', 'film', 'msm', 'msm32']);
+              if (targetHasArticle) {
+                ignorePrefixes.add('the');
+                ignorePrefixes.add('a');
+                ignorePrefixes.add('an');
+              }
+              if (!ignorePrefixes.has(prefixWord)) {
+                matchesCandidate = false;
+              }
+            }
+            if (matchesCandidate) {
+              const suffixMatch = normFn.match(new RegExp(`\\b${singleWord}\\s+([a-z0-9]+)\\b`, 'i'));
+              if (suffixMatch) {
+                const suffixWord = suffixMatch[1].toLowerCase();
+                if (!isAllowedTitleSuffix(suffixWord)) {
+                  matchesCandidate = false;
+                }
+              }
+            }
+          }
+
           // Movie validation: strictly enforce sequel number and release year alignment
           const docSequel = extractSequelInfo(filename);
           if (targetSequel) {
@@ -1791,8 +2040,22 @@ app.get('/api/resolve', async (req, res) => {
       }
 
       // 3. Strict Title Token Coverage check
+      // Determine if button is a bare action button (e.g. "[ 720p ]", "[ 01 ]") or has full filename
+      const isBare = isBareButton(btnText);
+      let titleTargetText = normBtnText;
+
+      if (isBare) {
+        // Strip bot search echo prefixes like "2 Results for Gadis Masa E04 (1/1)" before evaluating parent message
+        const cleanMsgText = msgText
+          .replace(/^\d+\s*results?\s*for\s*[^\n\r]+/i, '')
+          .replace(/^hasil\s*carian\s*[^\n\r]+/i, '')
+          .replace(/^search\s*results?\s*[^\n\r]+/i, '')
+          .trim();
+        titleTargetText = normalizeTitle(cleanMsgText);
+      }
+
       if (significantTokens.length > 0) {
-        const coverage = calculateTitleCoverage(significantTokens, combinedNorm);
+        const coverage = calculateTitleCoverage(significantTokens, titleTargetText);
         if (significantTokens.length <= 2 && coverage < 1.0) {
           return -999; // 1- or 2-word titles MUST match all words (prevents "One Piece" matching "One Cent")
         }
@@ -1804,8 +2067,12 @@ app.get('/api/resolve', async (req, res) => {
       let score = 0;
 
       if (significantTokens.length > 0) {
-        const coverage = calculateTitleCoverage(significantTokens, combinedNorm);
-        score += Math.round(coverage * 80);
+        const coverage = calculateTitleCoverage(significantTokens, titleTargetText);
+        if (coverage >= 1.0) {
+          score += 200; // Strong reward for full title match
+        } else {
+          score += Math.round(coverage * 100);
+        }
       }
 
       if (isTv) {
@@ -1898,11 +2165,38 @@ app.get('/api/resolve', async (req, res) => {
           }
         }
       } else {
-        // Movie validation: Heavily penalize TV series candidates (S01E01, episodes) during movie searches
-        const isTvCandidate = /\b(s\d{1,2}e\d{1,2}|s\d{1,2}\s*ep?\s*\d{1,2}|season\s*\d+|episode\s*\d+|ep\d{1,2}|\.end\.)\b/i.test(btnText) ||
-                              /\b(s\d{1,2}e\d{1,2}|s\d{1,2}\s*ep?\s*\d{1,2}|season\s*\d+|episode\s*\d+|ep\d{1,2}|\.end\.)\b/i.test(msgText);
+        // Movie validation: Instantly disqualify TV series candidates (S01E01, episodes) during movie searches
+        const isTvCandidate = /\b(s\d{1,2}e\d{1,2}|s\d{1,2}\s*ep?\s*\d{1,2}|season\s*\d+|musim\s*\d+|episode\s*\d+|episod\s*\d+|ep\s*\d+|\.end\.)\b/i.test(btnText) ||
+                              /\b(s\d{1,2}e\d{1,2}|s\d{1,2}\s*ep?\s*\d{1,2}|season\s*\d+|musim\s*\d+|episode\s*\d+|episod\s*\d+|ep\s*\d+|\.end\.)\b/i.test(msgText);
         if (isTvCandidate) {
-          score -= 700; // Reject TV episodes when searching for a movie
+          return -999; // Hard disqualify TV episodes when searching for a movie
+        }
+
+        // Single-word title collision guard: reject "Gold Digger" or "Runner Runner" when searching for "Digger" / "Runner"
+        if (significantTokens.length === 1) {
+          const singleWord = significantTokens[0];
+          const textToInspect = isBare ? titleTargetText : (normBtnText || titleTargetText);
+          const prefixMatch = textToInspect.match(new RegExp(`\\b([a-z0-9]+)\\s+${singleWord}\\b`, 'i'));
+          if (prefixMatch) {
+            const prefixWord = prefixMatch[1].toLowerCase();
+            const targetHasArticle = /^(the|a|an)\b/i.test(title.trim());
+            const ignorePrefixes = new Set(['movie', 'film', 'msm', 'msm32']);
+            if (targetHasArticle) {
+              ignorePrefixes.add('the');
+              ignorePrefixes.add('a');
+              ignorePrefixes.add('an');
+            }
+            if (!ignorePrefixes.has(prefixWord)) {
+              return -999; // Different title (preceding word)
+            }
+          }
+          const suffixMatch = textToInspect.match(new RegExp(`\\b${singleWord}\\s+([a-z0-9]+)\\b`, 'i'));
+          if (suffixMatch) {
+            const suffixWord = suffixMatch[1].toLowerCase();
+            if (!isAllowedTitleSuffix(suffixWord)) {
+              return -999; // Different title (succeeding word)
+            }
+          }
         }
 
         // Movie validation: Sequel and Release Year Alignment
@@ -1942,10 +2236,10 @@ app.get('/api/resolve', async (req, res) => {
         else if (btnText.includes('1080p') || btnText.includes('1080')) score += 5;
         else if (btnText.includes('2160p') || btnText.includes('4k')) score -= 50;
       } else {
-        if (btnText.includes('1080p') || btnText.includes('1080')) score += 50;
+        if (btnText.includes('1080p') || btnText.includes('1080')) score += 80;
         else if (btnText.includes('720p') || btnText.includes('720')) score += 30;
       }
-      if (btnText.toLowerCase().includes('.mp4') || btnText.toLowerCase().includes('mp4')) score += 35;
+      if (btnText.toLowerCase().includes('.mp4') || btnText.toLowerCase().includes('mp4')) score += 15;
       if (btnText.includes('malaysub') || btnText.includes('msm')) score += 5;
 
       return score;

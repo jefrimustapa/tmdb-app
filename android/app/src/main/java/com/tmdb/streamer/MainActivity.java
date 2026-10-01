@@ -556,6 +556,19 @@ public class MainActivity extends BridgeActivity {
                 }
 
                 @JavascriptInterface
+                public String getDeviceName() {
+                    try {
+                        String name = android.provider.Settings.Global.getString(getContentResolver(), "device_name");
+                        if (name != null && !name.trim().isEmpty()) return name.trim();
+                    } catch (Exception e) {}
+                    try {
+                        String name = android.provider.Settings.Secure.getString(getContentResolver(), "bluetooth_name");
+                        if (name != null && !name.trim().isEmpty()) return name.trim();
+                    } catch (Exception e) {}
+                    return android.os.Build.MODEL != null ? android.os.Build.MODEL : "Android Device";
+                }
+
+                @JavascriptInterface
                 public void setDropdownOpen(boolean open) {
                     isDropdownOpen = open;
                     Log.i("TMDB_APP", "[AndroidBridge] setDropdownOpen: " + open);

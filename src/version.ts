@@ -2,12 +2,17 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20261001-2048';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.msm-getter-streams.20261001-2048';
+export const APP_BUILD_NUMBER = '20261001-2155';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.fix-msm-getter-searc.20261001-2155';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
-export const APP_BRANCH = 'msm-getter-streams';
-export const APP_CHANGELOG = `* refactor(logs): remove redundant active streams card from web console and in-app drawer
+export const APP_BRANCH = 'fix-msm-getter-searc';
+export const APP_CHANGELOG = `* fix(clients): prioritize router DHCP hostnames over generic clientName query parameter
+* fix(logs): resolve SyntaxError on web console eviction button and enforce HTTPS fallback URL
+* fix(msm-getter): isolate search title matching to button text and add persistent stream cache manager
+* Merge pull request #165 from jefrimustapa/msm-getter-streams
+* fix(android): enable opening external browser URLs via AndroidBridge native intent
+* refactor(logs): remove redundant active streams card from web console and in-app drawer
 * feat(settings): display active streaming clients and devices in in-app log dashboard
 * fix(msm-getter): prevent multi-stream stacking and display client IP and device name in logs
 * Merge pull request #164 from jefrimustapa/fix/msm-getter-connection-issue
@@ -16,9 +21,4 @@ export const APP_CHANGELOG = `* refactor(logs): remove redundant active streams 
 * Merge pull request #163 from jefrimustapa/feat/check-msm-consistency
 * fix(msm-getter): catch 'Not connected' race and add 3-attempt sender reconnect backoff (#160)
 * perf(msm-getter): restore original pipeline concurrency tiers (Eco=2, Standard=4, Turbo=6)
-* Merge pull request #162 from jefrimustapa/fix/msm-getter-search-fail
-* fix(msm-getter): add resilient multi-candidate fallback loop to recover from forward_failed deleted Telegram links
-* fix(player): improve play & seek on 1080p transcoded MSM streams (#161)
-* perf(msm-getter): optimize 1080p streaming concurrency and Matroska clustering (#160)
-* Merge pull request #159 from jefrimustapa/fix/msm-getter-no-sound
-* fix(resolver): enforce strict word boundaries, disqualify split archives, and penalize TV episodes on movie searches`;
+* Merge pull request #162 from jefrimustapa/fix/msm-getter-search-fail`;
