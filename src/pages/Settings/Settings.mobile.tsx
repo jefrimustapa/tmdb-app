@@ -253,7 +253,7 @@ export const Settings: React.FC = () => {
   const [autoPollLogs, setAutoPollLogs] = useState(false);
 
   const fetchServerLogs = async () => {
-    const baseUrl = (settings?.msm32GetterUrl || 'http://julietmike.net:3033').replace(/\/+$/, '');
+    const baseUrl = (settings?.msm32GetterUrl || 'https://www.julietmike.net:3033').replace(/\/+$/, '');
     setLoadingServerLogs(true);
     try {
       const [logsRes, statsRes] = await Promise.all([
@@ -1863,7 +1863,7 @@ export const Settings: React.FC = () => {
         onClose={() => setActiveDrawer(null)}
         onBack={() => setActiveDrawer('telegram-msm32')}
         title="Server Logs & Console"
-        subtitle={`Live diagnostic logs from ${settings.msm32GetterUrl || 'http://julietmike.net:3033'}`}
+        subtitle={`Live diagnostic logs from ${settings.msm32GetterUrl || 'https://www.julietmike.net:3033'}`}
         categoryLabel="Telegram > MSM32bot > Server Logs"
       >
         <div className="space-y-3">
@@ -1917,7 +1917,7 @@ export const Settings: React.FC = () => {
             <button
               type="button"
               onClick={() => {
-                const target = `${(settings.msm32GetterUrl || 'http://julietmike.net:3033').replace(/\/+$/, '')}/logs`;
+                const target = `${(settings.msm32GetterUrl || 'https://www.julietmike.net:3033').replace(/\/+$/, '')}/logs`;
                 openExternalUrl(target);
               }}
               className="px-3 py-1.5 rounded-lg bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 border border-sky-500/20 text-xs font-semibold flex items-center gap-1.5 transition-colors"
@@ -1999,7 +1999,7 @@ export const Settings: React.FC = () => {
         onClose={() => setActiveDrawer(null)}
         onBack={() => setActiveDrawer('telegram-msm32')}
         title="Persistent Stream Cache"
-        subtitle={`Central DB video cache on ${settings.msm32GetterUrl || 'http://julietmike.net:3033'}`}
+        subtitle={`Central DB video cache on ${settings.msm32GetterUrl || 'https://www.julietmike.net:3033'}`}
         categoryLabel="Telegram > MSM32bot > Stream Cache"
       >
         <div className="space-y-3">

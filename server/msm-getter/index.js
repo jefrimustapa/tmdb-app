@@ -1262,8 +1262,17 @@ app.get('/logs', (req, res) => {
     const autoScrollCheck = document.getElementById('autoScroll');
     const searchInput = document.getElementById('searchInput');
 
+    function escapeHtml(str) {
+      return String(str || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
     function formatLine(line) {
-      const escaped = line.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      const escaped = escapeHtml(line);
       if (line.includes('[ERROR]') || line.includes('[FATAL]') || line.includes('Error:')) {
         return '<div class="text-rose-400 bg-rose-500/5 px-1 rounded">' + escaped + '</div>';
       } else if (line.includes('[WARN]')) {
@@ -1382,10 +1391,10 @@ app.get('/logs', (req, res) => {
             for (let i = 0; i < clients.length; i++) {
               const c = clients[i];
               rowsHtml += '<tr class="text-slate-300 hover:bg-slate-800/40 transition">' +
-                '<td class="py-1.5 px-2 font-bold text-sky-400 font-sans flex items-center gap-1.5">📺 ' + (c.clientName || 'Client') + '</td>' +
-                '<td class="py-1.5 px-2 text-slate-400 font-mono">' + (c.ip || '') + '</td>' +
-                '<td class="py-1.5 px-2 text-slate-200 truncate max-w-xs font-sans" title="' + (c.filename || '') + '">' + (c.filename || '') + '</td>' +
-                '<td class="py-1.5 px-2 text-emerald-400 font-sans text-[11px]">' + (c.mode || '') + '</td>' +
+                '<td class="py-1.5 px-2 font-bold text-sky-400 font-sans flex items-center gap-1.5">📺 ' + escapeHtml(c.clientName || 'Client') + '</td>' +
+                '<td class="py-1.5 px-2 text-slate-400 font-mono">' + escapeHtml(c.ip || '') + '</td>' +
+                '<td class="py-1.5 px-2 text-slate-200 truncate max-w-xs font-sans" title="' + escapeHtml(c.filename || '') + '">' + escapeHtml(c.filename || '') + '</td>' +
+                '<td class="py-1.5 px-2 text-emerald-400 font-sans text-[11px]">' + escapeHtml(c.mode || '') + '</td>' +
                 '<td class="py-1.5 px-2 text-slate-400 text-right font-mono">' + (c.connectedSec || 0) + 's</td>' +
               '</tr>';
             }
@@ -1425,20 +1434,32 @@ app.get('/logs', (req, res) => {
             '<div class="min-w-0 flex-1">' +
               '<div class="flex items-center gap-1.5 truncate">' +
                 '<span class="text-slate-400 text-[10px]">🎬</span>' +
-                '<span class="text-white font-semibold truncate text-[11px]">' + (item.filename || item.queryKey) + '</span>' +
+                '<span class="text-white font-semibold truncate text-[11px]">' + escapeHtml(item.filename || item.queryKey) + '</span>' +
               '</div>' +
               '<div class="text-[10px] text-slate-400 truncate flex items-center gap-2 mt-0.5">' +
-                '<span class="text-sky-400 font-bold">' + item.sizeFormatted + '</span>' +
-                '<span>Key: ' + item.queryKey + '</span>' +
-                '<span>Doc: ' + item.docId + '</span>' +
+                '<span class="text-sky-400 font-bold">' + escapeHtml(item.sizeFormatted) + '</span>' +
+                '<span>Key: ' + escapeHtml(item.queryKey) + '</span>' +
+                '<span>Doc: ' + escapeHtml(item.docId) + '</span>' +
               '</div>' +
             '</div>' +
-            '<button onclick="evictCacheRecord(\'' + item.queryKey + '\', \'' + item.docId + '\')" class="px-2 py-1 rounded bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 text-[10px] shrink-0 font-sans font-semibold transition">Evict</button>' +
+            '<button data-key="' + encodeURIComponent(item.queryKey || '') + '" data-doc="' + encodeURIComponent(item.docId || '') + '" class="evict-cache-btn px-2 py-1 rounded bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 text-[10px] shrink-0 font-sans font-semibold transition">Evict</button>' +
           '</div>';
         }).join('');
       } catch (err) {
         console.error('Failed to load cache:', err);
       }
+    }
+
+    const cacheContainerEl = document.getElementById('cacheListContainer');
+    if (cacheContainerEl) {
+      cacheContainerEl.addEventListener('click', function(e) {
+        const btn = e.target.closest('.evict-cache-btn');
+        if (btn) {
+          const k = decodeURIComponent(btn.getAttribute('data-key') || '');
+          const d = decodeURIComponent(btn.getAttribute('data-doc') || '');
+          evictCacheRecord(k, d);
+        }
+      });
     }
 
     async function evictCacheRecord(key, docId) {
