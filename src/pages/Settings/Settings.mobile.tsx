@@ -10,6 +10,7 @@ import { APP_VERSION, APP_BUILD_NUMBER, APP_VERSION_FULL, APP_BUILD_CHANNEL, APP
 import { updateService, type UpdateInfo } from '../../services/updateService';
 import { UpdateModal } from '../../components/common/UpdateModal';
 import { FormattedChangelog } from '../../components/common/FormattedChangelog';
+import { openExternalUrl } from '../../services/browserService';
 import {
   Settings as SettingsIcon,
   Monitor,
@@ -234,6 +235,14 @@ export const Settings: React.FC = () => {
     uptime?: number;
     isConnected?: boolean;
     activeStreams?: number;
+    activeClients?: Array<{
+      sessionKey: string;
+      ip: string;
+      clientName: string;
+      filename: string;
+      mode: string;
+      connectedSec: number;
+    }>;
     memory?: { rssMB: number; heapUsedMB: number };
     logSizeKB?: number;
   } | null>(null);
@@ -1769,7 +1778,7 @@ export const Settings: React.FC = () => {
       >
         <div className="space-y-3">
           {/* Live Metrics Chips */}
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-2 gap-2">
             <div className="p-2.5 rounded-xl bg-white/5 border border-white/10 text-center">
               <span className="text-[9px] text-gray-400 block uppercase tracking-wider font-semibold">Status</span>
               <span className={`text-xs font-bold font-mono mt-0.5 block ${serverStats?.isConnected ? 'text-emerald-400' : 'text-amber-400'}`}>
@@ -1782,13 +1791,36 @@ export const Settings: React.FC = () => {
                 {serverStats?.memory?.rssMB ? `${serverStats.memory.rssMB} MB` : '--'}
               </span>
             </div>
-            <div className="p-2.5 rounded-xl bg-white/5 border border-white/10 text-center">
-              <span className="text-[9px] text-gray-400 block uppercase tracking-wider font-semibold">Active Streams</span>
-              <span className="text-xs font-bold font-mono text-white mt-0.5 block">
-                {serverStats?.activeStreams !== undefined ? `${serverStats.activeStreams}` : '0'}
-              </span>
-            </div>
           </div>
+
+          {/* Active Streaming Clients List */}
+          {serverStats?.activeClients && serverStats.activeClients.length > 0 ? (
+            <div className="p-2.5 rounded-xl bg-sky-500/10 border border-sky-500/20 space-y-1.5">
+              <div className="flex items-center justify-between text-[11px] font-semibold text-sky-400">
+                <span className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                  Active Stream Clients ({serverStats.activeClients.length})
+                </span>
+              </div>
+              <div className="space-y-1">
+                {serverStats.activeClients.map((client) => (
+                  <div key={client.sessionKey} className="flex items-center justify-between text-[11px] bg-black/40 px-2 py-1 rounded-lg border border-white/5">
+                    <div className="flex items-center gap-1.5 truncate">
+                      <span>📺</span>
+                      <span className="font-semibold text-white">{client.clientName}</span>
+                      <span className="text-gray-400 font-mono text-[10px]">({client.ip})</span>
+                    </div>
+                    <span className="text-emerald-400 text-[10px] font-mono shrink-0 ml-2">{client.mode} • {client.connectedSec}s</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="px-3 py-1.5 rounded-xl bg-white/5 border border-white/5 text-[11px] text-gray-500 flex items-center justify-between">
+              <span>Connected Clients:</span>
+              <span className="font-mono text-gray-400">No active streams</span>
+            </div>
+          )}
 
           {/* Action Row: Open Web GUI & Auto-Poll */}
           <div className="flex items-center justify-between gap-2">
@@ -1796,7 +1828,7 @@ export const Settings: React.FC = () => {
               type="button"
               onClick={() => {
                 const target = `${(settings.msm32GetterUrl || 'http://julietmike.net:3033').replace(/\/+$/, '')}/logs`;
-                window.open(target, '_blank');
+                openExternalUrl(target);
               }}
               className="px-3 py-1.5 rounded-lg bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 border border-sky-500/20 text-xs font-semibold flex items-center gap-1.5 transition-colors"
             >

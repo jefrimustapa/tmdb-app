@@ -2,25 +2,23 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20260929-2250';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.fix-msm-getter-connection-issue.20260929-2250';
+export const APP_BUILD_NUMBER = '20261001-2048';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.msm-getter-streams.20261001-2048';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
-export const APP_BRANCH = 'fix/msm-getter-connection-issue';
-export const APP_CHANGELOG = `* fix(msm-getter): switch to ConnectionTCPObfuscated, preserve DC session authKey, and quiet internal GramJS reconnect spam
+export const APP_BRANCH = 'msm-getter-streams';
+export const APP_CHANGELOG = `* refactor(logs): remove redundant active streams card from web console and in-app drawer
+* feat(settings): display active streaming clients and devices in in-app log dashboard
+* fix(msm-getter): prevent multi-stream stacking and display client IP and device name in logs
+* Merge pull request #164 from jefrimustapa/fix/msm-getter-connection-issue
+* fix(msm-getter): attach custom onError handler to suppress benign reconnect logs and default dcId to 4
+* fix(msm-getter): switch to ConnectionTCPObfuscated, preserve DC session authKey, and quiet internal GramJS reconnect spam
+* Merge pull request #163 from jefrimustapa/feat/check-msm-consistency
+* fix(msm-getter): catch 'Not connected' race and add 3-attempt sender reconnect backoff (#160)
+* perf(msm-getter): restore original pipeline concurrency tiers (Eco=2, Standard=4, Turbo=6)
+* Merge pull request #162 from jefrimustapa/fix/msm-getter-search-fail
 * fix(msm-getter): add resilient multi-candidate fallback loop to recover from forward_failed deleted Telegram links
-* fix(player): resolve seek freeze on transcoded 1080p streams with asynchronous resume and cues probe optimization
+* fix(player): improve play & seek on 1080p transcoded MSM streams (#161)
 * perf(msm-getter): optimize 1080p streaming concurrency and Matroska clustering (#160)
 * Merge pull request #159 from jefrimustapa/fix/msm-getter-no-sound
-* fix(resolver): enforce strict word boundaries, disqualify split archives, and penalize TV episodes on movie searches
-* fix(player): resolve slow seeking and broken scrubber tap/drag for transcoded streams
-* fix(transcode): isolate single English audio track to avoid multi-language dub layering
-* fix(player): enable stereo AAC downmix for MKV and preserve all audio tracks
-* fix(msm-getter): add client abort handling, smart year extraction, and multi-result scoring (#158)
-* Merge pull request #157 from jefrimustapa/fix/unstable-keyboard-issue
-* fix(tv): preserve native text cursor navigation on virtual keyboard and guard DPAD_CENTER when typing
-* Merge pull request #156 from jefrimustapa/feat/improve-app-visuals
-* feat(ui): use favicon.svg for poster/still fallback with seamless dark gradient background
-* fix(visuals): eliminate search bar splash bleed, fix card full-bleed fill, and replace placeholder SVGs with inline fallbacks
-* fix(player): expand surround and multi-channel audio detection to downmix 6CH/surround streams to stereo (#155)
-* Merge pull request #154 from jefrimustapa/feat/improve-msm-getter-series-search`;
+* fix(resolver): enforce strict word boundaries, disqualify split archives, and penalize TV episodes on movie searches`;

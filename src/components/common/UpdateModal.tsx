@@ -4,6 +4,8 @@ import { updateService, type UpdateInfo } from '../../services/updateService';
 import { APP_VERSION_FULL } from '../../version';
 import { FormattedChangelog } from './FormattedChangelog';
 
+import { openExternalUrl } from '../../services/browserService';
+
 interface UpdateModalProps {
   updateInfo: UpdateInfo;
   onClose: () => void;
@@ -116,7 +118,7 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({ updateInfo, onClose })
 
   const handleInstall = () => {
     if (!updateInfo.apkUrl) {
-      window.open(updateInfo.htmlUrl, '_blank');
+      openExternalUrl(updateInfo.htmlUrl);
       return;
     }
 
