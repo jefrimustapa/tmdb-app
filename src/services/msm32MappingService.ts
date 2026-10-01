@@ -154,6 +154,13 @@ class Msm32MappingService {
         try {
           const u = new URL(finalStreamUrl);
           u.searchParams.set('chunkSize', String(chunkSize));
+          if (typeof window !== 'undefined') {
+            const ua = window.navigator?.userAgent || '';
+            const isTV = /Android.*TV|GoogleTV|AFT|SmartTV|CrKey/i.test(ua);
+            const isMobile = /Android|iPhone|iPad/i.test(ua);
+            const clientLabel = isTV ? 'Android TV' : (isMobile ? 'Mobile Device' : 'Web Desktop');
+            u.searchParams.set('clientName', clientLabel);
+          }
           finalStreamUrl = u.toString();
         } catch {}
 

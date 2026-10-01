@@ -18,6 +18,8 @@ export interface GitHubRelease {
   assets: GitHubReleaseAsset[];
 }
 
+import { openExternalUrl } from './browserService';
+
 export interface UpdateInfo {
   hasUpdate: boolean;
   currentVersion: string;
@@ -185,7 +187,7 @@ export const updateService = {
       (window as any).AndroidBridge.downloadAndInstallApk(apkUrl, apkName);
     } else {
       // Fallback for browser
-      window.open(apkUrl, '_blank');
+      openExternalUrl(apkUrl);
     }
   }
 };

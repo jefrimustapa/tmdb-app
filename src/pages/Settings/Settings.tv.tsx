@@ -10,6 +10,7 @@ import { APP_VERSION, APP_BUILD_NUMBER, APP_VERSION_FULL, APP_BUILD_CHANNEL, APP
 import { updateService, type UpdateInfo } from '../../services/updateService';
 import { UpdateModal } from '../../components/common/UpdateModal';
 import { FormattedChangelog } from '../../components/common/FormattedChangelog';
+import { openExternalUrl } from '../../services/browserService';
 import {
   Settings as SettingsIcon,
   Tv2,
@@ -4289,7 +4290,7 @@ export const Settings: React.FC = () => {
                       type="button"
                       onClick={() => {
                         const target = `${(settings.msm32GetterUrl || 'https://www.julietmike.net:3033').replace(/\/+$/, '')}/logs`;
-                        window.open(target, '_blank');
+                        openExternalUrl(target);
                       }}
                       className="w-full py-2.5 px-3 rounded-xl border text-xs font-bold transition-all tv-focus-target flex items-center justify-between border-sky-500/30 bg-sky-500/10 hover:bg-sky-500/20 text-sky-300"
                     >
