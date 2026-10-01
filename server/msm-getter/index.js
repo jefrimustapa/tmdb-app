@@ -12,6 +12,7 @@ import { Logger } from 'telegram/extensions/Logger.js';
 import bigInt from 'big-integer';
 import axios from 'axios';
 import fs from 'fs';
+import os from 'os';
 import { spawn, execSync } from 'child_process';
 import { db } from './db.js';
 
@@ -984,6 +985,49 @@ function resolveClientIdentity(rawIp, req) {
   return { ip, name };
 }
 
+// CPU Usage Tracker (Router System CPU from /proc/stat, and msm-getter Process CPU from process.cpuUsage)
+let lastSystemCpu = null;
+let lastProcCpu = process.cpuUsage();
+let lastProcTime = process.hrtime.bigint();
+
+function getCpuMetrics() {
+  const cores = os.cpus()?.length || 4;
+  const loadAvg1m = Math.round((os.loadavg()?.[0] || 0) * 100) / 100;
+
+  // 1. Router System CPU (differential /proc/stat)
+  let routerCpuPct = 0;
+  try {
+    if (fs.existsSync('/proc/stat')) {
+      const line = fs.readFileSync('/proc/stat', 'utf8').split('\n')[0];
+      const p = line.split(/\s+/).slice(1).map(Number);
+      const idle = p[3] + (p[4] || 0);
+      const total = p.reduce((a, b) => a + b, 0);
+      if (lastSystemCpu) {
+        const dt = total - lastSystemCpu.total;
+        const di = idle - lastSystemCpu.idle;
+        if (dt > 0) routerCpuPct = Math.max(0, Math.min(100, Math.round(((dt - di) / dt) * 100)));
+      }
+      lastSystemCpu = { idle, total };
+    }
+  } catch {}
+
+  // 2. msm-getter Process CPU (process.cpuUsage())
+  let nodeCpuPct = 0;
+  try {
+    const now = process.hrtime.bigint();
+    const usage = process.cpuUsage(lastProcCpu);
+    const elapsedMicros = Number(now - lastProcTime) / 1000;
+    if (elapsedMicros > 0) {
+      const totalMicros = usage.user + usage.system;
+      nodeCpuPct = Math.round((totalMicros / (elapsedMicros * cores)) * 100 * 10) / 10;
+    }
+    lastProcCpu = process.cpuUsage();
+    lastProcTime = now;
+  } catch {}
+
+  return { routerCpuPct, nodeCpuPct, cores, loadAvg1m };
+}
+
 // System Stats Endpoint (Uptime, Memory RSS, Active Streams, Active Clients, Log Size)
 app.get('/api/system/stats', (req, res) => {
   const mem = process.memoryUsage();
@@ -1007,6 +1051,11 @@ app.get('/api/system/stats', (req, res) => {
     });
   }
 
+  const cpu = getCpuMetrics();
+  const rssMB = Math.round(mem.rss / (1024 * 1024));
+  const capMB = 256;
+  const ramPct = Math.min(100, Math.round((rssMB / capMB) * 100));
+
   res.json({
     status: 'ok',
     uptime: Math.round(process.uptime()),
@@ -1015,8 +1064,11 @@ app.get('/api/system/stats', (req, res) => {
     activeStreams: activeClients.length,
     activeClients,
     authError: authError || null,
+    cpu,
     memory: {
-      rssMB: Math.round(mem.rss / (1024 * 1024)),
+      rssMB,
+      capMB,
+      ramPct,
       heapUsedMB: Math.round(mem.heapUsed / (1024 * 1024)),
       heapTotalMB: Math.round(mem.heapTotal / (1024 * 1024)),
     },
@@ -1202,25 +1254,40 @@ app.get('/logs', (req, res) => {
   </header>
 
   <!-- Live System Metrics Bar -->
-  <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+  <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5">
     <div class="p-3 rounded-xl bg-slate-900 border border-slate-800/80">
       <span class="text-[10px] text-slate-400 font-semibold block uppercase tracking-wider">Status</span>
       <div class="flex items-center gap-2 mt-1">
         <span id="metricDot" class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
         <span id="metricStatus" class="text-xs font-bold text-emerald-400">Online</span>
       </div>
+      <span class="text-[10px] text-slate-500 font-mono block mt-0.5">Telegram MTProto</span>
+    </div>
+    <div class="p-3 rounded-xl bg-slate-900 border border-slate-800/80">
+      <span class="text-[10px] text-slate-400 font-semibold block uppercase tracking-wider">CPU Usage</span>
+      <div class="flex items-baseline gap-1 mt-1 truncate">
+        <span id="metricNodeCpu" class="text-xs font-bold font-mono text-emerald-400">--%</span>
+        <span id="metricRouterCpuBadge" class="text-[11px] font-mono text-slate-400">[<span id="metricRouterCpu">--%</span> router]</span>
+      </div>
+      <span id="metricCpuDetail" class="text-[10px] text-slate-500 font-mono block mt-0.5">-- cores · load --</span>
+    </div>
+    <div class="p-3 rounded-xl bg-slate-900 border border-slate-800/80">
+      <span class="text-[10px] text-slate-400 font-semibold block uppercase tracking-wider">Node RAM / Cap</span>
+      <div class="flex items-baseline gap-1 mt-1 truncate">
+        <span id="metricRam" class="text-xs font-bold font-mono text-sky-400">-- / 256 MB</span>
+        <span id="metricRamPct" class="text-[10px] font-mono text-slate-400">(--%)</span>
+      </div>
+      <span id="metricHeapDetail" class="text-[10px] text-slate-500 font-mono block mt-0.5">Heap: -- MB</span>
     </div>
     <div class="p-3 rounded-xl bg-slate-900 border border-slate-800/80">
       <span class="text-[10px] text-slate-400 font-semibold block uppercase tracking-wider">Uptime</span>
       <span id="metricUptime" class="text-xs font-bold font-mono text-white mt-1 block">--</span>
+      <span class="text-[10px] text-slate-500 font-mono block mt-0.5">microservice</span>
     </div>
-    <div class="p-3 rounded-xl bg-slate-900 border border-slate-800/80">
-      <span class="text-[10px] text-slate-400 font-semibold block uppercase tracking-wider">Node RAM (RSS)</span>
-      <span id="metricRam" class="text-xs font-bold font-mono text-sky-400 mt-1 block">-- MB</span>
-    </div>
-    <div class="p-3 rounded-xl bg-slate-900 border border-slate-800/80">
+    <div class="p-3 rounded-xl bg-slate-900 border border-slate-800/80 col-span-2 sm:col-span-1">
       <span class="text-[10px] text-slate-400 font-semibold block uppercase tracking-wider">Log File Size</span>
       <span id="metricLogSize" class="text-xs font-bold font-mono text-slate-300 mt-1 block">-- KB</span>
+      <span class="text-[10px] text-slate-500 font-mono block mt-0.5">RAM disk (cap 5 MB)</span>
     </div>
   </div>
 
@@ -1421,7 +1488,43 @@ app.get('/logs', (req, res) => {
         const res = await fetch('/api/system/stats');
         const d = await res.json();
         document.getElementById('metricUptime').textContent = Math.floor(d.uptime / 3600) + 'h ' + Math.floor((d.uptime % 3600) / 60) + 'm ' + (d.uptime % 60) + 's';
-        document.getElementById('metricRam').textContent = (d.memory?.rssMB || 0) + ' MB';
+
+        // 1. CPU Usage: msm-getter [router]
+        const cpu = d.cpu || {};
+        const nodeCpuEl = document.getElementById('metricNodeCpu');
+        const routerCpuEl = document.getElementById('metricRouterCpu');
+        const cpuDetailEl = document.getElementById('metricCpuDetail');
+        if (nodeCpuEl && routerCpuEl) {
+          const nodeCpu = cpu.nodeCpuPct !== undefined ? cpu.nodeCpuPct : 0;
+          const routerCpu = cpu.routerCpuPct !== undefined ? cpu.routerCpuPct : 0;
+          nodeCpuEl.textContent = nodeCpu + '%';
+          routerCpuEl.textContent = routerCpu + '%';
+          if (nodeCpu > 50) nodeCpuEl.className = 'text-xs font-bold font-mono text-rose-400';
+          else if (nodeCpu > 20) nodeCpuEl.className = 'text-xs font-bold font-mono text-amber-400';
+          else nodeCpuEl.className = 'text-xs font-bold font-mono text-emerald-400';
+
+          if (cpuDetailEl) {
+            cpuDetailEl.textContent = (cpu.cores || 4) + ' cores · load ' + (cpu.loadAvg1m || 0);
+          }
+        }
+
+        // 2. Node RAM / Cap
+        const mem = d.memory || {};
+        const ramEl = document.getElementById('metricRam');
+        const ramPctEl = document.getElementById('metricRamPct');
+        const heapDetailEl = document.getElementById('metricHeapDetail');
+        if (ramEl) {
+          const rss = mem.rssMB || 0;
+          const cap = mem.capMB || 256;
+          const pct = mem.ramPct !== undefined ? mem.ramPct : Math.round((rss / cap) * 100);
+          ramEl.textContent = rss + ' / ' + cap + ' MB';
+          if (ramPctEl) ramPctEl.textContent = '(' + pct + '%)';
+          if (heapDetailEl) heapDetailEl.textContent = 'Heap: ' + (mem.heapUsedMB || 0) + ' MB';
+          if (pct > 80) ramEl.className = 'text-xs font-bold font-mono text-rose-400';
+          else if (pct > 50) ramEl.className = 'text-xs font-bold font-mono text-amber-400';
+          else ramEl.className = 'text-xs font-bold font-mono text-sky-400';
+        }
+
         document.getElementById('metricLogSize').textContent = (d.logSizeKB || 0) + ' KB';
         if (d.isConnected) {
           document.getElementById('metricDot').className = 'w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse';
