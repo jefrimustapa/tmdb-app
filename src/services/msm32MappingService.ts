@@ -172,6 +172,17 @@ class Msm32MappingService {
         try {
           const u = new URL(finalStreamUrl);
           u.searchParams.set('chunkSize', String(chunkSize));
+          if (typeof window !== 'undefined') {
+            const bridge = (window as any).AndroidBridge;
+            if (bridge?.getDeviceName) {
+              try {
+                const devName = bridge.getDeviceName();
+                if (devName && typeof devName === 'string' && devName.trim()) {
+                  u.searchParams.set('clientName', devName.trim());
+                }
+              } catch {}
+            }
+          }
           finalStreamUrl = u.toString();
         } catch {}
 
