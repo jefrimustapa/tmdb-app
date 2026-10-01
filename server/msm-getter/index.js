@@ -909,7 +909,9 @@ function resolveClientIdentity(rawIp, req) {
     return { ip, name: 'Internal Transcoder' };
   }
 
-  // 1. Prioritize Router DHCP leases and Asuswrt custom_clientlist
+  const isExternal = !/^(10\.|172\.(1[6-9]|2[0-9]|3[0-1])\.|192\.168\.|127\.|localhost)/.test(ip);
+
+  // 1. Prioritize Router DHCP leases and Asuswrt custom_clientlist (for LAN devices)
   const map = refreshClientMap();
   if (map.has(ip)) {
     const entry = map.get(ip);
@@ -918,10 +920,16 @@ function resolveClientIdentity(rawIp, req) {
     }
   }
 
-  // 2. Fallback to clientName query param / header (e.g. remote connections, WAN, or custom app label)
+  // 2. Fallback to clientName query param / header (e.g. remote connections, WAN, or native app model)
   const queryClient = req?.query?.clientName || req?.query?.client || req?.headers?.['x-client-name'];
   if (queryClient && !['Client', 'undefined', 'null'].includes(String(queryClient).trim())) {
-    return { ip, name: String(queryClient).trim() };
+    const cleanName = String(queryClient).trim();
+    return { ip, name: isExternal ? `${cleanName} (WAN)` : cleanName };
+  }
+
+  // 3. Fallback for external connections without clientName
+  if (isExternal) {
+    return { ip, name: `External (${ip})` };
   }
 
   const ua = req?.headers?.['user-agent'] || '';
