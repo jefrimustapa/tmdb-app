@@ -4301,6 +4301,24 @@ export const Settings: React.FC = () => {
                       <ExternalLink className="w-3.5 h-3.5 text-sky-400" />
                     </button>
 
+                    {/* Manage Persistent Cache in Browser Button */}
+                    <button
+                      id="drawer-btn-msm32-cache"
+                      data-telegram-msm-drawer-item="true"
+                      type="button"
+                      onClick={() => {
+                        const target = `${(settings.msm32GetterUrl || 'https://www.julietmike.net:3033').replace(/\/+$/, '')}/logs#cachePanel`;
+                        openExternalUrl(target);
+                      }}
+                      className="w-full py-2.5 px-3 rounded-xl border text-xs font-bold transition-all tv-focus-target flex items-center justify-between border-sky-500/30 bg-sky-500/10 hover:bg-sky-500/20 text-sky-300"
+                    >
+                      <div className="flex items-center gap-2">
+                        <HardDrive className="w-4 h-4 text-sky-400" />
+                        <span>Manage Persistent Stream Cache</span>
+                      </div>
+                      <ExternalLink className="w-3.5 h-3.5 text-sky-400" />
+                    </button>
+
                     {/* Sub-Drawer Item: Max Stream Resolution */}
                     <div className="bg-black/40 border border-hbo-border rounded-xl p-3.5 flex items-center justify-between">
                       <div className="min-w-0 pr-2">

@@ -3,7 +3,7 @@ import { dbService } from '../../services/db';
 import type { UserSettings, StreamResolverType } from '../../types/db';
 import { STREAM_PROVIDERS, CATEGORY_BADGE_CONFIG, ORIGIN_COUNTRY_LABELS } from '../../services/streamProviders';
 import type { OriginCountryCode } from '../../types/stream';
-import { msm32Service, getMsmServerLabel, type Msm32HealthResult } from '../../services/msm32MappingService';
+import { msm32Service, getMsmServerLabel, type Msm32HealthResult, type CachedStreamRecord } from '../../services/msm32MappingService';
 import { useDevice } from '../../hooks/useDevice';
 import { Logo } from '../../components/common/Logo';
 import { APP_VERSION, APP_BUILD_NUMBER, APP_VERSION_FULL, APP_BUILD_CHANNEL, APP_CHANGELOG } from '../../version';
@@ -44,6 +44,8 @@ import {
   Trash2,
   Terminal,
   ExternalLink,
+  Search,
+  Database,
 } from 'lucide-react';
 
 type MobileCategory = 'playback' | 'display' | 'content' | 'system';
@@ -182,6 +184,7 @@ export const Settings: React.FC = () => {
     | 'telegram-url'
     | 'telegram-chunk'
     | 'telegram-country'
+    | 'telegram-cache'
     | 'engine-embed'
     | 'priorityPicker'
     | 'adblock'
@@ -245,6 +248,7 @@ export const Settings: React.FC = () => {
     }>;
     memory?: { rssMB: number; heapUsedMB: number };
     logSizeKB?: number;
+    cachedStreams?: number;
   } | null>(null);
   const [autoPollLogs, setAutoPollLogs] = useState(false);
 
@@ -282,6 +286,72 @@ export const Settings: React.FC = () => {
     }, 3000);
     return () => clearInterval(interval);
   }, [activeDrawer, autoPollLogs, settings?.msm32GetterUrl]);
+
+  // Persistent Stream Cache State
+  const [cachedStreams, setCachedStreams] = useState<CachedStreamRecord[]>([]);
+  const [loadingCachedStreams, setLoadingCachedStreams] = useState(false);
+  const [cachedStreamsTotal, setCachedStreamsTotal] = useState(0);
+  const [cachedStreamsTotalSize, setCachedStreamsTotalSize] = useState(0);
+  const [cacheSearchQuery, setCacheSearchQuery] = useState('');
+  const [evictingKey, setEvictingKey] = useState<string | null>(null);
+
+  const fetchCacheList = async (query = cacheSearchQuery) => {
+    setLoadingCachedStreams(true);
+    try {
+      const url = settings?.msm32GetterUrl;
+      const res = await msm32Service.getCachedStreams(url, query);
+      setCachedStreams(res.items || []);
+      setCachedStreamsTotal(res.total || 0);
+      setCachedStreamsTotalSize(res.totalSizeBytes || 0);
+    } catch (err) {
+      console.error('[Settings] Error fetching cache:', err);
+    } finally {
+      setLoadingCachedStreams(false);
+    }
+  };
+
+  const handleEvictStream = async (item: CachedStreamRecord) => {
+    if (!window.confirm(`Evict "${item.filename || item.queryKey}" from persistent cache?`)) return;
+    const targetKey = item.queryKey || item.docId;
+    setEvictingKey(targetKey);
+    try {
+      const url = settings?.msm32GetterUrl;
+      const ok = await msm32Service.evictCachedStream(item.queryKey, item.docId, url);
+      if (ok) {
+        setCachedStreams(prev => prev.filter(c => c.queryKey !== item.queryKey && c.docId !== item.docId));
+        setCachedStreamsTotal(prev => Math.max(0, prev - 1));
+        setCachedStreamsTotalSize(prev => Math.max(0, prev - (item.size || 0)));
+      }
+    } catch (err) {
+      console.error('[Settings] Error evicting stream:', err);
+    } finally {
+      setEvictingKey(null);
+    }
+  };
+
+  const handleClearAllCache = async () => {
+    if (!window.confirm('Are you sure you want to CLEAR ALL persistent stream cache records from the server? This cannot be undone.')) return;
+    setLoadingCachedStreams(true);
+    try {
+      const url = settings?.msm32GetterUrl;
+      const ok = await msm32Service.clearAllCachedStreams(url);
+      if (ok) {
+        setCachedStreams([]);
+        setCachedStreamsTotal(0);
+        setCachedStreamsTotalSize(0);
+      }
+    } catch (err) {
+      console.error('[Settings] Error clearing cache:', err);
+    } finally {
+      setLoadingCachedStreams(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeDrawer === 'telegram-cache') {
+      fetchCacheList(cacheSearchQuery);
+    }
+  }, [activeDrawer, settings?.msm32GetterUrl]);
 
   const filterSentinelRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -1760,6 +1830,26 @@ export const Settings: React.FC = () => {
             </div>
           </button>
 
+          {/* Navigation to Persistent Stream Cache Manager Sub-Drawer */}
+          <button
+            type="button"
+            onClick={() => setActiveDrawer('telegram-cache')}
+            className="w-full flex items-center justify-between p-3.5 rounded-xl bg-white/5 border border-white/10 hover:border-sky-400/50 hover:bg-white/10 transition-all text-left"
+          >
+            <div className="space-y-0.5">
+              <span className="text-xs font-semibold text-white block">Persistent Stream Cache</span>
+              <span className="text-[11px] text-gray-400">View, search, and evict cached video streams</span>
+            </div>
+            <div className="flex items-center gap-1.5 flex-shrink-0">
+              <span className="text-[10px] text-sky-400 font-mono font-bold bg-sky-500/10 px-2 py-0.5 rounded border border-sky-400/20">
+                {(serverStats?.cachedStreams ?? msm32TestResult?.cachedStreams) !== undefined
+                  ? `${serverStats?.cachedStreams ?? msm32TestResult?.cachedStreams} cached`
+                  : 'Manage'}
+              </span>
+              <ChevronRight className="w-4 h-4 text-gray-400" />
+            </div>
+          </button>
+
 
           <p className="text-[11px] text-gray-400 leading-relaxed">
             The MSM Getter microservice executes queries against the Telegram bot <span className="text-sky-300 font-mono">@msm32bot</span>, resolving file documents and generating chunked HTTP byte-range streams directly into the custom player.
@@ -1898,6 +1988,160 @@ export const Settings: React.FC = () => {
                     </div>
                   );
                 })
+            )}
+          </div>
+        </div>
+      </SettingsDrawer>
+
+      {/* 3a-TG-CACHE. Sub-Drawer: Persistent Stream Cache Manager */}
+      <SettingsDrawer
+        isOpen={activeDrawer === 'telegram-cache'}
+        onClose={() => setActiveDrawer(null)}
+        onBack={() => setActiveDrawer('telegram-msm32')}
+        title="Persistent Stream Cache"
+        subtitle={`Central DB video cache on ${settings.msm32GetterUrl || 'http://julietmike.net:3033'}`}
+        categoryLabel="Telegram > MSM32bot > Stream Cache"
+      >
+        <div className="space-y-3">
+          {/* Summary Metric Chips */}
+          <div className="grid grid-cols-2 gap-2">
+            <div className="p-2.5 rounded-xl bg-white/5 border border-white/10 text-center">
+              <span className="text-[9px] text-gray-400 block uppercase tracking-wider font-semibold">Total Cached</span>
+              <span className="text-xs font-bold font-mono text-sky-400 mt-0.5 block">
+                {cachedStreamsTotal} videos
+              </span>
+            </div>
+            <div className="p-2.5 rounded-xl bg-white/5 border border-white/10 text-center">
+              <span className="text-[9px] text-gray-400 block uppercase tracking-wider font-semibold">Total Storage</span>
+              <span className="text-xs font-bold font-mono text-emerald-400 mt-0.5 block">
+                {cachedStreamsTotalSize >= 1024 * 1024 * 1024
+                  ? `${(cachedStreamsTotalSize / (1024 * 1024 * 1024)).toFixed(2)} GB`
+                  : `${(cachedStreamsTotalSize / (1024 * 1024)).toFixed(1)} MB`}
+              </span>
+            </div>
+          </div>
+
+          {/* Search Bar & Actions Row */}
+          <div className="flex items-center gap-2">
+            <div className="relative flex-1">
+              <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+              <input
+                type="text"
+                value={cacheSearchQuery}
+                onChange={(e) => {
+                  setCacheSearchQuery(e.target.value);
+                  fetchCacheList(e.target.value);
+                }}
+                placeholder="Search cached titles, episodes, IDs..."
+                className="w-full bg-white/5 border border-white/10 rounded-xl py-1.5 pl-8 pr-3 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-sky-500/50"
+              />
+              {cacheSearchQuery && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCacheSearchQuery('');
+                    fetchCacheList('');
+                  }}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              )}
+            </div>
+
+            <button
+              type="button"
+              disabled={loadingCachedStreams}
+              onClick={() => fetchCacheList(cacheSearchQuery)}
+              className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-gray-300 border border-white/10 transition-colors disabled:opacity-50 shrink-0"
+              title="Refresh Cache List"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${loadingCachedStreams ? 'animate-spin' : ''}`} />
+            </button>
+
+            {cachedStreamsTotal > 0 && (
+              <button
+                type="button"
+                disabled={loadingCachedStreams}
+                onClick={handleClearAllCache}
+                className="px-2.5 py-1.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 text-xs font-semibold flex items-center gap-1 transition-colors shrink-0 disabled:opacity-50"
+                title="Clear entire cache"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Clear All</span>
+              </button>
+            )}
+          </div>
+
+          {/* Cached Videos List */}
+          <div className="space-y-2 max-h-[60vh] overflow-y-auto pr-0.5">
+            {loadingCachedStreams && cachedStreams.length === 0 ? (
+              <div className="p-8 text-center text-xs text-gray-400 space-y-2">
+                <RefreshCw className="w-5 h-5 animate-spin mx-auto text-sky-400" />
+                <p>Loading persistent cache records...</p>
+              </div>
+            ) : cachedStreams.length === 0 ? (
+              <div className="p-8 text-center text-xs text-gray-400 bg-white/5 border border-white/5 rounded-2xl">
+                <Database className="w-6 h-6 mx-auto text-gray-500 mb-2 opacity-50" />
+                <p className="font-semibold text-gray-300">No cached streams found</p>
+                <p className="text-[11px] text-gray-500 mt-1">
+                  {cacheSearchQuery ? `No records match "${cacheSearchQuery}"` : 'Videos will automatically appear here once played or resolved.'}
+                </p>
+              </div>
+            ) : (
+              cachedStreams.map((item) => {
+                const isEvicting = evictingKey === (item.queryKey || item.docId);
+                const dateStr = item.createdAt
+                  ? new Date(item.createdAt).toLocaleDateString(undefined, {
+                      month: 'short',
+                      day: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })
+                  : null;
+
+                return (
+                  <div
+                    key={item.docId || item.queryKey}
+                    className="p-3 rounded-xl bg-white/5 border border-white/10 hover:border-white/20 transition-all space-y-1.5"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-xs">🎬</span>
+                          <span className="text-xs font-semibold text-white truncate block">
+                            {item.filename || item.queryKey}
+                          </span>
+                        </div>
+                        <span className="text-[10px] text-gray-400 font-mono block truncate mt-0.5">
+                          Key: {item.queryKey}
+                        </span>
+                      </div>
+
+                      <button
+                        type="button"
+                        disabled={isEvicting}
+                        onClick={() => handleEvictStream(item)}
+                        className="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 transition-colors disabled:opacity-50 shrink-0"
+                        title="Evict from server cache"
+                      >
+                        {isEvicting ? (
+                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <Trash2 className="w-3.5 h-3.5" />
+                        )}
+                      </button>
+                    </div>
+
+                    <div className="flex items-center gap-3 text-[10px] text-gray-400 font-mono pt-1 border-t border-white/5">
+                      <span className="text-sky-300 font-bold">{item.sizeFormatted}</span>
+                      {dateStr && <span>Added: {dateStr}</span>}
+                      {item.dcId && <span>DC: {item.dcId}</span>}
+                      <span className="truncate">Doc: {item.docId}</span>
+                    </div>
+                  </div>
+                );
+              })
             )}
           </div>
         </div>
