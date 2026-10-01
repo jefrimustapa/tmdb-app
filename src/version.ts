@@ -2,12 +2,13 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20261001-2026';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.msm-getter-streams.20261001-2026';
+export const APP_BUILD_NUMBER = '20261001-2034';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.msm-getter-streams.20261001-2034';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
 export const APP_BRANCH = 'msm-getter-streams';
-export const APP_CHANGELOG = `* Merge pull request #164 from jefrimustapa/fix/msm-getter-connection-issue
+export const APP_CHANGELOG = `* fix(msm-getter): prevent multi-stream stacking and display client IP and device name in logs
+* Merge pull request #164 from jefrimustapa/fix/msm-getter-connection-issue
 * fix(msm-getter): attach custom onError handler to suppress benign reconnect logs and default dcId to 4
 * fix(msm-getter): switch to ConnectionTCPObfuscated, preserve DC session authKey, and quiet internal GramJS reconnect spam
 * Merge pull request #163 from jefrimustapa/feat/check-msm-consistency
@@ -20,5 +21,4 @@ export const APP_CHANGELOG = `* Merge pull request #164 from jefrimustapa/fix/ms
 * Merge pull request #159 from jefrimustapa/fix/msm-getter-no-sound
 * fix(resolver): enforce strict word boundaries, disqualify split archives, and penalize TV episodes on movie searches
 * fix(player): resolve slow seeking and broken scrubber tap/drag for transcoded streams
-* fix(transcode): isolate single English audio track to avoid multi-language dub layering
-* fix(player): enable stereo AAC downmix for MKV and preserve all audio tracks`;
+* fix(transcode): isolate single English audio track to avoid multi-language dub layering`;
