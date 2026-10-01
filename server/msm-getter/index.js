@@ -1855,6 +1855,26 @@ app.get('/api/resolve', async (req, res) => {
             }
           }
         } else {
+          // Movie validation: Instantly reject any TV series/episode candidates during movie searches
+          const isTvDoc = /\b(s\d{1,2}e\d{1,2}|s\d{1,2}\s*ep?\s*\d{1,2}|season\s*\d+|musim\s*\d+|episode\s*\d+|episod\s*\d+|ep\s*\d+|\.end\.)\b/i.test(filename) ||
+                          /\b(s\d{1,2}e\d{1,2}|s\d{1,2}\s*ep?\s*\d{1,2}|season\s*\d+|musim\s*\d+|episode\s*\d+|episod\s*\d+|ep\s*\d+|\.end\.)\b/i.test(msg.message || '');
+          if (isTvDoc) {
+            matchesCandidate = false;
+          }
+
+          // Single-word title collision guard: reject "Gold Digger" when searching for "Digger"
+          if (matchesCandidate && significantTokens.length === 1) {
+            const singleWord = significantTokens[0];
+            const prefixMatch = normFn.match(new RegExp(`\\b([a-z0-9]+)\\s+${singleWord}\\b`, 'i'));
+            if (prefixMatch) {
+              const prefixWord = prefixMatch[1].toLowerCase();
+              const ignorePrefixes = new Set(['the', 'a', 'an', 'movie', 'film']);
+              if (!ignorePrefixes.has(prefixWord)) {
+                matchesCandidate = false;
+              }
+            }
+          }
+
           // Movie validation: strictly enforce sequel number and release year alignment
           const docSequel = extractSequelInfo(filename);
           if (targetSequel) {
@@ -2095,11 +2115,24 @@ app.get('/api/resolve', async (req, res) => {
           }
         }
       } else {
-        // Movie validation: Heavily penalize TV series candidates (S01E01, episodes) during movie searches
-        const isTvCandidate = /\b(s\d{1,2}e\d{1,2}|s\d{1,2}\s*ep?\s*\d{1,2}|season\s*\d+|episode\s*\d+|ep\d{1,2}|\.end\.)\b/i.test(btnText) ||
-                              /\b(s\d{1,2}e\d{1,2}|s\d{1,2}\s*ep?\s*\d{1,2}|season\s*\d+|episode\s*\d+|ep\d{1,2}|\.end\.)\b/i.test(msgText);
+        // Movie validation: Instantly disqualify TV series candidates (S01E01, episodes) during movie searches
+        const isTvCandidate = /\b(s\d{1,2}e\d{1,2}|s\d{1,2}\s*ep?\s*\d{1,2}|season\s*\d+|musim\s*\d+|episode\s*\d+|episod\s*\d+|ep\s*\d+|\.end\.)\b/i.test(btnText) ||
+                              /\b(s\d{1,2}e\d{1,2}|s\d{1,2}\s*ep?\s*\d{1,2}|season\s*\d+|musim\s*\d+|episode\s*\d+|episod\s*\d+|ep\s*\d+|\.end\.)\b/i.test(msgText);
         if (isTvCandidate) {
-          score -= 700; // Reject TV episodes when searching for a movie
+          return -999; // Hard disqualify TV episodes when searching for a movie
+        }
+
+        // Single-word title collision guard: reject "Gold Digger" when searching for "Digger"
+        if (significantTokens.length === 1) {
+          const singleWord = significantTokens[0];
+          const prefixMatch = normBtnText.match(new RegExp(`\\b([a-z0-9]+)\\s+${singleWord}\\b`, 'i'));
+          if (prefixMatch) {
+            const prefixWord = prefixMatch[1].toLowerCase();
+            const ignorePrefixes = new Set(['the', 'a', 'an', 'movie', 'film']);
+            if (!ignorePrefixes.has(prefixWord)) {
+              return -999; // Different title
+            }
+          }
         }
 
         // Movie validation: Sequel and Release Year Alignment
