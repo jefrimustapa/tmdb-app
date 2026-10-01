@@ -1777,7 +1777,7 @@ export const Settings: React.FC = () => {
       >
         <div className="space-y-3">
           {/* Live Metrics Chips */}
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-2 gap-2">
             <div className="p-2.5 rounded-xl bg-white/5 border border-white/10 text-center">
               <span className="text-[9px] text-gray-400 block uppercase tracking-wider font-semibold">Status</span>
               <span className={`text-xs font-bold font-mono mt-0.5 block ${serverStats?.isConnected ? 'text-emerald-400' : 'text-amber-400'}`}>
@@ -1788,12 +1788,6 @@ export const Settings: React.FC = () => {
               <span className="text-[9px] text-gray-400 block uppercase tracking-wider font-semibold">Memory (RSS)</span>
               <span className="text-xs font-bold font-mono text-sky-400 mt-0.5 block">
                 {serverStats?.memory?.rssMB ? `${serverStats.memory.rssMB} MB` : '--'}
-              </span>
-            </div>
-            <div className="p-2.5 rounded-xl bg-white/5 border border-white/10 text-center">
-              <span className="text-[9px] text-gray-400 block uppercase tracking-wider font-semibold">Active Streams</span>
-              <span className="text-xs font-bold font-mono text-white mt-0.5 block">
-                {serverStats?.activeStreams !== undefined ? `${serverStats.activeStreams}` : '0'}
               </span>
             </div>
           </div>

@@ -1131,7 +1131,7 @@ app.get('/logs', (req, res) => {
   </header>
 
   <!-- Live System Metrics Bar -->
-  <div class="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
+  <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
     <div class="p-3 rounded-xl bg-slate-900 border border-slate-800/80">
       <span class="text-[10px] text-slate-400 font-semibold block uppercase tracking-wider">Status</span>
       <div class="flex items-center gap-2 mt-1">
@@ -1148,10 +1148,6 @@ app.get('/logs', (req, res) => {
       <span id="metricRam" class="text-xs font-bold font-mono text-sky-400 mt-1 block">-- MB</span>
     </div>
     <div class="p-3 rounded-xl bg-slate-900 border border-slate-800/80">
-      <span class="text-[10px] text-slate-400 font-semibold block uppercase tracking-wider">Active Streams</span>
-      <span id="metricStreams" class="text-xs font-bold font-mono text-white mt-1 block">0 active</span>
-    </div>
-    <div class="p-3 rounded-xl bg-slate-900 border border-slate-800/80 col-span-2 sm:col-span-1">
       <span class="text-[10px] text-slate-400 font-semibold block uppercase tracking-wider">Log File Size</span>
       <span id="metricLogSize" class="text-xs font-bold font-mono text-slate-300 mt-1 block">-- KB</span>
     </div>
@@ -1327,7 +1323,6 @@ app.get('/logs', (req, res) => {
         const d = await res.json();
         document.getElementById('metricUptime').textContent = Math.floor(d.uptime / 3600) + 'h ' + Math.floor((d.uptime % 3600) / 60) + 'm ' + (d.uptime % 60) + 's';
         document.getElementById('metricRam').textContent = (d.memory?.rssMB || 0) + ' MB';
-        document.getElementById('metricStreams').textContent = (d.activeStreams || 0) + ' active';
         document.getElementById('metricLogSize').textContent = (d.logSizeKB || 0) + ' KB';
         if (d.isConnected) {
           document.getElementById('metricDot').className = 'w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse';

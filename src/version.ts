@@ -2,12 +2,13 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20261001-2034';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.msm-getter-streams.20261001-2034';
+export const APP_BUILD_NUMBER = '20261001-2037';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.msm-getter-streams.20261001-2037';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
 export const APP_BRANCH = 'msm-getter-streams';
-export const APP_CHANGELOG = `* fix(msm-getter): prevent multi-stream stacking and display client IP and device name in logs
+export const APP_CHANGELOG = `* feat(settings): display active streaming clients and devices in in-app log dashboard
+* fix(msm-getter): prevent multi-stream stacking and display client IP and device name in logs
 * Merge pull request #164 from jefrimustapa/fix/msm-getter-connection-issue
 * fix(msm-getter): attach custom onError handler to suppress benign reconnect logs and default dcId to 4
 * fix(msm-getter): switch to ConnectionTCPObfuscated, preserve DC session authKey, and quiet internal GramJS reconnect spam
@@ -20,5 +21,4 @@ export const APP_CHANGELOG = `* fix(msm-getter): prevent multi-stream stacking a
 * perf(msm-getter): optimize 1080p streaming concurrency and Matroska clustering (#160)
 * Merge pull request #159 from jefrimustapa/fix/msm-getter-no-sound
 * fix(resolver): enforce strict word boundaries, disqualify split archives, and penalize TV episodes on movie searches
-* fix(player): resolve slow seeking and broken scrubber tap/drag for transcoded streams
-* fix(transcode): isolate single English audio track to avoid multi-language dub layering`;
+* fix(player): resolve slow seeking and broken scrubber tap/drag for transcoded streams`;
