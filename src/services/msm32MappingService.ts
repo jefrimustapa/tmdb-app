@@ -16,6 +16,24 @@ export interface Msm32HealthResult {
   error?: string;
 }
 
+export interface CachedStreamRecord {
+  queryKey: string;
+  docId: string;
+  filename: string;
+  size: number;
+  sizeFormatted: string;
+  mimeType?: string;
+  dcId?: number;
+  createdAt?: number;
+}
+
+export interface CachedStreamsResponse {
+  success: boolean;
+  total: number;
+  totalSizeBytes: number;
+  items: CachedStreamRecord[];
+}
+
 class Msm32MappingService {
   constructor() {
     this.purgeLegacyClientStorage();
@@ -185,6 +203,68 @@ class Msm32MappingService {
     } finally {
       clearTimeout(timer);
       if (signal) signal.removeEventListener('abort', onExternalAbort);
+    }
+  }
+
+  /**
+   * Fetch all cached video streams from central DB on server
+   */
+  async getCachedStreams(customUrl?: string, search?: string): Promise<CachedStreamsResponse> {
+    const baseUrl = (customUrl?.trim() || (await this.getBaseUrl())).replace(/\/+$/, '');
+    try {
+      const q = search ? `?search=${encodeURIComponent(search.trim())}` : '';
+      const res = await fetch(`${baseUrl}/api/cache${q}`, {
+        headers: { Accept: 'application/json' },
+      });
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+      }
+      return await res.json();
+    } catch (err: any) {
+      console.error('[MSM32] Failed to fetch cached streams:', err);
+      return { success: false, total: 0, totalSizeBytes: 0, items: [] };
+    }
+  }
+
+  /**
+   * Evict a single cached video record by queryKey or docId
+   */
+  async evictCachedStream(queryKey?: string, docId?: string, customUrl?: string): Promise<boolean> {
+    const baseUrl = (customUrl?.trim() || (await this.getBaseUrl())).replace(/\/+$/, '');
+    try {
+      const params = new URLSearchParams();
+      if (queryKey) params.set('key', queryKey);
+      if (docId) params.set('docId', docId);
+
+      const res = await fetch(`${baseUrl}/api/cache?${params.toString()}`, {
+        method: 'DELETE',
+        headers: { Accept: 'application/json' },
+      });
+      if (!res.ok) return false;
+      const data = await res.json();
+      return !!data.evicted;
+    } catch (err) {
+      console.error('[MSM32] Failed to evict cached stream:', err);
+      return false;
+    }
+  }
+
+  /**
+   * Clear all cached streams from the central database
+   */
+  async clearAllCachedStreams(customUrl?: string): Promise<boolean> {
+    const baseUrl = (customUrl?.trim() || (await this.getBaseUrl())).replace(/\/+$/, '');
+    try {
+      const res = await fetch(`${baseUrl}/api/cache/clear`, {
+        method: 'POST',
+        headers: { Accept: 'application/json' },
+      });
+      if (!res.ok) return false;
+      const data = await res.json();
+      return !!data.success;
+    } catch (err) {
+      console.error('[MSM32] Failed to clear cached streams:', err);
+      return false;
     }
   }
 }

@@ -156,6 +156,29 @@ class CentralDatabase {
   size() {
     return this.byDocId.size;
   }
+
+  getAll(search = '') {
+    let items = Array.from(this.byDocId.values());
+    if (search && search.trim()) {
+      const q = search.trim().toLowerCase();
+      items = items.filter(r => 
+        (r.queryKey && r.queryKey.toLowerCase().includes(q)) ||
+        (r.filename && r.filename.toLowerCase().includes(q)) ||
+        (r.docId && r.docId.includes(q))
+      );
+    }
+    // Sort newest first
+    return items.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+  }
+
+  getTotalSizeBytes() {
+    let total = 0;
+    for (const r of this.byDocId.values()) {
+      const bytes = parseInt(r.size, 10);
+      if (!isNaN(bytes) && bytes > 0) total += bytes;
+    }
+    return total;
+  }
 }
 
 export const db = new CentralDatabase();

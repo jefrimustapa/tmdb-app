@@ -398,6 +398,25 @@ function calculateTitleCoverage(significantTokens, text) {
   return matched.length / significantTokens.length;
 }
 
+// Helper: Check if a button text is bare (e.g. only resolution, episode tag, numbers, or action verbs)
+function isBareButton(text) {
+  if (!text) return true;
+  const clean = text
+    .toLowerCase()
+    .replace(/[\[\]\(\)\{\}\-_:\|]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  const tokens = clean.split(' ').filter(Boolean);
+  if (tokens.length === 0) return true;
+  const bareKeywords = new Set([
+    '720p', '1080p', '480p', '540p', '360p', '2160p', '4k', 'hd', 'fhd', 'sd',
+    'ep', 'eps', 'episodes', 'episode', 'episod', 'e', 's', 'season', 'musim',
+    'download', 'muat', 'turun', 'stream', 'play', 'server', 'fast', 'direct',
+    'link', 'watch', 'mb', 'gb', 'mp4', 'mkv', 'avi'
+  ]);
+  return tokens.every(t => /^\d+$/.test(t) || bareKeywords.has(t));
+}
+
 // Web Auth State in RAM
 let pendingAuth = {
   client: null,
@@ -1192,6 +1211,25 @@ app.get('/logs', (req, res) => {
     </div>
   </div>
 
+  <!-- Persistent Stream Cache Panel -->
+  <div id="cachePanel" class="p-4 rounded-xl bg-slate-900 border border-slate-800/80 space-y-3">
+    <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 pb-2 border-b border-slate-800/60">
+      <div class="flex items-center gap-2">
+        <span class="text-sm">💾</span>
+        <span class="text-xs font-bold text-white uppercase tracking-wider">Persistent Stream Cache (Central DB)</span>
+        <span id="cacheCountBadge" class="text-[10px] font-mono font-bold bg-sky-500/10 text-sky-400 px-2 py-0.5 rounded border border-sky-500/20">-- items</span>
+      </div>
+      <div class="flex items-center gap-2 w-full sm:w-auto">
+        <input id="cacheSearch" type="text" placeholder="Search cached video / key..." class="bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-sky-500/50 w-full sm:w-64" oninput="loadCacheList()" />
+        <button onclick="loadCacheList()" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-medium text-slate-300 border border-slate-700 shrink-0">Refresh</button>
+        <button onclick="clearAllCache()" class="px-2.5 py-1 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 text-xs font-medium shrink-0">Clear All</button>
+      </div>
+    </div>
+    <div id="cacheListContainer" class="max-h-60 overflow-y-auto space-y-1.5 font-mono text-xs">
+      <div class="text-slate-500 italic py-2">Loading persistent cache...</div>
+    </div>
+  </div>
+
   <!-- Terminal Window -->
   <div class="relative flex-1 bg-slate-950 border border-slate-800/80 rounded-2xl overflow-hidden shadow-2xl glow-box flex flex-col min-h-[500px]">
     <div class="bg-slate-900/90 border-b border-slate-800/80 px-4 py-2 flex items-center justify-between">
@@ -1365,9 +1403,68 @@ app.get('/logs', (req, res) => {
       } catch {}
     }
 
+    async function loadCacheList() {
+      const searchEl = document.getElementById('cacheSearch');
+      const q = searchEl ? searchEl.value : '';
+      try {
+        const res = await fetch('/api/cache?search=' + encodeURIComponent(q));
+        const data = await res.json();
+        const container = document.getElementById('cacheListContainer');
+        const badge = document.getElementById('cacheCountBadge');
+        if (badge) {
+          const totalSizeMB = data.totalSizeBytes ? (data.totalSizeBytes / (1024 * 1024)).toFixed(1) + ' MB' : '0 MB';
+          badge.textContent = (data.total || 0) + ' videos (' + totalSizeMB + ')';
+        }
+        if (!container) return;
+        if (!data.items || data.items.length === 0) {
+          container.innerHTML = '<div class="text-slate-500 italic py-2">No cached records found.</div>';
+          return;
+        }
+        container.innerHTML = data.items.map(function(item) {
+          return '<div class="flex items-center justify-between p-2 rounded-lg bg-slate-950/60 border border-slate-800/40 hover:border-slate-700/60 transition gap-2">' +
+            '<div class="min-w-0 flex-1">' +
+              '<div class="flex items-center gap-1.5 truncate">' +
+                '<span class="text-slate-400 text-[10px]">🎬</span>' +
+                '<span class="text-white font-semibold truncate text-[11px]">' + (item.filename || item.queryKey) + '</span>' +
+              '</div>' +
+              '<div class="text-[10px] text-slate-400 truncate flex items-center gap-2 mt-0.5">' +
+                '<span class="text-sky-400 font-bold">' + item.sizeFormatted + '</span>' +
+                '<span>Key: ' + item.queryKey + '</span>' +
+                '<span>Doc: ' + item.docId + '</span>' +
+              '</div>' +
+            '</div>' +
+            '<button onclick="evictCacheRecord(\'' + item.queryKey + '\', \'' + item.docId + '\')" class="px-2 py-1 rounded bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 text-[10px] shrink-0 font-sans font-semibold transition">Evict</button>' +
+          '</div>';
+        }).join('');
+      } catch (err) {
+        console.error('Failed to load cache:', err);
+      }
+    }
+
+    async function evictCacheRecord(key, docId) {
+      if (!confirm('Evict this video stream from persistent cache?')) return;
+      try {
+        await fetch('/api/cache?key=' + encodeURIComponent(key) + '&docId=' + encodeURIComponent(docId), { method: 'DELETE' });
+        loadCacheList();
+      } catch (err) {
+        alert('Evict failed: ' + err.message);
+      }
+    }
+
+    async function clearAllCache() {
+      if (!confirm('DANGER: Clear ALL stream cache records from server?')) return;
+      try {
+        await fetch('/api/cache/clear', { method: 'POST' });
+        loadCacheList();
+      } catch (err) {
+        alert('Clear failed: ' + err.message);
+      }
+    }
+
     fetchInitialLogs();
     connectSSE();
     pollMetrics();
+    loadCacheList();
     setInterval(pollMetrics, 3000);
   </script>
 </body>
@@ -1414,6 +1511,50 @@ app.get('/api/debug-search', async (req, res) => {
 });
 
 // Cache management endpoints
+app.get('/api/cache', (req, res) => {
+  const { search = '' } = req.query;
+  const items = db.getAll(search);
+  const totalSizeBytes = db.getTotalSizeBytes();
+
+  const formattedItems = items.map(item => {
+    const bytes = parseInt(item.size, 10);
+    let sizeFormatted = '0 B';
+    if (!isNaN(bytes) && bytes > 0) {
+      if (bytes >= 1024 * 1024 * 1024) {
+        sizeFormatted = `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+      } else {
+        sizeFormatted = `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+      }
+    }
+    return {
+      queryKey: item.queryKey,
+      docId: item.docId,
+      filename: item.filename,
+      size: !isNaN(bytes) ? bytes : 0,
+      sizeFormatted,
+      mimeType: item.mimeType || 'video/mp4',
+      dcId: item.dcId || 4,
+      createdAt: item.createdAt || (item.date ? item.date * 1000 : 0),
+    };
+  });
+
+  return res.json({
+    success: true,
+    total: formattedItems.length,
+    totalSizeBytes,
+    items: formattedItems,
+  });
+});
+
+app.delete('/api/cache', (req, res) => {
+  const key = req.query.key || req.body?.key;
+  const docId = req.query.docId || req.body?.docId;
+  let evicted = false;
+  if (key) evicted = db.delete(key) || evicted;
+  if (docId) evicted = db.deleteByDocId(docId) || evicted;
+  return res.json({ success: true, evicted, key, docId });
+});
+
 app.post('/api/cache/clear', (req, res) => {
   db.clear();
   return res.json({ success: true, message: 'Central database cache cleared' });
@@ -1791,8 +1932,22 @@ app.get('/api/resolve', async (req, res) => {
       }
 
       // 3. Strict Title Token Coverage check
+      // Determine if button is a bare action button (e.g. "[ 720p ]", "[ 01 ]") or has full filename
+      const isBare = isBareButton(btnText);
+      let titleTargetText = normBtnText;
+
+      if (isBare) {
+        // Strip bot search echo prefixes like "2 Results for Gadis Masa E04 (1/1)" before evaluating parent message
+        const cleanMsgText = msgText
+          .replace(/^\d+\s*results?\s*for\s*[^\n\r]+/i, '')
+          .replace(/^hasil\s*carian\s*[^\n\r]+/i, '')
+          .replace(/^search\s*results?\s*[^\n\r]+/i, '')
+          .trim();
+        titleTargetText = normalizeTitle(cleanMsgText);
+      }
+
       if (significantTokens.length > 0) {
-        const coverage = calculateTitleCoverage(significantTokens, combinedNorm);
+        const coverage = calculateTitleCoverage(significantTokens, titleTargetText);
         if (significantTokens.length <= 2 && coverage < 1.0) {
           return -999; // 1- or 2-word titles MUST match all words (prevents "One Piece" matching "One Cent")
         }
@@ -1804,8 +1959,12 @@ app.get('/api/resolve', async (req, res) => {
       let score = 0;
 
       if (significantTokens.length > 0) {
-        const coverage = calculateTitleCoverage(significantTokens, combinedNorm);
-        score += Math.round(coverage * 80);
+        const coverage = calculateTitleCoverage(significantTokens, titleTargetText);
+        if (coverage >= 1.0) {
+          score += 200; // Strong reward for full title match
+        } else {
+          score += Math.round(coverage * 100);
+        }
       }
 
       if (isTv) {
@@ -1942,10 +2101,10 @@ app.get('/api/resolve', async (req, res) => {
         else if (btnText.includes('1080p') || btnText.includes('1080')) score += 5;
         else if (btnText.includes('2160p') || btnText.includes('4k')) score -= 50;
       } else {
-        if (btnText.includes('1080p') || btnText.includes('1080')) score += 50;
+        if (btnText.includes('1080p') || btnText.includes('1080')) score += 80;
         else if (btnText.includes('720p') || btnText.includes('720')) score += 30;
       }
-      if (btnText.toLowerCase().includes('.mp4') || btnText.toLowerCase().includes('mp4')) score += 35;
+      if (btnText.toLowerCase().includes('.mp4') || btnText.toLowerCase().includes('mp4')) score += 15;
       if (btnText.includes('malaysub') || btnText.includes('msm')) score += 5;
 
       return score;
