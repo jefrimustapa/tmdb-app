@@ -374,6 +374,37 @@ function cleanSearchTitle(str) {
     .trim();
 }
 
+// Whitelist legitimate release metadata tokens that can directly follow a single-word movie title
+function isAllowedTitleSuffix(word) {
+  if (!word) return true;
+  const w = word.toLowerCase();
+  // Pure digits: 4-digit years (1990-2030), resolution heights, channel digits, part numbers
+  if (/^\d+$/.test(w)) return true;
+  // Resolution patterns: 1080p, 720p, 4k, 2160p, etc.
+  if (/^\d+(p|k)$/.test(w)) return true;
+  // Disc/part patterns: cd1, cd2, pt1, part1, etc.
+  if (/^(?:cd|pt|part)\d+$/.test(w)) return true;
+
+  const allowed = new Set([
+    // Resolutions & standards
+    'p', 'k', 'hd', 'fhd', 'uhd', 'sd', 'hdr', 'hdr10', 'sdr', 'dovi', 'dv',
+    // Media sources
+    'bluray', 'blu', 'ray', 'webdl', 'webrip', 'web', 'hdrip', 'hdtv', 'dvdrip', 'brrip', 'remux', 'dvd', 'tvrip',
+    // Video codecs
+    'x264', 'x265', 'h264', 'h265', 'hevc', 'avc', 'av1', '10bit', '8bit',
+    // Audio codecs & channels
+    'aac', 'ac3', 'eac3', 'dts', 'ddp', 'ddp5', 'mp3', 'flac', 'atmos', 'truehd', 'opus',
+    // Containers
+    'mkv', 'mp4', 'avi',
+    // Languages & subtitles
+    'malay', 'malaysub', 'sub', 'subs', 'subtitle', 'subtitles', 'eng', 'engsub', 'indo', 'indosub', 'tam', 'tamil', 'multi', 'dual', 'dub', 'dubbed',
+    // Release descriptors
+    'movie', 'film', 'part', 'pt', 'vol', 'volume', 'complete', 'repack', 'proper', 'extended', 'unrated', 'directors', 'cut', 'edition', 'version', 'remastered', 'imax', 'internal'
+  ]);
+
+  return allowed.has(w);
+}
+
 // Extract primary keywords excluding common stopwords for strict coverage validation
 function extractSignificantTokens(str) {
   const norm = normalizeTitle(str);
@@ -1862,15 +1893,24 @@ app.get('/api/resolve', async (req, res) => {
             matchesCandidate = false;
           }
 
-          // Single-word title collision guard: reject "Gold Digger" when searching for "Digger"
+          // Single-word title collision guard: reject "Gold Digger" or "Runner Runner" when searching for "Digger" / "Runner"
           if (matchesCandidate && significantTokens.length === 1) {
             const singleWord = significantTokens[0];
             const prefixMatch = normFn.match(new RegExp(`\\b([a-z0-9]+)\\s+${singleWord}\\b`, 'i'));
             if (prefixMatch) {
               const prefixWord = prefixMatch[1].toLowerCase();
-              const ignorePrefixes = new Set(['the', 'a', 'an', 'movie', 'film']);
+              const ignorePrefixes = new Set(['the', 'a', 'an', 'movie', 'film', 'msm', 'msm32']);
               if (!ignorePrefixes.has(prefixWord)) {
                 matchesCandidate = false;
+              }
+            }
+            if (matchesCandidate) {
+              const suffixMatch = normFn.match(new RegExp(`\\b${singleWord}\\s+([a-z0-9]+)\\b`, 'i'));
+              if (suffixMatch) {
+                const suffixWord = suffixMatch[1].toLowerCase();
+                if (!isAllowedTitleSuffix(suffixWord)) {
+                  matchesCandidate = false;
+                }
               }
             }
           }
@@ -2122,15 +2162,23 @@ app.get('/api/resolve', async (req, res) => {
           return -999; // Hard disqualify TV episodes when searching for a movie
         }
 
-        // Single-word title collision guard: reject "Gold Digger" when searching for "Digger"
+        // Single-word title collision guard: reject "Gold Digger" or "Runner Runner" when searching for "Digger" / "Runner"
         if (significantTokens.length === 1) {
           const singleWord = significantTokens[0];
-          const prefixMatch = normBtnText.match(new RegExp(`\\b([a-z0-9]+)\\s+${singleWord}\\b`, 'i'));
+          const textToInspect = isBare ? titleTargetText : (normBtnText || titleTargetText);
+          const prefixMatch = textToInspect.match(new RegExp(`\\b([a-z0-9]+)\\s+${singleWord}\\b`, 'i'));
           if (prefixMatch) {
             const prefixWord = prefixMatch[1].toLowerCase();
-            const ignorePrefixes = new Set(['the', 'a', 'an', 'movie', 'film']);
+            const ignorePrefixes = new Set(['the', 'a', 'an', 'movie', 'film', 'msm', 'msm32']);
             if (!ignorePrefixes.has(prefixWord)) {
-              return -999; // Different title
+              return -999; // Different title (preceding word)
+            }
+          }
+          const suffixMatch = textToInspect.match(new RegExp(`\\b${singleWord}\\s+([a-z0-9]+)\\b`, 'i'));
+          if (suffixMatch) {
+            const suffixWord = suffixMatch[1].toLowerCase();
+            if (!isAllowedTitleSuffix(suffixWord)) {
+              return -999; // Different title (succeeding word)
             }
           }
         }
