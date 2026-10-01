@@ -408,8 +408,12 @@ function isAllowedTitleSuffix(word) {
 // Extract primary keywords excluding common stopwords for strict coverage validation
 function extractSignificantTokens(str) {
   const norm = normalizeTitle(str);
-  return norm.split(' ').filter(t => {
+  const rawTokens = norm.split(' ').filter(Boolean);
+  const hasLeadingArticle = rawTokens.length <= 2 && /^(the|a|an)$/i.test(rawTokens[0]);
+
+  return rawTokens.filter((t, idx) => {
     if (!t) return false;
+    if (idx === 0 && hasLeadingArticle) return true; // Keep leading article for short 1-2 word titles like "The Runner"
     if (STOPWORDS.has(t)) return false;
     if (/^\d+$/.test(t)) return true; // keep digits: 2, 3, 4
     if (/^(ii|iii|iv|v|vi)$/i.test(t)) return true; // keep roman numerals
@@ -1899,7 +1903,13 @@ app.get('/api/resolve', async (req, res) => {
             const prefixMatch = normFn.match(new RegExp(`\\b([a-z0-9]+)\\s+${singleWord}\\b`, 'i'));
             if (prefixMatch) {
               const prefixWord = prefixMatch[1].toLowerCase();
-              const ignorePrefixes = new Set(['the', 'a', 'an', 'movie', 'film', 'msm', 'msm32']);
+              const targetHasArticle = /^(the|a|an)\b/i.test(title.trim());
+              const ignorePrefixes = new Set(['movie', 'film', 'msm', 'msm32']);
+              if (targetHasArticle) {
+                ignorePrefixes.add('the');
+                ignorePrefixes.add('a');
+                ignorePrefixes.add('an');
+              }
               if (!ignorePrefixes.has(prefixWord)) {
                 matchesCandidate = false;
               }
@@ -2169,7 +2179,13 @@ app.get('/api/resolve', async (req, res) => {
           const prefixMatch = textToInspect.match(new RegExp(`\\b([a-z0-9]+)\\s+${singleWord}\\b`, 'i'));
           if (prefixMatch) {
             const prefixWord = prefixMatch[1].toLowerCase();
-            const ignorePrefixes = new Set(['the', 'a', 'an', 'movie', 'film', 'msm', 'msm32']);
+            const targetHasArticle = /^(the|a|an)\b/i.test(title.trim());
+            const ignorePrefixes = new Set(['movie', 'film', 'msm', 'msm32']);
+            if (targetHasArticle) {
+              ignorePrefixes.add('the');
+              ignorePrefixes.add('a');
+              ignorePrefixes.add('an');
+            }
             if (!ignorePrefixes.has(prefixWord)) {
               return -999; // Different title (preceding word)
             }
