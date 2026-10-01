@@ -12,7 +12,7 @@ import { Logger } from 'telegram/extensions/Logger.js';
 import bigInt from 'big-integer';
 import axios from 'axios';
 import fs from 'fs';
-import { spawn } from 'child_process';
+import { spawn, execSync } from 'child_process';
 import { db } from './db.js';
 
 class QuietLogger extends Logger {
@@ -797,7 +797,128 @@ app.get(['/', '/auth'], (req, res) => {
 // 1b. SERVER-SIDE LOG VIEWER & DIAGNOSTICS
 // ==========================================
 
-// System Stats Endpoint (Uptime, Memory RSS, Active Streams, Log Size)
+// Active client playback sessions & internal worker map
+// key: streamSessionKey (e.g. "192.168.0.109:5895615329916165408") -> {
+//   sessionKey: string,
+//   ip: string,
+//   clientName: string,
+//   docId: string,
+//   filename: string,
+//   mode: string,
+//   createdAt: number,
+//   lastActive: number,
+//   internalWorkers: Map<string, Function>,
+//   abort: Function,
+// }
+const activeStreams = new Map();
+const internalWorkers = new Map(); // key: workerKey -> { abort: Function, parentKey: string, createdAt: number }
+
+// Automated garbage collector for orphaned stream handles (stale entries older than 2 hours)
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, entry] of activeStreams.entries()) {
+    if (now - (entry.lastActive || entry.createdAt || now) > 2 * 3600 * 1000) {
+      console.warn(`[STREAM GC] Evicting orphaned activeStream: ${key}`);
+      try { entry.abort(); } catch {}
+      activeStreams.delete(key);
+    }
+  }
+  for (const [wKey, wEntry] of internalWorkers.entries()) {
+    if (now - (wEntry.createdAt || now) > 30 * 60 * 1000) {
+      try { wEntry.abort(); } catch {}
+      internalWorkers.delete(wKey);
+    }
+  }
+}, 5 * 60 * 1000).unref();
+
+// Network Client Device Resolver (Cached Asuswrt NVRAM + dnsmasq leases)
+let cachedClientMap = new Map();
+let lastClientMapRefresh = 0;
+
+function refreshClientMap() {
+  if (Date.now() - lastClientMapRefresh < 30000 && cachedClientMap.size > 0) {
+    return cachedClientMap;
+  }
+  const newMap = new Map();
+  const macToName = new Map();
+
+  if (process.platform === 'linux') {
+    try {
+      const nv = execSync('nvram get custom_clientlist 2>/dev/null', { timeout: 1000 }).toString('utf8');
+      nv.split('<').filter(Boolean).forEach(entry => {
+        const parts = entry.split('>');
+        if (parts.length >= 2 && parts[0] && parts[1]) {
+          macToName.set(parts[1].trim().toLowerCase(), parts[0].trim());
+        }
+      });
+    } catch {}
+  }
+
+  const leasePaths = ['/var/lib/misc/dnsmasq.leases', '/tmp/dnsmasq.leases'];
+  for (const lp of leasePaths) {
+    if (fs.existsSync(lp)) {
+      try {
+        const content = fs.readFileSync(lp, 'utf8');
+        content.split('\n').filter(Boolean).forEach(line => {
+          const tokens = line.trim().split(/\s+/);
+          if (tokens.length >= 4) {
+            const mac = tokens[1].toLowerCase();
+            const ip = tokens[2];
+            const host = tokens[3] !== '*' ? tokens[3] : '';
+            const friendly = macToName.get(mac) || host || ip;
+            newMap.set(ip, { ip, mac, name: friendly, host });
+          }
+        });
+      } catch {}
+      break;
+    }
+  }
+
+  cachedClientMap = newMap;
+  lastClientMapRefresh = Date.now();
+  return cachedClientMap;
+}
+
+function resolveClientIdentity(rawIp, req) {
+  let ip = rawIp || req?.headers?.['x-forwarded-for']?.split(',')[0]?.trim() || req?.ip || req?.socket?.remoteAddress || '127.0.0.1';
+  if (typeof ip === 'string') {
+    if (ip.startsWith('::ffff:')) ip = ip.replace('::ffff:', '');
+    if (ip === '::1') ip = '127.0.0.1';
+  }
+
+  const queryClient = req?.query?.clientName || req?.query?.client || req?.headers?.['x-client-name'];
+  if (queryClient) {
+    return { ip, name: String(queryClient).trim() };
+  }
+
+  if (ip === '127.0.0.1' || ip === 'localhost') {
+    return { ip, name: 'Internal Transcoder' };
+  }
+
+  const map = refreshClientMap();
+  if (map.has(ip)) {
+    const entry = map.get(ip);
+    return { ip, name: entry.name, mac: entry.mac };
+  }
+
+  const ua = req?.headers?.['user-agent'] || '';
+  let name = ip;
+  if (/Android.*TV|GoogleTV|AFT|SmartTV/i.test(ua)) {
+    name = 'Android TV';
+  } else if (/Android/i.test(ua)) {
+    name = 'Android Device';
+  } else if (/iPhone|iPad/i.test(ua)) {
+    name = 'iOS Device';
+  } else if (/Windows/i.test(ua)) {
+    name = 'Windows PC';
+  } else if (/Macintosh/i.test(ua)) {
+    name = 'Mac';
+  }
+
+  return { ip, name };
+}
+
+// System Stats Endpoint (Uptime, Memory RSS, Active Streams, Active Clients, Log Size)
 app.get('/api/system/stats', (req, res) => {
   const mem = process.memoryUsage();
   let logSizeKB = 0;
@@ -807,12 +928,26 @@ app.get('/api/system/stats', (req, res) => {
       logSizeKB = Math.round(fs.statSync(logPath).size / 1024);
     }
   } catch {}
+
+  const activeClients = [];
+  for (const [key, stream] of activeStreams.entries()) {
+    activeClients.push({
+      sessionKey: key,
+      ip: stream.ip || 'unknown',
+      clientName: stream.clientName || stream.ip || 'Client',
+      filename: stream.filename || 'media',
+      mode: stream.mode || 'Direct Native',
+      connectedSec: Math.max(0, Math.round((Date.now() - (stream.createdAt || Date.now())) / 1000)),
+    });
+  }
+
   res.json({
     status: 'ok',
     uptime: Math.round(process.uptime()),
     isConnected,
     cachedStreams: db.size(),
-    activeStreams: activeStreams.size,
+    activeStreams: activeClients.length,
+    activeClients,
     authError: authError || null,
     memory: {
       rssMB: Math.round(mem.rss / (1024 * 1024)),
@@ -1022,6 +1157,20 @@ app.get('/logs', (req, res) => {
     </div>
   </div>
 
+  <!-- Active Stream Clients Panel -->
+  <div id="activeStreamsPanel" class="p-4 rounded-xl bg-slate-900 border border-slate-800/80 space-y-2.5">
+    <div class="flex items-center justify-between">
+      <div class="flex items-center gap-2">
+        <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+        <span class="text-xs font-bold text-white uppercase tracking-wider">Active Stream Clients</span>
+      </div>
+      <span id="activeClientsCount" class="text-xs font-mono font-semibold text-slate-400">0 connected</span>
+    </div>
+    <div id="activeClientsList" class="text-xs text-slate-400">
+      <p class="text-slate-500 italic text-[11px] py-1">No active playback sessions.</p>
+    </div>
+  </div>
+
   <!-- Terminal Controls & Filters -->
   <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 pt-1">
     <div class="flex flex-wrap items-center gap-1.5 text-xs font-medium">
@@ -1186,6 +1335,37 @@ app.get('/logs', (req, res) => {
         } else {
           document.getElementById('metricDot').className = 'w-2.5 h-2.5 rounded-full bg-rose-400';
           document.getElementById('metricStatus').textContent = 'Offline';
+        }
+
+        const countEl = document.getElementById('activeClientsCount');
+        const listEl = document.getElementById('activeClientsList');
+        if (countEl && listEl) {
+          const clients = d.activeClients || [];
+          countEl.textContent = clients.length === 1 ? '1 client connected' : clients.length + ' clients connected';
+          if (clients.length === 0) {
+            listEl.innerHTML = '<p class="text-slate-500 italic text-[11px] py-1">No active playback sessions.</p>';
+          } else {
+            let rowsHtml = '';
+            for (let i = 0; i < clients.length; i++) {
+              const c = clients[i];
+              rowsHtml += '<tr class="text-slate-300 hover:bg-slate-800/40 transition">' +
+                '<td class="py-1.5 px-2 font-bold text-sky-400 font-sans flex items-center gap-1.5">📺 ' + (c.clientName || 'Client') + '</td>' +
+                '<td class="py-1.5 px-2 text-slate-400 font-mono">' + (c.ip || '') + '</td>' +
+                '<td class="py-1.5 px-2 text-slate-200 truncate max-w-xs font-sans" title="' + (c.filename || '') + '">' + (c.filename || '') + '</td>' +
+                '<td class="py-1.5 px-2 text-emerald-400 font-sans text-[11px]">' + (c.mode || '') + '</td>' +
+                '<td class="py-1.5 px-2 text-slate-400 text-right font-mono">' + (c.connectedSec || 0) + 's</td>' +
+              '</tr>';
+            }
+            listEl.innerHTML = '<div class="overflow-x-auto"><table class="w-full text-left text-xs">' +
+              '<thead><tr class="text-slate-500 border-b border-slate-800 pb-1.5 text-[11px]">' +
+              '<th class="py-1 px-2 font-semibold">Client / Device</th>' +
+              '<th class="py-1 px-2 font-semibold">IP Address</th>' +
+              '<th class="py-1 px-2 font-semibold">Media Filename</th>' +
+              '<th class="py-1 px-2 font-semibold">Playback Mode</th>' +
+              '<th class="py-1 px-2 font-semibold text-right">Connected</th>' +
+              '</tr></thead><tbody class="divide-y divide-slate-800/60 font-mono text-[11px]">' +
+              rowsHtml + '</tbody></table></div>';
+          }
         }
       } catch {}
     }
@@ -2162,19 +2342,6 @@ app.get('/api/resolve', async (req, res) => {
 // Caches up to 16 blocks (8 MB RAM) to eliminate seek latency while protecting router RAM from exhaustion.
 const BLOCK_CACHE_MAX_ENTRIES = 16; // 16 x 512KB = 8 MB
 const globalBlockCache = new Map();
-const activeStreams = new Map(); // key: streamSessionKey -> { abort: Function, createdAt: number }
-
-// Automated garbage collector for orphaned stream handles (stale entries older than 4 hours)
-setInterval(() => {
-  const now = Date.now();
-  for (const [key, entry] of activeStreams.entries()) {
-    if (now - (entry.createdAt || now) > 4 * 3600 * 1000) {
-      console.warn(`[STREAM GC] Evicting orphaned activeStream: ${key}`);
-      try { entry.abort(); } catch {}
-      activeStreams.delete(key);
-    }
-  }
-}, 10 * 60 * 1000).unref();
 
 // Pinned cache for container headers (first 2 blocks: 0, 1) and tail cues (last 2 blocks)
 // These blocks (<= 2 MB total per doc) are NEVER evicted by sequential playback pipelines,
@@ -2359,14 +2526,16 @@ async function streamTelegramPipelined(client, targetDoc, startByte, endByte, re
 
   const isProbe = req?.headers?.['x-internal-probe'] === '1' || req?.query?.probe === '1' || (endByte - startByte <= 1048576);
   const isInternal = req?.headers?.['x-internal-transcoder'] === '1' || req?.query?.direct === '1';
+  const parentSessionKey = req?.headers?.['x-parent-session'] || req?.query?.parentSession;
+  const clientIdentity = resolveClientIdentity(req?.headers?.['x-forwarded-for'] || req?.ip || req?.socket?.remoteAddress, req);
   if (isProbe) {
     CONCURRENCY = 1; // Prevent MTProto pipeline lookahead congestion during demuxer / metadata / cues probe
   }
 
-  const streamKey = passedStreamKey || `${isInternal ? 'internal-' + Date.now() : (req?.headers?.['x-client-id'] || req?.ip || req?.socket?.remoteAddress || 'client')}:${targetDoc.id}`;
+  const streamKey = passedStreamKey || `${isInternal ? (parentSessionKey ? `worker-${parentSessionKey}` : `internal-${Date.now()}`) : clientIdentity.ip}:${targetDoc.id}`;
 
-  if (activeStreams.has(streamKey)) {
-    console.log(`[PIPELINE ABORT PREVIOUS] Aborting existing active stream for key ${streamKey}`);
+  if (!isInternal && activeStreams.has(streamKey)) {
+    console.log(`[PIPELINE ABORT PREVIOUS] Aborting existing active stream for [${clientIdentity.name} (${clientIdentity.ip})] key ${streamKey}`);
     try {
       activeStreams.get(streamKey).abort();
     } catch (e) {}
@@ -2381,12 +2550,34 @@ async function streamTelegramPipelined(client, targetDoc, startByte, endByte, re
     inFlight.clear();
   };
 
-  activeStreams.set(streamKey, { abort: abortPipeline, createdAt: Date.now() });
+  const parentSession = parentSessionKey ? activeStreams.get(parentSessionKey) : null;
+  const workerId = `w-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+
+  if (parentSession) {
+    parentSession.internalWorkers.set(workerId, abortPipeline);
+  } else if (!isInternal) {
+    const fnAttr = targetDoc.attributes?.find(a => a.className === 'DocumentAttributeFilename');
+    const mediaName = fnAttr ? fnAttr.fileName : `video_${targetDoc.id}.mp4`;
+    activeStreams.set(streamKey, {
+      sessionKey: streamKey,
+      ip: clientIdentity.ip,
+      clientName: clientIdentity.name,
+      docId: targetDoc.id.toString(),
+      filename: mediaName,
+      mode: 'Direct Native',
+      createdAt: activeStreams.get(streamKey)?.createdAt || Date.now(),
+      lastActive: Date.now(),
+      internalWorkers: new Map(),
+      abort: abortPipeline,
+    });
+  } else {
+    internalWorkers.set(streamKey, { abort: abortPipeline, parentKey: parentSessionKey, createdAt: Date.now() });
+  }
 
   const onReqClose = () => {
     abortPipeline();
     cleanupStream();
-    console.log(`[PIPELINE CLOSED by client] active: block ${activeBlock}/${endBlock}, aborted remaining blocks.`);
+    console.log(`[PIPELINE CLOSED] [${clientIdentity.name} (${clientIdentity.ip})] active: block ${activeBlock}/${endBlock}, aborted remaining blocks.`);
   };
   const onResFinish = () => {
     cleanupStream();
@@ -2395,8 +2586,14 @@ async function streamTelegramPipelined(client, targetDoc, startByte, endByte, re
   const cleanupStream = () => {
     req.off('close', onReqClose);
     res.off('finish', onResFinish);
-    if (activeStreams.get(streamKey)) {
-      activeStreams.delete(streamKey);
+    if (parentSession) {
+      parentSession.internalWorkers.delete(workerId);
+    } else if (!isInternal) {
+      if (activeStreams.get(streamKey)?.abort === abortPipeline) {
+        activeStreams.delete(streamKey);
+      }
+    } else {
+      internalWorkers.delete(streamKey);
     }
   };
 
@@ -2422,7 +2619,7 @@ async function streamTelegramPipelined(client, targetDoc, startByte, endByte, re
     thumbSize: '',
   });
 
-  console.log(`[PIPELINE START] blocks ${startBlock}..${endBlock} (${endBlock - startBlock + 1} blocks), concurrency: ${CONCURRENCY}, chunkSize: ${CHUNK_SIZE / 1024}KB`);
+  console.log(`[PIPELINE START] [${clientIdentity.name} (${clientIdentity.ip})] blocks ${startBlock}..${endBlock} (${endBlock - startBlock + 1} blocks), concurrency: ${CONCURRENCY}, chunkSize: ${CHUNK_SIZE / 1024}KB`);
 
   async function fetchBlock(blockIdx) {
     if (aborted) return null;
@@ -2727,15 +2924,19 @@ app.post('/api/github-webhook', async (req, res) => {
 // Cache for probed audio track stream specifiers per docId (capped to prevent memory growth)
 const docAudioTrackCache = new Map();
 
-async function resolveBestAudioTrack(docId) {
+async function resolveBestAudioTrack(docId, parentSessionKey) {
   if (docAudioTrackCache.has(docId)) {
     return docAudioTrackCache.get(docId);
   }
 
   const ffprobeBin = process.env.FFPROBE_PATH || (fs.existsSync('/opt/bin/ffprobe') ? '/opt/bin/ffprobe' : 'ffprobe');
+  const probeHeaders = ['x-internal-probe: 1'];
+  if (parentSessionKey) {
+    probeHeaders.push(`x-parent-session: ${parentSessionKey}`);
+  }
   const probeArgs = [
     '-v', 'error',
-    '-headers', 'x-internal-probe: 1\r\n',
+    '-headers', probeHeaders.join('\r\n') + '\r\n',
     '-probesize', '262144',
     '-analyzeduration', '0',
     '-show_entries', 'stream=index,codec_type,codec_name:stream_tags=language,title',
@@ -2835,14 +3036,20 @@ app.get('/stream/:docId', async (req, res) => {
     // Instantly terminate any previous in-flight stream pipeline for this document for the same client session (e.g. user seeked forward)
     // to free 100% of the router's MTProto download bandwidth for the new seek position immediately.
     // Internal transcoder sessions are uniquely keyed so they never self-abort or abort other streams.
+    const isInternalProbe = req.headers['x-internal-probe'] === '1' || req.query.probe === '1';
     const isInternalTranscoder = req.headers['x-internal-transcoder'] === '1' || req.query.direct === '1';
-    const clientSession = isInternalTranscoder
-      ? `internal-${docId}-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`
-      : (req.headers['x-client-id'] || req.ip || req.socket.remoteAddress || 'client');
-    const streamSessionKey = `${clientSession}:${docId}`;
+    const isInternal = isInternalProbe || isInternalTranscoder;
+    const parentSessionKey = req.headers['x-parent-session'] || req.query.parentSession;
 
-    if (!isInternalTranscoder && activeStreams.has(streamSessionKey)) {
-      console.log(`[STREAM CANCEL] Terminating previous in-flight stream for client ${clientSession} doc ${docId} on new seek.`);
+    // Resolve client identity (IP and friendly device name)
+    const clientIdentity = resolveClientIdentity(req.headers['x-forwarded-for'] || req.ip || req.socket?.remoteAddress, req);
+    const clientSession = isInternal
+      ? (parentSessionKey ? `worker-${parentSessionKey}` : `internal-${docId}-${Date.now()}`)
+      : (req.headers['x-client-id'] || clientIdentity.ip || 'client');
+    const streamSessionKey = isInternal ? clientSession : `${clientSession}:${docId}`;
+
+    if (!isInternal && activeStreams.has(streamSessionKey)) {
+      console.log(`[STREAM CANCEL] Terminating previous in-flight stream for [${clientIdentity.name} (${clientIdentity.ip})] doc ${docId} on new seek.`);
       try { activeStreams.get(streamSessionKey).abort(); } catch {}
       activeStreams.delete(streamSessionKey);
     }
@@ -2895,7 +3102,7 @@ app.get('/stream/:docId', async (req, res) => {
     // Streams Matroska with video copied 1:1 and audio transcoded to stereo AAC directly via pipe:1
     if (req.query.transcode === 'audio') {
       const seekSec = Math.max(0, parseFloat(req.query.ss) || 0);
-      console.log(`[TRANSCODE AUDIO] Starting audio transcode for doc ${docId} (${filename}) at ${seekSec}s...`);
+      console.log(`[TRANSCODE AUDIO] Starting audio transcode for [${clientIdentity.name} (${clientIdentity.ip})] doc ${docId} (${filename}) at ${seekSec}s...`);
 
       if (req.method === 'HEAD') {
         res.writeHead(200, {
@@ -2914,7 +3121,7 @@ app.get('/stream/:docId', async (req, res) => {
         audioMapSpecifier = requestedTrack.startsWith('0:') ? requestedTrack : `0:${requestedTrack}`;
       } else {
         try {
-          audioMapSpecifier = await resolveBestAudioTrack(docId);
+          audioMapSpecifier = await resolveBestAudioTrack(docId, streamSessionKey);
         } catch (err) {
           audioMapSpecifier = '0:a:0';
         }
@@ -2925,7 +3132,7 @@ app.get('/stream/:docId', async (req, res) => {
         '-loglevel', 'error',
         '-noaccurate_seek',
         ...(seekSec > 0 ? ['-ss', seekSec.toString()] : []),
-        '-headers', 'x-internal-transcoder: 1\r\n',
+        '-headers', `x-internal-transcoder: 1\r\nx-parent-session: ${streamSessionKey}\r\n`,
         '-reconnect', '1',
         '-reconnect_streamed', '1',
         '-reconnect_delay_max', '2',
@@ -2967,23 +3174,34 @@ app.get('/stream/:docId', async (req, res) => {
 
       const ffmpegProc = spawn(ffmpegBin, ffmpegArgs, { stdio: ['ignore', 'pipe', 'pipe'] });
 
-      activeStreams.set(streamSessionKey, {
+      const transcodeEntry = {
+        sessionKey: streamSessionKey,
+        ip: clientIdentity.ip,
+        clientName: clientIdentity.name,
+        docId,
+        filename,
+        mode: '1080p Transcode (Stereo AAC)',
+        createdAt: activeStreams.get(streamSessionKey)?.createdAt || Date.now(),
+        lastActive: Date.now(),
+        internalWorkers: new Map(),
         abort: () => {
-          console.log(`[TRANSCODE ABORT] Killing ffmpeg process for doc ${docId}`);
+          console.log(`[TRANSCODE ABORT] Killing ffmpeg process and workers for doc ${docId}`);
           try { ffmpegProc.kill('SIGKILL'); } catch {}
-        },
-        createdAt: Date.now(),
-      });
+          for (const [, abortWorker] of transcodeEntry.internalWorkers.entries()) {
+            try { abortWorker(); } catch {}
+          }
+          transcodeEntry.internalWorkers.clear();
+        }
+      };
+      activeStreams.set(streamSessionKey, transcodeEntry);
 
       const cleanupFfmpeg = () => {
         req.off('close', cleanupFfmpeg);
         res.off('finish', cleanupFfmpeg);
-        if (activeStreams.get(streamSessionKey)) {
+        if (activeStreams.get(streamSessionKey) === transcodeEntry) {
           activeStreams.delete(streamSessionKey);
         }
-        if (!ffmpegProc.killed) {
-          try { ffmpegProc.kill('SIGKILL'); } catch {}
-        }
+        transcodeEntry.abort();
       };
 
       req.on('close', cleanupFfmpeg);
@@ -3105,7 +3323,7 @@ app.get('/stream/:docId', async (req, res) => {
       end = Math.min(end, fileSize - 1);
 
       const chunkSize = (end - start) + 1;
-      console.log(`[STREAM REQ] ${req.method} Range: "${rangeHeader}" -> start: ${start}, end: ${end} (${chunkSize} bytes, chunkParam: ${req.query.chunkSize || 'default'})`);
+      console.log(`[STREAM REQ] [${clientIdentity.name} (${clientIdentity.ip})] ${req.method} Range: "${rangeHeader}" -> start: ${start}, end: ${end} (${chunkSize} bytes, chunkParam: ${req.query.chunkSize || 'default'})`);
       res.writeHead(206, {
         'Content-Range': `bytes ${start}-${end}/${fileSize}`,
         'Accept-Ranges': 'bytes',
