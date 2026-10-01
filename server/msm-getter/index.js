@@ -905,19 +905,23 @@ function resolveClientIdentity(rawIp, req) {
     if (ip === '::1') ip = '127.0.0.1';
   }
 
-  const queryClient = req?.query?.clientName || req?.query?.client || req?.headers?.['x-client-name'];
-  if (queryClient) {
-    return { ip, name: String(queryClient).trim() };
-  }
-
   if (ip === '127.0.0.1' || ip === 'localhost') {
     return { ip, name: 'Internal Transcoder' };
   }
 
+  // 1. Prioritize Router DHCP leases and Asuswrt custom_clientlist
   const map = refreshClientMap();
   if (map.has(ip)) {
     const entry = map.get(ip);
-    return { ip, name: entry.name, mac: entry.mac };
+    if (entry.name && entry.name !== ip && entry.name !== '*') {
+      return { ip, name: entry.name, mac: entry.mac };
+    }
+  }
+
+  // 2. Fallback to clientName query param / header (e.g. remote connections, WAN, or custom app label)
+  const queryClient = req?.query?.clientName || req?.query?.client || req?.headers?.['x-client-name'];
+  if (queryClient && !['Client', 'undefined', 'null'].includes(String(queryClient).trim())) {
+    return { ip, name: String(queryClient).trim() };
   }
 
   const ua = req?.headers?.['user-agent'] || '';
@@ -1103,6 +1107,11 @@ app.get('/api/logs/download', (req, res) => {
 
 // Dedicated Web Log Viewer GUI
 app.get('/logs', (req, res) => {
+  res.set({
+    'Cache-Control': 'no-cache, no-store, must-revalidate',
+    'Pragma': 'no-cache',
+    'Expires': '0',
+  });
   res.send(`<!DOCTYPE html>
 <html lang="en" class="dark">
 <head>

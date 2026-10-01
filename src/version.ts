@@ -2,12 +2,13 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20261001-2135';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.fix-msm-getter-searc.20261001-2135';
+export const APP_BUILD_NUMBER = '20261001-2151';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.fix-msm-getter-searc.20261001-2151';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
 export const APP_BRANCH = 'fix-msm-getter-searc';
-export const APP_CHANGELOG = `* fix(msm-getter): isolate search title matching to button text and add persistent stream cache manager
+export const APP_CHANGELOG = `* fix(logs): resolve SyntaxError on web console eviction button and enforce HTTPS fallback URL
+* fix(msm-getter): isolate search title matching to button text and add persistent stream cache manager
 * Merge pull request #165 from jefrimustapa/msm-getter-streams
 * fix(android): enable opening external browser URLs via AndroidBridge native intent
 * refactor(logs): remove redundant active streams card from web console and in-app drawer
@@ -20,5 +21,4 @@ export const APP_CHANGELOG = `* fix(msm-getter): isolate search title matching t
 * fix(msm-getter): catch 'Not connected' race and add 3-attempt sender reconnect backoff (#160)
 * perf(msm-getter): restore original pipeline concurrency tiers (Eco=2, Standard=4, Turbo=6)
 * Merge pull request #162 from jefrimustapa/fix/msm-getter-search-fail
-* fix(msm-getter): add resilient multi-candidate fallback loop to recover from forward_failed deleted Telegram links
-* fix(player): improve play & seek on 1080p transcoded MSM streams (#161)`;
+* fix(msm-getter): add resilient multi-candidate fallback loop to recover from forward_failed deleted Telegram links`;
