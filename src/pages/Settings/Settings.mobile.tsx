@@ -234,6 +234,14 @@ export const Settings: React.FC = () => {
     uptime?: number;
     isConnected?: boolean;
     activeStreams?: number;
+    activeClients?: Array<{
+      sessionKey: string;
+      ip: string;
+      clientName: string;
+      filename: string;
+      mode: string;
+      connectedSec: number;
+    }>;
     memory?: { rssMB: number; heapUsedMB: number };
     logSizeKB?: number;
   } | null>(null);
@@ -1789,6 +1797,35 @@ export const Settings: React.FC = () => {
               </span>
             </div>
           </div>
+
+          {/* Active Streaming Clients List */}
+          {serverStats?.activeClients && serverStats.activeClients.length > 0 ? (
+            <div className="p-2.5 rounded-xl bg-sky-500/10 border border-sky-500/20 space-y-1.5">
+              <div className="flex items-center justify-between text-[11px] font-semibold text-sky-400">
+                <span className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                  Active Stream Clients ({serverStats.activeClients.length})
+                </span>
+              </div>
+              <div className="space-y-1">
+                {serverStats.activeClients.map((client) => (
+                  <div key={client.sessionKey} className="flex items-center justify-between text-[11px] bg-black/40 px-2 py-1 rounded-lg border border-white/5">
+                    <div className="flex items-center gap-1.5 truncate">
+                      <span>📺</span>
+                      <span className="font-semibold text-white">{client.clientName}</span>
+                      <span className="text-gray-400 font-mono text-[10px]">({client.ip})</span>
+                    </div>
+                    <span className="text-emerald-400 text-[10px] font-mono shrink-0 ml-2">{client.mode} • {client.connectedSec}s</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="px-3 py-1.5 rounded-xl bg-white/5 border border-white/5 text-[11px] text-gray-500 flex items-center justify-between">
+              <span>Connected Clients:</span>
+              <span className="font-mono text-gray-400">No active streams</span>
+            </div>
+          )}
 
           {/* Action Row: Open Web GUI & Auto-Poll */}
           <div className="flex items-center justify-between gap-2">
