@@ -1130,6 +1130,117 @@ app.get(['/', '/auth'], (req, res) => {
 const activeStreams = new Map();
 const internalWorkers = new Map(); // key: workerKey -> { abort: Function, parentKey: string, createdAt: number }
 
+// In-Memory LRU Block Cache for Telegram MTProto Stream Chunks
+// Caches up to 16 blocks (8 MB RAM) to eliminate seek latency while protecting router RAM from exhaustion.
+const BLOCK_CACHE_MAX_ENTRIES = 16; // 16 x 512KB = 8 MB
+const globalBlockCache = new Map();
+
+// Pinned cache for container headers (first 2 blocks: 0, 1) and tail cues (last 2 blocks)
+// These blocks (<= 2 MB total per doc) are NEVER evicted by sequential playback pipelines,
+// eliminating 5 out of 6 remote Telegram round-trips on every seek!
+const pinnedHeaderCache = new Map(); // key: `${docId}:${blockIdx}` -> Buffer
+
+function getCachedBlock(docId, blockIdx) {
+  const key = `${docId}:${blockIdx}`;
+  if (pinnedHeaderCache.has(key)) {
+    return pinnedHeaderCache.get(key);
+  }
+  if (globalBlockCache.has(key)) {
+    const data = globalBlockCache.get(key);
+    globalBlockCache.delete(key);
+    globalBlockCache.set(key, data);
+    return data;
+  }
+  return null;
+}
+
+function setCachedBlock(docId, blockIdx, data, isPinned = false) {
+  if (!data || data.length === 0) return;
+  const key = `${docId}:${blockIdx}`;
+  if (isPinned) {
+    if (pinnedHeaderCache.has(key)) {
+      pinnedHeaderCache.delete(key);
+    } else if (pinnedHeaderCache.size >= 24) {
+      const oldestKey = pinnedHeaderCache.keys().next().value;
+      pinnedHeaderCache.delete(oldestKey);
+    }
+    pinnedHeaderCache.set(key, data);
+    return;
+  }
+  if (globalBlockCache.has(key)) {
+    globalBlockCache.delete(key);
+  } else if (globalBlockCache.size >= BLOCK_CACHE_MAX_ENTRIES) {
+    const oldestKey = globalBlockCache.keys().next().value;
+    globalBlockCache.delete(oldestKey);
+  }
+  globalBlockCache.set(key, data);
+}
+
+function calculateChunkCacheBytes() {
+  let bytes = 0;
+  for (const buf of globalBlockCache.values()) {
+    if (buf && buf.length) bytes += buf.length;
+  }
+  for (const buf of pinnedHeaderCache.values()) {
+    if (buf && buf.length) bytes += buf.length;
+  }
+  return bytes;
+}
+
+let idlePurgeTimer = null;
+
+function cancelIdleMemoryPurge() {
+  if (idlePurgeTimer) {
+    clearTimeout(idlePurgeTimer);
+    idlePurgeTimer = null;
+  }
+}
+
+function scheduleIdleMemoryPurge(delayMs = 15000) {
+  cancelIdleMemoryPurge();
+  idlePurgeTimer = setTimeout(() => {
+    idlePurgeTimer = null;
+    if (activeStreams.size === 0) {
+      purgeIdleMemory();
+    }
+  }, delayMs);
+  if (idlePurgeTimer && idlePurgeTimer.unref) {
+    idlePurgeTimer.unref();
+  }
+}
+
+function purgeIdleMemory() {
+  const beforeMem = process.memoryUsage();
+  const beforeRssMB = Math.round(beforeMem.rss / (1024 * 1024));
+  const beforeHeapMB = Math.round(beforeMem.heapUsed / (1024 * 1024));
+
+  // 1. Evict temporary block cache (up to 8 MB)
+  const evictedBlocks = globalBlockCache.size;
+  globalBlockCache.clear();
+
+  // 2. Trim pinned header cache down to latest 4 blocks (up to 2 MB)
+  const pinnedKeys = Array.from(pinnedHeaderCache.keys());
+  if (pinnedKeys.length > 4) {
+    const keysToRemove = pinnedKeys.slice(0, pinnedKeys.length - 4);
+    for (const k of keysToRemove) {
+      pinnedHeaderCache.delete(k);
+    }
+  }
+
+  // 3. Clear GramJS entity cache
+  try {
+    if (client?._entityCache?.cacheMap) {
+      client._entityCache.cacheMap.clear();
+    }
+  } catch {}
+
+  const afterMem = process.memoryUsage();
+  const afterRssMB = Math.round(afterMem.rss / (1024 * 1024));
+  const afterHeapMB = Math.round(afterMem.heapUsed / (1024 * 1024));
+
+  console.log(`[MEMORY PURGE] Idle stream purge executed: evicted ${evictedBlocks} blocks, pinned retained: ${pinnedHeaderCache.size}. RSS: ${beforeRssMB}MB -> ${afterRssMB}MB, Heap: ${beforeHeapMB}MB -> ${afterHeapMB}MB`);
+}
+
 // Automated garbage collector for orphaned stream handles (stale entries older than 2 hours)
 setInterval(() => {
   const now = Date.now();
@@ -1138,6 +1249,7 @@ setInterval(() => {
       console.warn(`[STREAM GC] Evicting orphaned activeStream: ${key}`);
       try { entry.abort(); } catch {}
       activeStreams.delete(key);
+      if (activeStreams.size === 0) scheduleIdleMemoryPurge();
     }
   }
   for (const [wKey, wEntry] of internalWorkers.entries()) {
@@ -1333,8 +1445,25 @@ app.get('/api/system/stats', (req, res) => {
       ramPct,
       heapUsedMB: Math.round(mem.heapUsed / (1024 * 1024)),
       heapTotalMB: Math.round(mem.heapTotal / (1024 * 1024)),
+      externalMB: Math.round((mem.external || 0) / (1024 * 1024)),
+      arrayBuffersMB: Math.round((mem.arrayBuffers || 0) / (1024 * 1024)),
+      chunkCacheMB: Number((calculateChunkCacheBytes() / (1024 * 1024)).toFixed(1)),
     },
     logSizeKB,
+  });
+});
+
+// Manual Memory Purge API (Evicts chunk caches, clears client cache & runs GC)
+app.post('/api/system/purge-memory', (req, res) => {
+  purgeIdleMemory();
+  const mem = process.memoryUsage();
+  res.json({
+    success: true,
+    memory: {
+      rssMB: Math.round(mem.rss / (1024 * 1024)),
+      heapUsedMB: Math.round(mem.heapUsed / (1024 * 1024)),
+      chunkCacheMB: Number((calculateChunkCacheBytes() / (1024 * 1024)).toFixed(1)),
+    }
   });
 });
 
@@ -1781,7 +1910,7 @@ app.get('/logs', (req, res) => {
           const pct = mem.ramPct !== undefined ? mem.ramPct : Math.round((rss / cap) * 100);
           ramEl.textContent = rss + ' / ' + cap + ' MB';
           if (ramPctEl) ramPctEl.textContent = '(' + pct + '%)';
-          if (heapDetailEl) heapDetailEl.textContent = 'Heap: ' + (mem.heapUsedMB || 0) + ' MB';
+          if (heapDetailEl) heapDetailEl.textContent = 'Heap: ' + (mem.heapUsedMB || 0) + ' MB · Cache: ' + (mem.chunkCacheMB !== undefined ? mem.chunkCacheMB : 0) + ' MB';
           if (pct > 80) ramEl.className = 'text-xs font-bold font-mono text-rose-400';
           else if (pct > 50) ramEl.className = 'text-xs font-bold font-mono text-amber-400';
           else ramEl.className = 'text-xs font-bold font-mono text-sky-400';
@@ -2747,52 +2876,6 @@ app.get('/api/resolve', async (req, res) => {
   }
 });
 
-// In-Memory LRU Block Cache for Telegram MTProto Stream Chunks
-// Caches up to 16 blocks (8 MB RAM) to eliminate seek latency while protecting router RAM from exhaustion.
-const BLOCK_CACHE_MAX_ENTRIES = 16; // 16 x 512KB = 8 MB
-const globalBlockCache = new Map();
-
-// Pinned cache for container headers (first 2 blocks: 0, 1) and tail cues (last 2 blocks)
-// These blocks (<= 2 MB total per doc) are NEVER evicted by sequential playback pipelines,
-// eliminating 5 out of 6 remote Telegram round-trips on every seek!
-const pinnedHeaderCache = new Map(); // key: `${docId}:${blockIdx}` -> Buffer
-
-function getCachedBlock(docId, blockIdx) {
-  const key = `${docId}:${blockIdx}`;
-  if (pinnedHeaderCache.has(key)) {
-    return pinnedHeaderCache.get(key);
-  }
-  if (globalBlockCache.has(key)) {
-    const data = globalBlockCache.get(key);
-    globalBlockCache.delete(key);
-    globalBlockCache.set(key, data);
-    return data;
-  }
-  return null;
-}
-
-function setCachedBlock(docId, blockIdx, data, isPinned = false) {
-  if (!data || data.length === 0) return;
-  const key = `${docId}:${blockIdx}`;
-  if (isPinned) {
-    if (pinnedHeaderCache.has(key)) {
-      pinnedHeaderCache.delete(key);
-    } else if (pinnedHeaderCache.size >= 24) {
-      const oldestKey = pinnedHeaderCache.keys().next().value;
-      pinnedHeaderCache.delete(oldestKey);
-    }
-    pinnedHeaderCache.set(key, data);
-    return;
-  }
-  if (globalBlockCache.has(key)) {
-    globalBlockCache.delete(key);
-  } else if (globalBlockCache.size >= BLOCK_CACHE_MAX_ENTRIES) {
-    const oldestKey = globalBlockCache.keys().next().value;
-    globalBlockCache.delete(oldestKey);
-  }
-  globalBlockCache.set(key, data);
-}
-
 /**
  * Write a buffer chunk to the HTTP response with strict TCP backpressure.
  * Pauses upstream fetching if the client's network buffer is full.
@@ -2965,6 +3048,7 @@ async function streamTelegramPipelined(client, targetDoc, startByte, endByte, re
   if (parentSession) {
     parentSession.internalWorkers.set(workerId, abortPipeline);
   } else if (!isInternal) {
+    cancelIdleMemoryPurge();
     const fnAttr = targetDoc.attributes?.find(a => a.className === 'DocumentAttributeFilename');
     const mediaName = fnAttr ? fnAttr.fileName : `video_${targetDoc.id}.mp4`;
     activeStreams.set(streamKey, {
@@ -3000,6 +3084,9 @@ async function streamTelegramPipelined(client, targetDoc, startByte, endByte, re
     } else if (!isInternal) {
       if (activeStreams.get(streamKey)?.abort === abortPipeline) {
         activeStreams.delete(streamKey);
+        if (activeStreams.size === 0) {
+          scheduleIdleMemoryPurge();
+        }
       }
     } else {
       internalWorkers.delete(streamKey);
@@ -3634,6 +3721,7 @@ app.get('/stream/:docId', async (req, res) => {
           transcodeEntry.internalWorkers.clear();
         }
       };
+      cancelIdleMemoryPurge();
       activeStreams.set(streamSessionKey, transcodeEntry);
 
       const cleanupFfmpeg = () => {
@@ -3641,6 +3729,9 @@ app.get('/stream/:docId', async (req, res) => {
         res.off('finish', cleanupFfmpeg);
         if (activeStreams.get(streamSessionKey) === transcodeEntry) {
           activeStreams.delete(streamSessionKey);
+          if (activeStreams.size === 0) {
+            scheduleIdleMemoryPurge();
+          }
         }
         transcodeEntry.abort();
       };

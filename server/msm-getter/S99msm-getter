@@ -31,9 +31,9 @@ supervisor_loop() {
             continue
         fi
 
-        echo "[$(date '+%Y-%m-%d %H:%M:%S')] [SUPERVISOR] Spawning node with 256MB heap limit..." >> "$LOG_FILE"
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] [SUPERVISOR] Spawning node with 256MB heap limit, libfixmadvise and MALLOC_ARENA_MAX=2..." >> "$LOG_FILE"
         START_TIME=$(date +%s)
-        env LD_PRELOAD=/opt/lib/libfixmadvise.so /opt/bin/node --max-old-space-size=256 index.js >> "$LOG_FILE" 2>&1 &
+        env LD_PRELOAD=/opt/lib/libfixmadvise.so MALLOC_ARENA_MAX=2 /opt/bin/node --max-old-space-size=256 index.js >> "$LOG_FILE" 2>&1 &
         NODE_PID=$!
         echo $NODE_PID > "$PID_FILE"
         wait $NODE_PID
@@ -84,6 +84,7 @@ start() {
     mkdir -p /opt/var/run
 
     export PATH=/opt/bin:/opt/sbin:$PATH
+    export MALLOC_ARENA_MAX=2
     cd $APP_DIR
 
     # Initialize supervisor PID file

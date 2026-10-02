@@ -2,12 +2,14 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20261002-1137';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.fix-msm-getter-episo.20261002-1137';
+export const APP_BUILD_NUMBER = '20261002-1310';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.perf-msm-getter-memo.20261002-1310';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
-export const APP_BRANCH = 'fix-msm-getter-episo';
-export const APP_CHANGELOG = `* feat(watch): add desktop web fullscreen button with persistent header overlay (#171)
+export const APP_BRANCH = 'perf-msm-getter-memo';
+export const APP_CHANGELOG = `* Merge pull request #172 from jefrimustapa/fix/msm-getter-episode-matching
+* fix(msm-getter): overhaul TV episode matching, strict boundaries, and search precision
+* feat(watch): add desktop web fullscreen button with persistent header overlay (#171)
 * refactor(ui): rename 'My Space' to 'Space' in navigation and library headers (#169)
 * fix(player): resolve AVI/XviD black screen playback via ultra-low CPU single-thread H.264 transcoding (#168)
 * Merge pull request #167 from jefrimustapa/feat/console-system-metrics
@@ -19,6 +21,4 @@ export const APP_CHANGELOG = `* feat(watch): add desktop web fullscreen button w
 * feat(clients): expose native getDeviceName via AndroidBridge and label external WAN streams
 * fix(clients): prioritize router DHCP hostnames over generic clientName query parameter
 * fix(logs): resolve SyntaxError on web console eviction button and enforce HTTPS fallback URL
-* fix(msm-getter): isolate search title matching to button text and add persistent stream cache manager
-* Merge pull request #165 from jefrimustapa/msm-getter-streams
-* fix(android): enable opening external browser URLs via AndroidBridge native intent`;
+* fix(msm-getter): isolate search title matching to button text and add persistent stream cache manager`;
