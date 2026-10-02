@@ -1234,14 +1234,23 @@ function purgeIdleMemory() {
     }
   } catch {}
 
+  // 4. Force explicit V8 GC sweep if --expose-gc is enabled
+  if (typeof global.gc === 'function') {
+    try {
+      global.gc();
+    } catch (err) {
+      console.warn('[MEMORY PURGE] global.gc() error:', err.message);
+    }
+  }
+
   const afterMem = process.memoryUsage();
   const afterRssMB = Math.round(afterMem.rss / (1024 * 1024));
   const afterHeapMB = Math.round(afterMem.heapUsed / (1024 * 1024));
 
-  console.log(`[MEMORY PURGE] Idle stream purge executed: evicted ${evictedBlocks} blocks, pinned retained: ${pinnedHeaderCache.size}. RSS: ${beforeRssMB}MB -> ${afterRssMB}MB, Heap: ${beforeHeapMB}MB -> ${afterHeapMB}MB`);
+  console.log(`[MEMORY PURGE] Idle stream purge executed: evicted ${evictedBlocks} blocks, pinned retained: ${pinnedHeaderCache.size}. RSS: ${beforeRssMB}MB -> ${afterRssMB}MB, Heap: ${beforeHeapMB}MB -> ${afterHeapMB}MB (GC: ${typeof global.gc === 'function' ? 'active' : 'disabled'})`);
 }
 
-// Automated garbage collector for orphaned stream handles (stale entries older than 2 hours)
+// Automated garbage collector for orphaned stream handles & periodic idle watchdog
 setInterval(() => {
   const now = Date.now();
   for (const [key, entry] of activeStreams.entries()) {
@@ -1256,6 +1265,15 @@ setInterval(() => {
     if (now - (wEntry.createdAt || now) > 30 * 60 * 1000) {
       try { wEntry.abort(); } catch {}
       internalWorkers.delete(wKey);
+    }
+  }
+
+  // Periodic Idle Memory Watchdog: If no streams are running and RSS > 85 MB, purge idle memory
+  if (activeStreams.size === 0) {
+    const curRssMB = Math.round(process.memoryUsage().rss / (1024 * 1024));
+    if (curRssMB > 85) {
+      console.log(`[MEMORY WATCHDOG] Idle RSS is ${curRssMB}MB (>85MB target). Triggering idle purge...`);
+      purgeIdleMemory();
     }
   }
 }, 5 * 60 * 1000).unref();
