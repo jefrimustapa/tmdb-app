@@ -3499,9 +3499,13 @@ app.get('/stream/:docId', async (req, res) => {
       const seekSec = Math.max(0, parseFloat(req.query.ss) || 0);
       console.log(`[TRANSCODE ${isAvi ? 'AVI->H264' : 'AUDIO'}] Starting transcode for [${clientIdentity.name} (${clientIdentity.ip})] doc ${docId} (${filename}) at ${seekSec}s...`);
 
+      const isAviOrLegacyVideo = isAvi || req.query.vcodec === 'h264';
+      const outputMime = isAviOrLegacyVideo ? 'video/mp4' : 'video/x-matroska';
+      const outputExt = isAviOrLegacyVideo ? 'mp4' : 'mkv';
+
       if (req.method === 'HEAD') {
         res.writeHead(200, {
-          'Content-Type': 'video/x-matroska',
+          'Content-Type': outputMime,
           'Accept-Ranges': 'none',
           'Connection': 'keep-alive',
           'Access-Control-Allow-Origin': '*',
@@ -3525,7 +3529,6 @@ app.get('/stream/:docId', async (req, res) => {
       // Video encoding strategy:
       // For AVI / legacy video: use single-thread baseline libx264 (pinned to 1 core, 57 fps, ~11% avg router CPU).
       // For standard MKV/MP4: stream-copy 1:1 (-c:v copy, 0% CPU).
-      const isAviOrLegacyVideo = isAvi || req.query.vcodec === 'h264';
       const videoArgs = isAviOrLegacyVideo
         ? [
             '-threads', '1',
@@ -3540,6 +3543,10 @@ app.get('/stream/:docId', async (req, res) => {
             '-pix_fmt', 'yuv420p',
           ]
         : ['-c:v', 'copy'];
+
+      const muxerArgs = isAviOrLegacyVideo
+        ? ['-f', 'mp4', '-movflags', 'frag_keyframe+empty_moov+default_base_moof']
+        : ['-flush_packets', '1', '-cluster_time_limit', '1000', '-cluster_size_limit', '524288', '-f', 'matroska'];
 
       const ffmpegBin = process.env.FFMPEG_PATH || (fs.existsSync('/opt/bin/ffmpeg') ? '/opt/bin/ffmpeg' : 'ffmpeg');
       const inputSeekFlags = seekSec > 0 ? ['-ss', seekSec.toString()] : ['-seekable', '0'];
@@ -3561,10 +3568,7 @@ app.get('/stream/:docId', async (req, res) => {
         '-ac', '2',
         '-b:a', '128k',
         '-avoid_negative_ts', 'make_zero',
-        '-flush_packets', '1',
-        '-cluster_time_limit', '1000',
-        '-cluster_size_limit', '524288',
-        '-f', 'matroska',
+        ...muxerArgs,
         'pipe:1',
       ];
 
@@ -3575,12 +3579,12 @@ app.get('/stream/:docId', async (req, res) => {
         if (!headersSent && !res.headersSent) {
           headersSent = true;
           res.writeHead(200, {
-            'Content-Type': 'video/x-matroska',
+            'Content-Type': outputMime,
             'Transfer-Encoding': 'chunked',
             'Connection': 'keep-alive',
             'Cache-Control': 'no-cache, no-store',
             'Access-Control-Allow-Origin': '*',
-            'Content-Disposition': `inline; filename="transcoded_${docId}.mkv"`,
+            'Content-Disposition': `inline; filename="transcoded_${docId}.${outputExt}"`,
           });
         }
       };
