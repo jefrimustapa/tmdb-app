@@ -36,6 +36,9 @@ const __dirname = path.dirname(__filename);
 
 dotenv.config({ path: path.join(__dirname, '.env') });
 
+// Remove LD_PRELOAD from child environment so spawned 32-bit router binaries (nvram, sh) do not fail ELF class checks
+delete process.env.LD_PRELOAD;
+
 const app = express();
 app.set('trust proxy', true);
 app.use(cors());
