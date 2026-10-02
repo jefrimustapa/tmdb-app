@@ -18,8 +18,19 @@ export interface SubtitleCue {
 const BRIGHT67_BASE_URL = 'https://subs.bright67.online';
 const TMDB_API_KEY = '1c7b97dd8b1108d34ffdd5280fa13ac6';
 
-// Cache IMDb IDs so we don't repeat network calls
+// Cache IMDb IDs so we don't repeat network calls (capped to 100 items)
+const MAX_IMDB_CACHE_SIZE = 100;
 const imdbIdCache = new Map<number, string>();
+
+function setImdbIdCache(tmdbId: number, imdbId: string) {
+  if (imdbIdCache.size >= MAX_IMDB_CACHE_SIZE) {
+    const firstKey = imdbIdCache.keys().next().value;
+    if (firstKey !== undefined) {
+      imdbIdCache.delete(firstKey);
+    }
+  }
+  imdbIdCache.set(tmdbId, imdbId);
+}
 
 /**
  * Resolves IMDb ID from TMDB ID
@@ -34,7 +45,7 @@ async function resolveImdbId(tmdbId: number, mediaType: 'movie' | 'tv'): Promise
     if (!res.ok) return null;
     const data = await res.json();
     if (data.imdb_id) {
-      imdbIdCache.set(tmdbId, data.imdb_id);
+      setImdbIdCache(tmdbId, data.imdb_id);
       return data.imdb_id;
     }
   } catch (err) {
