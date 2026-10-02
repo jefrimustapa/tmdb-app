@@ -260,69 +260,67 @@ function generateSeriesSearchQueries(cleanT, sNum, eNum, totalSeasons, year) {
   };
 
   if (!isMultiSeason) {
-    // 1. Siri SATU season saja (mengikut turutan tepat dist/rule-msm-series-search)
-    addQuery(`${cleanT} E${e2}`);
-    addQuery(`${cleanT} EP${e2}`);
-    addQuery(`${cleanT} E${e1}`);
-    addQuery(`${cleanT} EP${e1}`);
-    addQuery(`${cleanT} Episod${e2}`);
-    addQuery(`${cleanT} Episod ${e2}`);
-    addQuery(`${cleanT} Episod${e1}`);
-    addQuery(`${cleanT} Episod ${e1}`);
-    addQuery(`${cleanT} Episode${e2}`);
-    addQuery(`${cleanT} Episode ${e2}`);
-    addQuery(`${cleanT} Episode${e1}`);
-    addQuery(`${cleanT} Episode ${e1}`);
-    addQuery(`${cleanT} S${s2}E${e2}`);
-    addQuery(`${cleanT} S${s2}EP${e2}`);
-    addQuery(`${cleanT} S${s2} E${e2}`);
-    addQuery(`${cleanT} S${s2} EP${e2}`);
-    addQuery(`${cleanT} S${s1}E${e1}`);
-    addQuery(`${cleanT} S${s1}EP${e1}`);
-    addQuery(`${cleanT} S${s1} E${e1}`);
-    addQuery(`${cleanT} S${s1} EP${e1}`);
-    addQuery(`${cleanT} Season ${s2} EP${e2}`);
-    addQuery(`${cleanT} Season ${s2} Episod${e2}`);
-    addQuery(`${cleanT} Season ${s2} Episod ${e2}`);
-    addQuery(`${cleanT} Season ${s2} Episode${e2}`);
-    addQuery(`${cleanT} Season ${s2} Episode ${e2}`);
-    addQuery(`${cleanT} Season ${s1} EP${e1}`);
-    addQuery(`${cleanT} Season ${s1} Episod${e1}`);
-    addQuery(`${cleanT} Season ${s1} Episod ${e1}`);
-    addQuery(`${cleanT} Season ${s1} Episode${e1}`);
-    addQuery(`${cleanT} Season ${s1} Episode ${e1}`);
-    if (year) addQuery(`${cleanT} ${year}`);
-    addQuery(cleanT);
-  } else {
-    // 2. Siri MULTI season (mengikut turutan tepat dist/rule-msm-series-search)
-    addQuery(`${cleanT} S${s2}E${e2}`);
-    addQuery(`${cleanT} S${s2}EP${e2}`);
-    addQuery(`${cleanT} S${s2} E${e2}`);
-    addQuery(`${cleanT} S${s2} EP${e2}`);
-    addQuery(`${cleanT} S${s1}E${e1}`);
-    addQuery(`${cleanT} S${s1}EP${e1}`);
-    addQuery(`${cleanT} S${s1} E${e1}`);
-    addQuery(`${cleanT} S${s1} EP${e1}`);
-    addQuery(`${cleanT} Season ${s2} EP${e2}`);
-    addQuery(`${cleanT} Season ${s2} Episode${e2}`);
-    addQuery(`${cleanT} Season ${s2} Episode ${e2}`);
-    addQuery(`${cleanT} Season ${s1} EP${e1}`);
-    addQuery(`${cleanT} Season ${s1} Episod${e1}`);
-    addQuery(`${cleanT} Season ${s1} Episod ${e1}`);
-    addQuery(`${cleanT} Season ${s1} Episode${e1}`);
-    addQuery(`${cleanT} Season ${s1} Episode ${e1}`);
+    // If explicit release year provided, prioritize year-qualified queries first to resolve reboot/remake title collisions
     if (year) {
-      addQuery(`${cleanT} ${year} EP${e2}`);
+      addQuery(`${cleanT} ${year} Episod ${e1}`);
+      addQuery(`${cleanT} ${year} E${e2}`);
       addQuery(`${cleanT} ${year}`);
     }
+
+    // 1. High-yield Localized Malaysian formats
+    addQuery(`${cleanT} Episod ${e1}`);
+    addQuery(`${cleanT} Episod ${e2}`);
+    addQuery(`${cleanT} Ep ${e1}`);
+    addQuery(`${cleanT} Ep ${e2}`);
+    addQuery(`${cleanT} Episod${e2}`);
+    addQuery(`${cleanT} Episod${e1}`);
+
+    // 2. High-yield Standard Scene formats
+    addQuery(`${cleanT} E${e2}`);
+    addQuery(`${cleanT} E${e1}`);
+    addQuery(`${cleanT} EP${e2}`);
+    addQuery(`${cleanT} EP${e1}`);
+    addQuery(`${cleanT} S${s2}E${e2}`);
+    addQuery(`${cleanT} S${s1}E${e1}`);
+
+    // 3. English "Episode" variants & Season 1
+    addQuery(`${cleanT} Episode ${e1}`);
+    addQuery(`${cleanT} Episode ${e2}`);
+    addQuery(`${cleanT} Season ${s1} Episod ${e1}`);
+    addQuery(`${cleanT} Season ${s2} EP${e2}`);
+
+    // 4. Base title fallback (prompts bot to return full series keyboard)
+    addQuery(cleanT);
+  } else {
+    // Siri MULTI season
+    if (year) {
+      addQuery(`${cleanT} ${year} S${s2}E${e2}`);
+      addQuery(`${cleanT} ${year} Episod ${e1}`);
+      addQuery(`${cleanT} ${year}`);
+    }
+
+    // 1. High-yield Scene format
+    addQuery(`${cleanT} S${s2}E${e2}`);
+    addQuery(`${cleanT} S${s1}E${e1}`);
+    addQuery(`${cleanT} S${s2}EP${e2}`);
+    addQuery(`${cleanT} S${s1}EP${e1}`);
+
+    // 2. Malaysian "Musim" and "Season" formats
+    addQuery(`${cleanT} Musim ${s1} Episod ${e1}`);
+    addQuery(`${cleanT} Musim ${s1} EP${e2}`);
+    addQuery(`${cleanT} Season ${s1} Episod ${e1}`);
+    addQuery(`${cleanT} Season ${s2} Episode ${e2}`);
+
+    // 3. Roman numeral variants (e.g. Musim II, Season II)
     const roman = toRoman(sNum);
     if (roman !== s1) {
-      addQuery(`${cleanT} Season ${roman} EP${e2}`);
-      addQuery(`${cleanT} Musim ${roman} EP${e2}`);
-      addQuery(`${cleanT} Season ${roman}`);
+      addQuery(`${cleanT} Musim ${roman} Episod ${e1}`);
+      addQuery(`${cleanT} Season ${roman} Episode ${e2}`);
       addQuery(`${cleanT} Musim ${roman}`);
+      addQuery(`${cleanT} Season ${roman}`);
     }
-    addQuery(`${cleanT} Musim ${s1} EP${e2}`);
+
+    addQuery(`${cleanT} Musim ${s1}`);
     addQuery(`${cleanT} Season ${s1}`);
     addQuery(cleanT);
   }
@@ -364,13 +362,13 @@ function parseSizeFromText(text) {
   return m[2].toLowerCase() === 'gb' ? val * 1024 : val;
 }
 
-// Clean title for bot searches (strips punctuation, colons, quotes, dashes, parentheticals)
+// Clean title for bot searches (strips punctuation, colons, quotes, dashes, parentheticals, and acronym dots)
 function cleanSearchTitle(str) {
   if (!str) return '';
   return str
     .replace(/\s*\([^)]*\)/g, ' ') // remove (2024), (US), etc.
     .replace(/\s*\[[^\]]*\]/g, ' ')
-    .replace(/[:\-–—'"`!?&]/g, ' ') // replace punctuation with space
+    .replace(/[:\-–—'"`!?&,._]/g, ' ') // cleanly replace punctuation with space
     .replace(/\s+/g, ' ')
     .trim();
 }
@@ -434,7 +432,77 @@ function calculateTitleCoverage(significantTokens, text) {
   return matched.length / significantTokens.length;
 }
 
-// Helper: Check if a button text is bare (e.g. only resolution, episode tag, numbers, or action verbs)
+// Helper: Strip bot search query echo headers from message before evaluation
+function cleanBotEchoHeader(msgText) {
+  if (!msgText) return '';
+  return msgText
+    .replace(/^[\s\S]*?(?:hasil\s*carian|carian\s*:|results?\s*for|search\s*results?)[^\n\r]*[\n\r]+/i, '')
+    .trim();
+}
+
+// Helper: Extract structured episode information from text
+function extractEpisodeInfo(text) {
+  if (!text) return null;
+  const s = String(text);
+
+  // 1. Episode range: Ep 01-16, E01-E10, Episod 1 - 20
+  const rangeMatch = s.match(/\b(?:s\d{1,2}\s*)?(?:e|ep|episod|episode)\.?\s*0*(\d{1,4})\s*(?:-|–|—|~|to)\s*(?:e|ep|episod|episode)?\.?\s*0*(\d{1,4})(?!\d)\b/i);
+  if (rangeMatch) {
+    const start = parseInt(rangeMatch[1], 10);
+    const end = parseInt(rangeMatch[2], 10);
+    return { isRange: true, start, end, episode: start };
+  }
+
+  // 2. Standard episode tags: S01E16, E16, Ep 16, Episod 16, Episode 16, Ep. 16, S1 EP 16
+  const stdMatch = s.match(/\b(?:s\d{1,2}\s*)?(?:e|ep|episod|episode)\.?\s*0*(\d{1,4})(?!\d)\b/i);
+  if (stdMatch) {
+    return { isRange: false, episode: parseInt(stdMatch[1], 10) };
+  }
+
+  // 3. Isolated bracketed or parenthesized number: [ 01 ], [ 16 ], ( 01 ), ( 16 )
+  const bracketMatch = s.match(/[\[\(]\s*0*(\d{1,3})\s*[\]\)]/);
+  if (bracketMatch) {
+    const num = parseInt(bracketMatch[1], 10);
+    // Ignore resolution numbers like 360, 480, 540, 576, 720, 1080
+    if (![360, 480, 540, 576, 720, 1080, 2160].includes(num)) {
+      return { isRange: false, episode: num };
+    }
+  }
+
+  // 4. Dot, underscore or space delimited episode number in filename: Show.Name.01.720p or Show_01_1080p
+  const dotNumMatch = s.match(/[\.\_\s]0*(\d{1,3})[\.\_\s]+(?:720p|1080p|480p|540p|360p|2160p|4k|web|bluray|hdrip|hdtv|x264|x265|hevc|mkv|mp4)/i);
+  if (dotNumMatch) {
+    const num = parseInt(dotNumMatch[1], 10);
+    if (![360, 480, 540, 576, 720, 1080, 2160].includes(num)) {
+      return { isRange: false, episode: num };
+    }
+  }
+
+  return null;
+}
+
+// Helper: Extract structured season information from text
+function extractSeasonInfo(text) {
+  if (!text) return null;
+  const s = String(text);
+
+  // Standard season patterns: S01, S1, Season 2, Musim 2, Season 10
+  const seasonMatch = s.match(/\b(?:s|season|musim)\s*0*(\d{1,2})(?!\d)\b/i);
+  if (seasonMatch) {
+    return parseInt(seasonMatch[1], 10);
+  }
+
+  // Roman numerals: Season II, Musim III, Part IV
+  const romanMatch = s.match(/\b(?:s|season|musim|part)\s*(ii|iii|iv|v|vi|vii|viii|ix|x)(?!\w)\b/i);
+  if (romanMatch) {
+    const map = { ii: 2, iii: 3, iv: 4, v: 5, vi: 6, vii: 7, viii: 8, ix: 9, x: 10 };
+    return map[romanMatch[1].toLowerCase()] || null;
+  }
+
+  return null;
+}
+
+// Helper: Check if a button text is bare (e.g. only resolution, episode tag, codecs, numbers, or action verbs)
 function isBareButton(text) {
   if (!text) return true;
   const clean = text
@@ -445,12 +513,206 @@ function isBareButton(text) {
   const tokens = clean.split(' ').filter(Boolean);
   if (tokens.length === 0) return true;
   const bareKeywords = new Set([
-    '720p', '1080p', '480p', '540p', '360p', '2160p', '4k', 'hd', 'fhd', 'sd',
-    'ep', 'eps', 'episodes', 'episode', 'episod', 'e', 's', 'season', 'musim',
+    // Resolutions & standards
+    '720p', '1080p', '480p', '540p', '360p', '2160p', '4k', 'hd', 'fhd', 'uhd', 'sd',
+    // Media sources & codecs
+    'webrip', 'webdl', 'web', 'dl', 'hdrip', 'hdtv', 'bluray', 'dvdrip', 'tvrip',
+    'hevc', 'x264', 'x265', 'h264', 'h265', '10bit', '8bit', 'aac', 'ac3', 'dts',
+    // Episode & Season identifiers
+    'ep', 'eps', 'episodes', 'episode', 'episod', 'e', 's', 'season', 'musim', 'part', 'pt',
+    // Action verbs / links
     'download', 'muat', 'turun', 'stream', 'play', 'server', 'fast', 'direct',
-    'link', 'watch', 'mb', 'gb', 'mp4', 'mkv', 'avi'
+    'link', 'watch', 'mb', 'gb', 'mp4', 'mkv', 'avi',
+    'klik', 'sini', 'tonton', 'salin', 'pautan', 'click', 'here', 'get', 'file', 'video', 'open', 'view', 'mirror', 'backup', 'vip'
   ]);
   return tokens.every(t => /^\d+$/.test(t) || bareKeywords.has(t));
+}
+
+// Score a candidate download button against search context
+function scoreCandidateButton(btn, msg, context = {}) {
+  const {
+    isTv = false,
+    title = '',
+    year = null,
+    sNum = 1,
+    eNum = 1,
+    targetQuality = 720,
+    significantTokens = extractSignificantTokens(title)
+  } = context;
+
+  if (btn.className !== 'KeyboardButtonUrlAuth' || !btn.url) return -999;
+  const btnText = (btn.text || '').toLowerCase();
+  const normBtnText = normalizeTitle(btnText);
+  const msgText = (msg.message || '').toLowerCase();
+  const normMsgText = normalizeTitle(msgText);
+
+  // 1. Immediately disqualify junk media (trailers, teasers, samples, promos, ost)
+  if (isJunkMedia(btnText) || isJunkMedia(msgText)) {
+    return -999;
+  }
+
+  // 2. Minimum file size sanity check
+  const btnSizeMB = parseSizeFromText(btn.text) || parseSizeFromText(msg.message);
+  if (btnSizeMB !== null) {
+    if (isTv) {
+      if (btnSizeMB < 70) return -999;
+      if (btnSizeMB < 120) return -600;
+    } else {
+      if (btnSizeMB < 100) return -999;
+      if (btnSizeMB < 250) return -600;
+    }
+  }
+
+  // 3. Strict Title Token Coverage check
+  const isBare = isBareButton(btnText);
+  const cleanMsgText = cleanBotEchoHeader(msgText);
+  let titleTargetText = normBtnText;
+
+  if (isBare) {
+    titleTargetText = normalizeTitle(cleanMsgText);
+  }
+
+  if (significantTokens.length > 0) {
+    const coverage = calculateTitleCoverage(significantTokens, titleTargetText);
+    if (significantTokens.length <= 2 && coverage < 1.0) {
+      return -999;
+    }
+    if (coverage < 0.70) {
+      return -999;
+    }
+  }
+
+  let score = 0;
+
+  if (significantTokens.length > 0) {
+    const coverage = calculateTitleCoverage(significantTokens, titleTargetText);
+    if (coverage >= 1.0) {
+      score += 200;
+    } else {
+      score += Math.round(coverage * 100);
+    }
+  }
+
+  if (isTv) {
+    // 1. Episode matching
+    let epInfo = extractEpisodeInfo(btnText);
+    if (!epInfo && (isBare || !extractEpisodeInfo(btnText))) {
+      epInfo = extractEpisodeInfo(cleanMsgText);
+    }
+
+    if (epInfo) {
+      if (epInfo.isRange) {
+        if (eNum >= epInfo.start && eNum <= epInfo.end) {
+          score += 90;
+        } else {
+          return -999;
+        }
+      } else if (epInfo.episode === eNum) {
+        score += 150;
+      } else {
+        return -999;
+      }
+    } else {
+      score -= 150;
+    }
+
+    // 2. Strict Season validation
+    const seasonFound = extractSeasonInfo(btnText) || extractSeasonInfo(cleanMsgText);
+    if (seasonFound !== null) {
+      if (seasonFound === sNum) {
+        score += 80;
+      } else {
+        return -999;
+      }
+    }
+
+    // 3. Release year validation
+    const explicitTargetYear = parseInt(year, 10);
+    const targetYear = !isNaN(explicitTargetYear) ? explicitTargetYear : extractYear(title, significantTokens);
+    const btnYear = extractYear(btnText, significantTokens) || extractYear(cleanMsgText, significantTokens);
+    if (targetYear && btnYear) {
+      if (Math.abs(targetYear - btnYear) <= 1) {
+        score += 90;
+      } else if (!isNaN(explicitTargetYear)) {
+        return -999;
+      }
+    }
+  } else {
+    // Movie validation
+    const isTvCandidate = /\b(s\d{1,2}e\d{1,2}|s\d{1,2}\s*ep?\s*\d{1,2}|season\s*\d+|musim\s*\d+|episode\s*\d+|episod\s*\d+|ep\s*\d+|\.end\.)\b/i.test(btnText) ||
+                          /\b(s\d{1,2}e\d{1,2}|s\d{1,2}\s*ep?\s*\d{1,2}|season\s*\d+|musim\s*\d+|episode\s*\d+|episod\s*\d+|ep\s*\d+|\.end\.)\b/i.test(msgText);
+    if (isTvCandidate) {
+      return -999;
+    }
+
+    if (significantTokens.length === 1) {
+      const singleWord = significantTokens[0];
+      const textToInspect = isBare ? titleTargetText : (normBtnText || titleTargetText);
+      const prefixMatch = textToInspect.match(new RegExp(`\\b([a-z0-9]+)\\s+${singleWord}\\b`, 'i'));
+      if (prefixMatch) {
+        const prefixWord = prefixMatch[1].toLowerCase();
+        const targetHasArticle = /^(the|a|an)\b/i.test(title.trim());
+        const ignorePrefixes = new Set(['movie', 'film', 'msm', 'msm32']);
+        if (targetHasArticle) {
+          ignorePrefixes.add('the');
+          ignorePrefixes.add('a');
+          ignorePrefixes.add('an');
+        }
+        if (!ignorePrefixes.has(prefixWord)) {
+          return -999;
+        }
+      }
+      const suffixMatch = textToInspect.match(new RegExp(`\\b${singleWord}\\s+([a-z0-9]+)\\b`, 'i'));
+      if (suffixMatch) {
+        const suffixWord = suffixMatch[1].toLowerCase();
+        if (!isAllowedTitleSuffix(suffixWord)) {
+          return -999;
+        }
+      }
+    }
+
+    const targetSequel = extractSequelInfo(title);
+    const btnSequel = extractSequelInfo(btnText);
+    if (targetSequel) {
+      if (btnSequel === targetSequel) {
+        score += 150;
+      } else if (btnSequel) {
+        score -= 600;
+      } else {
+        score -= 400;
+      }
+    } else {
+      if (btnSequel) {
+        score -= 600;
+      }
+    }
+
+    const explicitTargetYear = parseInt(year, 10);
+    const targetYear = !isNaN(explicitTargetYear) ? explicitTargetYear : extractYear(title, significantTokens);
+    const btnYear = extractYear(btnText, significantTokens) || extractYear(cleanMsgText, significantTokens);
+    if (targetYear && btnYear) {
+      if (Math.abs(targetYear - btnYear) <= 1) {
+        score += 120;
+      } else if (!isNaN(explicitTargetYear)) {
+        return -999;
+      }
+    }
+  }
+
+  // Quality preference
+  if (targetQuality <= 720) {
+    if (btnText.includes('720p') || btnText.includes('720')) score += 50;
+    else if (btnText.includes('540p') || btnText.includes('480p') || btnText.includes('360p')) score += 30;
+    else if (btnText.includes('1080p') || btnText.includes('1080')) score += 5;
+    else if (btnText.includes('2160p') || btnText.includes('4k')) score -= 50;
+  } else {
+    if (btnText.includes('1080p') || btnText.includes('1080')) score += 80;
+    else if (btnText.includes('720p') || btnText.includes('720')) score += 30;
+  }
+  if (btnText.toLowerCase().includes('.mp4') || btnText.toLowerCase().includes('mp4')) score += 15;
+  if (btnText.includes('malaysub') || btnText.includes('msm')) score += 5;
+
+  return score;
 }
 
 // Web Auth State in RAM
@@ -1873,7 +2135,7 @@ app.get('/api/resolve', async (req, res) => {
     // Search historical chat messages on Telegram servers for matching documents
     try {
       const serverDocs = await client.getMessages('msm32bot', {
-        search: cleanTitle,
+        search: isTv ? `${cleanTitle} ${epPadded}` : cleanTitle,
         limit: 20,
         filter: new Api.InputMessagesFilterDocument(),
       });
@@ -1883,6 +2145,22 @@ app.get('/api/resolve', async (req, res) => {
           if (!seenIds.has(sm.id)) {
             candidateMsgs.push(sm);
             seenIds.add(sm.id);
+          }
+        }
+      }
+      if (isTv) {
+        const epWordDocs = await client.getMessages('msm32bot', {
+          search: `${cleanTitle} Episod ${eNum}`,
+          limit: 15,
+          filter: new Api.InputMessagesFilterDocument(),
+        }).catch(() => []);
+        if (epWordDocs && epWordDocs.length > 0) {
+          const seenIds = new Set(candidateMsgs.map(m => m.id));
+          for (const sm of epWordDocs) {
+            if (!seenIds.has(sm.id)) {
+              candidateMsgs.push(sm);
+              seenIds.add(sm.id);
+            }
           }
         }
       }
@@ -1924,63 +2202,21 @@ app.get('/api/resolve', async (req, res) => {
         let matchesCandidate = true;
 
         if (isTv) {
-          const epKeywords = [
-            `s${sPadded}e${epPadded}`,
-            `s${sPadded}ep${epPadded}`,
-            `s${sNum}e${epPadded}`,
-            `s${sNum}ep${epPadded}`,
-            `s${sPadded} e${epPadded}`,
-            `s${sPadded} ep${epPadded}`,
-            `s${sNum} e${epPadded}`,
-            `s${sNum} ep${epPadded}`,
-            `s${sPadded}e${eNum}`,
-            `s${sPadded}ep${eNum}`,
-            `s${sNum}e${eNum}`,
-            `s${sNum}ep${eNum}`,
-            `s${sPadded} e${eNum}`,
-            `s${sPadded} ep${eNum}`,
-            `s${sNum} e${eNum}`,
-            `s${sNum} ep${eNum}`,
-            `ep${epPadded}`,
-            `ep ${epPadded}`,
-            `ep${eNum}`,
-            `ep ${eNum}`,
-            `e${epPadded}`,
-            `e ${epPadded}`,
-            `e${eNum}`,
-            `episod${epPadded}`,
-            `episod ${epPadded}`,
-            `episod${eNum}`,
-            `episod ${eNum}`,
-            `episode${epPadded}`,
-            `episode ${epPadded}`,
-            `episode${eNum}`,
-            `episode ${eNum}`,
-          ];
-          const hasTarget = epKeywords.some(kw => normFn.includes(kw));
-          if (!hasTarget) {
+          const epInfo = extractEpisodeInfo(filename);
+          if (!epInfo) {
             matchesCandidate = false;
-          } else {
-            const otherEpMatch = normFn.match(/\b(s\d+e(\d+)|e(\d+)|ep\s*(\d+)|episod\s*(\d+)|episode\s*(\d+))\b/);
-            if (otherEpMatch) {
-              const foundNum = parseInt(otherEpMatch[2] || otherEpMatch[3] || otherEpMatch[4] || otherEpMatch[5] || otherEpMatch[6], 10);
-              if (!isNaN(foundNum) && foundNum !== eNum) {
-                matchesCandidate = false;
-              }
-            }
-          }
-
-          // Season validation: prevent Season 1 files matching Season 2+, and vice-versa
-          if (sNum > 1) {
-            const roman = toRoman(sNum);
-            const hasSeason1 = normFn.match(/\b(s0?1(?:e\d+|ep\d+)?|season\s*1|musim\s*1)(?=\b|\D|$)/i);
-            const hasTargetSeason = normFn.match(new RegExp(`\\b(s0?${sNum}(?:e\\d+|ep\\d+)?|season\\s*(?:${sNum}|${roman})|musim\\s*(?:${sNum}|${roman})|part\\s*${sNum})(?=\\b|\\D|$)`, 'i'));
-            if (hasSeason1 && !hasTargetSeason) {
+          } else if (epInfo.isRange) {
+            if (eNum < epInfo.start || eNum > epInfo.end) {
               matchesCandidate = false;
             }
-          } else if (sNum === 1) {
-            const hasHigherSeason = normFn.match(/\b(s0?[2-9](?:e\d+|ep\d+)?|season\s*[2-9]|musim\s*[2-9])(?=\b|\D|$)/i);
-            if (hasHigherSeason) {
+          } else if (epInfo.episode !== eNum) {
+            matchesCandidate = false;
+          }
+
+          // Season validation
+          if (matchesCandidate) {
+            const seasonFound = extractSeasonInfo(filename);
+            if (seasonFound !== null && seasonFound !== sNum) {
               matchesCandidate = false;
             }
           }
@@ -2118,234 +2354,15 @@ app.get('/api/resolve', async (req, res) => {
 
     // Helper: Score a candidate download button
     function scoreButton(btn, msg) {
-      if (btn.className !== 'KeyboardButtonUrlAuth' || !btn.url) return -999;
-      const btnText = (btn.text || '').toLowerCase();
-      const normBtnText = normalizeTitle(btnText);
-      const msgText = (msg.message || '').toLowerCase();
-      const normMsgText = normalizeTitle(msgText);
-      const combinedNorm = `${normMsgText} ${normBtnText}`;
-
-      // 1. Immediately disqualify junk media (trailers, teasers, samples, promos, ost)
-      if (isJunkMedia(btnText) || isJunkMedia(msgText)) {
-        return -999;
-      }
-
-      // 2. Minimum file size sanity check (trailers/clips are typically < 100MB)
-      const btnSizeMB = parseSizeFromText(btn.text) || parseSizeFromText(msg.message);
-      if (btnSizeMB !== null) {
-        if (isTv) {
-          if (btnSizeMB < 70) return -999; // Disqualify tiny clips / trailers
-          if (btnSizeMB < 120) return -600; // Suspect low size for full episode
-        } else {
-          if (btnSizeMB < 100) return -999; // Disqualify trailers
-          if (btnSizeMB < 250) return -600; // Suspect low size for full movie
-        }
-      }
-
-      // 3. Strict Title Token Coverage check
-      // Determine if button is a bare action button (e.g. "[ 720p ]", "[ 01 ]") or has full filename
-      const isBare = isBareButton(btnText);
-      let titleTargetText = normBtnText;
-
-      if (isBare) {
-        // Strip bot search echo prefixes like "2 Results for Gadis Masa E04 (1/1)" before evaluating parent message
-        const cleanMsgText = msgText
-          .replace(/^\d+\s*results?\s*for\s*[^\n\r]+/i, '')
-          .replace(/^hasil\s*carian\s*[^\n\r]+/i, '')
-          .replace(/^search\s*results?\s*[^\n\r]+/i, '')
-          .trim();
-        titleTargetText = normalizeTitle(cleanMsgText);
-      }
-
-      if (significantTokens.length > 0) {
-        const coverage = calculateTitleCoverage(significantTokens, titleTargetText);
-        if (significantTokens.length <= 2 && coverage < 1.0) {
-          return -999; // 1- or 2-word titles MUST match all words (prevents "One Piece" matching "One Cent")
-        }
-        if (coverage < 0.70) {
-          return -999; // Unrelated content: less than 70% of significant title words match
-        }
-      }
-
-      let score = 0;
-
-      if (significantTokens.length > 0) {
-        const coverage = calculateTitleCoverage(significantTokens, titleTargetText);
-        if (coverage >= 1.0) {
-          score += 200; // Strong reward for full title match
-        } else {
-          score += Math.round(coverage * 100);
-        }
-      }
-
-      if (isTv) {
-        const epKeywords = [
-          `s${sPadded}e${epPadded}`,
-          `s${sPadded}ep${epPadded}`,
-          `s${sNum}e${epPadded}`,
-          `s${sNum}ep${epPadded}`,
-          `s${sPadded} e${epPadded}`,
-          `s${sPadded} ep${epPadded}`,
-          `s${sNum} e${epPadded}`,
-          `s${sNum} ep${epPadded}`,
-          `s${sPadded}e${eNum}`,
-          `s${sPadded}ep${eNum}`,
-          `s${sNum}e${eNum}`,
-          `s${sNum}ep${eNum}`,
-          `s${sPadded} e${eNum}`,
-          `s${sPadded} ep${eNum}`,
-          `s${sNum} e${eNum}`,
-          `s${sNum} ep${eNum}`,
-          `ep${epPadded}`,
-          `ep ${epPadded}`,
-          `ep${eNum}`,
-          `ep ${eNum}`,
-          `e${epPadded}`,
-          `e ${epPadded}`,
-          `e${eNum}`,
-          `episod${epPadded}`,
-          `episod ${epPadded}`,
-          `episod${eNum}`,
-          `episod ${eNum}`,
-          `episode${epPadded}`,
-          `episode ${epPadded}`,
-          `episode${eNum}`,
-          `episode ${eNum}`,
-        ];
-        const hasTargetEp = epKeywords.some(kw => normBtnText.includes(kw));
-
-        if (hasTargetEp) {
-          score += 100;
-        } else {
-          const otherEpMatch = normBtnText.match(/\b(s\d+e(\d+)|e(\d+)|ep\s*(\d+)|episod\s*(\d+)|episode\s*(\d+))\b/);
-          if (otherEpMatch) {
-            const foundNum = parseInt(otherEpMatch[2] || otherEpMatch[3] || otherEpMatch[4] || otherEpMatch[5] || otherEpMatch[6], 10);
-            if (!isNaN(foundNum) && foundNum !== eNum) {
-              score -= 500;
-            }
-          } else {
-            // Check for bare episode number button like "[ 01 ]", "[ 6 ]", "06"
-            const bareMatch = normBtnText.match(/^\[?\s*(\d{1,3})\s*\]?$/);
-            if (bareMatch) {
-              const bNum = parseInt(bareMatch[1], 10);
-              if (bNum === eNum) {
-                score += 80;
-              } else {
-                score -= 500;
-              }
-            } else {
-              score -= 150;
-            }
-          }
-        }
-
-        // Strict Season validation across button and parent message
-        if (sNum > 1) {
-          const roman = toRoman(sNum);
-          const hasSeason1 = combinedNorm.match(/\b(s0?1(?:e\d+|ep\d+)?|season\s*1|musim\s*1)(?=\b|\D|$)/i);
-          const hasTargetSeason = combinedNorm.match(new RegExp(`\\b(s0?${sNum}(?:e\\d+|ep\\d+)?|season\\s*(?:${sNum}|${roman})|musim\\s*(?:${sNum}|${roman})|part\\s*${sNum})(?=\\b|\\D|$)`, 'i'));
-          if (hasSeason1 && !hasTargetSeason) {
-            score -= 500;
-          } else if (hasTargetSeason) {
-            score += 80;
-          }
-        } else if (sNum === 1) {
-          const hasHigherSeason = combinedNorm.match(/\b(s0?[2-9](?:e\d+|ep\d+)?|season\s*[2-9]|musim\s*[2-9])(?=\b|\D|$)/i);
-          if (hasHigherSeason) {
-            score -= 500;
-          }
-        }
-
-        // Release year validation for TV episodes if target year is provided
-        const explicitTargetYear = parseInt(year, 10);
-        const targetYear = !isNaN(explicitTargetYear) ? explicitTargetYear : extractYear(title, significantTokens);
-        const btnYear = extractYear(btnText, significantTokens) || extractYear(msgText, significantTokens);
-        if (targetYear && btnYear) {
-          if (Math.abs(targetYear - btnYear) <= 1) {
-            score += 60; // Reward matching release year for the season
-          } else if (!isNaN(explicitTargetYear)) {
-            score -= 500; // Heavy penalty only if release year was explicitly provided
-          }
-        }
-      } else {
-        // Movie validation: Instantly disqualify TV series candidates (S01E01, episodes) during movie searches
-        const isTvCandidate = /\b(s\d{1,2}e\d{1,2}|s\d{1,2}\s*ep?\s*\d{1,2}|season\s*\d+|musim\s*\d+|episode\s*\d+|episod\s*\d+|ep\s*\d+|\.end\.)\b/i.test(btnText) ||
-                              /\b(s\d{1,2}e\d{1,2}|s\d{1,2}\s*ep?\s*\d{1,2}|season\s*\d+|musim\s*\d+|episode\s*\d+|episod\s*\d+|ep\s*\d+|\.end\.)\b/i.test(msgText);
-        if (isTvCandidate) {
-          return -999; // Hard disqualify TV episodes when searching for a movie
-        }
-
-        // Single-word title collision guard: reject "Gold Digger" or "Runner Runner" when searching for "Digger" / "Runner"
-        if (significantTokens.length === 1) {
-          const singleWord = significantTokens[0];
-          const textToInspect = isBare ? titleTargetText : (normBtnText || titleTargetText);
-          const prefixMatch = textToInspect.match(new RegExp(`\\b([a-z0-9]+)\\s+${singleWord}\\b`, 'i'));
-          if (prefixMatch) {
-            const prefixWord = prefixMatch[1].toLowerCase();
-            const targetHasArticle = /^(the|a|an)\b/i.test(title.trim());
-            const ignorePrefixes = new Set(['movie', 'film', 'msm', 'msm32']);
-            if (targetHasArticle) {
-              ignorePrefixes.add('the');
-              ignorePrefixes.add('a');
-              ignorePrefixes.add('an');
-            }
-            if (!ignorePrefixes.has(prefixWord)) {
-              return -999; // Different title (preceding word)
-            }
-          }
-          const suffixMatch = textToInspect.match(new RegExp(`\\b${singleWord}\\s+([a-z0-9]+)\\b`, 'i'));
-          if (suffixMatch) {
-            const suffixWord = suffixMatch[1].toLowerCase();
-            if (!isAllowedTitleSuffix(suffixWord)) {
-              return -999; // Different title (succeeding word)
-            }
-          }
-        }
-
-        // Movie validation: Sequel and Release Year Alignment
-        const targetSequel = extractSequelInfo(title);
-        const btnSequel = extractSequelInfo(btnText);
-        if (targetSequel) {
-          if (btnSequel === targetSequel) {
-            score += 150; // Strong reward for matching target sequel number
-          } else if (btnSequel) {
-            score -= 600; // Heavy penalty for wrong sequel number
-          } else {
-            score -= 400; // Heavy penalty if candidate lacks sequel number
-          }
-        } else {
-          // Target is original without sequel number -> reject candidates with sequel numbers
-          if (btnSequel) {
-            score -= 600;
-          }
-        }
-
-        const explicitTargetYear = parseInt(year, 10);
-        const targetYear = !isNaN(explicitTargetYear) ? explicitTargetYear : extractYear(title, significantTokens);
-        const btnYear = extractYear(btnText, significantTokens) || extractYear(msgText, significantTokens);
-        if (targetYear && btnYear) {
-          if (Math.abs(targetYear - btnYear) <= 1) {
-            score += 90; // Reward matching release year
-          } else if (!isNaN(explicitTargetYear)) {
-            score -= 450; // Heavy penalty only if release year was explicitly provided
-          }
-        }
-      }
-
-      // Quality preference
-      if (targetQuality <= 720) {
-        if (btnText.includes('720p') || btnText.includes('720')) score += 50;
-        else if (btnText.includes('540p') || btnText.includes('480p') || btnText.includes('360p')) score += 30;
-        else if (btnText.includes('1080p') || btnText.includes('1080')) score += 5;
-        else if (btnText.includes('2160p') || btnText.includes('4k')) score -= 50;
-      } else {
-        if (btnText.includes('1080p') || btnText.includes('1080')) score += 80;
-        else if (btnText.includes('720p') || btnText.includes('720')) score += 30;
-      }
-      if (btnText.toLowerCase().includes('.mp4') || btnText.toLowerCase().includes('mp4')) score += 15;
-      if (btnText.includes('malaysub') || btnText.includes('msm')) score += 5;
-
-      return score;
+      return scoreCandidateButton(btn, msg, {
+        isTv,
+        title,
+        year,
+        sNum,
+        eNum,
+        targetQuality,
+        significantTokens,
+      });
     }
 
     // Helper: Find pagination "Next" button in replyMarkup
@@ -3837,27 +3854,43 @@ function attachServerErrorHandler(server, name, sPort) {
 
 let serverInstance;
 
-if (sslCertFile && sslKeyFile) {
-  try {
-    const sslOptions = {
-      key: fs.readFileSync(sslKeyFile),
-      cert: fs.readFileSync(sslCertFile),
-    };
-    serverInstance = https.createServer(sslOptions, app);
-    attachServerErrorHandler(serverInstance, 'MSM Getter HTTPS', port);
-    serverInstance.listen(port, async () => {
-      console.log(`[SERVER] MSM Getter microservice listening securely on HTTPS port ${port} (cert: ${sslCertFile})`);
-      checkFfmpeg();
-      try {
-        await initTelegram();
-      } catch (err) {
-        console.warn(`[SERVER] Telegram not connected on startup (${err.message}). Web auth portal ready at /auth.`);
-      }
-    });
-  } catch (sslErr) {
-    console.error('[SERVER SSL ERROR] Failed to initialize HTTPS server, falling back to HTTP:', sslErr);
+const isMain = process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1]);
+
+if (isMain) {
+  if (sslCertFile && sslKeyFile) {
+    try {
+      const sslOptions = {
+        key: fs.readFileSync(sslKeyFile),
+        cert: fs.readFileSync(sslCertFile),
+      };
+      serverInstance = https.createServer(sslOptions, app);
+      attachServerErrorHandler(serverInstance, 'MSM Getter HTTPS', port);
+      serverInstance.listen(port, async () => {
+        console.log(`[SERVER] MSM Getter microservice listening securely on HTTPS port ${port} (cert: ${sslCertFile})`);
+        checkFfmpeg();
+        try {
+          await initTelegram();
+        } catch (err) {
+          console.warn(`[SERVER] Telegram not connected on startup (${err.message}). Web auth portal ready at /auth.`);
+        }
+      });
+    } catch (sslErr) {
+      console.error('[SERVER SSL ERROR] Failed to initialize HTTPS server, falling back to HTTP:', sslErr);
+      serverInstance = http.createServer(app);
+      attachServerErrorHandler(serverInstance, 'MSM Getter HTTP (Fallback)', port);
+      serverInstance.listen(port, async () => {
+        console.log(`[SERVER] MSM Getter microservice listening on HTTP port ${port}`);
+        checkFfmpeg();
+        try {
+          await initTelegram();
+        } catch (err) {
+          console.warn(`[SERVER] Telegram not connected on startup (${err.message}). Web auth portal ready at /auth.`);
+        }
+      });
+    }
+  } else {
     serverInstance = http.createServer(app);
-    attachServerErrorHandler(serverInstance, 'MSM Getter HTTP (Fallback)', port);
+    attachServerErrorHandler(serverInstance, 'MSM Getter HTTP', port);
     serverInstance.listen(port, async () => {
       console.log(`[SERVER] MSM Getter microservice listening on HTTP port ${port}`);
       checkFfmpeg();
@@ -3868,30 +3901,33 @@ if (sslCertFile && sslKeyFile) {
       }
     });
   }
-} else {
-  serverInstance = http.createServer(app);
-  attachServerErrorHandler(serverInstance, 'MSM Getter HTTP', port);
-  serverInstance.listen(port, async () => {
-    console.log(`[SERVER] MSM Getter microservice listening on HTTP port ${port}`);
-    checkFfmpeg();
-    try {
-      await initTelegram();
-    } catch (err) {
-      console.warn(`[SERVER] Telegram not connected on startup (${err.message}). Web auth portal ready at /auth.`);
-    }
-  });
-}
 
-// Start dedicated internal loopback HTTP listener on 127.0.0.1:3034
-// Bypasses TLS overhead completely for local ffmpeg transcode demuxer
-if (port !== INTERNAL_HTTP_PORT) {
-  try {
-    const internalServer = http.createServer(app);
-    attachServerErrorHandler(internalServer, 'Internal Transcoder Loopback', INTERNAL_HTTP_PORT);
-    internalServer.listen(INTERNAL_HTTP_PORT, '127.0.0.1', () => {
-      console.log(`[SERVER] Internal loopback HTTP listener active on http://127.0.0.1:${INTERNAL_HTTP_PORT} (0% TLS overhead for ffmpeg)`);
-    });
-  } catch (internalErr) {
-    console.warn('[SERVER] Could not bind internal HTTP listener:', internalErr.message);
+  // Start dedicated internal loopback HTTP listener on 127.0.0.1:3034
+  // Bypasses TLS overhead completely for local ffmpeg transcode demuxer
+  if (port !== INTERNAL_HTTP_PORT) {
+    try {
+      const internalServer = http.createServer(app);
+      attachServerErrorHandler(internalServer, 'Internal Transcoder Loopback', INTERNAL_HTTP_PORT);
+      internalServer.listen(INTERNAL_HTTP_PORT, '127.0.0.1', () => {
+        console.log(`[SERVER] Internal loopback HTTP listener active on http://127.0.0.1:${INTERNAL_HTTP_PORT} (0% TLS overhead for ffmpeg)`);
+      });
+    } catch (internalErr) {
+      console.warn('[SERVER] Could not bind internal HTTP listener:', internalErr.message);
+    }
   }
 }
+
+export {
+  extractEpisodeInfo,
+  extractSeasonInfo,
+  cleanBotEchoHeader,
+  cleanSearchTitle,
+  isBareButton,
+  scoreCandidateButton,
+  generateSeriesSearchQueries,
+  calculateTitleCoverage,
+  normalizeTitle,
+  extractSignificantTokens,
+  extractYear,
+  extractSequelInfo,
+};

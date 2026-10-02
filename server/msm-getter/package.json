@@ -6,6 +6,7 @@
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
+    "test": "node matching.test.js",
     "test-bot": "node test-bot.js",
     "login": "node login.js"
   },
