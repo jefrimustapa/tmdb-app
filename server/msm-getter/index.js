@@ -1613,6 +1613,21 @@ app.get('/api/logs/download', (req, res) => {
   }
 });
 
+// Clear / Truncate Physical Log File on Disk
+app.post('/api/logs/clear', (req, res) => {
+  try {
+    const logPath = getLogFilePath();
+    if (fs.existsSync(logPath)) {
+      fs.truncateSync(logPath, 0);
+    }
+    console.log('[SYSTEM] Log file physically truncated and cleared by user.');
+    return res.json({ success: true, message: 'Log file cleared successfully.' });
+  } catch (err) {
+    console.error('[SYSTEM ERROR] Failed to truncate log file:', err.message);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // Dedicated Web Log Viewer GUI
 app.get('/logs', (req, res) => {
   res.set({
@@ -1737,8 +1752,9 @@ app.get('/logs', (req, res) => {
         <input id="autoScroll" type="checkbox" checked class="rounded bg-slate-900 border-slate-700 text-sky-500 focus:ring-0" />
         <span>Auto-scroll</span>
       </label>
-      <button onclick="clearDisplay()" class="px-2.5 py-1 text-xs text-slate-400 hover:text-white bg-slate-900 hover:bg-slate-800 rounded-lg border border-slate-800 transition">
-        Clear
+      <button onclick="clearServerLog()" class="px-2.5 py-1 text-xs font-semibold text-rose-300 hover:text-white bg-rose-500/10 hover:bg-rose-500/20 rounded-lg border border-rose-500/30 transition flex items-center gap-1.5" title="Physically truncate and clear log file on router">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+        Clear Log
       </button>
     </div>
   </div>
@@ -1852,10 +1868,24 @@ app.get('/logs', (req, res) => {
       renderLines();
     }
 
-    function clearDisplay() {
-      rawLines = [];
-      renderLines();
+    async function clearServerLog() {
+      if (!confirm('Are you sure you want to physically clear and truncate the log file on the router?')) return;
+      try {
+        const res = await fetch('/api/logs/clear', { method: 'POST' });
+        const data = await res.json();
+        if (data.success) {
+          rawLines = [];
+          renderLines();
+          const metricLogSize = document.getElementById('metricLogSize');
+          if (metricLogSize) metricLogSize.textContent = '0 KB';
+        } else {
+          alert('Failed to clear log: ' + (data.error || 'Unknown error'));
+        }
+      } catch (err) {
+        alert('Network error while clearing log: ' + err.message);
+      }
     }
+    const clearDisplay = clearServerLog;
 
     searchInput.addEventListener('input', renderLines);
 
