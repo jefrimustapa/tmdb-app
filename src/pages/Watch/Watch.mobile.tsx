@@ -12,9 +12,11 @@ import type { OriginCountryCode } from '../../types/stream';
 import { getProviderById, extractMediaOriginCountries, isProviderMatchingMedia } from '../../services/streamProviders';
 import { isAnimeMedia } from '../../services/animeMappingService';
 import { isAseanMedia, isKoreanMedia } from '../../services/lariMappingService';
-import { ArrowLeft, SkipForward, SkipBack, Cast, Tv, X, Settings } from 'lucide-react';
+import { ArrowLeft, SkipForward, SkipBack, Cast, Tv, X, Settings, Maximize, Minimize } from 'lucide-react';
+import { useDevice } from '../../hooks/useDevice';
 
 export const Watch: React.FC = () => {
+  const { isDesktop } = useDevice();
   const { type, id } = useParams<{ type: 'movie' | 'tv'; id: string }>();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -251,7 +253,42 @@ export const Watch: React.FC = () => {
     };
   }, []);
 
+  const watchContainerRef = useRef<HTMLDivElement>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement || !!(document as any).webkitFullscreenElement);
+    };
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
+    };
+  }, []);
+
+  const handleToggleFullscreen = async () => {
+    resetHeaderTimer();
+    try {
+      if (!document.fullscreenElement && !(document as any).webkitFullscreenElement) {
+        const elem = watchContainerRef.current || document.documentElement;
+        if (elem.requestFullscreen) {
+          await elem.requestFullscreen();
+        } else if ((elem as any).webkitRequestFullscreen) {
+          await (elem as any).webkitRequestFullscreen();
+        }
+      } else {
+        if (document.exitFullscreen) {
+          await document.exitFullscreen();
+        } else if ((document as any).webkitExitFullscreen) {
+          await (document as any).webkitExitFullscreen();
+        }
+      }
+    } catch (err) {
+      console.warn('Error toggling fullscreen:', err);
+    }
+  };
 
   const resetHeaderTimer = React.useCallback(() => {
     setHeaderVisible(true);
@@ -282,6 +319,15 @@ export const Watch: React.FC = () => {
 
   // Robust exit watch navigation that cannot be trapped by iframe history
   const handleExitWatch = React.useCallback(() => {
+    try {
+      if (document.fullscreenElement || (document as any).webkitFullscreenElement) {
+        if (document.exitFullscreen) {
+          document.exitFullscreen().catch(() => {});
+        } else if ((document as any).webkitExitFullscreen) {
+          (document as any).webkitExitFullscreen();
+        }
+      }
+    } catch {}
     const targetId = id || details?.id;
     if (mediaType && targetId) {
       navigate(`/details/${mediaType}/${targetId}`, { replace: true });
@@ -519,6 +565,7 @@ export const Watch: React.FC = () => {
 
   return (
     <div
+      ref={watchContainerRef}
       className="relative w-screen h-screen min-h-screen bg-black overflow-hidden flex flex-col justify-start select-none"
       onClick={resetHeaderTimer}
       onTouchStart={resetHeaderTimer}
@@ -529,7 +576,7 @@ export const Watch: React.FC = () => {
         {/* Overlay Top Header Nav: Row 1 (Back + Center-aligned Title, Provider Switcher) & Row 2 (Season/Episode info + Prev/Next buttons) */}
         <div
           data-watch-header="true"
-          className={`absolute top-0 left-0 right-0 z-40 flex flex-col gap-2 px-3 sm:px-6 pt-[max(0.75rem,env(safe-area-inset-top,1.75rem))] pb-8 bg-gradient-to-b from-black via-black/90 to-transparent transition-all duration-300 pointer-events-auto ${
+          className={`absolute top-0 left-0 right-0 z-50 flex flex-col gap-2 px-3 sm:px-6 pt-[max(0.75rem,env(safe-area-inset-top,1.75rem))] pb-8 bg-gradient-to-b from-black via-black/90 to-transparent transition-all duration-300 pointer-events-auto ${
             headerVisible ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4 pointer-events-none'
           }`}
         >
@@ -617,7 +664,12 @@ export const Watch: React.FC = () => {
                 aria-label="Playback Settings"
                 tabIndex={0}
                 onKeyDown={(e) => {
-                  if (e.key === 'ArrowLeft') {
+                  if (e.key === 'ArrowRight') {
+                    if (isDesktop) {
+                      e.preventDefault();
+                      document.getElementById('watch-fullscreen-btn')?.focus();
+                    }
+                  } else if (e.key === 'ArrowLeft') {
                     e.preventDefault();
                     document.getElementById('watch-cast-btn')?.focus();
                   }
@@ -635,6 +687,31 @@ export const Watch: React.FC = () => {
                   <span className="text-white/90 font-medium truncate max-w-[100px] sm:max-w-[120px]">{activeServerLabel || currentProviderName}</span>
                 </div>
               </button>
+
+              {isDesktop && (
+                <button
+                  type="button"
+                  onClick={handleToggleFullscreen}
+                  id="watch-fullscreen-btn"
+                  data-watch-header-item="true"
+                  aria-label={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
+                  title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === 'ArrowLeft') {
+                      e.preventDefault();
+                      document.getElementById('watch-settings-btn')?.focus();
+                    }
+                  }}
+                  className="p-2 rounded-full bg-black/60 hover:bg-black/90 text-white/90 hover:text-white border border-white/15 transition active:scale-95 hover:scale-105 flex-shrink-0 tv-focus-target focus:outline-none focus:border-hbo-cyan focus:ring-2 focus:ring-hbo-cyan shadow-sm cursor-pointer"
+                >
+                  {isFullscreen ? (
+                    <Minimize className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
+                  ) : (
+                    <Maximize className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
+                  )}
+                </button>
+              )}
             </div>
           </div>
 
