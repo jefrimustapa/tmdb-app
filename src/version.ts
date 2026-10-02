@@ -2,12 +2,13 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20261002-0143';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.refactor-rename-my-s.20261002-0143';
+export const APP_BUILD_NUMBER = '20261002-1052';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-watch-header-fu.20261002-1052';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
-export const APP_BRANCH = 'refactor-rename-my-s';
-export const APP_CHANGELOG = `* fix(player): resolve AVI/XviD black screen playback via ultra-low CPU single-thread H.264 transcoding (#168)
+export const APP_BRANCH = 'feat-watch-header-fu';
+export const APP_CHANGELOG = `* refactor(ui): rename 'My Space' to 'Space' in navigation and library headers (#169)
+* fix(player): resolve AVI/XviD black screen playback via ultra-low CPU single-thread H.264 transcoding (#168)
 * Merge pull request #167 from jefrimustapa/feat/console-system-metrics
 * feat(console): display msm-getter cpu with router cpu and node ram with 256MB cap
 * Merge pull request #166 from jefrimustapa/fix/msm-getter-search
@@ -20,5 +21,4 @@ export const APP_CHANGELOG = `* fix(player): resolve AVI/XviD black screen playb
 * fix(msm-getter): isolate search title matching to button text and add persistent stream cache manager
 * Merge pull request #165 from jefrimustapa/msm-getter-streams
 * fix(android): enable opening external browser URLs via AndroidBridge native intent
-* refactor(logs): remove redundant active streams card from web console and in-app drawer
-* feat(settings): display active streaming clients and devices in in-app log dashboard`;
+* refactor(logs): remove redundant active streams card from web console and in-app drawer`;
