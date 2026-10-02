@@ -2,12 +2,13 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20261002-1400';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-visual-improvem.20261002-1400';
+export const APP_BUILD_NUMBER = '20261002-1403';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-visual-improvem.20261002-1403';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
 export const APP_BRANCH = 'feat-visual-improvem';
-export const APP_CHANGELOG = `* feat(home): constrain content rails to max-w-7xl mx-auto on desktop web
+export const APP_CHANGELOG = `* feat(hero): align info block and indicators to max-w-7xl container on desktop
+* feat(home): constrain content rails to max-w-7xl mx-auto on desktop web
 * feat(ui): use poster in portrait and backdrop in landscape for hero banner, bind backgrounds to object-top, and remove horizontal black tints
 * Merge pull request #173 from jefrimustapa/perf/msm-getter-memory-optimization
 * perf(msm-getter): optimize idle memory with allocator tuning, chunk cache eviction and watchdog
@@ -20,5 +21,4 @@ export const APP_CHANGELOG = `* feat(home): constrain content rails to max-w-7xl
 * feat(console): display msm-getter cpu with router cpu and node ram with 256MB cap
 * Merge pull request #166 from jefrimustapa/fix/msm-getter-search
 * fix(search): preserve leading articles for short titles and strictly separate titles like 'Runner' vs 'The Runner'
-* fix(search): enforce trailing word suffix guard for single-word movie queries
-* fix(msm-getter): strictly reject TV episodes and prefix collisions during movie searches`;
+* fix(search): enforce trailing word suffix guard for single-word movie queries`;
