@@ -239,6 +239,30 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     };
   }, [isFullscreen, resetControlsTimer]);
 
+  // Comprehensive player unmount teardown to release hardware decoders and iframe context
+  useEffect(() => {
+    return () => {
+      if (hlsRef.current) {
+        try {
+          hlsRef.current.destroy();
+          hlsRef.current = null;
+        } catch {}
+      }
+      if (videoRef.current) {
+        try {
+          videoRef.current.pause();
+          videoRef.current.removeAttribute('src');
+          videoRef.current.load();
+        } catch {}
+      }
+      if (iframeRef.current) {
+        try {
+          iframeRef.current.src = 'about:blank';
+        } catch {}
+      }
+    };
+  }, []);
+
   const handleContainerClick = (e: React.MouseEvent) => {
     // If click was on a button or interactive element, don't toggle
     if ((e.target as HTMLElement).closest('button, a, input, select')) {
@@ -1444,7 +1468,11 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         const hls = new Hls({
           enableWorker: false,
           lowLatencyMode: false,
-          backBufferLength: 90,
+          backBufferLength: 15, // Reduce from 90s to 15s to save 150MB-250MB RAM
+          maxBufferLength: 30,  // Target 30s forward buffer
+          maxMaxBufferLength: 60, // Hard ceiling of 60s (prevents default 600s runaway)
+          maxBufferSize: 30 * 1000 * 1000, // 30 MB max buffer capacity
+          maxBufferHole: 0.5,
           fragLoadingMaxRetry: 5,
           fragLoadingRetryDelay: 1000,
           fragLoadingTimeOut: 25000
@@ -1485,6 +1513,13 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         return () => {
           hls.destroy();
           hlsRef.current = null;
+          if (videoRef.current) {
+            try {
+              videoRef.current.pause();
+              videoRef.current.removeAttribute('src');
+              videoRef.current.load();
+            } catch {}
+          }
         };
       } else {
         videoRef.current.src = directStreamUrl;

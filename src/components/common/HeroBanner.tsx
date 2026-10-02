@@ -169,8 +169,9 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ items }) => {
     if (totalItems <= 1) return;
     const nextIdx = (currentIndex + 1) % totalItems;
     const nextItem = displayItems[nextIdx];
+    let img: HTMLImageElement | null = null;
     if (nextItem) {
-      const img = new Image();
+      img = new Image();
       const nextUrl = !isLandscape
         ? (nextItem.poster_path ? tmdbImages.poster(nextItem.poster_path, isPerfMode ? 'w500' : 'w780') : tmdbImages.backdrop(nextItem.backdrop_path, isPerfMode ? 'w780' : 'w1280'))
         : (nextItem.backdrop_path ? tmdbImages.backdrop(nextItem.backdrop_path, isPerfMode ? 'w780' : 'w1280') : tmdbImages.poster(nextItem.poster_path, isPerfMode ? 'w500' : 'w780'));
@@ -178,6 +179,12 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ items }) => {
         img.src = nextUrl;
       }
     }
+    return () => {
+      if (img) {
+        img.src = '';
+        img = null;
+      }
+    };
   }, [currentIndex, displayItems, isPerfMode, isLandscape, totalItems]);
 
   if (totalItems === 0) return null;
