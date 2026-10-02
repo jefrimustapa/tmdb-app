@@ -3491,8 +3491,14 @@ app.get('/stream/:docId', async (req, res) => {
     }
 
     // OPTION C: On-demand Audio & Video Transcoding Pipe (?transcode=audio|video or automatic for .avi)
-    // Streams Matroska with audio transcoded to stereo AAC and legacy AVI/MPEG4 video transcoded to H.264 Baseline (1 thread, ~11% CPU)
+    // Streams Matroska/fMP4 with audio transcoded to stereo AAC and legacy AVI/MPEG4 video transcoded to H.264 Baseline (1 thread, ~11% CPU)
     const isAvi = /\.avi$/i.test(filename);
+    if (isAvi && !isInternalTranscoder && !req.query.transcode) {
+      const sep = req.url.includes('?') ? '&' : '?';
+      console.log(`[AVI REDIRECT] Redirecting untagged AVI request to transcode pipe for [${clientIdentity.name} (${clientIdentity.ip})] doc ${docId}`);
+      return res.redirect(307, `${req.url}${sep}transcode=audio&vcodec=h264`);
+    }
+
     const shouldTranscode = req.query.transcode === 'audio' || req.query.transcode === 'video' || (isAvi && !isInternalTranscoder);
 
     if (shouldTranscode) {
@@ -3567,6 +3573,7 @@ app.get('/stream/:docId', async (req, res) => {
         '-c:a', 'aac',
         '-ac', '2',
         '-b:a', '128k',
+        ...(isAviOrLegacyVideo ? ['-af', 'aresample=async=1:first_pts=0'] : []),
         '-avoid_negative_ts', 'make_zero',
         ...muxerArgs,
         'pipe:1',

@@ -470,8 +470,8 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             let finalUrl = msmRes.streamUrl;
             if (isAviOrLegacy) {
               const sep = finalUrl.includes('?') ? '&' : '?';
-              finalUrl = `${finalUrl}${sep}transcode=video`;
-              console.log('[Resolver] 🎬 Detected AVI/XviD legacy video in Telegram stream. Enabling H.264 video transcode pipe:', finalUrl);
+              finalUrl = `${finalUrl}${sep}transcode=audio&vcodec=h264`;
+              console.log('[Resolver] 🎬 Detected AVI/XviD legacy video in Telegram stream. Enabling H.264 video + AAC transcode pipe:', finalUrl);
             } else if (isSurroundOrDolbyAudio) {
               const sep = finalUrl.includes('?') ? '&' : '?';
               finalUrl = `${finalUrl}${sep}transcode=audio`;

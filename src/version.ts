@@ -2,12 +2,15 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20261002-0020';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.fix-avi-black-screen.20261002-0020';
+export const APP_BUILD_NUMBER = '20261002-0049';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.fix-avi-black-screen.20261002-0049';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
 export const APP_BRANCH = 'fix-avi-black-screen';
-export const APP_CHANGELOG = `* Merge pull request #167 from jefrimustapa/feat/console-system-metrics
+export const APP_CHANGELOG = `* fix(player): switch live video transcode container to fragmented MP4 (video/mp4) for universal Chromium compatibility
+* fix(player): eliminate AVI transcoding jitter by enforcing 1s GOP keyframes and removing zerolatency
+* fix(player): resolve AVI/XviD black screen playback via ultra-low CPU single-thread H.264 transcoding
+* Merge pull request #167 from jefrimustapa/feat/console-system-metrics
 * feat(console): display msm-getter cpu with router cpu and node ram with 256MB cap
 * Merge pull request #166 from jefrimustapa/fix/msm-getter-search
 * fix(search): preserve leading articles for short titles and strictly separate titles like 'Runner' vs 'The Runner'
@@ -18,7 +21,4 @@ export const APP_CHANGELOG = `* Merge pull request #167 from jefrimustapa/feat/c
 * fix(logs): resolve SyntaxError on web console eviction button and enforce HTTPS fallback URL
 * fix(msm-getter): isolate search title matching to button text and add persistent stream cache manager
 * Merge pull request #165 from jefrimustapa/msm-getter-streams
-* fix(android): enable opening external browser URLs via AndroidBridge native intent
-* refactor(logs): remove redundant active streams card from web console and in-app drawer
-* feat(settings): display active streaming clients and devices in in-app log dashboard
-* fix(msm-getter): prevent multi-stream stacking and display client IP and device name in logs`;
+* fix(android): enable opening external browser URLs via AndroidBridge native intent`;
