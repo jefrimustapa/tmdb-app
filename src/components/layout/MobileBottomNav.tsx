@@ -30,7 +30,7 @@ export const MobileBottomNav: React.FC = () => {
     { label: 'Movies', path: '/movies', icon: Film },
     { label: 'Series', path: '/tv', icon: Tv },
     { label: 'Search', path: '/search', icon: Search },
-    { label: 'My Space', path: '/library', icon: Bookmark },
+    { label: 'Space', path: '/library', icon: Bookmark },
   ];
 
   return (

@@ -72,7 +72,7 @@ export function useTVNavigation(isEnabled = true) {
           target = mainContent.querySelector<HTMLElement>('[data-tv-filter-section="true"] button.tv-focus-target') ||
                    mainContent.querySelector<HTMLElement>('.tv-focus-target');
         } else if (pathname === '/library') {
-          // On My Space (Library): focus Watch History tab button
+          // On Space (Library): focus Watch History tab button
           target = Array.from(mainContent.querySelectorAll<HTMLElement>('button.tv-focus-target')).find(
             b => b.textContent?.trim().toLowerCase().includes('watch history')
           ) || mainContent.querySelector<HTMLElement>('.tv-focus-target');
