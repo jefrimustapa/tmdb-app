@@ -281,16 +281,6 @@ aside .tv-focus-target:focus-visible .tv-nav-label,
   );
 }
 
-.hero-side-gradient {
-  background: linear-gradient(
-    90deg,
-    #050508 0%,
-    rgba(5, 5, 8, 0.8) 25%,
-    rgba(5, 5, 8, 0.2) 60%,
-    transparent 100%
-  );
-}
-
 /* Cinematic HBO Billboard Motion */
 @keyframes heroFadeInUp {
   0% {

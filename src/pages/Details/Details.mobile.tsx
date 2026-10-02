@@ -535,7 +535,7 @@ export const Details: React.FC = () => {
             className={`${
               !isLandscape
                 ? 'w-full h-auto block'
-                : 'absolute inset-0 w-full h-full object-cover object-center'
+                : 'absolute inset-0 w-full h-full object-cover object-top'
             } transform-gpu will-change-[opacity] transition-opacity duration-700 ease-in-out ${
               isHeroLoaded ? 'opacity-100' : 'opacity-0'
             }`}
@@ -544,7 +544,6 @@ export const Details: React.FC = () => {
 
         {/* Cinematic HBO Gradients Layer (Identical to HeroBanner) */}
         <div className="absolute inset-0 hero-gradient-overlay" />
-        <div className="absolute inset-0 hero-side-gradient hidden sm:block" />
         <div className="absolute inset-0 bg-gradient-to-t from-transparent via-transparent to-black/40" />
         {!isLandscape && (
           <div className="absolute inset-x-0 bottom-0 h-44 bg-gradient-to-t from-hbo-dark via-hbo-dark/85 to-transparent" />

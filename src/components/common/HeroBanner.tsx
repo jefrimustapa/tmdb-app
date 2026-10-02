@@ -148,16 +148,37 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ items }) => {
     return () => window.removeEventListener('tmdb_settings_changed', handleSettings);
   }, []);
 
-  // Preload upcoming backdrops into browser cache to eliminate gray flash
+  const [isLandscape, setIsLandscape] = useState(() =>
+    typeof window !== 'undefined' ? window.innerWidth > window.innerHeight : false
+  );
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsLandscape(window.innerWidth > window.innerHeight);
+    };
+    window.addEventListener('resize', handleResize);
+    window.addEventListener('orientationchange', handleResize);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('orientationchange', handleResize);
+    };
+  }, []);
+
+  // Preload upcoming artwork into browser cache to eliminate gray flash
   useEffect(() => {
     if (totalItems <= 1) return;
     const nextIdx = (currentIndex + 1) % totalItems;
     const nextItem = displayItems[nextIdx];
-    if (nextItem?.backdrop_path) {
+    if (nextItem) {
       const img = new Image();
-      img.src = tmdbImages.backdrop(nextItem.backdrop_path, isPerfMode ? 'w780' : 'w1280');
+      const nextUrl = !isLandscape
+        ? (nextItem.poster_path ? tmdbImages.poster(nextItem.poster_path, isPerfMode ? 'w500' : 'w780') : tmdbImages.backdrop(nextItem.backdrop_path, isPerfMode ? 'w780' : 'w1280'))
+        : (nextItem.backdrop_path ? tmdbImages.backdrop(nextItem.backdrop_path, isPerfMode ? 'w780' : 'w1280') : tmdbImages.poster(nextItem.poster_path, isPerfMode ? 'w500' : 'w780'));
+      if (nextUrl) {
+        img.src = nextUrl;
+      }
     }
-  }, [currentIndex, displayItems, isPerfMode, totalItems]);
+  }, [currentIndex, displayItems, isPerfMode, isLandscape, totalItems]);
 
   if (totalItems === 0) return null;
 
@@ -235,7 +256,13 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ items }) => {
         {displayItems.map((featured, idx) => {
           const isCurrent = idx === currentIndex;
           const isNearby = Math.abs(idx - currentIndex) <= 1 || (idx === 0 && currentIndex === totalItems - 1) || (idx === totalItems - 1 && currentIndex === 0);
-          const backdropUrl = tmdbImages.backdrop(featured.backdrop_path, isPerfMode ? 'w780' : 'w1280');
+          const heroImgUrl = !isLandscape
+            ? (featured.poster_path
+                ? tmdbImages.poster(featured.poster_path, isPerfMode ? 'w500' : 'w780')
+                : tmdbImages.backdrop(featured.backdrop_path, isPerfMode ? 'w780' : 'w1280'))
+            : (featured.backdrop_path
+                ? tmdbImages.backdrop(featured.backdrop_path, isPerfMode ? 'w780' : 'w1280')
+                : tmdbImages.poster(featured.poster_path, isPerfMode ? 'w500' : 'w780'));
 
           return (
             <div
@@ -248,13 +275,13 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ items }) => {
               }}
             >
               <img
-                src={backdropUrl}
-                alt={featured.title || featured.name || 'Hero Backdrop'}
+                src={heroImgUrl}
+                alt={featured.title || featured.name || 'Hero Artwork'}
                 draggable={false}
                 loading={idx === 0 ? 'eager' : 'lazy'}
                 decoding="async"
-                onError={(e) => tmdbImages.handleImgError(e, true)}
-                className={`w-full h-full object-cover object-center transition-transform duration-1000 ease-out ${
+                onError={(e) => tmdbImages.handleImgError(e, isLandscape)}
+                className={`w-full h-full object-cover object-top transition-transform duration-1000 ease-out ${
                   isCurrent ? 'scale-100' : 'scale-105'
                 }`}
               />
@@ -266,7 +293,6 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ items }) => {
       {/* 2. Permanent Static Cinematic HBO Gradients Layer (Zero Seam Flickering) */}
       <div className="absolute inset-0 z-20 pointer-events-none select-none">
         <div className="absolute inset-0 hero-gradient-overlay" />
-        <div className="absolute inset-0 hero-side-gradient hidden sm:block" />
         <div className="absolute inset-0 bg-gradient-to-t from-transparent via-transparent to-black/40" />
       </div>
 

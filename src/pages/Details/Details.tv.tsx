@@ -452,7 +452,7 @@ export const Details: React.FC = () => {
               tmdbImages.handleImgError(e, true);
               setIsHeroLoaded(true);
             }}
-            className={`absolute inset-0 w-full h-full object-cover object-center transform-gpu will-change-[opacity] transition-opacity duration-700 ease-in-out ${
+            className={`absolute inset-0 w-full h-full object-cover object-top transform-gpu will-change-[opacity] transition-opacity duration-700 ease-in-out ${
               isHeroLoaded ? 'opacity-100' : 'opacity-0'
             }`}
           />
@@ -460,7 +460,6 @@ export const Details: React.FC = () => {
 
         {/* Cinematic HBO Gradients Layer (Identical to HeroBanner) */}
         <div className="absolute inset-0 hero-gradient-overlay" />
-        <div className="absolute inset-0 hero-side-gradient hidden sm:block" />
         <div className="absolute inset-0 bg-gradient-to-t from-transparent via-transparent to-black/40" />
       </div>
 
