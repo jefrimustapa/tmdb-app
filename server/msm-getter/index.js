@@ -1,3 +1,4 @@
+import './logger.js';
 import express from 'express';
 import http from 'http';
 import https from 'https';
@@ -38,23 +39,6 @@ dotenv.config({ path: path.join(__dirname, '.env') });
 
 // Remove LD_PRELOAD from child environment so spawned 32-bit router binaries (nvram, sh) do not fail ELF class checks
 delete process.env.LD_PRELOAD;
-
-// Standardize console output with local [YYYY-MM-DD HH:mm:ss] timestamps
-function getLogTimestamp() {
-  const d = new Date();
-  const pad = (n) => String(n).padStart(2, '0');
-  return `[${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}]`;
-}
-
-const origLog = console.log.bind(console);
-const origWarn = console.warn.bind(console);
-const origError = console.error.bind(console);
-const origInfo = console.info.bind(console);
-
-console.log = (...args) => origLog(getLogTimestamp(), ...args);
-console.warn = (...args) => origWarn(getLogTimestamp(), ...args);
-console.error = (...args) => origError(getLogTimestamp(), ...args);
-console.info = (...args) => origInfo(getLogTimestamp(), ...args);
 
 const app = express();
 app.set('trust proxy', true);
