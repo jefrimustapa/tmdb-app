@@ -3531,26 +3531,28 @@ app.get('/stream/:docId', async (req, res) => {
             '-threads', '1',
             '-c:v', 'libx264',
             '-preset', 'ultrafast',
-            '-tune', 'zerolatency,fastdecode',
+            '-tune', 'fastdecode',
             '-profile:v', 'baseline',
+            '-g', '25',
+            '-keyint_min', '25',
+            '-sc_threshold', '0',
             '-crf', '26',
             '-pix_fmt', 'yuv420p',
           ]
         : ['-c:v', 'copy'];
 
       const ffmpegBin = process.env.FFMPEG_PATH || (fs.existsSync('/opt/bin/ffmpeg') ? '/opt/bin/ffmpeg' : 'ffmpeg');
+      const inputSeekFlags = seekSec > 0 ? ['-ss', seekSec.toString()] : ['-seekable', '0'];
       const ffmpegArgs = [
         '-loglevel', 'error',
-        '-noaccurate_seek',
-        ...(seekSec > 0 ? ['-ss', seekSec.toString()] : []),
+        ...inputSeekFlags,
         '-headers', `x-internal-transcoder: 1\r\nx-parent-session: ${streamSessionKey}\r\n`,
         '-reconnect', '1',
         '-reconnect_streamed', '1',
         '-reconnect_delay_max', '2',
-        '-probesize', '393216',
-        '-analyzeduration', '0',
-        '-fflags', '+nobuffer+fastseek+flush_packets',
-        '-flags', 'low_delay',
+        '-probesize', '1000000',
+        '-analyzeduration', '1000000',
+        '-fflags', '+nobuffer+flush_packets',
         '-i', `http://127.0.0.1:${INTERNAL_HTTP_PORT}/stream/${docId}?direct=1`,
         '-map', '0:v:0',
         '-map', audioMapSpecifier,
