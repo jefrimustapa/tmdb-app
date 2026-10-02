@@ -73,8 +73,8 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
   const lastTouchTimeRef = useRef(0);
   const touchStartRef = useRef<{ time: number; x: number; y: number }>({ time: 0, x: 0, y: 0 });
 
-  // Option C: On-demand Audio Transcoding stream state & time offset
-  const isTranscoded = typeof src === 'string' && src.includes('transcode=audio');
+  // Option C: On-demand Audio/Video Transcoding stream state & time offset
+  const isTranscoded = typeof src === 'string' && (src.includes('transcode=') || /\.avi($|\?)/i.test(src));
   const baseOffsetRef = useRef<number>(isTranscoded && initialTimestamp > 10 ? Math.floor(initialTimestamp) : 0);
   const activeSrcRef = useRef<string>('');
 
