@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { ShieldCheck, RefreshCw, AlertCircle, Maximize2, Minimize2, Zap, Tv, ArrowLeft, Play, ExternalLink, SkipForward, Radio } from 'lucide-react';
-import Hls from 'hls.js';
+import type Hls from 'hls.js';
 import type { StreamProvider, OriginCountryCode } from '../../types/stream';
 import { STREAM_PROVIDERS, getProviderById, getOrderedProviders, extractMediaOriginCountries, isProviderMatchingMedia } from '../../services/streamProviders';
 import { dbService } from '../../services/db';
@@ -1457,62 +1457,80 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     return () => clearInterval(tickerInterval);
   }, [playerMode, hasError, allFailed, recordProgress, episodeRuntimeMinutes, tickerIntervalSec, mediaType, isAnime]);
 
-  // HLS Player attachment for direct streams
+  // HLS Player attachment for direct streams (lazy-loaded on demand)
   useEffect(() => {
+    let isCancelled = false;
+
     if (playerMode === 'direct' && directStreamUrl && videoRef.current) {
-      if (Hls.isSupported() && directStreamUrl.includes('.m3u8')) {
-        if (hlsRef.current) {
-          hlsRef.current.destroy();
-        }
+      if (directStreamUrl.includes('.m3u8')) {
+        import('hls.js').then(({ default: Hls }) => {
+          if (isCancelled || !videoRef.current) return;
 
-        const hls = new Hls({
-          enableWorker: false,
-          lowLatencyMode: false,
-          backBufferLength: 15, // Reduce from 90s to 15s to save 150MB-250MB RAM
-          maxBufferLength: 30,  // Target 30s forward buffer
-          maxMaxBufferLength: 60, // Hard ceiling of 60s (prevents default 600s runaway)
-          maxBufferSize: 30 * 1000 * 1000, // 30 MB max buffer capacity
-          maxBufferHole: 0.5,
-          fragLoadingMaxRetry: 5,
-          fragLoadingRetryDelay: 1000,
-          fragLoadingTimeOut: 25000
-        });
-
-        hls.on(Hls.Events.ERROR, (_event, data) => {
-          console.warn('[HLS] Error encountered:', data.type, data.details, 'fatal:', data.fatal, 'url:', data.frag?.url, 'response:', data.response);
-          if (data.fatal) {
-            switch (data.type) {
-              case Hls.ErrorTypes.NETWORK_ERROR:
-                console.warn('[HLS] Fatal network error encountered, attempting recovery...');
-                hls.startLoad();
-                break;
-              case Hls.ErrorTypes.MEDIA_ERROR:
-                console.warn('[HLS] Fatal media error encountered, attempting recovery...');
-                hls.recoverMediaError();
-                break;
-              default:
-                console.error('[HLS] Unrecoverable error, falling back to embed player.');
-                hls.destroy();
-                setPlayerMode('embed');
-                setDirectStreamUrl(null);
-                break;
+          if (Hls.isSupported()) {
+            if (hlsRef.current) {
+              hlsRef.current.destroy();
             }
+
+            const hls = new Hls({
+              enableWorker: false,
+              lowLatencyMode: false,
+              backBufferLength: 15, // Reduce from 90s to 15s to save 150MB-250MB RAM
+              maxBufferLength: 30,  // Target 30s forward buffer
+              maxMaxBufferLength: 60, // Hard ceiling of 60s (prevents default 600s runaway)
+              maxBufferSize: 30 * 1000 * 1000, // 30 MB max buffer capacity
+              maxBufferHole: 0.5,
+              fragLoadingMaxRetry: 5,
+              fragLoadingRetryDelay: 1000,
+              fragLoadingTimeOut: 25000
+            });
+
+            hls.on(Hls.Events.ERROR, (_event, data) => {
+              console.warn('[HLS] Error encountered:', data.type, data.details, 'fatal:', data.fatal, 'url:', data.frag?.url, 'response:', data.response);
+              if (data.fatal) {
+                switch (data.type) {
+                  case Hls.ErrorTypes.NETWORK_ERROR:
+                    console.warn('[HLS] Fatal network error encountered, attempting recovery...');
+                    hls.startLoad();
+                    break;
+                  case Hls.ErrorTypes.MEDIA_ERROR:
+                    console.warn('[HLS] Fatal media error encountered, attempting recovery...');
+                    hls.recoverMediaError();
+                    break;
+                  default:
+                    console.error('[HLS] Unrecoverable error, falling back to embed player.');
+                    hls.destroy();
+                    setPlayerMode('embed');
+                    setDirectStreamUrl(null);
+                    break;
+                }
+              }
+            });
+
+            hls.on(Hls.Events.MANIFEST_PARSED, () => {
+              console.log('[HLS] Manifest parsed successfully, starting playback.');
+              setIsLoading(false);
+              videoRef.current?.play().catch(() => {});
+            });
+
+            hls.loadSource(directStreamUrl);
+            hls.attachMedia(videoRef.current);
+            hlsRef.current = hls;
+          } else if (videoRef.current.canPlayType('application/vnd.apple.mpegurl')) {
+            videoRef.current.src = directStreamUrl;
+          }
+        }).catch((err) => {
+          console.error('[HLS] Failed to dynamically load hls.js:', err);
+          if (!isCancelled && videoRef.current) {
+            videoRef.current.src = directStreamUrl;
           }
         });
 
-        hls.on(Hls.Events.MANIFEST_PARSED, () => {
-          console.log('[HLS] Manifest parsed successfully, starting playback.');
-          setIsLoading(false);
-          videoRef.current?.play().catch(() => {});
-        });
-
-        hls.loadSource(directStreamUrl);
-        hls.attachMedia(videoRef.current);
-        hlsRef.current = hls;
-
         return () => {
-          hls.destroy();
-          hlsRef.current = null;
+          isCancelled = true;
+          if (hlsRef.current) {
+            hlsRef.current.destroy();
+            hlsRef.current = null;
+          }
           if (videoRef.current) {
             try {
               videoRef.current.pause();
@@ -1525,6 +1543,21 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         videoRef.current.src = directStreamUrl;
       }
     }
+
+    return () => {
+      isCancelled = true;
+      if (hlsRef.current) {
+        hlsRef.current.destroy();
+        hlsRef.current = null;
+      }
+      if (videoRef.current) {
+        try {
+          videoRef.current.pause();
+          videoRef.current.removeAttribute('src');
+          videoRef.current.load();
+        } catch {}
+      }
+    };
   }, [playerMode, directStreamUrl]);
 
   // Fullscreen event listener & escape key

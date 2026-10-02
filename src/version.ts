@@ -2,12 +2,13 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20261002-1540';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.perf-client-memory-o.20261002-1540';
+export const APP_BUILD_NUMBER = '20261002-2316';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.perf-client-memory-o.20261002-2316';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
 export const APP_BRANCH = 'perf-client-memory-o';
-export const APP_CHANGELOG = `* feat(ui): use poster in portrait and backdrop in landscape for hero banner, bind backgrounds to object-top, and remove horizontal black tints (#174)
+export const APP_CHANGELOG = `* perf(client): optimize HLS buffers, hardware video teardown, and bound in-memory caches
+* feat(ui): use poster in portrait and backdrop in landscape for hero banner, bind backgrounds to object-top, and remove horizontal black tints (#174)
 * Merge pull request #173 from jefrimustapa/perf/msm-getter-memory-optimization
 * perf(msm-getter): optimize idle memory with allocator tuning, chunk cache eviction and watchdog
 * Merge pull request #172 from jefrimustapa/fix/msm-getter-episode-matching
@@ -20,5 +21,4 @@ export const APP_CHANGELOG = `* feat(ui): use poster in portrait and backdrop in
 * Merge pull request #166 from jefrimustapa/fix/msm-getter-search
 * fix(search): preserve leading articles for short titles and strictly separate titles like 'Runner' vs 'The Runner'
 * fix(search): enforce trailing word suffix guard for single-word movie queries
-* fix(msm-getter): strictly reject TV episodes and prefix collisions during movie searches
-* feat(clients): expose native getDeviceName via AndroidBridge and label external WAN streams`;
+* fix(msm-getter): strictly reject TV episodes and prefix collisions during movie searches`;
