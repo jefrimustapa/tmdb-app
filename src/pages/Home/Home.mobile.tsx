@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { tmdbApi } from '../../services/tmdb';
 import type { TMDBMediaItem } from '../../types/tmdb';
 import type { WatchHistoryItem } from '../../types/db';
@@ -23,6 +24,7 @@ interface HomeFeedCache {
 let homeFeedCache: HomeFeedCache | null = null;
 
 export const Home: React.FC = () => {
+  const continueWatchingRef = useRef<HTMLDivElement>(null);
   const [trending, setTrending] = useState<TMDBMediaItem[]>(() => homeFeedCache?.trending || []);
   const [popularMovies, setPopularMovies] = useState<TMDBMediaItem[]>(() => homeFeedCache?.popularMovies || []);
   const [popularTV, setPopularTV] = useState<TMDBMediaItem[]>(() => homeFeedCache?.popularTV || []);
@@ -34,6 +36,16 @@ export const Home: React.FC = () => {
   const [newReleaseMovies, setNewReleaseMovies] = useState<TMDBMediaItem[]>(() => homeFeedCache?.newReleaseMovies || []);
   const [newReleaseTV, setNewReleaseTV] = useState<TMDBMediaItem[]>(() => homeFeedCache?.newReleaseTV || []);
   const [isLoading, setIsLoading] = useState(() => !homeFeedCache);
+
+  const scrollContinueWatching = (direction: 'left' | 'right') => {
+    if (continueWatchingRef.current) {
+      const scrollAmount = continueWatchingRef.current.clientWidth * 0.75;
+      continueWatchingRef.current.scrollBy({
+        left: direction === 'left' ? -scrollAmount : scrollAmount,
+        behavior: 'smooth'
+      });
+    }
+  };
 
   useEffect(() => {
     let isMounted = true;
@@ -132,87 +144,114 @@ export const Home: React.FC = () => {
       {/* Hero Billboard Full-Width Sliding Carousel */}
       <HeroBanner items={trending} />
 
-      {/* Continue Watching Section (HBO Max 16:9 Landscape Widescreen Cards) */}
-      {history.length > 0 && (
-        <section className="mb-6 w-full" data-content-rail="true">
-          <div className="px-4 sm:px-8 mb-2">
-            <h2 className="text-lg sm:text-2xl font-bold font-display text-white tracking-tight flex items-center gap-2">
-              <span className="w-1.5 h-5 bg-hbo-cyan rounded-full inline-block"></span>
-              Continue Watching
-            </h2>
-          </div>
-          <div
-            style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-x pan-y' }}
-            className="flex items-center gap-3.5 overflow-x-auto no-scrollbar py-4 pl-4 sm:pl-8 pr-6 sm:pr-8 -my-2 touch-pan-x touch-pan-y overscroll-x-contain"
-          >
-            {history.map((hist) => (
-              <MediaCard
-                key={hist.id || `${hist.tmdbId}-${hist.mediaType}`}
-                item={{
-                  id: hist.tmdbId,
-                  title: hist.title,
-                  overview: '',
-                  poster_path: hist.posterPath,
-                  backdrop_path: hist.backdropPath,
-                  vote_average: hist.voteAverage || 0,
-                  vote_count: 0,
-                  popularity: 0,
-                  original_language: 'en'
-                }}
-                type={hist.mediaType}
-                variant="landscape"
-                season={hist.season}
-                episode={hist.episode}
-                episodeTitle={hist.episodeTitle}
-                stillPath={hist.stillPath}
-                progress={hist.progressPercent}
-                timestamp={hist.timestamp}
-              />
-            ))}
-          </div>
-        </section>
-      )}
+      {/* Main Content Rails (Constrained to max-w-7xl on desktop web matching Movies, Series, and Space) */}
+      <div className="max-w-7xl mx-auto">
+        {/* Continue Watching Section (HBO Max 16:9 Landscape Widescreen Cards) */}
+        {history.length > 0 && (
+          <section className="relative mb-6 sm:mb-8 w-full group" data-content-rail="true">
+            <div className="flex items-end justify-between mb-2.5 px-4 sm:px-8">
+              <h2 className="text-lg sm:text-2xl font-bold font-display text-white tracking-tight flex items-center gap-2">
+                <span className="w-1.5 h-5 bg-hbo-cyan rounded-full inline-block"></span>
+                Continue Watching
+              </h2>
+            </div>
 
-      {/* Content Rails */}
-      <MediaRow
-        title="Trending Now"
-        subtitle="Most watched titles across the world this week"
-        items={trending}
-      />
+            {/* Row Container with Navigation Buttons */}
+            <div className="relative w-full">
+              {/* Left Scroll Button */}
+              <button
+                onClick={() => scrollContinueWatching('left')}
+                className="absolute left-2 top-1/2 -translate-y-1/2 z-30 w-10 h-10 rounded-full bg-hbo-card/90 border border-hbo-border text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 hover:bg-hbo-purple hover:scale-110 shadow-lg hidden sm:flex"
+                aria-label="Scroll left"
+              >
+                <ChevronLeft className="w-6 h-6" />
+              </button>
 
-      <MediaRow
-        title="Popular Movies"
-        subtitle="Critically acclaimed and high grossing films"
-        items={popularMovies}
-        type="movie"
-      />
+              {/* Horizontal Carousel */}
+              <div
+                ref={continueWatchingRef}
+                style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-x pan-y' }}
+                className="flex items-center gap-3.5 overflow-x-auto no-scrollbar py-4 pl-4 sm:pl-8 pr-6 sm:pr-8 -my-2 touch-pan-x touch-pan-y overscroll-x-contain"
+              >
+                {history.map((hist) => (
+                  <MediaCard
+                    key={hist.id || `${hist.tmdbId}-${hist.mediaType}`}
+                    item={{
+                      id: hist.tmdbId,
+                      title: hist.title,
+                      overview: '',
+                      poster_path: hist.posterPath,
+                      backdrop_path: hist.backdropPath,
+                      vote_average: hist.voteAverage || 0,
+                      vote_count: 0,
+                      popularity: 0,
+                      original_language: 'en'
+                    }}
+                    type={hist.mediaType}
+                    variant="landscape"
+                    season={hist.season}
+                    episode={hist.episode}
+                    episodeTitle={hist.episodeTitle}
+                    stillPath={hist.stillPath}
+                    progress={hist.progressPercent}
+                    timestamp={hist.timestamp}
+                  />
+                ))}
+              </div>
 
-      <MediaRow
-        title="Trending TV Shows"
-        subtitle="Captivating series and multi-season dramas"
-        items={popularTV}
-        type="tv"
-      />
+              {/* Right Scroll Button */}
+              <button
+                onClick={() => scrollContinueWatching('right')}
+                className="absolute right-2 top-1/2 -translate-y-1/2 z-30 w-10 h-10 rounded-full bg-hbo-card/90 border border-hbo-border text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 hover:bg-hbo-purple hover:scale-110 shadow-lg hidden sm:flex"
+                aria-label="Scroll right"
+              >
+                <ChevronRight className="w-6 h-6" />
+              </button>
+            </div>
+          </section>
+        )}
 
-      <MediaRow
-        title="New Release Movie"
-        subtitle="Latest blockbuster films and digital premieres"
-        items={newReleaseMovies}
-        type="movie"
-      />
+        {/* Content Rails */}
+        <MediaRow
+          title="Trending Now"
+          subtitle="Most watched titles across the world this week"
+          items={trending}
+        />
 
-      <MediaRow
-        title="New Release Series"
-        subtitle="Fresh seasons and newly premiering shows"
-        items={newReleaseTV}
-        type="tv"
-      />
+        <MediaRow
+          title="Popular Movies"
+          subtitle="Critically acclaimed and high grossing films"
+          items={popularMovies}
+          type="movie"
+        />
 
-      <MediaRow
-        title="Suggestions"
-        subtitle={suggestionSubtitle}
-        items={suggestions}
-      />
+        <MediaRow
+          title="Trending TV Shows"
+          subtitle="Captivating series and multi-season dramas"
+          items={popularTV}
+          type="tv"
+        />
+
+        <MediaRow
+          title="New Release Movie"
+          subtitle="Latest blockbuster films and digital premieres"
+          items={newReleaseMovies}
+          type="movie"
+        />
+
+        <MediaRow
+          title="New Release Series"
+          subtitle="Fresh seasons and newly premiering shows"
+          items={newReleaseTV}
+          type="tv"
+        />
+
+        <MediaRow
+          title="Suggestions"
+          subtitle={suggestionSubtitle}
+          items={suggestions}
+        />
+      </div>
     </div>
   );
 };
