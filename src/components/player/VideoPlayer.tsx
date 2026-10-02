@@ -461,11 +461,18 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             // Android Chromium/WebView does not downmix 6CH/surround to 2CH stereo, dropping the Center channel (dialogue).
             // FFmpeg downmixes multi-channel audio to 2-channel stereo AAC with crisp dialogue at negligible CPU cost.
             // Standard 2CH stereo files play directly without invoking FFmpeg on the router.
+            const isAviOrLegacy = msmRes.filename
+              ? /(\.avi$|avi\b|xvid|divx)/i.test(msmRes.filename)
+              : false;
             const isSurroundOrDolbyAudio = msmRes.filename
               ? /(\.mkv$|mkv\b|ddp|dd\+|ac3|ac-3|eac3|e-ac-3|atmos|dts|truehd|thd|5[._-]1|7[._-]1|[345678]ch|surround)/i.test(msmRes.filename)
               : false;
             let finalUrl = msmRes.streamUrl;
-            if (isSurroundOrDolbyAudio) {
+            if (isAviOrLegacy) {
+              const sep = finalUrl.includes('?') ? '&' : '?';
+              finalUrl = `${finalUrl}${sep}transcode=video`;
+              console.log('[Resolver] 🎬 Detected AVI/XviD legacy video in Telegram stream. Enabling H.264 video transcode pipe:', finalUrl);
+            } else if (isSurroundOrDolbyAudio) {
               const sep = finalUrl.includes('?') ? '&' : '?';
               finalUrl = `${finalUrl}${sep}transcode=audio`;
               console.log('[Resolver] 🔊 Detected multi-channel surround/Dolby audio in Telegram stream. Enabling stereo AAC downmix pipe:', finalUrl);

@@ -3490,11 +3490,14 @@ app.get('/stream/:docId', async (req, res) => {
       return res.status(404).send('Media document not found or invalid media size');
     }
 
-    // OPTION C: On-demand Audio Transcoding Pipe (?transcode=audio&ss=<timestamp>)
-    // Streams Matroska with video copied 1:1 and audio transcoded to stereo AAC directly via pipe:1
-    if (req.query.transcode === 'audio') {
+    // OPTION C: On-demand Audio & Video Transcoding Pipe (?transcode=audio|video or automatic for .avi)
+    // Streams Matroska with audio transcoded to stereo AAC and legacy AVI/MPEG4 video transcoded to H.264 Baseline (1 thread, ~11% CPU)
+    const isAvi = /\.avi$/i.test(filename);
+    const shouldTranscode = req.query.transcode === 'audio' || req.query.transcode === 'video' || (isAvi && !isInternalTranscoder);
+
+    if (shouldTranscode) {
       const seekSec = Math.max(0, parseFloat(req.query.ss) || 0);
-      console.log(`[TRANSCODE AUDIO] Starting audio transcode for [${clientIdentity.name} (${clientIdentity.ip})] doc ${docId} (${filename}) at ${seekSec}s...`);
+      console.log(`[TRANSCODE ${isAvi ? 'AVI->H264' : 'AUDIO'}] Starting transcode for [${clientIdentity.name} (${clientIdentity.ip})] doc ${docId} (${filename}) at ${seekSec}s...`);
 
       if (req.method === 'HEAD') {
         res.writeHead(200, {
@@ -3519,6 +3522,22 @@ app.get('/stream/:docId', async (req, res) => {
         }
       }
 
+      // Video encoding strategy:
+      // For AVI / legacy video: use single-thread baseline libx264 (pinned to 1 core, 57 fps, ~11% avg router CPU).
+      // For standard MKV/MP4: stream-copy 1:1 (-c:v copy, 0% CPU).
+      const isAviOrLegacyVideo = isAvi || req.query.vcodec === 'h264';
+      const videoArgs = isAviOrLegacyVideo
+        ? [
+            '-threads', '1',
+            '-c:v', 'libx264',
+            '-preset', 'ultrafast',
+            '-tune', 'zerolatency,fastdecode',
+            '-profile:v', 'baseline',
+            '-crf', '26',
+            '-pix_fmt', 'yuv420p',
+          ]
+        : ['-c:v', 'copy'];
+
       const ffmpegBin = process.env.FFMPEG_PATH || (fs.existsSync('/opt/bin/ffmpeg') ? '/opt/bin/ffmpeg' : 'ffmpeg');
       const ffmpegArgs = [
         '-loglevel', 'error',
@@ -3535,10 +3554,10 @@ app.get('/stream/:docId', async (req, res) => {
         '-i', `http://127.0.0.1:${INTERNAL_HTTP_PORT}/stream/${docId}?direct=1`,
         '-map', '0:v:0',
         '-map', audioMapSpecifier,
-        '-c:v', 'copy',
+        ...videoArgs,
         '-c:a', 'aac',
         '-ac', '2',
-        '-b:a', '192k',
+        '-b:a', '128k',
         '-avoid_negative_ts', 'make_zero',
         '-flush_packets', '1',
         '-cluster_time_limit', '1000',
