@@ -10,7 +10,7 @@ import {
   Sparkles,
   Loader2
 } from 'lucide-react';
-import Hls from 'hls.js';
+import type Hls from 'hls.js';
 import { tmdbImages, TMDB_FALLBACK_BACKDROP } from '../../services/tmdb';
 import { useDevice } from '../../hooks/useDevice';
 
@@ -232,49 +232,71 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
     setIsBuffering(false);
     hasSeekedInitialRef.current = false;
 
-    if (Hls.isSupported() && src.includes('.m3u8')) {
-      if (hlsRef.current) {
-        hlsRef.current.destroy();
-      }
+    if (src.includes('.m3u8')) {
+      let isCancelled = false;
 
-      const hls = new Hls({
-        enableWorker: false,
-        lowLatencyMode: false,
-        backBufferLength: 90,
-        fragLoadingMaxRetry: 5,
-        fragLoadingRetryDelay: 1000,
-        fragLoadingTimeOut: 25000,
-      });
+      import('hls.js').then(({ default: Hls }) => {
+        if (isCancelled || !videoRef.current) return;
 
-      hls.on(Hls.Events.MANIFEST_PARSED, () => {
-        setIsInitialLoading(false);
-        video.play().catch(() => {});
-      });
-
-      hls.on(Hls.Events.ERROR, (_event, data) => {
-        if (data.fatal) {
-          switch (data.type) {
-            case Hls.ErrorTypes.NETWORK_ERROR:
-              hls.startLoad();
-              break;
-            case Hls.ErrorTypes.MEDIA_ERROR:
-              hls.recoverMediaError();
-              break;
-            default:
-              hls.destroy();
-              onErrorRef.current?.(data);
-              break;
+        if (Hls.isSupported()) {
+          if (hlsRef.current) {
+            hlsRef.current.destroy();
           }
+
+          const hls = new Hls({
+            enableWorker: false,
+            lowLatencyMode: false,
+            backBufferLength: 15, // Reduce from 90s to 15s to save 150MB-250MB RAM
+            maxBufferLength: 30,  // Target 30s forward buffer
+            maxMaxBufferLength: 60, // Hard ceiling of 60s
+            maxBufferSize: 30 * 1000 * 1000, // 30 MB max buffer capacity
+            maxBufferHole: 0.5,
+            fragLoadingMaxRetry: 5,
+            fragLoadingRetryDelay: 1000,
+            fragLoadingTimeOut: 25000,
+          });
+
+          hls.on(Hls.Events.MANIFEST_PARSED, () => {
+            setIsInitialLoading(false);
+            video.play().catch(() => {});
+          });
+
+          hls.on(Hls.Events.ERROR, (_event, data) => {
+            if (data.fatal) {
+              switch (data.type) {
+                case Hls.ErrorTypes.NETWORK_ERROR:
+                  hls.startLoad();
+                  break;
+                case Hls.ErrorTypes.MEDIA_ERROR:
+                  hls.recoverMediaError();
+                  break;
+                default:
+                  hls.destroy();
+                  onErrorRef.current?.(data);
+                  break;
+              }
+            }
+          });
+
+          hls.loadSource(src);
+          hls.attachMedia(video);
+          hlsRef.current = hls;
+        } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+          video.src = src;
+        }
+      }).catch((err) => {
+        console.error('[HLS] Failed to dynamically load hls.js in CustomDirectPlayer:', err);
+        if (!isCancelled && videoRef.current) {
+          videoRef.current.src = src;
         }
       });
 
-      hls.loadSource(src);
-      hls.attachMedia(video);
-      hlsRef.current = hls;
-
       return () => {
-        hls.destroy();
-        hlsRef.current = null;
+        isCancelled = true;
+        if (hlsRef.current) {
+          hlsRef.current.destroy();
+          hlsRef.current = null;
+        }
         attachedSrcRef.current = null;
       };
     } else {

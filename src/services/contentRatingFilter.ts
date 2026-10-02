@@ -235,7 +235,18 @@ export function getExplicitAdultRating(details: TMDBMovieDetails | TMDBTVDetails
 /**
  * In-memory cache for media ID -> explicit adult boolean
  */
+const MAX_RATING_CACHE_SIZE = 150;
 const explicitRatingCache = new Map<string, boolean>();
+
+function setBoundedCache<K, V>(map: Map<K, V>, key: K, value: V, maxSize = MAX_RATING_CACHE_SIZE) {
+  if (map.size >= maxSize) {
+    const firstKey = map.keys().next().value;
+    if (firstKey !== undefined) {
+      map.delete(firstKey);
+    }
+  }
+  map.set(key, value);
+}
 
 /**
  * Genre IDs in TMDB
@@ -285,7 +296,7 @@ export async function checkMovieIsExplicitAdult(
   try {
     const persisted = await dbService.getRatingCacheItem(cacheKey);
     if (typeof persisted === 'boolean') {
-      explicitRatingCache.set(cacheKey, persisted);
+      setBoundedCache(explicitRatingCache, cacheKey, persisted);
       return persisted;
     }
   } catch {}
@@ -293,7 +304,7 @@ export async function checkMovieIsExplicitAdult(
   try {
     const data = await fetchReleaseDates(movieId);
     const cert = extractMovieCertification(data);
-    resolvedRatingCache.set(`movie_${movieId}`, cert);
+    setBoundedCache(resolvedRatingCache, `movie_${movieId}`, cert);
     dbService.setRatingCacheItem(`movie_${movieId}`, cert).catch(() => {});
 
     // Strategy 4: Explicit descriptors or notes in release dates
@@ -322,7 +333,7 @@ export async function checkMovieIsExplicitAdult(
     const romanceMatch = isRomance && (hasExplicit18 || isUncertified || has19);
 
     const result = hasExplicitDescriptor || romanceMatch;
-    explicitRatingCache.set(cacheKey, result);
+    setBoundedCache(explicitRatingCache, cacheKey, result);
     dbService.setRatingCacheItem(cacheKey, result).catch(() => {});
     return result;
   } catch {
@@ -360,7 +371,7 @@ export async function checkTVIsExplicitAdult(
   try {
     const persisted = await dbService.getRatingCacheItem(cacheKey);
     if (typeof persisted === 'boolean') {
-      explicitRatingCache.set(cacheKey, persisted);
+      setBoundedCache(explicitRatingCache, cacheKey, persisted);
       return persisted;
     }
   } catch {}
@@ -368,7 +379,7 @@ export async function checkTVIsExplicitAdult(
   try {
     const data = await fetchContentRatings(tvId);
     const cert = extractTVCertification(data);
-    resolvedRatingCache.set(`tv_${tvId}`, cert);
+    setBoundedCache(resolvedRatingCache, `tv_${tvId}`, cert);
     dbService.setRatingCacheItem(`tv_${tvId}`, cert).catch(() => {});
 
     // Strategy 4: Explicit descriptors on TV content ratings
@@ -393,7 +404,7 @@ export async function checkTVIsExplicitAdult(
     const romanceMatch = isRomance && (hasExplicit18 || isUncertified || has19);
 
     const result = hasExplicitDescriptor || romanceMatch;
-    explicitRatingCache.set(cacheKey, result);
+    setBoundedCache(explicitRatingCache, cacheKey, result);
     dbService.setRatingCacheItem(cacheKey, result).catch(() => {});
     return result;
   } catch {
@@ -503,11 +514,11 @@ export async function getResolvedMediaCertification(
       ? extractMovieCertification(rawData)
       : extractTVCertification(rawData);
 
-    resolvedRatingCache.set(cacheKey, cert);
+    setBoundedCache(resolvedRatingCache, cacheKey, cert);
     dbService.setRatingCacheItem(cacheKey, cert).catch(() => {});
     return cert;
   } catch {
-    resolvedRatingCache.set(cacheKey, null);
+    setBoundedCache(resolvedRatingCache, cacheKey, null);
     return null;
   }
 }

@@ -61,6 +61,20 @@ export const tmdbImages = {
 
 const apiCache = new Map<string, { data: any; expiry: number }>();
 const CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes in-memory cache for instant 0ms back-navigation
+const MAX_API_CACHE_ENTRIES = 60; // Hard cap on cache entries to prevent memory leaks
+
+function setApiCache(key: string, data: any) {
+  const now = Date.now();
+  // If approaching limit, evict expired items first, then FIFO oldest
+  if (apiCache.size >= MAX_API_CACHE_ENTRIES) {
+    for (const [k, v] of apiCache.entries()) {
+      if (now >= v.expiry || apiCache.size >= MAX_API_CACHE_ENTRIES) {
+        apiCache.delete(k);
+      }
+    }
+  }
+  apiCache.set(key, { data, expiry: now + CACHE_TTL_MS });
+}
 
 // Clear cache on settings changes
 if (typeof window !== 'undefined') {
@@ -323,7 +337,7 @@ async function tmdbFetch<T>(endpoint: string, params: Record<string, string | nu
     }
   }
 
-  apiCache.set(cacheKey, { data, expiry: Date.now() + CACHE_TTL_MS });
+  setApiCache(cacheKey, data);
 
   return data as T;
 }

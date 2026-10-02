@@ -88,9 +88,9 @@ const MediaCardComponent: React.FC<MediaCardProps> = ({
 
   const imageUrl = variant === 'landscape'
     ? (stillPath
-        ? tmdbImages.still(stillPath, isPerfMode ? 'w300' : 'original')
-        : tmdbImages.backdrop(item.backdrop_path || item.poster_path, isPerfMode ? 'w300' : 'w1280'))
-    : tmdbImages.poster(item.poster_path, isPerfMode ? 'w185' : 'w500');
+        ? tmdbImages.still(stillPath, 'w300')
+        : tmdbImages.backdrop(item.backdrop_path || item.poster_path, isPerfMode ? 'w300' : 'w780'))
+    : tmdbImages.poster(item.poster_path, isPerfMode ? 'w185' : 'w342');
 
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null);
