@@ -30,7 +30,7 @@ export const Navbar: React.FC = () => {
     { label: 'Home', path: '/' },
     { label: 'Movies', path: '/movies' },
     { label: 'Series', path: '/tv' },
-    { label: 'My Space', path: '/library' },
+    { label: 'Space', path: '/library' },
   ];
 
   const getModeIcon = () => {

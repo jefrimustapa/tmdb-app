@@ -92,7 +92,7 @@ export const Library: React.FC = () => {
         <div>
           <h1 className="text-2xl sm:text-4xl font-extrabold font-display text-white tracking-tight flex items-center gap-2">
             <span className="w-2 h-6 bg-hbo-purple-light rounded-full"></span>
-            My Space & Library
+            Space & Library
           </h1>
           <p className="text-xs sm:text-sm text-gray-400 mt-1">
             Stored locally on your device via IndexedDB
