@@ -3490,15 +3490,28 @@ app.get('/stream/:docId', async (req, res) => {
       return res.status(404).send('Media document not found or invalid media size');
     }
 
-    // OPTION C: On-demand Audio Transcoding Pipe (?transcode=audio&ss=<timestamp>)
-    // Streams Matroska with video copied 1:1 and audio transcoded to stereo AAC directly via pipe:1
-    if (req.query.transcode === 'audio') {
+    // OPTION C: On-demand Audio & Video Transcoding Pipe (?transcode=audio|video or automatic for .avi)
+    // Streams Matroska/fMP4 with audio transcoded to stereo AAC and legacy AVI/MPEG4 video transcoded to H.264 Baseline (1 thread, ~11% CPU)
+    const isAvi = /\.avi$/i.test(filename);
+    if (isAvi && !isInternalTranscoder && !req.query.transcode) {
+      const sep = req.url.includes('?') ? '&' : '?';
+      console.log(`[AVI REDIRECT] Redirecting untagged AVI request to transcode pipe for [${clientIdentity.name} (${clientIdentity.ip})] doc ${docId}`);
+      return res.redirect(307, `${req.url}${sep}transcode=audio&vcodec=h264`);
+    }
+
+    const shouldTranscode = req.query.transcode === 'audio' || req.query.transcode === 'video' || (isAvi && !isInternalTranscoder);
+
+    if (shouldTranscode) {
       const seekSec = Math.max(0, parseFloat(req.query.ss) || 0);
-      console.log(`[TRANSCODE AUDIO] Starting audio transcode for [${clientIdentity.name} (${clientIdentity.ip})] doc ${docId} (${filename}) at ${seekSec}s...`);
+      console.log(`[TRANSCODE ${isAvi ? 'AVI->H264' : 'AUDIO'}] Starting transcode for [${clientIdentity.name} (${clientIdentity.ip})] doc ${docId} (${filename}) at ${seekSec}s...`);
+
+      const isAviOrLegacyVideo = isAvi || req.query.vcodec === 'h264';
+      const outputMime = isAviOrLegacyVideo ? 'video/mp4' : 'video/x-matroska';
+      const outputExt = isAviOrLegacyVideo ? 'mp4' : 'mkv';
 
       if (req.method === 'HEAD') {
         res.writeHead(200, {
-          'Content-Type': 'video/x-matroska',
+          'Content-Type': outputMime,
           'Accept-Ranges': 'none',
           'Connection': 'keep-alive',
           'Access-Control-Allow-Origin': '*',
@@ -3519,31 +3532,50 @@ app.get('/stream/:docId', async (req, res) => {
         }
       }
 
+      // Video encoding strategy:
+      // For AVI / legacy video: use single-thread baseline libx264 (pinned to 1 core, 57 fps, ~11% avg router CPU).
+      // For standard MKV/MP4: stream-copy 1:1 (-c:v copy, 0% CPU).
+      const videoArgs = isAviOrLegacyVideo
+        ? [
+            '-threads', '1',
+            '-c:v', 'libx264',
+            '-preset', 'ultrafast',
+            '-tune', 'fastdecode',
+            '-profile:v', 'baseline',
+            '-g', '25',
+            '-keyint_min', '25',
+            '-sc_threshold', '0',
+            '-crf', '26',
+            '-pix_fmt', 'yuv420p',
+          ]
+        : ['-c:v', 'copy'];
+
+      const muxerArgs = isAviOrLegacyVideo
+        ? ['-f', 'mp4', '-movflags', 'frag_keyframe+empty_moov+default_base_moof']
+        : ['-flush_packets', '1', '-cluster_time_limit', '1000', '-cluster_size_limit', '524288', '-f', 'matroska'];
+
       const ffmpegBin = process.env.FFMPEG_PATH || (fs.existsSync('/opt/bin/ffmpeg') ? '/opt/bin/ffmpeg' : 'ffmpeg');
+      const inputSeekFlags = seekSec > 0 ? ['-ss', seekSec.toString()] : ['-seekable', '0'];
       const ffmpegArgs = [
         '-loglevel', 'error',
-        '-noaccurate_seek',
-        ...(seekSec > 0 ? ['-ss', seekSec.toString()] : []),
+        ...inputSeekFlags,
         '-headers', `x-internal-transcoder: 1\r\nx-parent-session: ${streamSessionKey}\r\n`,
         '-reconnect', '1',
         '-reconnect_streamed', '1',
         '-reconnect_delay_max', '2',
-        '-probesize', '393216',
-        '-analyzeduration', '0',
-        '-fflags', '+nobuffer+fastseek+flush_packets',
-        '-flags', 'low_delay',
+        '-probesize', '1000000',
+        '-analyzeduration', '1000000',
+        '-fflags', '+nobuffer+flush_packets',
         '-i', `http://127.0.0.1:${INTERNAL_HTTP_PORT}/stream/${docId}?direct=1`,
         '-map', '0:v:0',
         '-map', audioMapSpecifier,
-        '-c:v', 'copy',
+        ...videoArgs,
         '-c:a', 'aac',
         '-ac', '2',
-        '-b:a', '192k',
+        '-b:a', '128k',
+        ...(isAviOrLegacyVideo ? ['-af', 'aresample=async=1:first_pts=0'] : []),
         '-avoid_negative_ts', 'make_zero',
-        '-flush_packets', '1',
-        '-cluster_time_limit', '1000',
-        '-cluster_size_limit', '524288',
-        '-f', 'matroska',
+        ...muxerArgs,
         'pipe:1',
       ];
 
@@ -3554,12 +3586,12 @@ app.get('/stream/:docId', async (req, res) => {
         if (!headersSent && !res.headersSent) {
           headersSent = true;
           res.writeHead(200, {
-            'Content-Type': 'video/x-matroska',
+            'Content-Type': outputMime,
             'Transfer-Encoding': 'chunked',
             'Connection': 'keep-alive',
             'Cache-Control': 'no-cache, no-store',
             'Access-Control-Allow-Origin': '*',
-            'Content-Disposition': `inline; filename="transcoded_${docId}.mkv"`,
+            'Content-Disposition': `inline; filename="transcoded_${docId}.${outputExt}"`,
           });
         }
       };

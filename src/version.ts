@@ -2,23 +2,23 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20261001-2155';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.fix-msm-getter-searc.20261001-2155';
+export const APP_BUILD_NUMBER = '20261002-0049';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.fix-avi-black-screen.20261002-0049';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
-export const APP_BRANCH = 'fix-msm-getter-searc';
-export const APP_CHANGELOG = `* fix(clients): prioritize router DHCP hostnames over generic clientName query parameter
+export const APP_BRANCH = 'fix-avi-black-screen';
+export const APP_CHANGELOG = `* fix(player): switch live video transcode container to fragmented MP4 (video/mp4) for universal Chromium compatibility
+* fix(player): eliminate AVI transcoding jitter by enforcing 1s GOP keyframes and removing zerolatency
+* fix(player): resolve AVI/XviD black screen playback via ultra-low CPU single-thread H.264 transcoding
+* Merge pull request #167 from jefrimustapa/feat/console-system-metrics
+* feat(console): display msm-getter cpu with router cpu and node ram with 256MB cap
+* Merge pull request #166 from jefrimustapa/fix/msm-getter-search
+* fix(search): preserve leading articles for short titles and strictly separate titles like 'Runner' vs 'The Runner'
+* fix(search): enforce trailing word suffix guard for single-word movie queries
+* fix(msm-getter): strictly reject TV episodes and prefix collisions during movie searches
+* feat(clients): expose native getDeviceName via AndroidBridge and label external WAN streams
+* fix(clients): prioritize router DHCP hostnames over generic clientName query parameter
 * fix(logs): resolve SyntaxError on web console eviction button and enforce HTTPS fallback URL
 * fix(msm-getter): isolate search title matching to button text and add persistent stream cache manager
 * Merge pull request #165 from jefrimustapa/msm-getter-streams
-* fix(android): enable opening external browser URLs via AndroidBridge native intent
-* refactor(logs): remove redundant active streams card from web console and in-app drawer
-* feat(settings): display active streaming clients and devices in in-app log dashboard
-* fix(msm-getter): prevent multi-stream stacking and display client IP and device name in logs
-* Merge pull request #164 from jefrimustapa/fix/msm-getter-connection-issue
-* fix(msm-getter): attach custom onError handler to suppress benign reconnect logs and default dcId to 4
-* fix(msm-getter): switch to ConnectionTCPObfuscated, preserve DC session authKey, and quiet internal GramJS reconnect spam
-* Merge pull request #163 from jefrimustapa/feat/check-msm-consistency
-* fix(msm-getter): catch 'Not connected' race and add 3-attempt sender reconnect backoff (#160)
-* perf(msm-getter): restore original pipeline concurrency tiers (Eco=2, Standard=4, Turbo=6)
-* Merge pull request #162 from jefrimustapa/fix/msm-getter-search-fail`;
+* fix(android): enable opening external browser URLs via AndroidBridge native intent`;
