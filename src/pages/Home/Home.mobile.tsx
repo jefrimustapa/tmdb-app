@@ -132,87 +132,90 @@ export const Home: React.FC = () => {
       {/* Hero Billboard Full-Width Sliding Carousel */}
       <HeroBanner items={trending} />
 
-      {/* Continue Watching Section (HBO Max 16:9 Landscape Widescreen Cards) */}
-      {history.length > 0 && (
-        <section className="mb-6 w-full" data-content-rail="true">
-          <div className="px-4 sm:px-8 mb-2">
-            <h2 className="text-lg sm:text-2xl font-bold font-display text-white tracking-tight flex items-center gap-2">
-              <span className="w-1.5 h-5 bg-hbo-cyan rounded-full inline-block"></span>
-              Continue Watching
-            </h2>
-          </div>
-          <div
-            style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-x pan-y' }}
-            className="flex items-center gap-3.5 overflow-x-auto no-scrollbar py-4 pl-4 sm:pl-8 pr-6 sm:pr-8 -my-2 touch-pan-x touch-pan-y overscroll-x-contain"
-          >
-            {history.map((hist) => (
-              <MediaCard
-                key={hist.id || `${hist.tmdbId}-${hist.mediaType}`}
-                item={{
-                  id: hist.tmdbId,
-                  title: hist.title,
-                  overview: '',
-                  poster_path: hist.posterPath,
-                  backdrop_path: hist.backdropPath,
-                  vote_average: hist.voteAverage || 0,
-                  vote_count: 0,
-                  popularity: 0,
-                  original_language: 'en'
-                }}
-                type={hist.mediaType}
-                variant="landscape"
-                season={hist.season}
-                episode={hist.episode}
-                episodeTitle={hist.episodeTitle}
-                stillPath={hist.stillPath}
-                progress={hist.progressPercent}
-                timestamp={hist.timestamp}
-              />
-            ))}
-          </div>
-        </section>
-      )}
+      {/* Main Content Rails (Constrained to max-w-7xl on desktop web matching Movies, Series, and Space) */}
+      <div className="max-w-7xl mx-auto">
+        {/* Continue Watching Section (HBO Max 16:9 Landscape Widescreen Cards) */}
+        {history.length > 0 && (
+          <section className="mb-6 w-full" data-content-rail="true">
+            <div className="px-4 sm:px-8 mb-2">
+              <h2 className="text-lg sm:text-2xl font-bold font-display text-white tracking-tight flex items-center gap-2">
+                <span className="w-1.5 h-5 bg-hbo-cyan rounded-full inline-block"></span>
+                Continue Watching
+              </h2>
+            </div>
+            <div
+              style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-x pan-y' }}
+              className="flex items-center gap-3.5 overflow-x-auto no-scrollbar py-4 pl-4 sm:pl-8 pr-6 sm:pr-8 -my-2 touch-pan-x touch-pan-y overscroll-x-contain"
+            >
+              {history.map((hist) => (
+                <MediaCard
+                  key={hist.id || `${hist.tmdbId}-${hist.mediaType}`}
+                  item={{
+                    id: hist.tmdbId,
+                    title: hist.title,
+                    overview: '',
+                    poster_path: hist.posterPath,
+                    backdrop_path: hist.backdropPath,
+                    vote_average: hist.voteAverage || 0,
+                    vote_count: 0,
+                    popularity: 0,
+                    original_language: 'en'
+                  }}
+                  type={hist.mediaType}
+                  variant="landscape"
+                  season={hist.season}
+                  episode={hist.episode}
+                  episodeTitle={hist.episodeTitle}
+                  stillPath={hist.stillPath}
+                  progress={hist.progressPercent}
+                  timestamp={hist.timestamp}
+                />
+              ))}
+            </div>
+          </section>
+        )}
 
-      {/* Content Rails */}
-      <MediaRow
-        title="Trending Now"
-        subtitle="Most watched titles across the world this week"
-        items={trending}
-      />
+        {/* Content Rails */}
+        <MediaRow
+          title="Trending Now"
+          subtitle="Most watched titles across the world this week"
+          items={trending}
+        />
 
-      <MediaRow
-        title="Popular Movies"
-        subtitle="Critically acclaimed and high grossing films"
-        items={popularMovies}
-        type="movie"
-      />
+        <MediaRow
+          title="Popular Movies"
+          subtitle="Critically acclaimed and high grossing films"
+          items={popularMovies}
+          type="movie"
+        />
 
-      <MediaRow
-        title="Trending TV Shows"
-        subtitle="Captivating series and multi-season dramas"
-        items={popularTV}
-        type="tv"
-      />
+        <MediaRow
+          title="Trending TV Shows"
+          subtitle="Captivating series and multi-season dramas"
+          items={popularTV}
+          type="tv"
+        />
 
-      <MediaRow
-        title="New Release Movie"
-        subtitle="Latest blockbuster films and digital premieres"
-        items={newReleaseMovies}
-        type="movie"
-      />
+        <MediaRow
+          title="New Release Movie"
+          subtitle="Latest blockbuster films and digital premieres"
+          items={newReleaseMovies}
+          type="movie"
+        />
 
-      <MediaRow
-        title="New Release Series"
-        subtitle="Fresh seasons and newly premiering shows"
-        items={newReleaseTV}
-        type="tv"
-      />
+        <MediaRow
+          title="New Release Series"
+          subtitle="Fresh seasons and newly premiering shows"
+          items={newReleaseTV}
+          type="tv"
+        />
 
-      <MediaRow
-        title="Suggestions"
-        subtitle={suggestionSubtitle}
-        items={suggestions}
-      />
+        <MediaRow
+          title="Suggestions"
+          subtitle={suggestionSubtitle}
+          items={suggestions}
+        />
+      </div>
     </div>
   );
 };

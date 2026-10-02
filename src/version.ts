@@ -2,8 +2,8 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20261002-1339';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-visual-improvem.20261002-1339';
+export const APP_BUILD_NUMBER = '20261002-1355';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-visual-improvem.20261002-1355';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
 export const APP_BRANCH = 'feat-visual-improvem';
@@ -21,5 +21,4 @@ export const APP_CHANGELOG = `* feat(ui): use poster in portrait and backdrop in
 * fix(search): preserve leading articles for short titles and strictly separate titles like 'Runner' vs 'The Runner'
 * fix(search): enforce trailing word suffix guard for single-word movie queries
 * fix(msm-getter): strictly reject TV episodes and prefix collisions during movie searches
-* feat(clients): expose native getDeviceName via AndroidBridge and label external WAN streams
-* fix(clients): prioritize router DHCP hostnames over generic clientName query parameter`;
+* feat(clients): expose native getDeviceName via AndroidBridge and label external WAN streams`;
