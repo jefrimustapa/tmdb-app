@@ -296,94 +296,98 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ items }) => {
         <div className="absolute inset-0 bg-gradient-to-t from-transparent via-transparent to-black/40" />
       </div>
 
-      {/* 3. Staggered Content Animation Layer (Meta -> Title -> Overview -> Buttons) */}
-      <div
-        key={`hero-content-${currentFeatured.id}-${currentIndex}`}
-        className="relative z-30 h-full w-full px-6 sm:px-12 flex flex-col justify-end pb-12 sm:pb-16 max-w-3xl"
-      >
-        {/* Brand Tag & Meta (0ms delay) */}
-        <div className="flex items-center gap-2.5 mb-2 flex-wrap animate-hero-badge">
-          <span className="px-2.5 py-0.5 rounded-full bg-hbo-purple/90 border border-hbo-purple-light text-white text-xs font-bold uppercase tracking-wider">
-            {mediaType === 'movie' ? 'MOVIE' : 'SERIES'}
-          </span>
-          <RatingBadge score={currentFeatured.vote_average} size="md" />
-          <span className="text-sm font-medium text-gray-300">{releaseYear}</span>
-        </div>
-
-        {/* Scaled Refined Title (60ms delay) */}
-        <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black font-display text-white tracking-tight leading-snug mb-2 drop-shadow-md line-clamp-2 animate-hero-title">
-          {title}
-        </h1>
-
-        {/* Overview Synopsis (120ms delay) */}
-        <p className="text-xs sm:text-sm text-gray-300 line-clamp-3 mb-4 max-w-xl leading-relaxed drop-shadow-sm animate-hero-overview">
-          {currentFeatured.overview}
-        </p>
-
-        {/* Vertical Action Buttons Stack (180ms delay) */}
-        <div className="flex flex-col gap-2.5 w-fit animate-hero-buttons">
-          <Link
-            to={`/watch/${mediaType}/${currentFeatured.id}`}
-            data-hero-btn="play"
-            data-hero-index={currentIndex}
-            tabIndex={0}
-            onClick={(e) => {
-              e.preventDefault();
-              navigate(`/watch/${mediaType}/${currentFeatured.id}`);
-            }}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault();
-                navigate(`/watch/${mediaType}/${currentFeatured.id}`);
-              }
-            }}
-            className="flex items-center gap-2 px-5 sm:px-6 py-2.5 rounded-xl bg-gradient-to-r from-hbo-purple to-hbo-cyan text-white font-bold text-xs sm:text-sm shadow-hbo-glow hover:scale-105 transition-all tv-focus-target"
+      {/* 3. Hero Content & Indicators Layer (Constrained to max-w-7xl mx-auto to align with content rails) */}
+      <div className="absolute inset-0 z-30 pointer-events-none">
+        <div className="relative h-full w-full max-w-7xl mx-auto px-4 sm:px-8 flex flex-col justify-end pb-12 sm:pb-16">
+          <div
+            key={`hero-content-${currentFeatured.id}-${currentIndex}`}
+            className="pointer-events-auto flex flex-col justify-end max-w-3xl"
           >
-            <Play className="w-4 h-4 fill-current" />
-            <span>Watch Now</span>
-          </Link>
+            {/* Brand Tag & Meta (0ms delay) */}
+            <div className="flex items-center gap-2.5 mb-2 flex-wrap animate-hero-badge">
+              <span className="px-2.5 py-0.5 rounded-full bg-hbo-purple/90 border border-hbo-purple-light text-white text-xs font-bold uppercase tracking-wider">
+                {mediaType === 'movie' ? 'MOVIE' : 'SERIES'}
+              </span>
+              <RatingBadge score={currentFeatured.vote_average} size="md" />
+              <span className="text-sm font-medium text-gray-300">{releaseYear}</span>
+            </div>
 
-          <Link
-            to={`/details/${mediaType}/${currentFeatured.id}`}
-            state={{ item: currentFeatured }}
-            data-hero-btn="details"
-            data-hero-index={currentIndex}
-            tabIndex={0}
-            onClick={(e) => {
-              e.preventDefault();
-              navigate(`/details/${mediaType}/${currentFeatured.id}`, { state: { item: currentFeatured } });
-            }}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault();
-                navigate(`/details/${mediaType}/${currentFeatured.id}`, { state: { item: currentFeatured } });
-              }
-            }}
-            className="flex items-center gap-2 px-4 sm:px-5 py-2 rounded-xl bg-white/20 hover:bg-white/30 text-white font-semibold text-xs sm:text-sm border border-white/25 transition-all hover:scale-105 tv-focus-target"
-          >
-            <Info className="w-4 h-4" />
-            <span>Details</span>
-          </Link>
+            {/* Scaled Refined Title (60ms delay) */}
+            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black font-display text-white tracking-tight leading-snug mb-2 drop-shadow-md line-clamp-2 animate-hero-title">
+              {title}
+            </h1>
+
+            {/* Overview Synopsis (120ms delay) */}
+            <p className="text-xs sm:text-sm text-gray-300 line-clamp-3 mb-4 max-w-xl leading-relaxed drop-shadow-sm animate-hero-overview">
+              {currentFeatured.overview}
+            </p>
+
+            {/* Vertical Action Buttons Stack (180ms delay) */}
+            <div className="flex flex-col gap-2.5 w-fit animate-hero-buttons">
+              <Link
+                to={`/watch/${mediaType}/${currentFeatured.id}`}
+                data-hero-btn="play"
+                data-hero-index={currentIndex}
+                tabIndex={0}
+                onClick={(e) => {
+                  e.preventDefault();
+                  navigate(`/watch/${mediaType}/${currentFeatured.id}`);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    navigate(`/watch/${mediaType}/${currentFeatured.id}`);
+                  }
+                }}
+                className="flex items-center gap-2 px-5 sm:px-6 py-2.5 rounded-xl bg-gradient-to-r from-hbo-purple to-hbo-cyan text-white font-bold text-xs sm:text-sm shadow-hbo-glow hover:scale-105 transition-all tv-focus-target"
+              >
+                <Play className="w-4 h-4 fill-current" />
+                <span>Watch Now</span>
+              </Link>
+
+              <Link
+                to={`/details/${mediaType}/${currentFeatured.id}`}
+                state={{ item: currentFeatured }}
+                data-hero-btn="details"
+                data-hero-index={currentIndex}
+                tabIndex={0}
+                onClick={(e) => {
+                  e.preventDefault();
+                  navigate(`/details/${mediaType}/${currentFeatured.id}`, { state: { item: currentFeatured } });
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    navigate(`/details/${mediaType}/${currentFeatured.id}`, { state: { item: currentFeatured } });
+                  }
+                }}
+                className="flex items-center gap-2 px-4 sm:px-5 py-2 rounded-xl bg-white/20 hover:bg-white/30 text-white font-semibold text-xs sm:text-sm border border-white/25 transition-all hover:scale-105 tv-focus-target"
+              >
+                <Info className="w-4 h-4" />
+                <span>Details</span>
+              </Link>
+            </div>
+          </div>
+
+          {/* 4. Slide Indicators with Glowing Active Pill */}
+          <div className="absolute bottom-4 left-4 sm:left-8 z-40 flex items-center gap-2 pointer-events-auto">
+            {displayItems.map((_, idx) => (
+              <button
+                key={idx}
+                onClick={() => {
+                  trigger5sRemotePause();
+                  setCurrentIndex(idx);
+                }}
+                className={`h-1.5 rounded-full transition-all duration-500 ${
+                  idx === currentIndex
+                    ? 'w-8 bg-gradient-to-r from-hbo-purple to-hbo-cyan shadow-[0_0_8px_rgba(144,85,255,0.8)]'
+                    : 'w-2 bg-white/30 hover:bg-white/50'
+                }`}
+                aria-label={`Slide ${idx + 1}`}
+              />
+            ))}
+          </div>
         </div>
-      </div>
-
-      {/* 4. Slide Indicators with Glowing Active Pill */}
-      <div className="absolute bottom-4 left-4 sm:left-12 z-40 flex items-center gap-2">
-        {displayItems.map((_, idx) => (
-          <button
-            key={idx}
-            onClick={() => {
-              trigger5sRemotePause();
-              setCurrentIndex(idx);
-            }}
-            className={`h-1.5 rounded-full transition-all duration-500 ${
-              idx === currentIndex
-                ? 'w-8 bg-gradient-to-r from-hbo-purple to-hbo-cyan shadow-[0_0_8px_rgba(144,85,255,0.8)]'
-                : 'w-2 bg-white/30 hover:bg-white/50'
-            }`}
-            aria-label={`Slide ${idx + 1}`}
-          />
-        ))}
       </div>
     </div>
   );
