@@ -247,9 +247,8 @@ function toRoman(num) {
   return map[num] || String(num);
 }
 
-// Generate TV series prioritized search queries according to rule-msm-series-search
+// Generate TV series prioritized search queries according to user-specified strict hierarchy
 function generateSeriesSearchQueries(cleanT, sNum, eNum, totalSeasons, year) {
-  const isMultiSeason = totalSeasons > 1 || sNum > 1;
   const s2 = String(sNum).padStart(2, '0');
   const s1 = String(sNum);
   const e2 = String(eNum).padStart(2, '0');
@@ -263,71 +262,72 @@ function generateSeriesSearchQueries(cleanT, sNum, eNum, totalSeasons, year) {
     }
   };
 
-  if (!isMultiSeason) {
-    // If explicit release year provided, prioritize year-qualified queries first to resolve reboot/remake title collisions
-    if (year) {
-      addQuery(`${cleanT} ${year} Episod ${e1}`);
-      addQuery(`${cleanT} ${year} E${e2}`);
-      addQuery(`${cleanT} ${year}`);
-    }
+  // Helper to append the 28 strict patterns for a given prefix (either `${cleanT} ${year}` or `${cleanT}`)
+  const appendPatterns = (prefix) => {
+    // 1. S{%2d}E{%2d}
+    addQuery(`${prefix} S${s2}E${e2}`);
+    // 2. S{%2d}EP{%2d}
+    addQuery(`${prefix} S${s2}EP${e2}`);
+    // 3. S{%2d} E{%2d}
+    addQuery(`${prefix} S${s2} E${e2}`);
+    // 4. S{%2d} EP{%2d}
+    addQuery(`${prefix} S${s2} EP${e2}`);
+    // 5. S{%d}E{%d}
+    addQuery(`${prefix} S${s1}E${e1}`);
+    // 6. S{%d}EP{%d}
+    addQuery(`${prefix} S${s1}EP${e1}`);
+    // 7. S{%d} E{%d}
+    addQuery(`${prefix} S${s1} E${e1}`);
+    // 8. S{%d} EP{%d}
+    addQuery(`${prefix} S${s1} EP${e1}`);
+    // 9. Season {%2d} EP{%2d}
+    addQuery(`${prefix} Season ${s2} EP${e2}`);
+    // 10. Season {%2d} Episode{%2d} (unspaced & spaced)
+    addQuery(`${prefix} Season ${s2} Episode${e2}`);
+    addQuery(`${prefix} Season ${s2} Episode ${e2}`);
+    // 11. Season {%d} EP{%d}
+    addQuery(`${prefix} Season ${s1} EP${e1}`);
+    // 12. Season {%d} Episod{%d} (unspaced & spaced)
+    addQuery(`${prefix} Season ${s1} Episod${e1}`);
+    addQuery(`${prefix} Season ${s1} Episod ${e1}`);
+    // 13. Season {%d} Episode{%d} (unspaced & spaced)
+    addQuery(`${prefix} Season ${s1} Episode${e1}`);
+    addQuery(`${prefix} Season ${s1} Episode ${e1}`);
+    // 14. E{%2d}
+    addQuery(`${prefix} E${e2}`);
+    // 15. EP{%2d}
+    addQuery(`${prefix} EP${e2}`);
+    // 16. E{%d}
+    addQuery(`${prefix} E${e1}`);
+    // 17. EP{%d}
+    addQuery(`${prefix} EP${e1}`);
+    // 18. Episod{%2d} (unspaced & spaced)
+    addQuery(`${prefix} Episod${e2}`);
+    addQuery(`${prefix} Episod ${e2}`);
+    // 19. Episod{%d} (unspaced & spaced)
+    addQuery(`${prefix} Episod${e1}`);
+    addQuery(`${prefix} Episod ${e1}`);
+    // 20. Episode{%2d} (unspaced & spaced)
+    addQuery(`${prefix} Episode${e2}`);
+    addQuery(`${prefix} Episode ${e2}`);
+    // 21. Episode{%d} (unspaced & spaced)
+    addQuery(`${prefix} Episode${e1}`);
+    addQuery(`${prefix} Episode ${e1}`);
+  };
 
-    // 1. High-yield Localized Malaysian formats
-    addQuery(`${cleanT} Episod ${e1}`);
-    addQuery(`${cleanT} Episod ${e2}`);
-    addQuery(`${cleanT} Ep ${e1}`);
-    addQuery(`${cleanT} Ep ${e2}`);
-    addQuery(`${cleanT} Episod${e2}`);
-    addQuery(`${cleanT} Episod${e1}`);
-
-    // 2. High-yield Standard Scene formats
-    addQuery(`${cleanT} E${e2}`);
-    addQuery(`${cleanT} E${e1}`);
-    addQuery(`${cleanT} EP${e2}`);
-    addQuery(`${cleanT} EP${e1}`);
-    addQuery(`${cleanT} S${s2}E${e2}`);
-    addQuery(`${cleanT} S${s1}E${e1}`);
-
-    // 3. English "Episode" variants & Season 1
-    addQuery(`${cleanT} Episode ${e1}`);
-    addQuery(`${cleanT} Episode ${e2}`);
-    addQuery(`${cleanT} Season ${s1} Episod ${e1}`);
-    addQuery(`${cleanT} Season ${s2} EP${e2}`);
-
-    // 4. Base title fallback (prompts bot to return full series keyboard)
-    addQuery(cleanT);
-  } else {
-    // Siri MULTI season
-    if (year) {
-      addQuery(`${cleanT} ${year} S${s2}E${e2}`);
-      addQuery(`${cleanT} ${year} Episod ${e1}`);
-      addQuery(`${cleanT} ${year}`);
-    }
-
-    // 1. High-yield Scene format
-    addQuery(`${cleanT} S${s2}E${e2}`);
-    addQuery(`${cleanT} S${s1}E${e1}`);
-    addQuery(`${cleanT} S${s2}EP${e2}`);
-    addQuery(`${cleanT} S${s1}EP${e1}`);
-
-    // 2. Malaysian "Musim" and "Season" formats
-    addQuery(`${cleanT} Musim ${s1} Episod ${e1}`);
-    addQuery(`${cleanT} Musim ${s1} EP${e2}`);
-    addQuery(`${cleanT} Season ${s1} Episod ${e1}`);
-    addQuery(`${cleanT} Season ${s2} Episode ${e2}`);
-
-    // 3. Roman numeral variants (e.g. Musim II, Season II)
-    const roman = toRoman(sNum);
-    if (roman !== s1) {
-      addQuery(`${cleanT} Musim ${roman} Episod ${e1}`);
-      addQuery(`${cleanT} Season ${roman} Episode ${e2}`);
-      addQuery(`${cleanT} Musim ${roman}`);
-      addQuery(`${cleanT} Season ${roman}`);
-    }
-
-    addQuery(`${cleanT} Musim ${s1}`);
-    addQuery(`${cleanT} Season ${s1}`);
-    addQuery(cleanT);
+  // 1. Primary: Strict patterns WITH Year (if year is provided)
+  if (year) {
+    appendPatterns(`${cleanT} ${year}`);
   }
+
+  // 2. Fallback: Strict patterns WITHOUT Year (in case uploader omitted the year)
+  appendPatterns(cleanT);
+
+  // 3. Final Fallbacks: Base title with year, then base title alone
+  if (year) {
+    addQuery(`${cleanT} ${year}`);
+  }
+  addQuery(cleanT);
 
   return queries;
 }
@@ -2658,9 +2658,8 @@ app.get('/api/resolve', async (req, res) => {
                   }
                 }
 
-                // Check if we already found an acceptable episode match (score >= 50)
-                const hasGoodMatch = candidates.some(c => c.score >= 50);
-                if (hasGoodMatch || pageCount >= MAX_PAGES || isAborted || req.destroyed) break;
+                // Traverse all pages to accumulate all candidate buttons for this query
+                if (pageCount >= MAX_PAGES || isAborted || req.destroyed) break;
 
                 // Otherwise, check for pagination button to traverse to next page
                 const nextBtn = findNextPageButton(currentMsg.replyMarkup);
@@ -2706,8 +2705,8 @@ app.get('/api/resolve', async (req, res) => {
             }
           }
 
-          // Try up to top 4 valid candidates with resilient fallback
-          const candidatesToTry = uniqueValid.slice(0, 4);
+          // Exhaustively try all candidate buttons across all pages for this query
+          const candidatesToTry = uniqueValid;
           for (let candIdx = 0; candIdx < candidatesToTry.length; candIdx++) {
             if (isAborted || req.destroyed) break;
             const cand = candidatesToTry[candIdx];

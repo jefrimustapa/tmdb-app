@@ -428,27 +428,47 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             ? (details?.number_of_seasons || (details?.seasons ? details.seasons.filter((s: any) => s.season_number > 0).length : undefined))
             : undefined;
 
+          // Mandatory Year extraction for Movies and Series
+          let effectiveYear = releaseYear ? String(releaseYear).trim() : '';
+          if (!effectiveYear && details) {
+            const rawDate = mediaType === 'movie'
+              ? (details.release_date || '')
+              : (details.first_air_date || '');
+            if (rawDate) {
+              const parsed = new Date(rawDate).getFullYear();
+              if (!isNaN(parsed) && parsed > 1900) {
+                effectiveYear = String(parsed);
+              } else {
+                effectiveYear = rawDate.split('-')[0];
+              }
+            }
+          }
+
           // For TV, resolve the specific season's release year if available (e.g. S1 = 2022, S2 = 2025)
-          let effectiveSeasonYear = releaseYear;
+          let effectiveSeasonYear = effectiveYear;
           if (mediaType === 'tv' && details?.seasons && Array.isArray(details.seasons)) {
             const currentSeasonObj = details.seasons.find((s: any) => s.season_number === season);
             if (currentSeasonObj?.air_date) {
               const parsedYear = new Date(currentSeasonObj.air_date).getFullYear();
               if (!isNaN(parsedYear) && parsedYear > 1900) {
-                effectiveSeasonYear = parsedYear;
+                effectiveSeasonYear = String(parsedYear);
               }
             }
           }
 
+          const queryYear = mediaType === 'tv' ? effectiveSeasonYear : effectiveYear;
+          const querySeason = mediaType === 'tv' ? (season || 1) : undefined;
+          const queryEpisode = mediaType === 'tv' ? (episode || 1) : undefined;
+
           let msmRes: Msm32ResolveResult | null = null;
           for (const searchTitle of telegramSearchTitles) {
             if (!isMounted || abortController.signal.aborted) return;
-            console.log(`[Resolver] Telegram Provider (${provider.name}) searching for "${searchTitle}"...`);
+            console.log(`[Resolver] Telegram Provider (${provider.name}) searching for "${searchTitle}" (year: ${queryYear || 'none'}, s: ${querySeason}, e: ${queryEpisode}, forceFresh: ${isForceFresh})...`);
             const res = await msm32Service.resolveStream(
               searchTitle,
-              effectiveSeasonYear,
-              mediaType === 'tv' ? season : undefined,
-              mediaType === 'tv' ? episode : undefined,
+              queryYear,
+              querySeason,
+              queryEpisode,
               abortController.signal,
               isForceFresh,
               effectiveTotalSeasons

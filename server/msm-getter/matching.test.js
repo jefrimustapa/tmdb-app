@@ -160,10 +160,47 @@ it('disqualifies conflicting release years for movie reboots/remakes', () => {
 });
 
 console.log('\n7. Search Query Generation (generateSeriesSearchQueries)');
-it('includes year-qualified queries when year is explicitly provided', () => {
-  const queries = generateSeriesSearchQueries('Hantu Punya Boss', 1, 1, 1, '2024');
-  assert.ok(queries.some(q => q.includes('2024 Episod 1')), 'Must include year-qualified episode query');
-  assert.ok(queries.some(q => q === 'Hantu Punya Boss Episod 1'), 'Must include standard localized query');
+it('generates the strict 28 query patterns with year prefix', () => {
+  const queries = generateSeriesSearchQueries('Reacher', 1, 1, 1, '2022');
+  const expectedPatterns = [
+    'Reacher 2022 S01E01',
+    'Reacher 2022 S01EP01',
+    'Reacher 2022 S01 E01',
+    'Reacher 2022 S01 EP01',
+    'Reacher 2022 S1E1',
+    'Reacher 2022 S1EP1',
+    'Reacher 2022 S1 E1',
+    'Reacher 2022 S1 EP1',
+    'Reacher 2022 Season 01 EP01',
+    'Reacher 2022 Season 01 Episode01',
+    'Reacher 2022 Season 01 Episode 01',
+    'Reacher 2022 Season 1 EP1',
+    'Reacher 2022 Season 1 Episod1',
+    'Reacher 2022 Season 1 Episod 1',
+    'Reacher 2022 Season 1 Episode1',
+    'Reacher 2022 Season 1 Episode 1',
+    'Reacher 2022 E01',
+    'Reacher 2022 EP01',
+    'Reacher 2022 E1',
+    'Reacher 2022 EP1',
+    'Reacher 2022 Episod01',
+    'Reacher 2022 Episod 01',
+    'Reacher 2022 Episod1',
+    'Reacher 2022 Episod 1',
+    'Reacher 2022 Episode01',
+    'Reacher 2022 Episode 01',
+    'Reacher 2022 Episode1',
+    'Reacher 2022 Episode 1'
+  ];
+
+  // Verify the first 28 queries match expectedPatterns in exact order
+  for (let i = 0; i < expectedPatterns.length; i++) {
+    assert.strictEqual(queries[i], expectedPatterns[i], `Query pattern index ${i} should be ${expectedPatterns[i]}`);
+  }
+
+  // Also verify fallback without year is included later
+  assert.ok(queries.includes('Reacher S01E01'), 'Must include non-year fallback query');
+  assert.ok(queries.includes('Reacher Episode 1'), 'Must include non-year episode fallback query');
 });
 
 console.log(`\nResults: ${passed}/${total} tests passed!\n`);
