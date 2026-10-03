@@ -124,8 +124,8 @@ class Msm32MappingService {
     if (signal?.aborted) return null;
 
     const controller = new AbortController();
-    // Allow up to 45 seconds to accommodate sequential MTProto queue and bot dispatches
-    const timer = setTimeout(() => controller.abort(), 45000);
+    // Allow up to 65 seconds to accommodate sequential MTProto queue and candidate ad-gate stepping
+    const timer = setTimeout(() => controller.abort(), 65000);
 
     const onExternalAbort = () => {
       clearTimeout(timer);
