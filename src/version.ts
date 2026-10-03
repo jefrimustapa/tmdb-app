@@ -2,12 +2,13 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20261003-0449';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.refactor-msm-getter-.20261003-0449';
+export const APP_BUILD_NUMBER = '20261003-0546';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.refactor-msm-getter-.20261003-0546';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
 export const APP_BRANCH = 'refactor-msm-getter-';
-export const APP_CHANGELOG = `* feat(search): enforce 28-pattern series queries, mandatory app params, and exhaustive page traversal
+export const APP_CHANGELOG = `* refactor(search): streamline series queries to 12 patterns without season tag and enforce strict multi-season candidate matching
+* feat(search): enforce 28-pattern series queries, mandatory app params, and exhaustive page traversal
 * perf(msm-getter): optimize idle memory with expose-gc, glibc allocator tuning and idle watchdog (#176)
 * perf(client): optimize HLS buffers, hardware video teardown, and bound in-memory caches (#175)
 * feat(ui): use poster in portrait and backdrop in landscape for hero banner, bind backgrounds to object-top, and remove horizontal black tints (#174)
@@ -20,5 +21,4 @@ export const APP_CHANGELOG = `* feat(search): enforce 28-pattern series queries,
 * fix(player): resolve AVI/XviD black screen playback via ultra-low CPU single-thread H.264 transcoding (#168)
 * Merge pull request #167 from jefrimustapa/feat/console-system-metrics
 * feat(console): display msm-getter cpu with router cpu and node ram with 256MB cap
-* Merge pull request #166 from jefrimustapa/fix/msm-getter-search
-* fix(search): preserve leading articles for short titles and strictly separate titles like 'Runner' vs 'The Runner'`;
+* Merge pull request #166 from jefrimustapa/fix/msm-getter-search`;
