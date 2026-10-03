@@ -2488,7 +2488,7 @@ app.get('/api/resolve', async (req, res) => {
           }
           if (fnLower.includes('.mp4') || fnLower.includes('mp4')) qualityScore += 15;
 
-          matchingRecentDocs.push({ doc, filename, qualityScore });
+          matchingRecentDocs.push({ doc, filename, qualityScore, msgId: msg.id });
         }
       }
     }
@@ -2502,6 +2502,7 @@ app.get('/api/resolve', async (req, res) => {
         console.log(`[RESOLVE] Found matching recent document in chat: ${chosen.filename} (ID: ${docIdStr}, score: ${chosen.qualityScore})`);
         const streamItem = db.set(cacheKey, {
           docId: docIdStr,
+          msgId: chosen.msgId,
           accessHash: chosen.doc.accessHash?.toString() || '',
           fileReference: chosen.doc.fileReference ? chosen.doc.fileReference.toString('hex') : '',
           filename: chosen.filename,
@@ -2835,6 +2836,7 @@ app.get('/api/resolve', async (req, res) => {
 
             console.log(`[RESOLVE] Waiting for media delivery from @msm32bot (newer than msgId: ${sentMsgId})...`);
             let candDeliveredDoc = null;
+            let candDeliveredMsgId = null;
             let finalFilename = candidateFilename || queryTitle;
 
             for (let attempt = 0; attempt < 8; attempt++) {
@@ -2845,6 +2847,7 @@ app.get('/api/resolve', async (req, res) => {
               for (const im of incoming) {
                 if (im.id > sentMsgId && im.media?.document) {
                   candDeliveredDoc = im.media.document;
+                  candDeliveredMsgId = im.id;
                   const fnAttr = candDeliveredDoc.attributes?.find(a => a.className === 'DocumentAttributeFilename');
                   if (fnAttr) finalFilename = fnAttr.fileName;
                   break;
@@ -2856,6 +2859,7 @@ app.get('/api/resolve', async (req, res) => {
             if (candDeliveredDoc) {
               console.log(`[RESOLVE] Successfully received media document for candidate "${cand.text}"!`);
               deliveredDoc = candDeliveredDoc;
+              deliveredMsgId = candDeliveredMsgId;
               resolvedFilename = finalFilename;
               break; // Candidate loop succeeded!
             } else {
@@ -2890,6 +2894,7 @@ app.get('/api/resolve', async (req, res) => {
     const filename = resolvedFilename || chosenFilename || queryTitle;
     const resolvedItem = db.set(cacheKey, {
       docId: docIdStr,
+      msgId: deliveredMsgId,
       accessHash: deliveredDoc.accessHash?.toString() || '',
       fileReference: deliveredDoc.fileReference ? deliveredDoc.fileReference.toString('hex') : '',
       filename,
@@ -2971,8 +2976,33 @@ async function refreshDocumentFileReference(client, targetDoc) {
 
   const refreshPromise = (async () => {
     console.log(`[FILE_REF RECOVERY] Refreshing expired fileReference for Doc ID: ${docIdStr}...`);
+    const dbRecord = db.getByDocId(docIdStr);
 
-    // 1. Scan recent chat messages from @msm32bot for the exact document ID
+    // 1. Direct message ID lookup (official MTProto fast path: re-fetching the message provides fresh HMAC file_reference)
+    if (dbRecord && dbRecord.msgId) {
+      try {
+        const msgs = await client.getMessages('msm32bot', { ids: [Number(dbRecord.msgId)] });
+        const m = msgs?.[0];
+        if (m && m.media?.document?.id?.toString() === docIdStr) {
+          const freshRef = m.media.document.fileReference;
+          if (freshRef) {
+            console.log(`[FILE_REF RECOVERY] Found fresh fileReference via direct msgId ${dbRecord.msgId} for Doc ID: ${docIdStr}!`);
+            if (dbRecord.queryKey) {
+              db.set(dbRecord.queryKey, {
+                ...dbRecord,
+                fileReference: freshRef.toString('hex'),
+                updatedAt: Date.now(),
+              });
+            }
+            return freshRef;
+          }
+        }
+      } catch (idErr) {
+        console.warn(`[FILE_REF RECOVERY] Message ID lookup failed (${idErr.message}). Falling back to scan...`);
+      }
+    }
+
+    // 2. Scan recent chat messages from @msm32bot for the exact document ID
     try {
       const recentMsgs = await client.getMessages('msm32bot', { limit: 100 });
       for (const m of recentMsgs) {
@@ -2980,12 +3010,12 @@ async function refreshDocumentFileReference(client, targetDoc) {
           const freshRef = m.media.document.fileReference;
           if (freshRef) {
             console.log(`[FILE_REF RECOVERY] Found fresh fileReference in chat message ${m.id} for Doc ID: ${docIdStr}!`);
-            const dbRecord = db.getByDocId(docIdStr);
             if (dbRecord && dbRecord.queryKey) {
               db.set(dbRecord.queryKey, {
                 ...dbRecord,
+                msgId: m.id,
                 fileReference: freshRef.toString('hex'),
-                createdAt: Date.now(),
+                updatedAt: Date.now(),
               });
             }
             return freshRef;
@@ -2996,49 +3026,42 @@ async function refreshDocumentFileReference(client, targetDoc) {
       console.warn('[FILE_REF RECOVERY] Chat scan error:', scanErr.message);
     }
 
-    // 2. If not found in recent chat, search by clean title or queryKey via bot
-    const dbRecord = db.getByDocId(docIdStr);
+    // 3. Search Telegram MTProto servers for historical media documents
     if (dbRecord) {
       let searchTerm = '';
       if (dbRecord.queryKey) {
         searchTerm = dbRecord.queryKey.replace(/_(?:720|1080)p$/i, '').trim();
       } else if (dbRecord.filename) {
-        searchTerm = dbRecord.filename
-          .replace(/^[#\[][^\]\s]+[\]\s]*/g, '') // remove #NPRH22 or [Group]
-          .replace(/\.(mp4|mkv|avi)$/i, '')
-          .replace(/[\._\-]/g, ' ')
-          .replace(/[^\w\s]/g, ' ')
-          .replace(/\s+/g, ' ')
-          .trim();
+        searchTerm = cleanSearchTitle(dbRecord.filename);
       }
 
       if (searchTerm) {
-        console.log(`[FILE_REF RECOVERY] Re-querying bot with: "${searchTerm}" for Doc ID: ${docIdStr}...`);
+        console.log(`[FILE_REF RECOVERY] Searching server messages for "${searchTerm}" (Doc ID: ${docIdStr})...`);
         try {
-          await queueTelegramTask(async () => {
-            await client.sendMessage('msm32bot', { message: searchTerm });
-            await new Promise(r => setTimeout(r, 2500));
-            const msgs = await client.getMessages('msm32bot', { limit: 20 });
-            for (const m of msgs) {
-              if (m.media?.document?.id?.toString() === docIdStr) {
-                const freshRef = m.media.document.fileReference;
-                if (freshRef) {
-                  console.log(`[FILE_REF RECOVERY] Successfully refreshed fileReference via bot re-query!`);
-                  if (dbRecord.queryKey) {
-                    db.set(dbRecord.queryKey, {
-                      ...dbRecord,
-                      fileReference: freshRef.toString('hex'),
-                      createdAt: Date.now(),
-                    });
-                  }
-                  return freshRef;
+          const serverDocs = await client.getMessages('msm32bot', {
+            search: searchTerm,
+            limit: 30,
+            filter: new Api.InputMessagesFilterDocument(),
+          }).catch(() => []);
+          for (const m of serverDocs) {
+            if (m.media?.document?.id?.toString() === docIdStr) {
+              const freshRef = m.media.document.fileReference;
+              if (freshRef) {
+                console.log(`[FILE_REF RECOVERY] Successfully recovered fresh fileReference via MTProto server search (msgId: ${m.id})!`);
+                if (dbRecord.queryKey) {
+                  db.set(dbRecord.queryKey, {
+                    ...dbRecord,
+                    msgId: m.id,
+                    fileReference: freshRef.toString('hex'),
+                    updatedAt: Date.now(),
+                  });
                 }
+                return freshRef;
               }
             }
-            return null;
-          });
-        } catch (qErr) {
-          console.warn('[FILE_REF RECOVERY] Bot re-query error:', qErr.message);
+          }
+        } catch (searchErr) {
+          console.warn('[FILE_REF RECOVERY] MTProto document search error:', searchErr.message);
         }
       }
     }
