@@ -2,12 +2,13 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20261003-2337';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.fix-embed-provider-f.20261003-2337';
+export const APP_BUILD_NUMBER = '20261003-2348';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.fix-embed-provider-f.20261003-2348';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
 export const APP_BRANCH = 'fix-embed-provider-f';
-export const APP_CHANGELOG = `* feat(player): continuous long-press seek on mobile FW/RW buttons (#179)
+export const APP_CHANGELOG = `* fix(player): enforce context-aware and user-configured embed provider priority fallback after MSM failure
+* feat(player): continuous long-press seek on mobile FW/RW buttons (#179)
 * fix(msm-getter): prevent poll retry storm on failed candidates, add dead shortcode cache, and extend client timeout to 65s (#178)
 * feat(search): streamline series queries to 12 patterns, enforce mandatory app params, and strict multi-season matching (#177)
 * perf(msm-getter): optimize idle memory with expose-gc, glibc allocator tuning and idle watchdog (#176)
@@ -20,5 +21,4 @@ export const APP_CHANGELOG = `* feat(player): continuous long-press seek on mobi
 * feat(watch): add desktop web fullscreen button with persistent header overlay (#171)
 * refactor(ui): rename 'My Space' to 'Space' in navigation and library headers (#169)
 * fix(player): resolve AVI/XviD black screen playback via ultra-low CPU single-thread H.264 transcoding (#168)
-* Merge pull request #167 from jefrimustapa/feat/console-system-metrics
-* feat(console): display msm-getter cpu with router cpu and node ram with 256MB cap`;
+* Merge pull request #167 from jefrimustapa/feat/console-system-metrics`;
