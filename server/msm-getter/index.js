@@ -1640,6 +1640,9 @@ app.get('/logs', (req, res) => {
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
   <title>MSM Getter — Live Log Console</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
@@ -1660,7 +1663,7 @@ app.get('/logs', (req, res) => {
       </div>
       <div>
         <h1 class="text-lg font-black tracking-tight text-white flex items-center gap-2">
-          MSM Getter <span class="text-xs font-mono font-normal px-2 py-0.5 rounded bg-sky-500/10 text-sky-400 border border-sky-500/20">Live Console</span>
+          MSM Getter <span class="text-xs font-mono font-normal px-2 py-0.5 rounded bg-sky-500/10 text-sky-400 border border-sky-500/20">v1.2.1 • Live Console</span>
         </h1>
         <p class="text-xs text-slate-400">Telegram MTProto Cloud Streaming Server Logs</p>
       </div>
@@ -1798,7 +1801,7 @@ app.get('/logs', (req, res) => {
     </div>
 
     <!-- Output Body -->
-    <div id="terminalBody" class="p-4 overflow-y-auto flex-1 font-mono text-[11px] leading-relaxed space-y-0.5 select-text">
+    <div id="terminalBody" class="p-4 overflow-y-auto flex-1 font-mono text-[11px] leading-relaxed space-y-0.5 select-text whitespace-pre-wrap break-all">
       <div class="text-slate-500 italic">Connecting to live log stream...</div>
     </div>
   </div>
@@ -1835,7 +1838,7 @@ app.get('/logs', (req, res) => {
       } else if (line.includes('[MEMORY PURGE]') || line.includes('[MEMORY WATCHDOG]') || line.includes('[SYSTEM]')) {
         colorClass = 'text-cyan-400 font-medium';
       }
-      return '<div class="' + colorClass + '">' + escaped + '</div>';
+      return '<div class="m-0 p-0 ' + colorClass + '">' + escaped + '</div>';
     }
 
     function renderLines() {
