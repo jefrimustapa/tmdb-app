@@ -130,6 +130,55 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     );
   }, [effectiveOriginCountries, telegramProviderCountries, enabledTelegramProviders]);
 
+  const activeTopProviders = useMemo(() => {
+    if (isKorean) return topKoreanProviders;
+    if (isAnime) return topAnimeProviders;
+    if (activeAsean) return topAseanProviders;
+    return topProviders;
+  }, [isAnime, activeAsean, isKorean, topAnimeProviders, topAseanProviders, topKoreanProviders, topProviders]);
+
+  const orderedProviders = React.useMemo(() => {
+    const list = getOrderedProviders(activeTopProviders, isAnime, activeAsean, isKorean);
+    const hasEmbed = enabledResolvers.includes('embed');
+    const hasTelegram = enabledResolvers.includes('telegram');
+
+    return list.filter((p) => {
+      const isDirect = p.engine === 'telegram';
+      if (isDirect) {
+        if (!hasTelegram) return false;
+        return isProviderMatchingMedia(p, effectiveOriginCountries, telegramProviderCountries, enabledTelegramProviders);
+      }
+      return hasEmbed;
+    });
+  }, [activeTopProviders, isAnime, activeAsean, isKorean, enabledResolvers, effectiveOriginCountries, telegramProviderCountries, enabledTelegramProviders]);
+
+  const getFallbackEmbedProvider = useCallback((): StreamProvider => {
+    // 1. First priority: First available embed provider from orderedProviders
+    const firstEligible = orderedProviders.find((p) => (p.engine || 'embed') === 'embed');
+    if (firstEligible) return firstEligible;
+
+    // 2. Context-aware top pick from user settings
+    if (activeAsean && topAseanProviders && topAseanProviders.length > 0) {
+      const aseanPick = topAseanProviders.find((id) => id !== 'telegram-msm32');
+      if (aseanPick) return getProviderById(aseanPick);
+    }
+    if (isAnime && topAnimeProviders && topAnimeProviders.length > 0) {
+      const animePick = topAnimeProviders.find((id) => id !== 'telegram-msm32');
+      if (animePick) return getProviderById(animePick);
+    }
+    if (isKorean && topKoreanProviders && topKoreanProviders.length > 0) {
+      const koreanPick = topKoreanProviders.find((id) => id !== 'telegram-msm32');
+      if (koreanPick) return getProviderById(koreanPick);
+    }
+    if (topProviders && topProviders.length > 0) {
+      const generalPick = topProviders.find((id) => id !== 'telegram-msm32');
+      if (generalPick) return getProviderById(generalPick);
+    }
+
+    // 3. Fallback safety net
+    return getProviderById('vidlink');
+  }, [orderedProviders, activeAsean, isAnime, isKorean, topAseanProviders, topAnimeProviders, topKoreanProviders, topProviders]);
+
   // Up Next state
   const [showUpNext, setShowUpNext] = useState(false);
   const [countdown, setCountdown] = useState(10);
@@ -373,11 +422,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         if (!isTelegramOriginMatching && !isUserSelected) {
           console.log(`[Resolver] Title origin (${effectiveOriginCountries.join(',') || 'unknown'}) is not within telegram-msm filter, skipping to next engine...`);
           if (enabledResolvers.includes('embed')) {
-            const fallbackProvider = isAnime
-              ? getProviderById('megaplay-anime')
-              : isKorean
-              ? getProviderById('kisskh-kdrama')
-              : getProviderById('vidlink');
+            const fallbackProvider = getFallbackEmbedProvider();
             onProviderChange(fallbackProvider);
             return;
           } else {
@@ -555,7 +600,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           console.warn('[Resolver] Telegram stream not found');
           if (enabledResolvers.includes('embed')) {
             setResolvingStatus('Telegram stream not found, switching to primary embed...');
-            const fallbackProvider = getProviderById('vidlink');
+            const fallbackProvider = getFallbackEmbedProvider();
             onProviderChange(fallbackProvider);
             return;
           } else {
@@ -569,7 +614,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         } catch (err) {
           console.warn('[Resolver] Telegram resolution error:', err);
           if (enabledResolvers.includes('embed')) {
-            const fallbackProvider = getProviderById('vidlink');
+            const fallbackProvider = getFallbackEmbedProvider();
             onProviderChange(fallbackProvider);
             return;
           } else {
@@ -698,7 +743,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           return;
         } catch (err) {
           console.warn('[Resolver] LARI21 resolution error:', err);
-          const fallbackProvider = getProviderById('vidlink');
+          const fallbackProvider = getFallbackEmbedProvider();
           onProviderChange(fallbackProvider);
           return;
         }
@@ -840,7 +885,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       isMounted = false;
       abortController.abort();
     };
-  }, [enabledResolvers, tmdbId, title, mediaType, season, episode, activeAsean, providerId, releaseYear, originalTitle, topAnimeProviders, topAseanProviders, isUserSelected, isTelegramOriginMatching, resolveTrigger]);
+  }, [enabledResolvers, tmdbId, title, mediaType, season, episode, activeAsean, providerId, releaseYear, originalTitle, topAnimeProviders, topAseanProviders, isUserSelected, isTelegramOriginMatching, resolveTrigger, getFallbackEmbedProvider]);
 
   const [resumeTimestamp, setResumeTimestamp] = useState<number>(initialTimestamp || 0);
   const [resolvedAnimeMapping, setResolvedAnimeMapping] = useState<ResolvedAnimeMapping | null>(null);
@@ -1689,28 +1734,6 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     };
     initProgress();
   }, [tmdbId, mediaType, season, episode, voteAverage, posterPath, backdropPath, stillPath, episodeTitle, episodeRuntimeMinutes, initialTimestamp, releaseYear]);
-
-  const activeTopProviders = useMemo(() => {
-    if (isKorean) return topKoreanProviders;
-    if (isAnime) return topAnimeProviders;
-    if (activeAsean) return topAseanProviders;
-    return topProviders;
-  }, [isAnime, activeAsean, isKorean, topAnimeProviders, topAseanProviders, topKoreanProviders, topProviders]);
-
-  const orderedProviders = React.useMemo(() => {
-    const list = getOrderedProviders(activeTopProviders, isAnime, activeAsean, isKorean);
-    const hasEmbed = enabledResolvers.includes('embed');
-    const hasTelegram = enabledResolvers.includes('telegram');
-
-    return list.filter((p) => {
-      const isDirect = p.engine === 'telegram';
-      if (isDirect) {
-        if (!hasTelegram) return false;
-        return isProviderMatchingMedia(p, effectiveOriginCountries, telegramProviderCountries, enabledTelegramProviders);
-      }
-      return hasEmbed;
-    });
-  }, [activeTopProviders, isAnime, activeAsean, isKorean, enabledResolvers, effectiveOriginCountries, telegramProviderCountries, enabledTelegramProviders]);
 
   // Notify parent of probing status updates
   useEffect(() => {
