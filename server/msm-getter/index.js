@@ -2538,6 +2538,7 @@ app.get('/api/resolve', async (req, res) => {
     let chosenFilename = null;
     let sentMsgId = 0;
     let deliveredDoc = null;
+    let deliveredMsgId = null;
     let resolvedFilename = null;
 
     // Helper: Score a candidate download button
