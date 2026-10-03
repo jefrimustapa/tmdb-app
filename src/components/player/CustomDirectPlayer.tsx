@@ -114,6 +114,33 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
   const targetSeekTimeRef = useRef<number | null>(null);
   const scrubValueRef = useRef<number | null>(null);
 
+  // Long-press continuous seek refs & cleanup (mobile touchscreen & mouse)
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const isLongPressingRef = useRef(false);
+  const suppressNextClickRef = useRef(false);
+
+  const clearLongPress = useCallback(() => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+    if (longPressIntervalRef.current) {
+      clearInterval(longPressIntervalRef.current);
+      longPressIntervalRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      clearLongPress();
+      if (seekFeedbackTimerRef.current) clearTimeout(seekFeedbackTimerRef.current);
+      if (pendingSeekTimerRef.current) clearTimeout(pendingSeekTimerRef.current);
+      if (remoteHudTimerRef.current) clearTimeout(remoteHudTimerRef.current);
+      if (playFeedbackTimerRef.current) clearTimeout(playFeedbackTimerRef.current);
+    };
+  }, [clearLongPress]);
+
   const hasSeekedInitialRef = useRef(false);
   const seekWatchdogTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -545,6 +572,63 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
 
     resetControlsTimer();
   }, [isTV, isTranscoded, duration, totalDurationSec, performSeek, resetControlsTimer]);
+
+  // Reusable event bindings for seek buttons supporting instant tap & long-press continuous seek
+  const createSeekButtonProps = useCallback((seconds: number) => {
+    return {
+      onPointerDown: (e: React.PointerEvent) => {
+        if (e.button !== 0 && e.pointerType === 'mouse') return;
+        e.stopPropagation();
+        try {
+          (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
+        } catch {}
+        clearLongPress();
+        isLongPressingRef.current = false;
+        suppressNextClickRef.current = false;
+
+        // Long press threshold: 350ms before continuous seeking kicks in
+        longPressTimerRef.current = setTimeout(() => {
+          isLongPressingRef.current = true;
+          suppressNextClickRef.current = true;
+          handleSeekRelative(seconds);
+
+          // Continuous cadence: 160ms per tick (matches TV remote D-pad auto-repeat)
+          longPressIntervalRef.current = setInterval(() => {
+            handleSeekRelative(seconds);
+          }, 160);
+        }, 350);
+      },
+      onPointerUp: (e: React.PointerEvent) => {
+        e.stopPropagation();
+        try {
+          (e.target as HTMLElement).releasePointerCapture?.(e.pointerId);
+        } catch {}
+        clearLongPress();
+        isLongPressingRef.current = false;
+      },
+      onPointerLeave: (e: React.PointerEvent) => {
+        e.stopPropagation();
+        clearLongPress();
+        isLongPressingRef.current = false;
+      },
+      onPointerCancel: (e: React.PointerEvent) => {
+        e.stopPropagation();
+        clearLongPress();
+        isLongPressingRef.current = false;
+      },
+      onClick: (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (suppressNextClickRef.current) {
+          suppressNextClickRef.current = false;
+          return;
+        }
+        handleSeekRelative(seconds);
+      },
+      onContextMenu: (e: React.MouseEvent) => {
+        e.preventDefault();
+      },
+    };
+  }, [clearLongPress, handleSeekRelative]);
 
   // Handle toggling controls visibility with timer reset
   const handleToggleControls = useCallback(() => {
@@ -1095,21 +1179,18 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
           {/* Rewind 10s Button - Visual Seek Feedback on Center Control */}
           <button
             type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              handleSeekRelative(-10);
-            }}
+            {...createSeekButtonProps(-10)}
             title="Rewind 10s"
             aria-label="Rewind 10 seconds"
-            className={`relative p-2 text-white bg-transparent border-0 transition-all duration-200 flex items-center justify-center pointer-events-auto ${
+            className={`relative p-2 text-white bg-transparent border-0 transition-all duration-200 flex items-center justify-center pointer-events-auto select-none ${
               seekFeedback === 'rwd'
                 ? 'opacity-100 scale-125 -rotate-12'
                 : 'opacity-70 hover:opacity-100 active:scale-90'
             }`}
           >
             <RotateCcw className="w-10 h-10 sm:w-12 sm:h-12" />
-            <span className="absolute text-[11px] sm:text-xs font-black">
-              {seekFeedback === 'rwd' ? '-10s' : '10'}
+            <span className="absolute text-[10px] sm:text-xs font-black">
+              {seekFeedback === 'rwd' ? `${seekDeltaTotal ? seekDeltaTotal : -10}s` : '10'}
             </span>
           </button>
 
@@ -1137,21 +1218,18 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
           {/* Forward 10s Button - Visual Seek Feedback on Center Control */}
           <button
             type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              handleSeekRelative(10);
-            }}
+            {...createSeekButtonProps(10)}
             title="Forward 10s"
             aria-label="Forward 10 seconds"
-            className={`relative p-2 text-white bg-transparent border-0 transition-all duration-200 flex items-center justify-center pointer-events-auto ${
+            className={`relative p-2 text-white bg-transparent border-0 transition-all duration-200 flex items-center justify-center pointer-events-auto select-none ${
               seekFeedback === 'fwd'
                 ? 'opacity-100 scale-125 rotate-12'
                 : 'opacity-70 hover:opacity-100 active:scale-90'
             }`}
           >
             <RotateCw className="w-10 h-10 sm:w-12 sm:h-12" />
-            <span className="absolute text-[11px] sm:text-xs font-black">
-              {seekFeedback === 'fwd' ? '+10s' : '10'}
+            <span className="absolute text-[10px] sm:text-xs font-black">
+              {seekFeedback === 'fwd' ? `+${seekDeltaTotal ? seekDeltaTotal : 10}s` : '10'}
             </span>
           </button>
         </div>
@@ -1211,8 +1289,8 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
               {/* Rewind 10s Mini */}
               <button
                 type="button"
-                onClick={() => handleSeekRelative(-10)}
-                className="p-1 text-white/80 hover:text-hbo-cyan transition flex items-center gap-0.5 active:scale-95"
+                {...createSeekButtonProps(-10)}
+                className="p-1 text-white/80 hover:text-hbo-cyan transition flex items-center gap-0.5 active:scale-95 select-none"
                 title="Rewind 10s"
               >
                 <RotateCcw className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
@@ -1222,8 +1300,8 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
               {/* Forward 10s Mini */}
               <button
                 type="button"
-                onClick={() => handleSeekRelative(10)}
-                className="p-1 text-white/80 hover:text-hbo-cyan transition flex items-center gap-0.5 active:scale-95"
+                {...createSeekButtonProps(10)}
+                className="p-1 text-white/80 hover:text-hbo-cyan transition flex items-center gap-0.5 active:scale-95 select-none"
                 title="Forward 10s"
               >
                 <RotateCw className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
