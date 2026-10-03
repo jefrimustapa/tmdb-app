@@ -247,10 +247,9 @@ function toRoman(num) {
   return map[num] || String(num);
 }
 
-// Generate TV series prioritized search queries according to user-specified strict hierarchy
+// Generate TV series prioritized search queries without season tags for faster, high-yield retrieval
 function generateSeriesSearchQueries(cleanT, sNum, eNum, totalSeasons, year) {
   const s2 = String(sNum).padStart(2, '0');
-  const s1 = String(sNum);
   const e2 = String(eNum).padStart(2, '0');
   const e1 = String(eNum);
 
@@ -262,71 +261,44 @@ function generateSeriesSearchQueries(cleanT, sNum, eNum, totalSeasons, year) {
     }
   };
 
-  // Helper to append the 28 strict patterns for a given prefix (either `${cleanT} ${year}` or `${cleanT}`)
+  // Helper to append the 12 strict episode patterns without season for a given prefix (either `${cleanT} ${year}` or `${cleanT}`)
   const appendPatterns = (prefix) => {
-    // 1. S{%2d}E{%2d}
-    addQuery(`${prefix} S${s2}E${e2}`);
-    // 2. S{%2d}EP{%2d}
-    addQuery(`${prefix} S${s2}EP${e2}`);
-    // 3. S{%2d} E{%2d}
-    addQuery(`${prefix} S${s2} E${e2}`);
-    // 4. S{%2d} EP{%2d}
-    addQuery(`${prefix} S${s2} EP${e2}`);
-    // 5. S{%d}E{%d}
-    addQuery(`${prefix} S${s1}E${e1}`);
-    // 6. S{%d}EP{%d}
-    addQuery(`${prefix} S${s1}EP${e1}`);
-    // 7. S{%d} E{%d}
-    addQuery(`${prefix} S${s1} E${e1}`);
-    // 8. S{%d} EP{%d}
-    addQuery(`${prefix} S${s1} EP${e1}`);
-    // 9. Season {%2d} EP{%2d}
-    addQuery(`${prefix} Season ${s2} EP${e2}`);
-    // 10. Season {%2d} Episode{%2d} (unspaced & spaced)
-    addQuery(`${prefix} Season ${s2} Episode${e2}`);
-    addQuery(`${prefix} Season ${s2} Episode ${e2}`);
-    // 11. Season {%d} EP{%d}
-    addQuery(`${prefix} Season ${s1} EP${e1}`);
-    // 12. Season {%d} Episod{%d} (unspaced & spaced)
-    addQuery(`${prefix} Season ${s1} Episod${e1}`);
-    addQuery(`${prefix} Season ${s1} Episod ${e1}`);
-    // 13. Season {%d} Episode{%d} (unspaced & spaced)
-    addQuery(`${prefix} Season ${s1} Episode${e1}`);
-    addQuery(`${prefix} Season ${s1} Episode ${e1}`);
-    // 14. E{%2d}
+    // 1. E{%2d}
     addQuery(`${prefix} E${e2}`);
-    // 15. EP{%2d}
+    // 2. EP{%2d}
     addQuery(`${prefix} EP${e2}`);
-    // 16. E{%d}
+    // 3. E{%d}
     addQuery(`${prefix} E${e1}`);
-    // 17. EP{%d}
+    // 4. EP{%d}
     addQuery(`${prefix} EP${e1}`);
-    // 18. Episod{%2d} (unspaced & spaced)
+    // 5. Episod{%2d} (unspaced & spaced)
     addQuery(`${prefix} Episod${e2}`);
     addQuery(`${prefix} Episod ${e2}`);
-    // 19. Episod{%d} (unspaced & spaced)
+    // 6. Episod{%d} (unspaced & spaced)
     addQuery(`${prefix} Episod${e1}`);
     addQuery(`${prefix} Episod ${e1}`);
-    // 20. Episode{%2d} (unspaced & spaced)
+    // 7. Episode{%2d} (unspaced & spaced)
     addQuery(`${prefix} Episode${e2}`);
     addQuery(`${prefix} Episode ${e2}`);
-    // 21. Episode{%d} (unspaced & spaced)
+    // 8. Episode{%d} (unspaced & spaced)
     addQuery(`${prefix} Episode${e1}`);
     addQuery(`${prefix} Episode ${e1}`);
   };
 
-  // 1. Primary: Strict patterns WITH Year (if year is provided)
+  // 1. Primary: 12 strict patterns WITH Year (if year is provided)
   if (year) {
     appendPatterns(`${cleanT} ${year}`);
   }
 
-  // 2. Fallback: Strict patterns WITHOUT Year (in case uploader omitted the year)
+  // 2. Fallback: 12 strict patterns WITHOUT Year (in case uploader omitted the year)
   appendPatterns(cleanT);
 
-  // 3. Final Fallbacks: Base title with year, then base title alone
+  // 3. Final Fallbacks: Standard scene SxxExx with year, base title with year, then base title alone
   if (year) {
+    addQuery(`${cleanT} ${year} S${s2}E${e2}`);
     addQuery(`${cleanT} ${year}`);
   }
+  addQuery(`${cleanT} S${s2}E${e2}`);
   addQuery(cleanT);
 
   return queries;
@@ -490,8 +462,8 @@ function extractSeasonInfo(text) {
   if (!text) return null;
   const s = String(text);
 
-  // Standard season patterns: S01, S1, Season 2, Musim 2, Season 10
-  const seasonMatch = s.match(/\b(?:s|season|musim)\s*0*(\d{1,2})(?!\d)\b/i);
+  // Standard season patterns: S01E01, S01, S1, Season 2, Musim 2, Season 10
+  const seasonMatch = s.match(/\b(?:s|season|musim)\s*0*(\d{1,2})(?=[e\s\.\_\-\]]|$|\b)/i);
   if (seasonMatch) {
     return parseInt(seasonMatch[1], 10);
   }
@@ -540,6 +512,7 @@ function scoreCandidateButton(btn, msg, context = {}) {
     year = null,
     sNum = 1,
     eNum = 1,
+    totalSeasons = 1,
     targetQuality = 720,
     significantTokens = extractSignificantTokens(title)
   } = context;
@@ -622,18 +595,24 @@ function scoreCandidateButton(btn, msg, context = {}) {
 
     // 2. Strict Season validation
     const seasonFound = extractSeasonInfo(btnText) || extractSeasonInfo(cleanMsgText);
+    const explicitTargetYear = parseInt(year, 10);
+    const targetYear = !isNaN(explicitTargetYear) ? explicitTargetYear : extractYear(title, significantTokens);
+    const btnYear = extractYear(btnText, significantTokens) || extractYear(cleanMsgText, significantTokens);
+
     if (seasonFound !== null) {
       if (seasonFound === sNum) {
         score += 80;
       } else {
         return -999;
       }
+    } else if (sNum > 1 && totalSeasons > 1) {
+      // Multi-season protection: when watching Season 2 or later, reject un-versioned candidates with no matching year
+      if (!btnYear || Math.abs(targetYear - btnYear) > 1) {
+        return -999;
+      }
     }
 
     // 3. Release year validation
-    const explicitTargetYear = parseInt(year, 10);
-    const targetYear = !isNaN(explicitTargetYear) ? explicitTargetYear : extractYear(title, significantTokens);
-    const btnYear = extractYear(btnText, significantTokens) || extractYear(cleanMsgText, significantTokens);
     if (targetYear && btnYear) {
       if (Math.abs(targetYear - btnYear) <= 1) {
         score += 90;
@@ -2549,6 +2528,7 @@ app.get('/api/resolve', async (req, res) => {
         year,
         sNum,
         eNum,
+        totalSeasons,
         targetQuality,
         significantTokens,
       });
