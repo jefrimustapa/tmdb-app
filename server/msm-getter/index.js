@@ -1821,18 +1821,21 @@ app.get('/logs', (req, res) => {
 
     function formatLine(line) {
       const escaped = escapeHtml(line);
+      let colorClass = 'text-slate-300';
       if (line.includes('[ERROR]') || line.includes('[FATAL]') || line.includes('Error:')) {
-        return '<div class="text-rose-400 bg-rose-500/5 px-1 rounded">' + escaped + '</div>';
+        colorClass = 'text-rose-400 font-semibold';
       } else if (line.includes('[WARN]')) {
-        return '<div class="text-amber-400 bg-amber-500/5 px-1 rounded">' + escaped + '</div>';
+        colorClass = 'text-amber-400';
       } else if (line.includes('[STREAM') || line.includes('[PIPELINE')) {
-        return '<div class="text-sky-300 bg-sky-500/5 px-1 rounded font-medium">' + escaped + '</div>';
+        colorClass = 'text-sky-300 font-medium';
       } else if (line.includes('[SUPERVISOR')) {
-        return '<div class="text-emerald-400 bg-emerald-500/5 px-1 rounded font-medium">' + escaped + '</div>';
+        colorClass = 'text-emerald-400 font-medium';
       } else if (line.includes('[TG]') || line.includes('[AUTH')) {
-        return '<div class="text-purple-300 bg-purple-500/5 px-1 rounded">' + escaped + '</div>';
+        colorClass = 'text-purple-300';
+      } else if (line.includes('[MEMORY PURGE]') || line.includes('[MEMORY WATCHDOG]') || line.includes('[SYSTEM]')) {
+        colorClass = 'text-cyan-400 font-medium';
       }
-      return '<div class="text-slate-300">' + escaped + '</div>';
+      return '<div class="' + colorClass + '">' + escaped + '</div>';
     }
 
     function renderLines() {
