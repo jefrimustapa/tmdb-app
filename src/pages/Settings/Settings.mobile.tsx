@@ -2519,11 +2519,11 @@ export const Settings: React.FC = () => {
       {/* 3a. Level 2 Sub-Drawer: Stream Provider Selection */}
       <SettingsDrawer
         isOpen={activeDrawer === 'priorityPicker'}
-        onClose={() => setActiveDrawer(null)}
-        onBack={() => setActiveDrawer('resolvers')}
+        onClose={() => setActiveDrawer('engine-embed')}
+        onBack={() => setActiveDrawer('engine-embed')}
         title="Select Stream Provider"
         subtitle={priorityPickerSlot ? `Assign provider for ${priorityPickerSlot.label}` : 'Choose streaming provider'}
-        categoryLabel="Playback > Resolvers"
+        categoryLabel="Stream Engines > Embed > Priority"
       >
         <div className="space-y-2">
           {STREAM_PROVIDERS.map((provider) => {
@@ -2566,7 +2566,7 @@ export const Settings: React.FC = () => {
                       preferredProvider: current[0]
                     });
                   }
-                  setActiveDrawer('resolvers');
+                  setActiveDrawer('engine-embed');
                 }}
                 className={`w-full p-3.5 rounded-xl border text-left transition-all flex items-center justify-between gap-3 ${
                   isSelected
