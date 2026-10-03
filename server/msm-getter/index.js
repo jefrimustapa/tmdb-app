@@ -157,6 +157,9 @@ function checkFfmpeg() {
 // In-flight request deduplication map: key = cacheKey -> Promise
 const inFlightResolutions = new Map();
 
+// In-memory blacklist of dead shortcodes that returned forward_failed (deleted source messages)
+const deadShortcodes = new Set();
+
 // Sequential FIFO mutex queue for Telegram bot operations
 let resolveMutex = Promise.resolve();
 let pendingTelegramTasks = 0;
@@ -2698,6 +2701,11 @@ app.get('/api/resolve', async (req, res) => {
             const linkMatch = cand.url ? cand.url.match(/\/link\/([a-zA-Z0-9_-]+)/) : null;
             const candShortcode = linkMatch ? linkMatch[1] : null;
 
+            if (candShortcode && deadShortcodes.has(candShortcode)) {
+              console.log(`[RESOLVE] Skipping candidate "${cand.text}" (shortcode ${candShortcode} is known dead forward_failed)`);
+              continue;
+            }
+
             let authRes;
             try {
               console.log(`[RESOLVE] Authorizing button (msgId: ${targetMsgId}, buttonId: ${targetButtonId})...`);
@@ -2804,6 +2812,9 @@ app.get('/api/resolve', async (req, res) => {
                 if (ajaxRes.data?.data?.description === 'forward_failed' || (ajaxRes.data?.data && ajaxRes.data.data.ok === false)) {
                   console.warn(`[RESOLVE WARN] Media forward failed on @msm32bot for candidate "${cand.text}" (${ajaxRes.data?.data?.description || 'failed'}). Trying next candidate...`);
                   forwardFailed = true;
+                  if (shortcode) deadShortcodes.add(shortcode);
+                  if (candShortcode) deadShortcodes.add(candShortcode);
+                  if (deadShortcodes.size > 2000) deadShortcodes.clear();
                 }
               } catch (postErr) {
                 console.warn(`[RESOLVE WARN] msmbot_getfile request issue (${postErr.message}). Checking Telegram chat for delivery anyway...`);
@@ -2847,7 +2858,8 @@ app.get('/api/resolve', async (req, res) => {
             }
           }
 
-          if (deliveredDoc) break; // Exit poll loop
+          // Break out of the poll loop as all candidates for this query's bot response have been evaluated
+          break;
         }
       }
 
