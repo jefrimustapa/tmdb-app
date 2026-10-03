@@ -1,3 +1,4 @@
+import './logger.js';
 import express from 'express';
 import http from 'http';
 import https from 'https';
@@ -35,6 +36,9 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 dotenv.config({ path: path.join(__dirname, '.env') });
+
+// Remove LD_PRELOAD from child environment so spawned 32-bit router binaries (nvram, sh) do not fail ELF class checks
+delete process.env.LD_PRELOAD;
 
 const app = express();
 app.set('trust proxy', true);
@@ -1234,14 +1238,23 @@ function purgeIdleMemory() {
     }
   } catch {}
 
+  // 4. Force explicit V8 GC sweep if --expose-gc is enabled
+  if (typeof global.gc === 'function') {
+    try {
+      global.gc();
+    } catch (err) {
+      console.warn('[MEMORY PURGE] global.gc() error:', err.message);
+    }
+  }
+
   const afterMem = process.memoryUsage();
   const afterRssMB = Math.round(afterMem.rss / (1024 * 1024));
   const afterHeapMB = Math.round(afterMem.heapUsed / (1024 * 1024));
 
-  console.log(`[MEMORY PURGE] Idle stream purge executed: evicted ${evictedBlocks} blocks, pinned retained: ${pinnedHeaderCache.size}. RSS: ${beforeRssMB}MB -> ${afterRssMB}MB, Heap: ${beforeHeapMB}MB -> ${afterHeapMB}MB`);
+  console.log(`[MEMORY PURGE] Idle stream purge executed: evicted ${evictedBlocks} blocks, pinned retained: ${pinnedHeaderCache.size}. RSS: ${beforeRssMB}MB -> ${afterRssMB}MB, Heap: ${beforeHeapMB}MB -> ${afterHeapMB}MB (GC: ${typeof global.gc === 'function' ? 'active' : 'disabled'})`);
 }
 
-// Automated garbage collector for orphaned stream handles (stale entries older than 2 hours)
+// Automated garbage collector for orphaned stream handles & periodic idle watchdog
 setInterval(() => {
   const now = Date.now();
   for (const [key, entry] of activeStreams.entries()) {
@@ -1256,6 +1269,15 @@ setInterval(() => {
     if (now - (wEntry.createdAt || now) > 30 * 60 * 1000) {
       try { wEntry.abort(); } catch {}
       internalWorkers.delete(wKey);
+    }
+  }
+
+  // Periodic Idle Memory Watchdog: If no streams are running and RSS > 85 MB, purge idle memory
+  if (activeStreams.size === 0) {
+    const curRssMB = Math.round(process.memoryUsage().rss / (1024 * 1024));
+    if (curRssMB > 85) {
+      console.log(`[MEMORY WATCHDOG] Idle RSS is ${curRssMB}MB (>85MB target). Triggering idle purge...`);
+      purgeIdleMemory();
     }
   }
 }, 5 * 60 * 1000).unref();
@@ -1591,6 +1613,21 @@ app.get('/api/logs/download', (req, res) => {
   }
 });
 
+// Clear / Truncate Physical Log File on Disk
+app.post('/api/logs/clear', (req, res) => {
+  try {
+    const logPath = getLogFilePath();
+    if (fs.existsSync(logPath)) {
+      fs.truncateSync(logPath, 0);
+    }
+    console.log('[SYSTEM] Log file physically truncated and cleared by user.');
+    return res.json({ success: true, message: 'Log file cleared successfully.' });
+  } catch (err) {
+    console.error('[SYSTEM ERROR] Failed to truncate log file:', err.message);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // Dedicated Web Log Viewer GUI
 app.get('/logs', (req, res) => {
   res.set({
@@ -1603,6 +1640,9 @@ app.get('/logs', (req, res) => {
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
   <title>MSM Getter — Live Log Console</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
@@ -1623,7 +1663,7 @@ app.get('/logs', (req, res) => {
       </div>
       <div>
         <h1 class="text-lg font-black tracking-tight text-white flex items-center gap-2">
-          MSM Getter <span class="text-xs font-mono font-normal px-2 py-0.5 rounded bg-sky-500/10 text-sky-400 border border-sky-500/20">Live Console</span>
+          MSM Getter <span class="text-xs font-mono font-normal px-2 py-0.5 rounded bg-sky-500/10 text-sky-400 border border-sky-500/20">v1.2.1 • Live Console</span>
         </h1>
         <p class="text-xs text-slate-400">Telegram MTProto Cloud Streaming Server Logs</p>
       </div>
@@ -1715,8 +1755,9 @@ app.get('/logs', (req, res) => {
         <input id="autoScroll" type="checkbox" checked class="rounded bg-slate-900 border-slate-700 text-sky-500 focus:ring-0" />
         <span>Auto-scroll</span>
       </label>
-      <button onclick="clearDisplay()" class="px-2.5 py-1 text-xs text-slate-400 hover:text-white bg-slate-900 hover:bg-slate-800 rounded-lg border border-slate-800 transition">
-        Clear
+      <button onclick="clearServerLog()" class="px-2.5 py-1 text-xs font-semibold text-rose-300 hover:text-white bg-rose-500/10 hover:bg-rose-500/20 rounded-lg border border-rose-500/30 transition flex items-center gap-1.5" title="Physically truncate and clear log file on router">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+        Clear Log
       </button>
     </div>
   </div>
@@ -1760,7 +1801,7 @@ app.get('/logs', (req, res) => {
     </div>
 
     <!-- Output Body -->
-    <div id="terminalBody" class="p-4 overflow-y-auto flex-1 font-mono text-[11px] leading-relaxed space-y-0.5 select-text">
+    <div id="terminalBody" class="p-4 overflow-y-auto flex-1 font-mono text-[11px] leading-relaxed space-y-0.5 select-text whitespace-pre-wrap break-all">
       <div class="text-slate-500 italic">Connecting to live log stream...</div>
     </div>
   </div>
@@ -1783,18 +1824,21 @@ app.get('/logs', (req, res) => {
 
     function formatLine(line) {
       const escaped = escapeHtml(line);
+      let colorClass = 'text-slate-300';
       if (line.includes('[ERROR]') || line.includes('[FATAL]') || line.includes('Error:')) {
-        return '<div class="text-rose-400 bg-rose-500/5 px-1 rounded">' + escaped + '</div>';
+        colorClass = 'text-rose-400 font-semibold';
       } else if (line.includes('[WARN]')) {
-        return '<div class="text-amber-400 bg-amber-500/5 px-1 rounded">' + escaped + '</div>';
+        colorClass = 'text-amber-400';
       } else if (line.includes('[STREAM') || line.includes('[PIPELINE')) {
-        return '<div class="text-sky-300 bg-sky-500/5 px-1 rounded font-medium">' + escaped + '</div>';
+        colorClass = 'text-sky-300 font-medium';
       } else if (line.includes('[SUPERVISOR')) {
-        return '<div class="text-emerald-400 bg-emerald-500/5 px-1 rounded font-medium">' + escaped + '</div>';
+        colorClass = 'text-emerald-400 font-medium';
       } else if (line.includes('[TG]') || line.includes('[AUTH')) {
-        return '<div class="text-purple-300 bg-purple-500/5 px-1 rounded">' + escaped + '</div>';
+        colorClass = 'text-purple-300';
+      } else if (line.includes('[MEMORY PURGE]') || line.includes('[MEMORY WATCHDOG]') || line.includes('[SYSTEM]')) {
+        colorClass = 'text-cyan-400 font-medium';
       }
-      return '<div class="text-slate-300">' + escaped + '</div>';
+      return '<div class="m-0 p-0 ' + colorClass + '">' + escaped + '</div>';
     }
 
     function renderLines() {
@@ -1830,10 +1874,24 @@ app.get('/logs', (req, res) => {
       renderLines();
     }
 
-    function clearDisplay() {
-      rawLines = [];
-      renderLines();
+    async function clearServerLog() {
+      if (!confirm('Are you sure you want to physically clear and truncate the log file on the router?')) return;
+      try {
+        const res = await fetch('/api/logs/clear', { method: 'POST' });
+        const data = await res.json();
+        if (data.success) {
+          rawLines = [];
+          renderLines();
+          const metricLogSize = document.getElementById('metricLogSize');
+          if (metricLogSize) metricLogSize.textContent = '0 KB';
+        } else {
+          alert('Failed to clear log: ' + (data.error || 'Unknown error'));
+        }
+      } catch (err) {
+        alert('Network error while clearing log: ' + err.message);
+      }
     }
+    const clearDisplay = clearServerLog;
 
     searchInput.addEventListener('input', renderLines);
 
@@ -2430,7 +2488,7 @@ app.get('/api/resolve', async (req, res) => {
           }
           if (fnLower.includes('.mp4') || fnLower.includes('mp4')) qualityScore += 15;
 
-          matchingRecentDocs.push({ doc, filename, qualityScore });
+          matchingRecentDocs.push({ doc, filename, qualityScore, msgId: msg.id });
         }
       }
     }
@@ -2444,6 +2502,7 @@ app.get('/api/resolve', async (req, res) => {
         console.log(`[RESOLVE] Found matching recent document in chat: ${chosen.filename} (ID: ${docIdStr}, score: ${chosen.qualityScore})`);
         const streamItem = db.set(cacheKey, {
           docId: docIdStr,
+          msgId: chosen.msgId,
           accessHash: chosen.doc.accessHash?.toString() || '',
           fileReference: chosen.doc.fileReference ? chosen.doc.fileReference.toString('hex') : '',
           filename: chosen.filename,
@@ -2479,6 +2538,7 @@ app.get('/api/resolve', async (req, res) => {
     let chosenFilename = null;
     let sentMsgId = 0;
     let deliveredDoc = null;
+    let deliveredMsgId = null;
     let resolvedFilename = null;
 
     // Helper: Score a candidate download button
@@ -2777,6 +2837,7 @@ app.get('/api/resolve', async (req, res) => {
 
             console.log(`[RESOLVE] Waiting for media delivery from @msm32bot (newer than msgId: ${sentMsgId})...`);
             let candDeliveredDoc = null;
+            let candDeliveredMsgId = null;
             let finalFilename = candidateFilename || queryTitle;
 
             for (let attempt = 0; attempt < 8; attempt++) {
@@ -2787,6 +2848,7 @@ app.get('/api/resolve', async (req, res) => {
               for (const im of incoming) {
                 if (im.id > sentMsgId && im.media?.document) {
                   candDeliveredDoc = im.media.document;
+                  candDeliveredMsgId = im.id;
                   const fnAttr = candDeliveredDoc.attributes?.find(a => a.className === 'DocumentAttributeFilename');
                   if (fnAttr) finalFilename = fnAttr.fileName;
                   break;
@@ -2798,6 +2860,7 @@ app.get('/api/resolve', async (req, res) => {
             if (candDeliveredDoc) {
               console.log(`[RESOLVE] Successfully received media document for candidate "${cand.text}"!`);
               deliveredDoc = candDeliveredDoc;
+              deliveredMsgId = candDeliveredMsgId;
               resolvedFilename = finalFilename;
               break; // Candidate loop succeeded!
             } else {
@@ -2832,6 +2895,7 @@ app.get('/api/resolve', async (req, res) => {
     const filename = resolvedFilename || chosenFilename || queryTitle;
     const resolvedItem = db.set(cacheKey, {
       docId: docIdStr,
+      msgId: deliveredMsgId,
       accessHash: deliveredDoc.accessHash?.toString() || '',
       fileReference: deliveredDoc.fileReference ? deliveredDoc.fileReference.toString('hex') : '',
       filename,
@@ -2913,8 +2977,33 @@ async function refreshDocumentFileReference(client, targetDoc) {
 
   const refreshPromise = (async () => {
     console.log(`[FILE_REF RECOVERY] Refreshing expired fileReference for Doc ID: ${docIdStr}...`);
+    const dbRecord = db.getByDocId(docIdStr);
 
-    // 1. Scan recent chat messages from @msm32bot for the exact document ID
+    // 1. Direct message ID lookup (official MTProto fast path: re-fetching the message provides fresh HMAC file_reference)
+    if (dbRecord && dbRecord.msgId) {
+      try {
+        const msgs = await client.getMessages('msm32bot', { ids: [Number(dbRecord.msgId)] });
+        const m = msgs?.[0];
+        if (m && m.media?.document?.id?.toString() === docIdStr) {
+          const freshRef = m.media.document.fileReference;
+          if (freshRef) {
+            console.log(`[FILE_REF RECOVERY] Found fresh fileReference via direct msgId ${dbRecord.msgId} for Doc ID: ${docIdStr}!`);
+            if (dbRecord.queryKey) {
+              db.set(dbRecord.queryKey, {
+                ...dbRecord,
+                fileReference: freshRef.toString('hex'),
+                updatedAt: Date.now(),
+              });
+            }
+            return freshRef;
+          }
+        }
+      } catch (idErr) {
+        console.warn(`[FILE_REF RECOVERY] Message ID lookup failed (${idErr.message}). Falling back to scan...`);
+      }
+    }
+
+    // 2. Scan recent chat messages from @msm32bot for the exact document ID
     try {
       const recentMsgs = await client.getMessages('msm32bot', { limit: 100 });
       for (const m of recentMsgs) {
@@ -2922,12 +3011,12 @@ async function refreshDocumentFileReference(client, targetDoc) {
           const freshRef = m.media.document.fileReference;
           if (freshRef) {
             console.log(`[FILE_REF RECOVERY] Found fresh fileReference in chat message ${m.id} for Doc ID: ${docIdStr}!`);
-            const dbRecord = db.getByDocId(docIdStr);
             if (dbRecord && dbRecord.queryKey) {
               db.set(dbRecord.queryKey, {
                 ...dbRecord,
+                msgId: m.id,
                 fileReference: freshRef.toString('hex'),
-                createdAt: Date.now(),
+                updatedAt: Date.now(),
               });
             }
             return freshRef;
@@ -2938,49 +3027,42 @@ async function refreshDocumentFileReference(client, targetDoc) {
       console.warn('[FILE_REF RECOVERY] Chat scan error:', scanErr.message);
     }
 
-    // 2. If not found in recent chat, search by clean title or queryKey via bot
-    const dbRecord = db.getByDocId(docIdStr);
+    // 3. Search Telegram MTProto servers for historical media documents
     if (dbRecord) {
       let searchTerm = '';
       if (dbRecord.queryKey) {
         searchTerm = dbRecord.queryKey.replace(/_(?:720|1080)p$/i, '').trim();
       } else if (dbRecord.filename) {
-        searchTerm = dbRecord.filename
-          .replace(/^[#\[][^\]\s]+[\]\s]*/g, '') // remove #NPRH22 or [Group]
-          .replace(/\.(mp4|mkv|avi)$/i, '')
-          .replace(/[\._\-]/g, ' ')
-          .replace(/[^\w\s]/g, ' ')
-          .replace(/\s+/g, ' ')
-          .trim();
+        searchTerm = cleanSearchTitle(dbRecord.filename);
       }
 
       if (searchTerm) {
-        console.log(`[FILE_REF RECOVERY] Re-querying bot with: "${searchTerm}" for Doc ID: ${docIdStr}...`);
+        console.log(`[FILE_REF RECOVERY] Searching server messages for "${searchTerm}" (Doc ID: ${docIdStr})...`);
         try {
-          await queueTelegramTask(async () => {
-            await client.sendMessage('msm32bot', { message: searchTerm });
-            await new Promise(r => setTimeout(r, 2500));
-            const msgs = await client.getMessages('msm32bot', { limit: 20 });
-            for (const m of msgs) {
-              if (m.media?.document?.id?.toString() === docIdStr) {
-                const freshRef = m.media.document.fileReference;
-                if (freshRef) {
-                  console.log(`[FILE_REF RECOVERY] Successfully refreshed fileReference via bot re-query!`);
-                  if (dbRecord.queryKey) {
-                    db.set(dbRecord.queryKey, {
-                      ...dbRecord,
-                      fileReference: freshRef.toString('hex'),
-                      createdAt: Date.now(),
-                    });
-                  }
-                  return freshRef;
+          const serverDocs = await client.getMessages('msm32bot', {
+            search: searchTerm,
+            limit: 30,
+            filter: new Api.InputMessagesFilterDocument(),
+          }).catch(() => []);
+          for (const m of serverDocs) {
+            if (m.media?.document?.id?.toString() === docIdStr) {
+              const freshRef = m.media.document.fileReference;
+              if (freshRef) {
+                console.log(`[FILE_REF RECOVERY] Successfully recovered fresh fileReference via MTProto server search (msgId: ${m.id})!`);
+                if (dbRecord.queryKey) {
+                  db.set(dbRecord.queryKey, {
+                    ...dbRecord,
+                    msgId: m.id,
+                    fileReference: freshRef.toString('hex'),
+                    updatedAt: Date.now(),
+                  });
                 }
+                return freshRef;
               }
             }
-            return null;
-          });
-        } catch (qErr) {
-          console.warn('[FILE_REF RECOVERY] Bot re-query error:', qErr.message);
+          }
+        } catch (searchErr) {
+          console.warn('[FILE_REF RECOVERY] MTProto document search error:', searchErr.message);
         }
       }
     }

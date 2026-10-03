@@ -205,6 +205,11 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     customSubtitleCuesRef.current = customSubtitleCues;
   }, [customSubtitleEnabled, customSubtitleCues]);
 
+  // Stream Resolution Trigger & Telegram Recovery Refs
+  const [resolveTrigger, setResolveTrigger] = useState(0);
+  const forceFreshTelegramRef = useRef(false);
+  const hasRetriedTelegramForceRef = useRef(false);
+
   // Auto-Cycle Provider until first working stream state
   const [autoCycle, setAutoCycle] = useState(true);
   const [isProbing, setIsProbing] = useState(true);
@@ -348,9 +353,14 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     }
 
     async function executeStreamResolution() {
+      const isForceFresh = forceFreshTelegramRef.current;
+      forceFreshTelegramRef.current = false;
+      if (!isForceFresh) {
+        hasRetriedTelegramForceRef.current = false;
+      }
       setIsExtracting(true);
       setPlayerMode('loading');
-      setResolvingStatus('Initializing stream resolver...');
+      setResolvingStatus(isForceFresh ? 'Refreshing Telegram stream...' : 'Initializing stream resolver...');
 
       const rawTimeout = typeof streamResolverTimeoutRef.current === 'number'
         ? streamResolverTimeoutRef.current
@@ -440,7 +450,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
               mediaType === 'tv' ? season : undefined,
               mediaType === 'tv' ? episode : undefined,
               abortController.signal,
-              false,
+              isForceFresh,
               effectiveTotalSeasons
             );
 
@@ -810,7 +820,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       isMounted = false;
       abortController.abort();
     };
-  }, [enabledResolvers, tmdbId, title, mediaType, season, episode, activeAsean, providerId, releaseYear, originalTitle, topAnimeProviders, topAseanProviders, isUserSelected, isTelegramOriginMatching]);
+  }, [enabledResolvers, tmdbId, title, mediaType, season, episode, activeAsean, providerId, releaseYear, originalTitle, topAnimeProviders, topAseanProviders, isUserSelected, isTelegramOriginMatching, resolveTrigger]);
 
   const [resumeTimestamp, setResumeTimestamp] = useState<number>(initialTimestamp || 0);
   const [resolvedAnimeMapping, setResolvedAnimeMapping] = useState<ResolvedAnimeMapping | null>(null);
@@ -2107,7 +2117,18 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             }
           }}
           onError={() => {
-            // If playing a Telegram direct stream without transcode and direct playback errors out (e.g. unsupported audio codec), retry once with transcode=audio!
+            // 1. If playing Telegram direct stream and it errors out, auto-retry once with fresh resolution (bypasses stale DB cache or expired fileReference)
+            if (directStreamLabel === 'Telegram (MSM32)' && !hasRetriedTelegramForceRef.current) {
+              hasRetriedTelegramForceRef.current = true;
+              forceFreshTelegramRef.current = true;
+              console.log('[DirectStream] Telegram playback error. Auto-re-resolving with bypassCache=true...');
+              setDirectStreamUrl(null);
+              setResolvedMsm32Url(null);
+              setResolvingStatus('Refreshing Telegram stream...');
+              setResolveTrigger(prev => prev + 1);
+              return;
+            }
+            // 2. If playing a direct stream without transcode and direct playback errors out (e.g. unsupported audio codec), retry once with transcode=audio!
             if (directStreamUrl && !directStreamUrl.includes('transcode=audio')) {
               const sep = directStreamUrl.includes('?') ? '&' : '?';
               const transcodedUrl = `${directStreamUrl}${sep}transcode=audio`;
