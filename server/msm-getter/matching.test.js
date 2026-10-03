@@ -159,11 +159,46 @@ it('disqualifies conflicting release years for movie reboots/remakes', () => {
   assert.ok(scoreCandidateButton(btn2024, msg, contextMovie2024) >= 200, '2024 movie should score high');
 });
 
+it('disqualifies un-versioned candidates with no matching year when Season > 1 is requested', () => {
+  const contextS2 = { isTv: true, title: 'Reacher', year: '2023', sNum: 2, eNum: 1, totalSeasons: 2, targetQuality: 720 };
+  const btnBareS1 = { className: 'KeyboardButtonUrlAuth', url: 'https://t.me/msm32bot/link/bare', text: 'Reacher Episod 1 720p' };
+  const btnMatchedS2 = { className: 'KeyboardButtonUrlAuth', url: 'https://t.me/msm32bot/link/s2', text: 'Reacher S02E01 720p' };
+  const btnMatchedYear = { className: 'KeyboardButtonUrlAuth', url: 'https://t.me/msm32bot/link/year', text: 'Reacher 2023 Episod 1 720p' };
+  const msg = { message: '' };
+
+  assert.strictEqual(scoreCandidateButton(btnBareS1, msg, contextS2), -999, 'Un-versioned episode must be disqualified for Season 2');
+  assert.ok(scoreCandidateButton(btnMatchedS2, msg, contextS2) >= 150, 'S02E01 button should match Season 2');
+  assert.ok(scoreCandidateButton(btnMatchedYear, msg, contextS2) >= 150, 'Matching release year button should match Season 2');
+});
+
 console.log('\n7. Search Query Generation (generateSeriesSearchQueries)');
-it('includes year-qualified queries when year is explicitly provided', () => {
-  const queries = generateSeriesSearchQueries('Hantu Punya Boss', 1, 1, 1, '2024');
-  assert.ok(queries.some(q => q.includes('2024 Episod 1')), 'Must include year-qualified episode query');
-  assert.ok(queries.some(q => q === 'Hantu Punya Boss Episod 1'), 'Must include standard localized query');
+it('generates the streamlined 12 query patterns without season prefix', () => {
+  const queries = generateSeriesSearchQueries('Reacher', 1, 1, 1, '2022');
+  const expectedPatterns = [
+    'Reacher 2022 E01',
+    'Reacher 2022 EP01',
+    'Reacher 2022 E1',
+    'Reacher 2022 EP1',
+    'Reacher 2022 Episod01',
+    'Reacher 2022 Episod 01',
+    'Reacher 2022 Episod1',
+    'Reacher 2022 Episod 1',
+    'Reacher 2022 Episode01',
+    'Reacher 2022 Episode 01',
+    'Reacher 2022 Episode1',
+    'Reacher 2022 Episode 1'
+  ];
+
+  // Verify the first 12 queries match expectedPatterns in exact order
+  for (let i = 0; i < expectedPatterns.length; i++) {
+    assert.strictEqual(queries[i], expectedPatterns[i], `Query pattern index ${i} should be ${expectedPatterns[i]}`);
+  }
+
+  // Also verify fallback without year is included later
+  assert.ok(queries.includes('Reacher E01'), 'Must include non-year fallback query');
+  assert.ok(queries.includes('Reacher Episode 1'), 'Must include non-year episode fallback query');
+  assert.ok(queries.includes('Reacher 2022 S01E01'), 'Must include scene fallback with year');
+  assert.ok(queries.includes('Reacher S01E01'), 'Must include scene fallback without year');
 });
 
 console.log(`\nResults: ${passed}/${total} tests passed!\n`);

@@ -247,11 +247,9 @@ function toRoman(num) {
   return map[num] || String(num);
 }
 
-// Generate TV series prioritized search queries according to rule-msm-series-search
+// Generate TV series prioritized search queries without season tags for faster, high-yield retrieval
 function generateSeriesSearchQueries(cleanT, sNum, eNum, totalSeasons, year) {
-  const isMultiSeason = totalSeasons > 1 || sNum > 1;
   const s2 = String(sNum).padStart(2, '0');
-  const s1 = String(sNum);
   const e2 = String(eNum).padStart(2, '0');
   const e1 = String(eNum);
 
@@ -263,71 +261,45 @@ function generateSeriesSearchQueries(cleanT, sNum, eNum, totalSeasons, year) {
     }
   };
 
-  if (!isMultiSeason) {
-    // If explicit release year provided, prioritize year-qualified queries first to resolve reboot/remake title collisions
-    if (year) {
-      addQuery(`${cleanT} ${year} Episod ${e1}`);
-      addQuery(`${cleanT} ${year} E${e2}`);
-      addQuery(`${cleanT} ${year}`);
-    }
+  // Helper to append the 12 strict episode patterns without season for a given prefix (either `${cleanT} ${year}` or `${cleanT}`)
+  const appendPatterns = (prefix) => {
+    // 1. E{%2d}
+    addQuery(`${prefix} E${e2}`);
+    // 2. EP{%2d}
+    addQuery(`${prefix} EP${e2}`);
+    // 3. E{%d}
+    addQuery(`${prefix} E${e1}`);
+    // 4. EP{%d}
+    addQuery(`${prefix} EP${e1}`);
+    // 5. Episod{%2d} (unspaced & spaced)
+    addQuery(`${prefix} Episod${e2}`);
+    addQuery(`${prefix} Episod ${e2}`);
+    // 6. Episod{%d} (unspaced & spaced)
+    addQuery(`${prefix} Episod${e1}`);
+    addQuery(`${prefix} Episod ${e1}`);
+    // 7. Episode{%2d} (unspaced & spaced)
+    addQuery(`${prefix} Episode${e2}`);
+    addQuery(`${prefix} Episode ${e2}`);
+    // 8. Episode{%d} (unspaced & spaced)
+    addQuery(`${prefix} Episode${e1}`);
+    addQuery(`${prefix} Episode ${e1}`);
+  };
 
-    // 1. High-yield Localized Malaysian formats
-    addQuery(`${cleanT} Episod ${e1}`);
-    addQuery(`${cleanT} Episod ${e2}`);
-    addQuery(`${cleanT} Ep ${e1}`);
-    addQuery(`${cleanT} Ep ${e2}`);
-    addQuery(`${cleanT} Episod${e2}`);
-    addQuery(`${cleanT} Episod${e1}`);
-
-    // 2. High-yield Standard Scene formats
-    addQuery(`${cleanT} E${e2}`);
-    addQuery(`${cleanT} E${e1}`);
-    addQuery(`${cleanT} EP${e2}`);
-    addQuery(`${cleanT} EP${e1}`);
-    addQuery(`${cleanT} S${s2}E${e2}`);
-    addQuery(`${cleanT} S${s1}E${e1}`);
-
-    // 3. English "Episode" variants & Season 1
-    addQuery(`${cleanT} Episode ${e1}`);
-    addQuery(`${cleanT} Episode ${e2}`);
-    addQuery(`${cleanT} Season ${s1} Episod ${e1}`);
-    addQuery(`${cleanT} Season ${s2} EP${e2}`);
-
-    // 4. Base title fallback (prompts bot to return full series keyboard)
-    addQuery(cleanT);
-  } else {
-    // Siri MULTI season
-    if (year) {
-      addQuery(`${cleanT} ${year} S${s2}E${e2}`);
-      addQuery(`${cleanT} ${year} Episod ${e1}`);
-      addQuery(`${cleanT} ${year}`);
-    }
-
-    // 1. High-yield Scene format
-    addQuery(`${cleanT} S${s2}E${e2}`);
-    addQuery(`${cleanT} S${s1}E${e1}`);
-    addQuery(`${cleanT} S${s2}EP${e2}`);
-    addQuery(`${cleanT} S${s1}EP${e1}`);
-
-    // 2. Malaysian "Musim" and "Season" formats
-    addQuery(`${cleanT} Musim ${s1} Episod ${e1}`);
-    addQuery(`${cleanT} Musim ${s1} EP${e2}`);
-    addQuery(`${cleanT} Season ${s1} Episod ${e1}`);
-    addQuery(`${cleanT} Season ${s2} Episode ${e2}`);
-
-    // 3. Roman numeral variants (e.g. Musim II, Season II)
-    const roman = toRoman(sNum);
-    if (roman !== s1) {
-      addQuery(`${cleanT} Musim ${roman} Episod ${e1}`);
-      addQuery(`${cleanT} Season ${roman} Episode ${e2}`);
-      addQuery(`${cleanT} Musim ${roman}`);
-      addQuery(`${cleanT} Season ${roman}`);
-    }
-
-    addQuery(`${cleanT} Musim ${s1}`);
-    addQuery(`${cleanT} Season ${s1}`);
-    addQuery(cleanT);
+  // 1. Primary: 12 strict patterns WITH Year (if year is provided)
+  if (year) {
+    appendPatterns(`${cleanT} ${year}`);
   }
+
+  // 2. Fallback: 12 strict patterns WITHOUT Year (in case uploader omitted the year)
+  appendPatterns(cleanT);
+
+  // 3. Final Fallbacks: Standard scene SxxExx with year, base title with year, then base title alone
+  if (year) {
+    addQuery(`${cleanT} ${year} S${s2}E${e2}`);
+    addQuery(`${cleanT} ${year}`);
+  }
+  addQuery(`${cleanT} S${s2}E${e2}`);
+  addQuery(cleanT);
 
   return queries;
 }
@@ -490,8 +462,8 @@ function extractSeasonInfo(text) {
   if (!text) return null;
   const s = String(text);
 
-  // Standard season patterns: S01, S1, Season 2, Musim 2, Season 10
-  const seasonMatch = s.match(/\b(?:s|season|musim)\s*0*(\d{1,2})(?!\d)\b/i);
+  // Standard season patterns: S01E01, S01, S1, Season 2, Musim 2, Season 10
+  const seasonMatch = s.match(/\b(?:s|season|musim)\s*0*(\d{1,2})(?=[e\s\.\_\-\]]|$|\b)/i);
   if (seasonMatch) {
     return parseInt(seasonMatch[1], 10);
   }
@@ -540,6 +512,7 @@ function scoreCandidateButton(btn, msg, context = {}) {
     year = null,
     sNum = 1,
     eNum = 1,
+    totalSeasons = 1,
     targetQuality = 720,
     significantTokens = extractSignificantTokens(title)
   } = context;
@@ -622,18 +595,24 @@ function scoreCandidateButton(btn, msg, context = {}) {
 
     // 2. Strict Season validation
     const seasonFound = extractSeasonInfo(btnText) || extractSeasonInfo(cleanMsgText);
+    const explicitTargetYear = parseInt(year, 10);
+    const targetYear = !isNaN(explicitTargetYear) ? explicitTargetYear : extractYear(title, significantTokens);
+    const btnYear = extractYear(btnText, significantTokens) || extractYear(cleanMsgText, significantTokens);
+
     if (seasonFound !== null) {
       if (seasonFound === sNum) {
         score += 80;
       } else {
         return -999;
       }
+    } else if (sNum > 1 && totalSeasons > 1) {
+      // Multi-season protection: when watching Season 2 or later, reject un-versioned candidates with no matching year
+      if (!btnYear || Math.abs(targetYear - btnYear) > 1) {
+        return -999;
+      }
     }
 
     // 3. Release year validation
-    const explicitTargetYear = parseInt(year, 10);
-    const targetYear = !isNaN(explicitTargetYear) ? explicitTargetYear : extractYear(title, significantTokens);
-    const btnYear = extractYear(btnText, significantTokens) || extractYear(cleanMsgText, significantTokens);
     if (targetYear && btnYear) {
       if (Math.abs(targetYear - btnYear) <= 1) {
         score += 90;
@@ -2549,6 +2528,7 @@ app.get('/api/resolve', async (req, res) => {
         year,
         sNum,
         eNum,
+        totalSeasons,
         targetQuality,
         significantTokens,
       });
@@ -2658,9 +2638,8 @@ app.get('/api/resolve', async (req, res) => {
                   }
                 }
 
-                // Check if we already found an acceptable episode match (score >= 50)
-                const hasGoodMatch = candidates.some(c => c.score >= 50);
-                if (hasGoodMatch || pageCount >= MAX_PAGES || isAborted || req.destroyed) break;
+                // Traverse all pages to accumulate all candidate buttons for this query
+                if (pageCount >= MAX_PAGES || isAborted || req.destroyed) break;
 
                 // Otherwise, check for pagination button to traverse to next page
                 const nextBtn = findNextPageButton(currentMsg.replyMarkup);
@@ -2706,8 +2685,8 @@ app.get('/api/resolve', async (req, res) => {
             }
           }
 
-          // Try up to top 4 valid candidates with resilient fallback
-          const candidatesToTry = uniqueValid.slice(0, 4);
+          // Exhaustively try all candidate buttons across all pages for this query
+          const candidatesToTry = uniqueValid;
           for (let candIdx = 0; candIdx < candidatesToTry.length; candIdx++) {
             if (isAborted || req.destroyed) break;
             const cand = candidatesToTry[candIdx];
