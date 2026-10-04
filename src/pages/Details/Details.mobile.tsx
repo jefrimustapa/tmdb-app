@@ -834,19 +834,6 @@ export const Details: React.FC = () => {
           <p className="text-sm sm:text-base text-gray-200 leading-relaxed">
             {details.overview || 'No synopsis provided for this title.'}
           </p>
-          {originCountries.length > 0 && (
-            <div className="flex items-center gap-2 pt-2 text-xs sm:text-sm text-gray-400">
-              <span className="font-semibold text-gray-300">Country of Origin:</span>
-              <div className="flex items-center gap-2 flex-wrap">
-                {originCountries.map((c) => (
-                  <span key={c.code} className="inline-flex items-center gap-1.5 text-gray-200 font-medium bg-white/[0.06] border border-white/10 px-2 py-0.5 rounded">
-                    <span className="text-sm leading-none">{c.flag}</span>
-                    <span>{c.name}</span>
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
 
         {/* Series Seasons & Episode Selector Grid (TV Series only) */}

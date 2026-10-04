@@ -2,12 +2,13 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20261004-1704';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-adaptive-bg-col.20261004-1704';
+export const APP_BUILD_NUMBER = '20261004-1709';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-adaptive-bg-col.20261004-1709';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
 export const APP_BRANCH = 'feat-adaptive-bg-col';
-export const APP_CHANGELOG = `* fix(ui): extend dark tint to 105vh to eliminate Continue Watching seam
+export const APP_CHANGELOG = `* feat(details): style all metadata items with translucent grey boxes
+* fix(ui): extend dark tint to 105vh to eliminate Continue Watching seam
 * fix(home): extract dominant color from poster in portrait and restore ambient visibility
 * fix(home): extract dominant color from poster in portrait and restore ambient visibility
 * fix(ui): implement smooth quintic hero gradient and seamless ambient transition
@@ -20,5 +21,4 @@ export const APP_CHANGELOG = `* fix(ui): extend dark tint to 105vh to eliminate 
 * feat(ui): implement dynamic adaptive background colors for home, details and modal
 * Merge pull request #184 from jefrimustapa/fix/kisskh-selection-matching
 * fix(kisskh): enforce English-first search queries and implement score-based candidate selection algorithm
-* Merge pull request #183 from jefrimustapa/fix/embed-provider-error-classification
-* chore: bump build version`;
+* Merge pull request #183 from jefrimustapa/fix/embed-provider-error-classification`;
