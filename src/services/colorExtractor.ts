@@ -155,11 +155,11 @@ export function getAdaptiveBackgroundStyle(
 
   const { r, g, b } = color;
   const oPeak = accentOpacity.toFixed(3);
-  const oMid = (accentOpacity * 0.60).toFixed(3);
-  const oSubtle = (accentOpacity * 0.25).toFixed(3);
+  const oMid = (accentOpacity * 0.65).toFixed(3);
+  const oSubtle = (accentOpacity * 0.35).toFixed(3);
 
   return {
-    background: `linear-gradient(180deg, #050508 0%, #050508 105vh, rgba(${r}, ${g}, ${b}, ${oSubtle}) 130vh, rgba(${r}, ${g}, ${b}, ${oMid}) 170vh, rgba(${r}, ${g}, ${b}, ${oPeak}) 100%)`,
+    background: `linear-gradient(180deg, rgba(5, 5, 8, 0.85) 0%, rgba(${r}, ${g}, ${b}, ${oSubtle}) 38vh, rgba(${r}, ${g}, ${b}, ${oMid}) 68vh, rgba(${r}, ${g}, ${b}, ${oPeak}) 100%)`,
     backgroundColor: '#050508',
     transition: 'background 0.8s cubic-bezier(0.16, 1, 0.3, 1)'
   };
