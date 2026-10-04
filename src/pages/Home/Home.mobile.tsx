@@ -39,8 +39,9 @@ export const Home: React.FC = () => {
   const [newReleaseTV, setNewReleaseTV] = useState<TMDBMediaItem[]>(() => homeFeedCache?.newReleaseTV || []);
   const [isLoading, setIsLoading] = useState(() => !homeFeedCache);
   const [dominantColor, setDominantColor] = useState<DominantColor | null>(null);
+  const activeHeroItemRef = useRef<TMDBMediaItem | null>(null);
 
-  const handleHeroSlideChange = useCallback((item: TMDBMediaItem | null) => {
+  const updateDominantColor = useCallback((item: TMDBMediaItem | null) => {
     if (!item) return;
     const isLandscape = typeof window !== 'undefined' ? window.innerWidth > window.innerHeight : false;
 
@@ -55,6 +56,26 @@ export const Home: React.FC = () => {
       });
     }
   }, []);
+
+  const handleHeroSlideChange = useCallback((item: TMDBMediaItem | null) => {
+    activeHeroItemRef.current = item;
+    updateDominantColor(item);
+  }, [updateDominantColor]);
+
+  // Re-evaluate on window resize or orientation change (e.g. testing in browser or rotating device)
+  useEffect(() => {
+    const handleResize = () => {
+      if (activeHeroItemRef.current) {
+        updateDominantColor(activeHeroItemRef.current);
+      }
+    };
+    window.addEventListener('resize', handleResize);
+    window.addEventListener('orientationchange', handleResize);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('orientationchange', handleResize);
+    };
+  }, [updateDominantColor]);
 
   const scrollContinueWatching = (direction: 'left' | 'right') => {
     if (continueWatchingRef.current) {
@@ -161,7 +182,7 @@ export const Home: React.FC = () => {
   return (
     <div
       className="min-h-screen pb-16 transition-colors duration-700 ease-in-out"
-      style={getAdaptiveBackgroundStyle(dominantColor, 0.42)}
+      style={getAdaptiveBackgroundStyle(dominantColor, 0.75)}
     >
       {/* Hero Billboard Full-Width Sliding Carousel */}
       <HeroBanner items={trending} onActiveItemChange={handleHeroSlideChange} />
