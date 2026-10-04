@@ -1495,6 +1495,11 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             if (current > 0) {
               lastPostMessageTimeRef.current = Date.now();
               recordProgress(current, dur);
+              setIsProbing(false);
+              if (autoCycleTimeoutRef.current) {
+                clearTimeout(autoCycleTimeoutRef.current);
+                autoCycleTimeoutRef.current = null;
+              }
             }
             return;
           }
@@ -1513,6 +1518,11 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           if (current > 0) {
             lastPostMessageTimeRef.current = Date.now();
             recordProgress(current, dur);
+            setIsProbing(false);
+            if (autoCycleTimeoutRef.current) {
+              clearTimeout(autoCycleTimeoutRef.current);
+              autoCycleTimeoutRef.current = null;
+            }
           }
         }
       } catch {}
@@ -1791,7 +1801,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
   // Failover watchdog timer: gives current provider configured timeout seconds to establish playback, otherwise auto-cycles
   useEffect(() => {
-    if (!autoCycle || !isProbing || allFailed || playerMode !== 'embed') return;
+    if (!autoCycle || allFailed || playerMode !== 'embed') return;
 
     const timeoutSec = typeof streamResolverTimeoutRef.current === 'number'
       ? streamResolverTimeoutRef.current
@@ -1805,7 +1815,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     }
 
     autoCycleTimeoutRef.current = setTimeout(() => {
-      console.warn(`[AutoCycle] Server ${providerId} did not respond in ${timeoutSec}s. Auto-cycling to next server...`);
+      console.warn(`[AutoCycle] Server ${providerId} did not establish active video in ${timeoutSec}s. Auto-cycling to next server...`);
       cycleToNextProvider();
     }, timeoutSec * 1000);
 
@@ -1814,7 +1824,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         clearTimeout(autoCycleTimeoutRef.current);
       }
     };
-  }, [providerId, autoCycle, isProbing, allFailed, playerMode, cycleToNextProvider, iframeKey, streamResolverTimeout]);
+  }, [providerId, autoCycle, allFailed, playerMode, cycleToNextProvider, iframeKey, streamResolverTimeout]);
 
   // Reset provider error details and clear error state whenever active provider changes (e.g. from header dropdown)
   useEffect(() => {
@@ -1943,11 +1953,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   }, [streamUrl, playerMode, provider.id, provider.name, autoCycle, isUserSelected, allFailed, cycleToNextProvider]);
 
   const handleIframeLoaded = () => {
-    if (autoCycleTimeoutRef.current) {
-      clearTimeout(autoCycleTimeoutRef.current);
-    }
     setIsLoading(false);
-    setIsProbing(false);
     if (!providerErrorDetail) {
       setHasError(false);
     }
