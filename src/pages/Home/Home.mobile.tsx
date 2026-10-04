@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { tmdbApi } from '../../services/tmdb';
 import type { TMDBMediaItem } from '../../types/tmdb';
@@ -8,6 +8,8 @@ import { getPersonalizedSuggestions } from '../../services/suggestionService';
 import { HeroBanner } from '../../components/common/HeroBanner';
 import { MediaRow } from '../../components/common/MediaRow';
 import { MediaCard } from '../../components/common/MediaCard';
+import { tmdbImages } from '../../services/tmdb';
+import { extractDominantColor, getAdaptiveBackgroundStyle, type DominantColor } from '../../services/colorExtractor';
 
 interface HomeFeedCache {
   trending: TMDBMediaItem[];
@@ -36,6 +38,44 @@ export const Home: React.FC = () => {
   const [newReleaseMovies, setNewReleaseMovies] = useState<TMDBMediaItem[]>(() => homeFeedCache?.newReleaseMovies || []);
   const [newReleaseTV, setNewReleaseTV] = useState<TMDBMediaItem[]>(() => homeFeedCache?.newReleaseTV || []);
   const [isLoading, setIsLoading] = useState(() => !homeFeedCache);
+  const [dominantColor, setDominantColor] = useState<DominantColor | null>(null);
+  const activeHeroItemRef = useRef<TMDBMediaItem | null>(null);
+
+  const updateDominantColor = useCallback((item: TMDBMediaItem | null) => {
+    if (!item) return;
+    const isLandscape = typeof window !== 'undefined' ? window.innerWidth > window.innerHeight : false;
+
+    // In portrait (!isLandscape), extract dominant color from poster (w342). In landscape, use backdrop (w300).
+    const url = !isLandscape
+      ? (item.poster_path ? tmdbImages.poster(item.poster_path, 'w342') : tmdbImages.backdrop(item.backdrop_path, 'w300'))
+      : (item.backdrop_path ? tmdbImages.backdrop(item.backdrop_path, 'w300') : tmdbImages.poster(item.poster_path, 'w342'));
+
+    if (url) {
+      extractDominantColor(url).then((color) => {
+        if (color) setDominantColor(color);
+      });
+    }
+  }, []);
+
+  const handleHeroSlideChange = useCallback((item: TMDBMediaItem | null) => {
+    activeHeroItemRef.current = item;
+    updateDominantColor(item);
+  }, [updateDominantColor]);
+
+  // Re-evaluate on window resize or orientation change (e.g. testing in browser or rotating device)
+  useEffect(() => {
+    const handleResize = () => {
+      if (activeHeroItemRef.current) {
+        updateDominantColor(activeHeroItemRef.current);
+      }
+    };
+    window.addEventListener('resize', handleResize);
+    window.addEventListener('orientationchange', handleResize);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('orientationchange', handleResize);
+    };
+  }, [updateDominantColor]);
 
   const scrollContinueWatching = (direction: 'left' | 'right') => {
     if (continueWatchingRef.current) {
@@ -140,9 +180,12 @@ export const Home: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen pb-16 bg-hbo-dark">
+    <div
+      className="min-h-screen pb-16 transition-colors duration-700 ease-in-out"
+      style={getAdaptiveBackgroundStyle(dominantColor, 0.75)}
+    >
       {/* Hero Billboard Full-Width Sliding Carousel */}
-      <HeroBanner items={trending} />
+      <HeroBanner items={trending} onActiveItemChange={handleHeroSlideChange} />
 
       {/* Main Content Rails (Constrained to max-w-7xl on desktop web matching Movies, Series, and Space) */}
       <div className="max-w-7xl mx-auto">

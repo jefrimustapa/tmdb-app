@@ -5,6 +5,7 @@ import type { TMDBMediaItem, TMDBMovieDetails, TMDBTVDetails } from '../../types
 import { tmdbApi, tmdbImages, extractContentRating, isExplicitAdultCertification } from '../../services/tmdb';
 import { dbService } from '../../services/db';
 import { getMediaOriginCountries } from '../../services/streamProviders';
+import { extractDominantColor, getAdaptiveBackgroundStyle, type DominantColor } from '../../services/colorExtractor';
 
 interface DetailsModalProps {
   item: TMDBMediaItem | null;
@@ -108,9 +109,23 @@ export const DetailsModal: React.FC<DetailsModalProps> = ({ item, onClose }) => 
     setIsWatchlist(status);
   };
 
+  const [dominantColor, setDominantColor] = useState<DominantColor | null>(null);
+
+  useEffect(() => {
+    const targetImg = backdropUrl || (item.poster_path ? tmdbImages.poster(item.poster_path, 'w500') : null);
+    if (targetImg) {
+      extractDominantColor(targetImg).then((color) => {
+        if (color) setDominantColor(color);
+      });
+    }
+  }, [backdropUrl, item.poster_path]);
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fade-in">
-      <div className="relative w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-2xl bg-hbo-card border border-hbo-border shadow-2xl no-scrollbar">
+      <div
+        className="relative w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-2xl bg-hbo-card border border-hbo-border shadow-2xl no-scrollbar"
+        style={getAdaptiveBackgroundStyle(dominantColor, 0.45)}
+      >
         {/* Close Button */}
         <button
           data-modal-close="true"
@@ -177,50 +192,46 @@ export const DetailsModal: React.FC<DetailsModalProps> = ({ item, onClose }) => 
         {/* Modal Content Details */}
         <div className="p-6 sm:p-8 space-y-6">
           {/* Metadata Row */}
-          <div className="flex items-center gap-4 text-xs sm:text-sm text-gray-300 flex-wrap">
-            <div className="flex items-center gap-1 font-bold text-yellow-400">
-              <Star className="w-4 h-4 fill-current" />
-              <span>{item.vote_average.toFixed(1)}</span>
-            </div>
-            <span>•</span>
-            <span>{releaseYear}</span>
+          <div className="flex items-center gap-2 text-xs sm:text-sm text-gray-300 font-semibold flex-wrap">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-black/60 border border-white/15 text-xs font-semibold backdrop-blur-md shadow-sm">
+              <Star className="w-3.5 h-3.5 fill-current text-yellow-400" />
+              <span className="text-yellow-400 font-bold">{item.vote_average.toFixed(1)}</span>
+            </span>
+
+            {releaseYear && (
+              <span className="inline-flex items-center px-2.5 py-0.5 rounded-md bg-black/60 border border-white/15 text-white text-xs font-medium backdrop-blur-md shadow-sm">
+                {releaseYear}
+              </span>
+            )}
+
             {originCountries.length > 0 && (
-              <>
-                <span>•</span>
-                <span className="inline-flex items-center gap-1.5 flex-wrap">
-                  {originCountries.map((c) => (
-                    <span
-                      key={c.code}
-                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white/[0.08] border border-white/15 text-white text-xs font-medium shadow-sm"
-                      title={`Country of Origin: ${c.name}`}
-                    >
-                      <span className="text-sm leading-none">{c.flag}</span>
-                      <span>{c.name}</span>
-                    </span>
-                  ))}
+              originCountries.map((c) => (
+                <span
+                  key={c.code}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-black/60 border border-white/15 text-white text-xs font-medium shadow-sm backdrop-blur-md hover:border-hbo-cyan/50 transition-colors"
+                  title={`Country of Origin: ${c.name}`}
+                >
+                  <span className="text-sm leading-none">{c.flag}</span>
+                  <span>{c.name}</span>
                 </span>
-              </>
+              ))
             )}
+
             {contentRating && (
-              <>
-                <span>•</span>
-                <span className="px-2 py-0.5 rounded bg-white/10 border border-white/20 text-white font-bold text-xs">
-                  {contentRating}
-                </span>
-              </>
+              <span className="inline-flex items-center px-2.5 py-0.5 rounded-md bg-black/60 border border-white/15 text-white text-xs font-medium backdrop-blur-md shadow-sm">
+                {contentRating}
+              </span>
             )}
-            {details && 'runtime' in details && details.runtime > 0 && (
-              <>
-                <span>•</span>
-                <span>{details.runtime} mins</span>
-              </>
-            )}
-            {details && 'number_of_seasons' in details && (
-              <>
-                <span>•</span>
-                <span>{details.number_of_seasons} Season{details.number_of_seasons > 1 ? 's' : ''}</span>
-              </>
-            )}
+
+            {details && 'runtime' in details && details.runtime > 0 ? (
+              <span className="inline-flex items-center px-2.5 py-0.5 rounded-md bg-black/60 border border-white/15 text-white text-xs font-medium backdrop-blur-md shadow-sm">
+                {details.runtime} mins
+              </span>
+            ) : details && 'number_of_seasons' in details && details.number_of_seasons > 0 ? (
+              <span className="inline-flex items-center px-2.5 py-0.5 rounded-md bg-black/60 border border-white/15 text-white text-xs font-medium backdrop-blur-md shadow-sm">
+                {details.number_of_seasons} Season{details.number_of_seasons > 1 ? 's' : ''}
+              </span>
+            ) : null}
             <div className="ml-auto flex items-center gap-2">
               <button
                 onClick={handleToggleLike}

@@ -8,9 +8,10 @@ import { RatingBadge } from './RatingBadge';
 interface HeroBannerProps {
   items: TMDBMediaItem[];
   onOpenDetails?: (item: TMDBMediaItem) => void;
+  onActiveItemChange?: (item: TMDBMediaItem | null) => void;
 }
 
-export const HeroBanner: React.FC<HeroBannerProps> = ({ items }) => {
+export const HeroBanner: React.FC<HeroBannerProps> = ({ items, onActiveItemChange }) => {
   const navigate = useNavigate();
   const [currentIndex, setCurrentIndex] = useState(0);
   const bannerRef = useRef<HTMLDivElement>(null);
@@ -20,6 +21,12 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ items }) => {
 
   const displayItems = items && items.length > 0 ? items.slice(0, 8) : [];
   const totalItems = displayItems.length;
+
+  useEffect(() => {
+    if (displayItems.length > 0) {
+      onActiveItemChange?.(displayItems[currentIndex] || null);
+    }
+  }, [currentIndex, displayItems, onActiveItemChange]);
 
   // Helper to pause for 5 seconds upon remote activity in billboard
   const trigger5sRemotePause = () => {
@@ -300,7 +307,8 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ items }) => {
       {/* 2. Permanent Static Cinematic HBO Gradients Layer (Zero Seam Flickering) */}
       <div className="absolute inset-0 z-20 pointer-events-none select-none">
         <div className="absolute inset-0 hero-gradient-overlay" />
-        <div className="absolute inset-0 bg-gradient-to-t from-transparent via-transparent to-black/40" />
+        <div className="absolute inset-0 bg-gradient-to-r from-black/75 via-black/35 to-transparent max-w-3xl" />
+        <div className="absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-black/50 to-transparent" />
       </div>
 
       {/* 3. Hero Content & Indicators Layer (Constrained to max-w-7xl mx-auto to align with content rails) */}

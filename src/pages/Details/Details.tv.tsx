@@ -10,6 +10,7 @@ import { MediaRow } from '../../components/common/MediaRow';
 import { EpisodeGrid } from '../../components/player/EpisodeGrid';
 import { useDevice } from '../../hooks/useDevice';
 import { getMediaOriginCountries } from '../../services/streamProviders';
+import { extractDominantColor, getAdaptiveBackgroundStyle, type DominantColor } from '../../services/colorExtractor';
 
 const pickRandomPoster = (
   item: { poster_path?: string | null; backdrop_path?: string | null; images?: { posters?: TMDBImageItem[] } } | null
@@ -416,6 +417,17 @@ export const Details: React.FC = () => {
     setIsPosterLoaded(false);
   }, [posterCardUrl]);
 
+  const [dominantColor, setDominantColor] = useState<DominantColor | null>(null);
+
+  useEffect(() => {
+    const targetImg = heroUrl || posterCardUrl;
+    if (targetImg) {
+      extractDominantColor(targetImg).then((color) => {
+        if (color) setDominantColor(color);
+      });
+    }
+  }, [heroUrl, posterCardUrl]);
+
   if (isLoading || !details) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-hbo-dark">
@@ -435,7 +447,10 @@ export const Details: React.FC = () => {
   const contentRating = extractContentRating(details);
 
   return (
-    <div className="relative min-h-screen bg-hbo-dark text-white pb-28 sm:pb-36 overflow-x-hidden">
+    <div
+      className="relative min-h-screen bg-hbo-dark text-white pb-28 sm:pb-36 overflow-x-hidden"
+      style={getAdaptiveBackgroundStyle(dominantColor, 0.45)}
+    >
       {/* Top Hero Ambient Backdrop (Matched with HeroBanner) */}
       <div className="absolute top-0 left-0 right-0 h-[65vh] sm:h-[80vh] lg:h-[90vh] overflow-hidden pointer-events-none z-0">
         {heroUrl && (
@@ -460,9 +475,10 @@ export const Details: React.FC = () => {
           />
         )}
 
-        {/* Cinematic HBO Gradients Layer (Identical to HeroBanner) */}
+        {/* Cinematic HBO Gradients Layer */}
         <div className="absolute inset-0 hero-gradient-overlay" />
-        <div className="absolute inset-0 bg-gradient-to-t from-transparent via-transparent to-black/40" />
+        <div className="absolute inset-0 bg-gradient-to-r from-black/75 via-black/35 to-transparent max-w-3xl" />
+        <div className="absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-black/50 to-transparent" />
       </div>
 
       {/* Main Content Area */}
@@ -555,7 +571,7 @@ export const Details: React.FC = () => {
               </h1>
               {hasAlternativeTitle && (
                 <div className="flex items-center justify-center sm:justify-start gap-2 pt-0.5 text-sm sm:text-base text-gray-300 font-medium">
-                  <span className="px-2 py-0.5 rounded bg-white/10 text-xs font-semibold uppercase tracking-wider text-hbo-cyan border border-white/15">
+                  <span className="px-2.5 py-0.5 rounded-md bg-black/60 text-xs font-semibold uppercase tracking-wider text-hbo-cyan border border-white/15 backdrop-blur-md shadow-sm">
                     Original Title
                   </span>
                   <span className="text-white/90 italic font-semibold">{originalTitle}</span>
@@ -564,51 +580,47 @@ export const Details: React.FC = () => {
             </div>
 
             {/* Quick Meta Row */}
-            <div className="flex items-center justify-center sm:justify-start gap-3 text-xs sm:text-sm text-gray-300 font-semibold flex-wrap min-h-[22px]">
-              <div className="flex items-center gap-1.5 font-bold text-yellow-400">
-                <Star className="w-4 h-4 fill-current" />
-                <span>{details.vote_average.toFixed(1)}</span>
-              </div>
-              <span>•</span>
-              <span>{releaseYear}</span>
-              {originCountries.length > 0 && (
-                <>
-                  <span>•</span>
-                  <span className="inline-flex items-center gap-1.5 flex-wrap">
-                    {originCountries.map((c) => (
-                      <span
-                        key={c.code}
-                        className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md bg-white/[0.08] border border-white/15 text-white text-xs font-medium shadow-sm hover:border-hbo-cyan/50 transition-colors"
-                        title={`Country of Origin: ${c.name}`}
-                      >
-                        <span className="text-sm leading-none">{c.flag}</span>
-                        <span>{c.name}</span>
-                      </span>
-                    ))}
-                  </span>
-                </>
+            <div className="flex items-center justify-center sm:justify-start gap-2 text-xs sm:text-sm text-gray-300 font-semibold flex-wrap min-h-[26px]">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-black/60 border border-white/15 text-xs font-semibold backdrop-blur-md shadow-sm">
+                <Star className="w-3.5 h-3.5 fill-current text-yellow-400" />
+                <span className="text-yellow-400 font-bold">{details.vote_average.toFixed(1)}</span>
+              </span>
+
+              {releaseYear && (
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-md bg-black/60 border border-white/15 text-white text-xs font-medium backdrop-blur-md shadow-sm">
+                  {releaseYear}
+                </span>
               )}
+
+              {originCountries.length > 0 && (
+                originCountries.map((c) => (
+                  <span
+                    key={c.code}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-black/60 border border-white/15 text-white text-xs font-medium shadow-sm backdrop-blur-md hover:border-hbo-cyan/50 transition-colors"
+                    title={`Country of Origin: ${c.name}`}
+                  >
+                    <span className="text-sm leading-none">{c.flag}</span>
+                    <span>{c.name}</span>
+                  </span>
+                ))
+              )}
+
               {details && 'runtime' in details && details.runtime > 0 ? (
-                <>
-                  <span>•</span>
-                  <span className="animate-fade-in">{details.runtime} mins</span>
-                </>
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-md bg-black/60 border border-white/15 text-white text-xs font-medium backdrop-blur-md shadow-sm animate-fade-in">
+                  {details.runtime} mins
+                </span>
               ) : details && 'number_of_seasons' in details && details.number_of_seasons > 0 ? (
-                <>
-                  <span>•</span>
-                  <span className="animate-fade-in">{details.number_of_seasons} Season{details.number_of_seasons > 1 ? 's' : ''}</span>
-                </>
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-md bg-black/60 border border-white/15 text-white text-xs font-medium backdrop-blur-md shadow-sm animate-fade-in">
+                  {details.number_of_seasons} Season{details.number_of_seasons > 1 ? 's' : ''}
+                </span>
               ) : isLoading ? (
-                <>
-                  <span>•</span>
-                  <span className="inline-block w-14 h-3.5 rounded bg-white/10 animate-pulse my-auto" />
-                </>
+                <span className="inline-block w-14 h-5 rounded-md bg-black/60 border border-white/10 animate-pulse my-auto" />
               ) : null}
+
               {details.genres && details.genres.length > 0 && (
-                <>
-                  <span>•</span>
-                  <span className="text-gray-300">{details.genres.map(g => g.name).join(', ')}</span>
-                </>
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-md bg-black/60 border border-white/15 text-gray-200 text-xs font-medium backdrop-blur-md shadow-sm">
+                  {details.genres.map(g => g.name).join(', ')}
+                </span>
               )}
             </div>
 
@@ -714,19 +726,6 @@ export const Details: React.FC = () => {
           <p className="text-sm sm:text-base text-gray-200 leading-relaxed">
             {details.overview || 'No synopsis provided for this title.'}
           </p>
-          {originCountries.length > 0 && (
-            <div className="flex items-center gap-2 pt-2 text-xs sm:text-sm text-gray-400">
-              <span className="font-semibold text-gray-300">Country of Origin:</span>
-              <div className="flex items-center gap-2 flex-wrap">
-                {originCountries.map((c) => (
-                  <span key={c.code} className="inline-flex items-center gap-1.5 text-gray-200 font-medium bg-white/[0.06] border border-white/10 px-2.5 py-0.5 rounded">
-                    <span className="text-sm leading-none">{c.flag}</span>
-                    <span>{c.name}</span>
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
 
         {/* Series Seasons & Episode Selector Grid (TV Series only) */}
