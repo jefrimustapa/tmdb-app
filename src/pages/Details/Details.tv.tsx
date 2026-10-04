@@ -580,51 +580,47 @@ export const Details: React.FC = () => {
             </div>
 
             {/* Quick Meta Row */}
-            <div className="flex items-center justify-center sm:justify-start gap-3 text-xs sm:text-sm text-gray-300 font-semibold flex-wrap min-h-[22px]">
-              <div className="flex items-center gap-1.5 font-bold text-yellow-400">
-                <Star className="w-4 h-4 fill-current" />
-                <span>{details.vote_average.toFixed(1)}</span>
-              </div>
-              <span>•</span>
-              <span>{releaseYear}</span>
-              {originCountries.length > 0 && (
-                <>
-                  <span>•</span>
-                  <span className="inline-flex items-center gap-1.5 flex-wrap">
-                    {originCountries.map((c) => (
-                      <span
-                        key={c.code}
-                        className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md bg-white/[0.08] border border-white/15 text-white text-xs font-medium shadow-sm hover:border-hbo-cyan/50 transition-colors"
-                        title={`Country of Origin: ${c.name}`}
-                      >
-                        <span className="text-sm leading-none">{c.flag}</span>
-                        <span>{c.name}</span>
-                      </span>
-                    ))}
-                  </span>
-                </>
+            <div className="flex items-center justify-center sm:justify-start gap-2 text-xs sm:text-sm text-gray-300 font-semibold flex-wrap min-h-[26px]">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-white/[0.08] border border-white/15 text-xs font-semibold backdrop-blur-md shadow-sm">
+                <Star className="w-3.5 h-3.5 fill-current text-yellow-400" />
+                <span className="text-yellow-400 font-bold">{details.vote_average.toFixed(1)}</span>
+              </span>
+
+              {releaseYear && (
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-md bg-white/[0.08] border border-white/15 text-white text-xs font-medium backdrop-blur-md shadow-sm">
+                  {releaseYear}
+                </span>
               )}
+
+              {originCountries.length > 0 && (
+                originCountries.map((c) => (
+                  <span
+                    key={c.code}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-white/[0.08] border border-white/15 text-white text-xs font-medium shadow-sm backdrop-blur-md hover:border-hbo-cyan/50 transition-colors"
+                    title={`Country of Origin: ${c.name}`}
+                  >
+                    <span className="text-sm leading-none">{c.flag}</span>
+                    <span>{c.name}</span>
+                  </span>
+                ))
+              )}
+
               {details && 'runtime' in details && details.runtime > 0 ? (
-                <>
-                  <span>•</span>
-                  <span className="animate-fade-in">{details.runtime} mins</span>
-                </>
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-md bg-white/[0.08] border border-white/15 text-white text-xs font-medium backdrop-blur-md shadow-sm animate-fade-in">
+                  {details.runtime} mins
+                </span>
               ) : details && 'number_of_seasons' in details && details.number_of_seasons > 0 ? (
-                <>
-                  <span>•</span>
-                  <span className="animate-fade-in">{details.number_of_seasons} Season{details.number_of_seasons > 1 ? 's' : ''}</span>
-                </>
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-md bg-white/[0.08] border border-white/15 text-white text-xs font-medium backdrop-blur-md shadow-sm animate-fade-in">
+                  {details.number_of_seasons} Season{details.number_of_seasons > 1 ? 's' : ''}
+                </span>
               ) : isLoading ? (
-                <>
-                  <span>•</span>
-                  <span className="inline-block w-14 h-3.5 rounded bg-white/10 animate-pulse my-auto" />
-                </>
+                <span className="inline-block w-14 h-5 rounded-md bg-white/10 animate-pulse my-auto" />
               ) : null}
+
               {details.genres && details.genres.length > 0 && (
-                <>
-                  <span>•</span>
-                  <span className="text-gray-300">{details.genres.map(g => g.name).join(', ')}</span>
-                </>
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-md bg-white/[0.08] border border-white/15 text-gray-200 text-xs font-medium backdrop-blur-md shadow-sm">
+                  {details.genres.map(g => g.name).join(', ')}
+                </span>
               )}
             </div>
 
