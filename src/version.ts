@@ -2,12 +2,13 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20261004-1532';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-adaptive-bg-col.20261004-1532';
+export const APP_BUILD_NUMBER = '20261004-1537';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-adaptive-bg-col.20261004-1537';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
 export const APP_BRANCH = 'feat-adaptive-bg-col';
-export const APP_CHANGELOG = `* fix(ui): invert adaptive background to flow from black at hero into ambient tint below
+export const APP_CHANGELOG = `* fix(ui): transition background continuously from dark under hero to translucent color at bottom
+* fix(ui): invert adaptive background to flow from black at hero into ambient tint below
 * feat(ui): implement dynamic adaptive background colors for home, details and modal
 * Merge pull request #184 from jefrimustapa/fix/kisskh-selection-matching
 * fix(kisskh): enforce English-first search queries and implement score-based candidate selection algorithm
@@ -20,5 +21,4 @@ export const APP_CHANGELOG = `* fix(ui): invert adaptive background to flow from
 * fix(player): distinguish live playback from saved MEDIA_DATA progress to prevent premature watchdog clearance
 * fix(player): require sustained active media playback and pulse center touch to prevent premature watchdog cancellation
 * fix(player): add native audio playback detector and universal watchdog cancellation across embed providers
-* fix(player): accurately classify HTTP server errors vs embedding blocks and expand iframe error interception
-* Merge pull request #182 from jefrimustapa/feat/improve-provider-error-display`;
+* fix(player): accurately classify HTTP server errors vs embedding blocks and expand iframe error interception`;
