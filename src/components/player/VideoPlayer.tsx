@@ -1797,10 +1797,14 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     };
   }, [providerId, autoCycle, isProbing, allFailed, playerMode, cycleToNextProvider, iframeKey]);
 
-  // Reset provider error details whenever active provider or stream URL changes
+  // Reset provider error details and clear error state whenever active provider changes (e.g. from header dropdown)
   useEffect(() => {
     setProviderErrorDetail(null);
-  }, [provider.id, streamUrl]);
+    setHasError(false);
+    setIsLoading(true);
+    setIsProbing(false);
+    setIframeKey((prev) => prev + 1);
+  }, [provider.id, providerId]);
 
   // Intercept native Android iframe connection errors (e.g. ERR_CONNECTION_REFUSED, X-Frame-Options)
   useEffect(() => {
