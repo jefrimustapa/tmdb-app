@@ -2,12 +2,13 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20261004-1649';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-adaptive-bg-col.20261004-1649';
+export const APP_BUILD_NUMBER = '20261004-1654';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-adaptive-bg-col.20261004-1654';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
 export const APP_BRANCH = 'feat-adaptive-bg-col';
 export const APP_CHANGELOG = `* fix(home): extract dominant color from poster in portrait and restore ambient visibility
+* fix(home): extract dominant color from poster in portrait and restore ambient visibility
 * fix(ui): implement smooth quintic hero gradient and seamless ambient transition
 * fix(ui): eliminate full-width horizontal smoke bar using targeted text vignette
 * feat(ui): implement smooth backdrop mask and lighter seamless ambient gradient
@@ -20,5 +21,4 @@ export const APP_CHANGELOG = `* fix(home): extract dominant color from poster in
 * fix(kisskh): enforce English-first search queries and implement score-based candidate selection algorithm
 * Merge pull request #183 from jefrimustapa/fix/embed-provider-error-classification
 * chore: bump build version
-* fix(player): completely eliminate all hardcoded provider fallbacks in favor of dynamic priority ordering
-* feat(details): display country of origin with flag badge on mobile, TV, and preview modal`;
+* fix(player): completely eliminate all hardcoded provider fallbacks in favor of dynamic priority ordering`;
