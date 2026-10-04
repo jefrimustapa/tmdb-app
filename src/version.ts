@@ -2,12 +2,13 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20261004-0908';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-improve-provide.20261004-0908';
+export const APP_BUILD_NUMBER = '20261004-0915';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-improve-provide.20261004-0915';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
 export const APP_BRANCH = 'feat-improve-provide';
-export const APP_CHANGELOG = `* feat(settings): update streamResolverTimeout options to 60/90/120/180/unlimited (default 60s) and link to embed watchdog
+export const APP_CHANGELOG = `* fix(player): preserve watchdog timer until actual playback starts instead of aborting on iframe HTML load
+* feat(settings): update streamResolverTimeout options to 60/90/120/180/unlimited (default 60s) and link to embed watchdog
 * feat(player): align fallback priority flow with auto-cycling on connection refusal and manual TMDB error display
 * fix(player): dismiss error overlay on MSM direct stream and scope native error interception to iframe docs
 * fix(player): clear error state and remount iframe when selecting provider from header
@@ -20,5 +21,4 @@ export const APP_CHANGELOG = `* feat(settings): update streamResolverTimeout opt
 * feat(player): continuous long-press seek on mobile FW/RW buttons (#179)
 * fix(msm-getter): prevent poll retry storm on failed candidates, add dead shortcode cache, and extend client timeout to 65s (#178)
 * feat(search): streamline series queries to 12 patterns, enforce mandatory app params, and strict multi-season matching (#177)
-* perf(msm-getter): optimize idle memory with expose-gc, glibc allocator tuning and idle watchdog (#176)
-* perf(client): optimize HLS buffers, hardware video teardown, and bound in-memory caches (#175)`;
+* perf(msm-getter): optimize idle memory with expose-gc, glibc allocator tuning and idle watchdog (#176)`;
