@@ -1935,6 +1935,54 @@ public class MainActivity extends BridgeActivity {
                         "})();";
                     view.evaluateJavascript(mediaMonitorScript, null);
                 }
+
+                @Override
+                public void onReceivedError(WebView view, WebResourceRequest request, android.webkit.WebResourceError error) {
+                    super.onReceivedError(view, request, error);
+                    if (request != null && !request.isForMainFrame() && request.getUrl() != null) {
+                        String url = request.getUrl().toString();
+                        String desc = (error != null && error.getDescription() != null) ? error.getDescription().toString() : "Connection refused";
+                        int code = (error != null) ? error.getErrorCode() : -1;
+                        notifyIframeError(view, url, code, desc);
+                    }
+                }
+
+                @Override
+                public void onReceivedHttpError(WebView view, WebResourceRequest request, WebResourceResponse errorResponse) {
+                    super.onReceivedHttpError(view, request, errorResponse);
+                    if (request != null && !request.isForMainFrame() && request.getUrl() != null && errorResponse != null) {
+                        int status = errorResponse.getStatusCode();
+                        Map<String, String> headers = errorResponse.getResponseHeaders();
+                        boolean hasXfo = headers != null && (headers.containsKey("x-frame-options") || headers.containsKey("X-Frame-Options"));
+                        boolean hasCspFrame = headers != null && (headers.containsKey("content-security-policy") || headers.containsKey("Content-Security-Policy"));
+
+                        if (status >= 400 || hasXfo || hasCspFrame) {
+                            String url = request.getUrl().toString();
+                            String reason = hasXfo ? "X-Frame-Options blocked embedding" : ("HTTP " + status);
+                            notifyIframeError(view, url, status, reason);
+                        }
+                    }
+                }
+
+                private void notifyIframeError(WebView view, String url, int code, String description) {
+                    if (view == null || url == null) return;
+                    String lower = url.toLowerCase();
+                    if (lower.contains("moviesapi") || lower.contains("vidlink") || lower.contains("cinesrc") || 
+                        lower.contains("cinezo") || lower.contains("peestream") || lower.contains("flaxmovies") ||
+                        lower.contains("vidsrc") || lower.contains("2embed") || lower.contains("superembed") ||
+                        lower.contains("smashystream") || lower.contains("embed") || lower.contains("player") ||
+                        lower.contains("stream") || lower.contains("movie") || lower.contains("tv/")) {
+                        
+                        view.post(() -> {
+                            try {
+                                String safeUrl = url.replace("'", "\\'");
+                                String safeDesc = description != null ? description.replace("'", "\\'") : "Error";
+                                String js = "window.dispatchEvent(new CustomEvent('tmdb_iframe_load_error', { detail: { url: '" + safeUrl + "', code: " + code + ", description: '" + safeDesc + "' } }));";
+                                view.evaluateJavascript(js, null);
+                            } catch (Exception ignored) {}
+                        });
+                    }
+                }
             });
 
             // Handle cold-start deep link intent (if app was launched directly via tmdbstream://)
