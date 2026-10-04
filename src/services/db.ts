@@ -83,7 +83,7 @@ export const DEFAULT_SETTINGS: UserSettings = {
   msm32ChunkSize: 524288,
   msm32MaxQuality: '1080',
   streamHeaderTimeout: 5,
-  streamResolverTimeout: 0,
+  streamResolverTimeout: 60,
   streamResolverRetries: 1,
   includeNightlyUpdates: false,
   autoUpdateCheck: true,
@@ -342,8 +342,9 @@ export const dbService = {
       settings.topAsianProviders = settings.topAseanProviders;
       await db.settings.put(settings);
     }
-    if (settings.streamResolverTimeout === undefined || (settings.streamResolverTimeout !== 0 && (settings.streamResolverTimeout < 10 || settings.streamResolverTimeout > 30))) {
-      settings.streamResolverTimeout = 0;
+    const validResolverTimeouts = [0, 60, 90, 120, 180];
+    if (settings.streamResolverTimeout === undefined || !validResolverTimeouts.includes(settings.streamResolverTimeout)) {
+      settings.streamResolverTimeout = 60;
       await db.settings.put(settings);
     }
     if (settings.streamResolverRetries === undefined || settings.streamResolverRetries < 0 || settings.streamResolverRetries > 3) {
