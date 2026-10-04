@@ -274,9 +274,11 @@ aside .tv-focus-target:focus-visible .tv-nav-label,
 .hero-gradient-overlay {
   background: linear-gradient(
     180deg,
-    rgba(5, 5, 8, 0.1) 0%,
-    rgba(5, 5, 8, 0.4) 40%,
-    rgba(5, 5, 8, 0.85) 75%,
+    rgba(5, 5, 8, 0.05) 0%,
+    rgba(5, 5, 8, 0.35) 35%,
+    rgba(5, 5, 8, 0.75) 60%,
+    rgba(5, 5, 8, 0.95) 78%,
+    #050508 88%,
     #050508 100%
   );
 }
