@@ -4562,7 +4562,7 @@ export const Settings: React.FC = () => {
                         }}
                         className="px-3 py-1.5 rounded-lg border text-xs font-bold transition-all tv-focus-target flex items-center gap-1.5 border-hbo-border bg-hbo-dark/80 hover:bg-hbo-hover text-white flex-shrink-0"
                       >
-                        <span className="text-hbo-cyan">{(settings.streamResolverTimeout ?? 0) === 0 ? 'Unlimited' : `${settings.streamResolverTimeout} Seconds`}</span>
+                        <span className="text-hbo-cyan">{`${settings.streamResolverTimeout ?? 30} Seconds`}</span>
                         <ChevronRight className="w-3.5 h-3.5 text-gray-400" />
                       </button>
                     </div>
@@ -4852,14 +4852,13 @@ export const Settings: React.FC = () => {
             <div className="flex-1 overflow-y-auto px-6 py-6 space-y-2.5 font-sans">
               {(() => {
                 const options = [
-                  { seconds: 0, label: 'Unlimited (Default)', desc: 'Wait until stream resolves without timing out prematurely.' },
-                  { seconds: 10, label: '10 Seconds', desc: 'Fast failover for high-speed fiber connections.' },
-                  { seconds: 15, label: '15 Seconds', desc: 'Quick handshake for standard broadband.' },
-                  { seconds: 20, label: '20 Seconds', desc: 'Balanced wait time for multi-step stream scrapers.' },
-                  { seconds: 25, label: '25 Seconds', desc: 'Relaxed connection for slower networks & busy Wi-Fi.' },
-                  { seconds: 30, label: '30 Seconds', desc: 'Maximum patience for high-latency mobile or VPN links.' },
+                  { seconds: 30, label: '30 Seconds (Default)', desc: 'Standard failover threshold for embed providers and stream handshakes.' },
+                  { seconds: 60, label: '60 Seconds', desc: 'Extended patience for slower servers and high-traffic periods.' },
+                  { seconds: 90, label: '90 Seconds', desc: 'Generous wait time for complex embed stream loading.' },
+                  { seconds: 180, label: '180 Seconds', desc: 'Maximum patience for high-latency mobile or congested networks.' },
+                  { seconds: 240, label: '240 Seconds', desc: 'Ultra-patient timeout for extremely slow or throttled connections.' },
                 ];
-                const currentVal = settings.streamResolverTimeout ?? 0;
+                const currentVal = settings.streamResolverTimeout ?? 30;
 
                 return options.map((opt, idx) => {
                   const isSelected = currentVal === opt.seconds;

@@ -2,23 +2,23 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20261004-0654';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-improve-msm-ser.20261004-0654';
+export const APP_BUILD_NUMBER = '20261004-0940';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-improve-provide.20261004-0940';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
-export const APP_BRANCH = 'feat-improve-msm-ser';
-export const APP_CHANGELOG = `* Merge pull request #180 from jefrimustapa/fix/embed-provider-fallback-priority
+export const APP_BRANCH = 'feat-improve-provide';
+export const APP_CHANGELOG = `* fix(player): activate timeout in manual selection to display custom TMDB error overlay upon timeout
+* fix(player): prevent native video element from prematurely clearing watchdog before currentTime > 0 and guard countdown against re-renders
+* fix(player): decouple watchdog timer from render cycles and memoize provider change callbacks
+* fix(player): preserve watchdog timer until actual playback starts instead of aborting on iframe HTML load
+* feat(settings): update streamResolverTimeout options to 60/90/120/180/unlimited (default 60s) and link to embed watchdog
+* feat(player): align fallback priority flow with auto-cycling on connection refusal and manual TMDB error display
+* fix(player): dismiss error overlay on MSM direct stream and scope native error interception to iframe docs
+* fix(player): clear error state and remount iframe when selecting provider from header
+* feat(player): intercept native iframe connection errors and display custom TMDB error overlay
+* Merge pull request #181 from jefrimustapa/feat/improve-msm-series-search
+* fix(player): resolve seek state lock, extend transcode seek watchdog, and preserve touch activation
+* Merge pull request #180 from jefrimustapa/fix/embed-provider-fallback-priority
 * fix(settings): return to engine-embed instead of resolvers when closing priorityPicker drawer
 * fix(player): enforce context-aware and user-configured embed provider priority fallback after MSM failure
-* feat(player): continuous long-press seek on mobile FW/RW buttons (#179)
-* fix(msm-getter): prevent poll retry storm on failed candidates, add dead shortcode cache, and extend client timeout to 65s (#178)
-* feat(search): streamline series queries to 12 patterns, enforce mandatory app params, and strict multi-season matching (#177)
-* perf(msm-getter): optimize idle memory with expose-gc, glibc allocator tuning and idle watchdog (#176)
-* perf(client): optimize HLS buffers, hardware video teardown, and bound in-memory caches (#175)
-* feat(ui): use poster in portrait and backdrop in landscape for hero banner, bind backgrounds to object-top, and remove horizontal black tints (#174)
-* Merge pull request #173 from jefrimustapa/perf/msm-getter-memory-optimization
-* perf(msm-getter): optimize idle memory with allocator tuning, chunk cache eviction and watchdog
-* Merge pull request #172 from jefrimustapa/fix/msm-getter-episode-matching
-* fix(msm-getter): overhaul TV episode matching, strict boundaries, and search precision
-* feat(watch): add desktop web fullscreen button with persistent header overlay (#171)
-* refactor(ui): rename 'My Space' to 'Space' in navigation and library headers (#169)`;
+* feat(player): continuous long-press seek on mobile FW/RW buttons (#179)`;
