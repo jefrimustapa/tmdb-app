@@ -90,6 +90,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const [iframeKey, setIframeKey] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
+  const [providerErrorDetail, setProviderErrorDetail] = useState<{ title?: string; message?: string; badge?: string } | null>(null);
   const [adShieldEnabled, setAdShieldEnabled] = useState(true);
   const [streamResolver, setStreamResolver] = useState<StreamResolverType>('embed');
   const [playerMode, setPlayerMode] = useState<'loading' | 'embed' | 'direct' | 'error'>('loading');
@@ -1796,13 +1797,85 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     };
   }, [providerId, autoCycle, isProbing, allFailed, playerMode, cycleToNextProvider, iframeKey]);
 
+  // Reset provider error details whenever active provider or stream URL changes
+  useEffect(() => {
+    setProviderErrorDetail(null);
+  }, [provider.id, streamUrl]);
+
+  // Intercept native Android iframe connection errors (e.g. ERR_CONNECTION_REFUSED, X-Frame-Options)
+  useEffect(() => {
+    const handleNativeIframeError = (e: Event) => {
+      const customEvent = e as CustomEvent<{ url?: string; code?: number; description?: string }>;
+      const detail = customEvent.detail;
+      console.warn('[VideoPlayer] Intercepted native iframe error:', detail?.url, detail);
+
+      const descLower = (detail?.description || '').toLowerCase();
+      const isConnectionRefused = descLower.includes('refused') || detail?.code === -6;
+      const isXfoBlocked = descLower.includes('x-frame-options');
+
+      setProviderErrorDetail({
+        title: isXfoBlocked ? 'Embedding Blocked by Provider' : 'Unable to Connect to Server',
+        badge: isXfoBlocked ? 'Embed Blocked' : (isConnectionRefused ? 'Connection Refused' : 'Server Stream Unavailable'),
+        message: isXfoBlocked
+          ? `The streaming server (${provider.name}) has disabled third-party embedding. Please switch to another server.`
+          : `The selected server (${provider.name}) refused the connection or is currently unreachable. Please try switching to another server.`,
+      });
+
+      setHasError(true);
+      setIsLoading(false);
+      setIsProbing(false);
+      if (autoCycleTimeoutRef.current) {
+        clearTimeout(autoCycleTimeoutRef.current);
+      }
+    };
+
+    window.addEventListener('tmdb_iframe_load_error', handleNativeIframeError);
+    return () => {
+      window.removeEventListener('tmdb_iframe_load_error', handleNativeIframeError);
+    };
+  }, [provider.name]);
+
+  // Proactive pre-flight connection test for embed providers
+  // Catches hard TCP connection refusals within 1.5s before Chromium displays native sad document
+  useEffect(() => {
+    if (playerMode !== 'embed' || !streamUrl) return;
+
+    let isCurrent = true;
+    const controller = new AbortController();
+
+    fetch(streamUrl, { mode: 'no-cors', signal: controller.signal })
+      .catch((err) => {
+        if (!isCurrent) return;
+        if (err.name === 'AbortError') return;
+        console.warn(`[VideoPlayer] Embed pre-flight connection failed for ${provider.id} (${streamUrl}):`, err);
+        setProviderErrorDetail({
+          title: 'Unable to Connect to Server',
+          badge: 'Connection Refused',
+          message: `The server (${provider.name}) refused the connection or is currently unreachable. Please switch to another streaming server.`,
+        });
+        setHasError(true);
+        setIsLoading(false);
+        setIsProbing(false);
+        if (autoCycleTimeoutRef.current) {
+          clearTimeout(autoCycleTimeoutRef.current);
+        }
+      });
+
+    return () => {
+      isCurrent = false;
+      controller.abort();
+    };
+  }, [streamUrl, playerMode, provider.id, provider.name]);
+
   const handleIframeLoaded = () => {
     if (autoCycleTimeoutRef.current) {
       clearTimeout(autoCycleTimeoutRef.current);
     }
     setIsLoading(false);
     setIsProbing(false);
-    setHasError(false);
+    if (!providerErrorDetail) {
+      setHasError(false);
+    }
 
     // Active un-muting routine across embedded video players (VidLink, VidSrc, Plyr, JWPlayer, Video.js)
     const sendUnmuteMessages = () => {
@@ -1946,6 +2019,8 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
   const handleRefresh = () => {
     resetControlsTimer();
+    setHasError(false);
+    setProviderErrorDetail(null);
     if (playerMode === 'direct') {
       setIsExtracting(true);
       setExtractionFailed(false);
@@ -2192,8 +2267,8 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         />
       )}
 
-      {/* STATE 4: Protected Video Embed (ONLY rendered if embed is enabled) */}
-      {playerMode === 'embed' && enabledResolvers.includes('embed') && (
+      {/* STATE 4: Protected Video Embed (ONLY rendered if embed is enabled and no error) */}
+      {playerMode === 'embed' && enabledResolvers.includes('embed') && !hasError && (
         <iframe
           ref={iframeRef}
           key={`${streamUrl}-${iframeKey}-${adShieldEnabled}`}
@@ -2248,23 +2323,37 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
       {/* Fallback Error Overlay */}
       {hasError && (
-        <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-black/95 backdrop-blur-md p-6 text-center animate-fade-in">
-          <div className="mb-4">
+        <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-black/95 backdrop-blur-md p-6 text-center animate-fade-in select-none">
+          <div className="mb-4 drop-shadow-[0_0_25px_rgba(103,58,183,0.5)]">
             <Logo size="lg" showText={true} />
           </div>
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-red-500/20 border border-red-500/40 text-red-400 text-xs font-bold mb-3">
+          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-red-500/20 border border-red-500/40 text-red-400 text-xs font-bold mb-3">
             <AlertCircle className="w-4 h-4" />
-            <span>{allFailed ? 'All Stream Servers Attempted' : 'Server Stream Unavailable'}</span>
+            <span>{providerErrorDetail?.badge || (allFailed ? 'All Stream Servers Attempted' : 'Server Stream Unavailable')}</span>
           </div>
           <h3 className="text-lg sm:text-xl font-black font-display text-white mb-2 tracking-tight">
-            Unable to Load Video Stream
+            {providerErrorDetail?.title || 'Unable to Load Video Stream'}
           </h3>
           <p className="text-xs sm:text-sm text-gray-400 max-w-md mb-6 leading-relaxed">
-            {allFailed
+            {providerErrorDetail?.message || (allFailed
               ? `We tested all ${STREAM_PROVIDERS.length} streaming servers, but none responded with an active video feed for this title right now.`
-              : `The selected server (${provider.name}) could not stream "${title}". Please try switching to another server.`}
+              : `The selected server (${provider.name}) could not stream "${title}". Please try switching to another server.`)}
           </p>
           <div className="flex flex-wrap items-center justify-center gap-3">
+            {resolvedMsm32Url && (
+              <button
+                onClick={() => {
+                  setPlayerMode('direct');
+                  setDirectStreamUrl(resolvedMsm32Url);
+                  setDirectStreamLabel('Telegram (MSM32)');
+                  setHasError(false);
+                  setProviderErrorDetail(null);
+                }}
+                className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 text-white font-bold text-xs sm:text-sm shadow-[0_0_20px_rgba(6,182,212,0.4)] hover:scale-105 transition tv-focus-target"
+              >
+                Play via Telegram (MSM32)
+              </button>
+            )}
             {provider.id === 'dramacool-kdrama' && dramacoolServers.length > 1 && (
               <button
                 onClick={() => {
@@ -2274,6 +2363,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                   setResolvedDramacoolUrl(nextServer.url);
                   setDirectStreamLabel(`Dramacool (${nextServer.name})`);
                   setHasError(false);
+                  setProviderErrorDetail(null);
                   setIsLoading(true);
                   setIframeKey((prev) => prev + 1);
                 }}
@@ -2283,16 +2373,16 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
               </button>
             )}
             <button
-              onClick={restartAutoCycle}
+              onClick={cycleToNextProvider}
               className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-hbo-purple to-hbo-cyan text-white font-bold text-xs sm:text-sm shadow-hbo-glow hover:scale-105 transition tv-focus-target"
             >
-              Restart Auto-Cycle (All Servers)
+              Switch to Next Server
             </button>
             <button
-              onClick={cycleToNextProvider}
+              onClick={handleRefresh}
               className="px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs sm:text-sm font-semibold border border-white/20 transition hover:scale-105 tv-focus-target"
             >
-              Try Next Server
+              Retry Server
             </button>
           </div>
         </div>
