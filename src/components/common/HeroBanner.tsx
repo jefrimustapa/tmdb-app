@@ -255,7 +255,7 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ items, onActiveItemChang
       ref={bannerRef}
       data-hero-banner="true"
       data-total-slides={totalItems}
-      className="relative w-full h-[65vh] sm:h-[75vh] min-h-[460px] max-h-[750px] overflow-hidden bg-transparent select-none touch-pan-y"
+      className="relative w-full h-[65vh] sm:h-[75vh] min-h-[460px] max-h-[750px] overflow-hidden bg-[#050508] select-none touch-pan-y"
       onKeyDownCapture={trigger5sRemotePause}
       onMouseEnter={() => { isAutoPlayPaused.current = true; }}
       onMouseLeave={() => { isAutoPlayPaused.current = false; }}
@@ -266,13 +266,7 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ items, onActiveItemChang
       onTouchCancel={handleTouchCancel}
     >
       {/* 1. Cinematic Cross-Dissolving Backdrops Layer */}
-      <div
-        className="absolute inset-0 overflow-hidden pointer-events-none select-none"
-        style={{
-          maskImage: 'linear-gradient(180deg, black 0%, black 50%, transparent 100%)',
-          WebkitMaskImage: 'linear-gradient(180deg, black 0%, black 50%, transparent 100%)'
-        }}
-      >
+      <div className="absolute inset-0 overflow-hidden pointer-events-none select-none">
         {displayItems.map((featured, idx) => {
           const isCurrent = idx === currentIndex;
           const isNearby = Math.abs(idx - currentIndex) <= 1 || (idx === 0 && currentIndex === totalItems - 1) || (idx === totalItems - 1 && currentIndex === 0);
@@ -310,8 +304,9 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ items, onActiveItemChang
         })}
       </div>
 
-      {/* 2. Permanent Static Cinematic Vignette (Ensures text readability without creating a horizontal smoke line) */}
+      {/* 2. Permanent Static Cinematic HBO Gradients Layer (Zero Seam Flickering) */}
       <div className="absolute inset-0 z-20 pointer-events-none select-none">
+        <div className="absolute inset-0 hero-gradient-overlay" />
         <div className="absolute inset-0 bg-gradient-to-r from-black/75 via-black/35 to-transparent max-w-3xl" />
         <div className="absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-black/50 to-transparent" />
       </div>
