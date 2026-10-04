@@ -2,12 +2,13 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20261004-0933';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-improve-provide.20261004-0933';
+export const APP_BUILD_NUMBER = '20261004-0940';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-improve-provide.20261004-0940';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
 export const APP_BRANCH = 'feat-improve-provide';
-export const APP_CHANGELOG = `* fix(player): prevent native video element from prematurely clearing watchdog before currentTime > 0 and guard countdown against re-renders
+export const APP_CHANGELOG = `* fix(player): activate timeout in manual selection to display custom TMDB error overlay upon timeout
+* fix(player): prevent native video element from prematurely clearing watchdog before currentTime > 0 and guard countdown against re-renders
 * fix(player): decouple watchdog timer from render cycles and memoize provider change callbacks
 * fix(player): preserve watchdog timer until actual playback starts instead of aborting on iframe HTML load
 * feat(settings): update streamResolverTimeout options to 60/90/120/180/unlimited (default 60s) and link to embed watchdog
@@ -20,5 +21,4 @@ export const APP_CHANGELOG = `* fix(player): prevent native video element from p
 * Merge pull request #180 from jefrimustapa/fix/embed-provider-fallback-priority
 * fix(settings): return to engine-embed instead of resolvers when closing priorityPicker drawer
 * fix(player): enforce context-aware and user-configured embed provider priority fallback after MSM failure
-* feat(player): continuous long-press seek on mobile FW/RW buttons (#179)
-* fix(msm-getter): prevent poll retry storm on failed candidates, add dead shortcode cache, and extend client timeout to 65s (#178)`;
+* feat(player): continuous long-press seek on mobile FW/RW buttons (#179)`;

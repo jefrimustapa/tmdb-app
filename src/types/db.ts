@@ -101,7 +101,7 @@ export interface UserSettings {
   msm32ChunkSize?: number; // Chunk buffer slice in bytes: 262144 (256KB Eco), 524288 (512KB Standard), 1048576 (1MB Turbo)
   msm32MaxQuality?: '720' | '1080'; // Resolution preference: '720' or '1080' (default: '1080')
   streamHeaderTimeout: number; // in seconds, e.g. 3, 5, 8, or 0 for always visible
-  streamResolverTimeout?: number; // Provider stream resolution timeout in seconds (60, 90, 120, 180, or 0 for unlimited, default 60s)
+  streamResolverTimeout?: number; // Provider stream resolution timeout in seconds (30, 60, 90, 180, 240, default 30s)
   streamResolverRetries?: number; // Number of retry attempts on provider failure (0-3, default 1)
   includeNightlyUpdates: boolean; // Option to check for and install Nightly pre-releases
   autoUpdateCheck?: boolean; // Automatically check for updates on application startup
