@@ -962,7 +962,6 @@ export const Watch: React.FC = () => {
             releaseYear={releaseYear}
             originalTitle={details.original_title || details.original_name}
             onProviderChange={(p) => {
-              setUserSelectedProvider(true);
               setActiveServerLabel('');
               setProviderId(p.id);
             }}

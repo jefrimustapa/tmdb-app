@@ -2,12 +2,13 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20261004-0807';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-improve-provide.20261004-0807';
+export const APP_BUILD_NUMBER = '20261004-0820';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-improve-provide.20261004-0820';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
 export const APP_BRANCH = 'feat-improve-provide';
-export const APP_CHANGELOG = `* fix(player): clear error state and remount iframe when selecting provider from header
+export const APP_CHANGELOG = `* fix(player): dismiss error overlay on MSM direct stream and scope native error interception to iframe docs
+* fix(player): clear error state and remount iframe when selecting provider from header
 * feat(player): intercept native iframe connection errors and display custom TMDB error overlay
 * Merge pull request #181 from jefrimustapa/feat/improve-msm-series-search
 * fix(player): resolve seek state lock, extend transcode seek watchdog, and preserve touch activation
@@ -20,5 +21,4 @@ export const APP_CHANGELOG = `* fix(player): clear error state and remount ifram
 * perf(msm-getter): optimize idle memory with expose-gc, glibc allocator tuning and idle watchdog (#176)
 * perf(client): optimize HLS buffers, hardware video teardown, and bound in-memory caches (#175)
 * feat(ui): use poster in portrait and backdrop in landscape for hero banner, bind backgrounds to object-top, and remove horizontal black tints (#174)
-* Merge pull request #173 from jefrimustapa/perf/msm-getter-memory-optimization
-* perf(msm-getter): optimize idle memory with allocator tuning, chunk cache eviction and watchdog`;
+* Merge pull request #173 from jefrimustapa/perf/msm-getter-memory-optimization`;
