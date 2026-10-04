@@ -1977,7 +1977,18 @@ public class MainActivity extends BridgeActivity {
 
                             if (status >= 400 || hasXfo || hasCspFrame) {
                                 String url = request.getUrl().toString();
-                                String reason = hasXfo ? "X-Frame-Options blocked embedding" : ("HTTP " + status);
+                                String reason;
+                                if (status >= 500) {
+                                    reason = "Server Error (HTTP " + status + ")";
+                                } else if (status >= 400) {
+                                    reason = "HTTP " + status + " (" + (status == 404 ? "Not Found" : (status == 403 ? "Forbidden" : "Client Error")) + ")";
+                                } else if (hasXfo) {
+                                    reason = "X-Frame-Options blocked embedding";
+                                } else if (hasCspFrame) {
+                                    reason = "CSP frame-ancestors blocked embedding";
+                                } else {
+                                    reason = "HTTP " + status;
+                                }
                                 notifyIframeError(view, url, status, reason);
                             }
                         }
@@ -1986,21 +1997,14 @@ public class MainActivity extends BridgeActivity {
 
                 private void notifyIframeError(WebView view, String url, int code, String description) {
                     if (view == null || url == null) return;
-                    String lower = url.toLowerCase();
-                    if (lower.contains("moviesapi") || lower.contains("vidlink") || lower.contains("cinesrc") || 
-                        lower.contains("cinezo") || lower.contains("peestream") || lower.contains("flaxmovies") ||
-                        lower.contains("vidsrc") || lower.contains("2embed") || lower.contains("superembed") ||
-                        lower.contains("smashystream") || lower.contains("autoembed") || lower.contains("multiembed")) {
-                        
-                        view.post(() -> {
-                            try {
-                                String safeUrl = url.replace("'", "\\'");
-                                String safeDesc = description != null ? description.replace("'", "\\'") : "Error";
-                                String js = "window.dispatchEvent(new CustomEvent('tmdb_iframe_load_error', { detail: { url: '" + safeUrl + "', code: " + code + ", description: '" + safeDesc + "' } }));";
-                                view.evaluateJavascript(js, null);
-                            } catch (Exception ignored) {}
-                        });
-                    }
+                    view.post(() -> {
+                        try {
+                            String safeUrl = url.replace("'", "\\'");
+                            String safeDesc = description != null ? description.replace("'", "\\'") : "Error";
+                            String js = "window.dispatchEvent(new CustomEvent('tmdb_iframe_load_error', { detail: { url: '" + safeUrl + "', code: " + code + ", description: '" + safeDesc + "' } }));";
+                            view.evaluateJavascript(js, null);
+                        } catch (Exception ignored) {}
+                    });
                 }
             });
 
