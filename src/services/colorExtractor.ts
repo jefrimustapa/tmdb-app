@@ -137,14 +137,14 @@ export async function extractDominantColor(imageUrl: string | null | undefined):
 }
 
 /**
- * Returns a React CSS style object with an inverted ambient linear gradient.
- * Starts with deep black (#050508) under the hero image so it blends seamlessly
- * without any hard edge or color separation, then smoothly transitions into a
- * translucent ambient dominant tint (telus) across the content rails below the image.
+ * Returns a React CSS style object with an adaptive ambient background gradient.
+ * - Under hero banner (0% - 48vh): Deep black (#050508) matching the original hero banner bottom tint seamlessly.
+ * - After hero banner down to bottom (48vh -> 100%): Transitions continuously from dark (#050508)
+ *   to a rich translucent ambient tint (lutsinar), so the very bottom is translucent dominant color.
  */
 export function getAdaptiveBackgroundStyle(
   color: DominantColor | null,
-  accentOpacity = 0.38
+  accentOpacity = 0.52
 ): React.CSSProperties {
   if (!color) {
     return {
@@ -155,11 +155,11 @@ export function getAdaptiveBackgroundStyle(
 
   const { r, g, b } = color;
   const oPeak = accentOpacity.toFixed(3);
-  const oSubtle = (accentOpacity * 0.45).toFixed(3);
-  const oDeep = (accentOpacity * 0.18).toFixed(3);
+  const oMid = (accentOpacity * 0.60).toFixed(3);
+  const oSubtle = (accentOpacity * 0.25).toFixed(3);
 
   return {
-    background: `linear-gradient(180deg, #050508 0%, #050508 42vh, rgba(${r}, ${g}, ${b}, ${oSubtle}) 58vh, rgba(${r}, ${g}, ${b}, ${oPeak}) 78vh, rgba(${r}, ${g}, ${b}, ${oSubtle}) 115vh, rgba(${r}, ${g}, ${b}, ${oDeep}) 160vh, #050508 100%)`,
+    background: `linear-gradient(180deg, #050508 0%, #050508 48vh, rgba(${r}, ${g}, ${b}, ${oSubtle}) 66vh, rgba(${r}, ${g}, ${b}, ${oMid}) 85vh, rgba(${r}, ${g}, ${b}, ${oPeak}) 100%)`,
     backgroundColor: '#050508',
     transition: 'background 0.8s cubic-bezier(0.16, 1, 0.3, 1)'
   };
