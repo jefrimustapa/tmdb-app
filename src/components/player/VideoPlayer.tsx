@@ -266,6 +266,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const [triedProviders, setTriedProviders] = useState<string[]>([]);
   const [allFailed, setAllFailed] = useState(false);
   const autoCycleTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const watchdogActiveProviderRef = useRef<string | null>(null);
 
   // Disable auto-cycling if provider was manually selected by user
   useEffect(() => {
@@ -1192,13 +1193,15 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       const { isPlaying, currentTime, duration } = e.detail || {};
       if (isPlaying !== undefined) {
         isPlayingRef.current = !!isPlaying;
-        if (isPlaying) {
+        if (isPlaying && currentTime > 0) {
           setIsLoading(false);
           setHasError(false);
           setIsProbing(false);
           if (autoCycleTimeoutRef.current) {
+            console.log(`[AutoCycle Watchdog] ✅ Active video playback verified (time: ${currentTime}s). Watchdog cleared.`);
             clearTimeout(autoCycleTimeoutRef.current);
             autoCycleTimeoutRef.current = null;
+            watchdogActiveProviderRef.current = null;
           }
         }
         if (duration > 0 && currentTime > 0) {
@@ -1806,34 +1809,49 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   useEffect(() => {
     if (!autoCycle || allFailed || playerMode !== 'embed') return;
 
-    const timeoutSec = typeof streamResolverTimeoutRef.current === 'number'
+    // If watchdog is already actively counting down for this provider, do NOT reset or interrupt it!
+    if (watchdogActiveProviderRef.current === providerId && autoCycleTimeoutRef.current) {
+      return;
+    }
+
+    const rawTimeout = typeof streamResolverTimeoutRef.current === 'number'
       ? streamResolverTimeoutRef.current
       : (typeof streamResolverTimeout === 'number' ? streamResolverTimeout : 60);
 
-    // If unlimited (0), do not trigger watchdog auto-cycle
-    if (timeoutSec <= 0) return;
+    const timeoutSec = rawTimeout > 0 ? rawTimeout : 60;
 
-    console.log(`[AutoCycle Watchdog] ⏱️ Watchdog started for "${providerId}": ${timeoutSec}s threshold.`);
+    // If explicitly configured as 0 (Unlimited), disable watchdog
+    if (rawTimeout === 0) {
+      console.log(`[AutoCycle Watchdog] Watchdog disabled for "${providerId}" (timeout set to unlimited).`);
+      return;
+    }
 
     if (autoCycleTimeoutRef.current) {
       clearTimeout(autoCycleTimeoutRef.current);
       autoCycleTimeoutRef.current = null;
     }
 
-    const timer = setTimeout(() => {
+    watchdogActiveProviderRef.current = providerId;
+    console.log(`[AutoCycle Watchdog] ⏱️ Watchdog started for "${providerId}": ${timeoutSec}s threshold.`);
+
+    autoCycleTimeoutRef.current = setTimeout(() => {
       console.warn(`[AutoCycle Watchdog] ⏱️ Server "${providerId}" did not establish active video in ${timeoutSec}s. Auto-cycling to next server...`);
+      autoCycleTimeoutRef.current = null;
+      watchdogActiveProviderRef.current = null;
       cycleToNextProviderRef.current();
     }, timeoutSec * 1000);
+  }, [providerId, autoCycle, allFailed, playerMode]);
 
-    autoCycleTimeoutRef.current = timer;
-
+  // Clean up watchdog timer only when providerId changes or player unmounts
+  useEffect(() => {
     return () => {
-      clearTimeout(timer);
-      if (autoCycleTimeoutRef.current === timer) {
+      if (autoCycleTimeoutRef.current) {
+        clearTimeout(autoCycleTimeoutRef.current);
         autoCycleTimeoutRef.current = null;
+        watchdogActiveProviderRef.current = null;
       }
     };
-  }, [providerId, autoCycle, allFailed, playerMode, iframeKey]);
+  }, [providerId]);
 
   // Reset provider error details and clear error state whenever active provider changes (e.g. from header dropdown)
   useEffect(() => {
@@ -2083,6 +2101,8 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const handleIframeError = () => {
     if (autoCycleTimeoutRef.current) {
       clearTimeout(autoCycleTimeoutRef.current);
+      autoCycleTimeoutRef.current = null;
+      watchdogActiveProviderRef.current = null;
     }
 
     // If active provider is Dramacool and has backup servers (e.g. Streamtape, MixDrop), try next server first
