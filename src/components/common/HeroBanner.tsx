@@ -255,7 +255,7 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ items, onActiveItemChang
       ref={bannerRef}
       data-hero-banner="true"
       data-total-slides={totalItems}
-      className="relative w-full h-[65vh] sm:h-[75vh] min-h-[460px] max-h-[750px] overflow-hidden bg-[#050508] select-none touch-pan-y"
+      className="relative w-full h-[65vh] sm:h-[75vh] min-h-[460px] max-h-[750px] overflow-hidden bg-transparent select-none touch-pan-y"
       onKeyDownCapture={trigger5sRemotePause}
       onMouseEnter={() => { isAutoPlayPaused.current = true; }}
       onMouseLeave={() => { isAutoPlayPaused.current = false; }}
