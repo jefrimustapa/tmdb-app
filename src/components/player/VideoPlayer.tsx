@@ -827,7 +827,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         try {
           console.log(`[Resolver] Fast-path Korean Provider (KissKH) [timeout: ${isUnlimited ? 'unlimited' : activeTimeoutMs + 'ms'}]...`);
           setResolvingStatus('Resolving KissKH Korean Stream...');
-          const kisskhPromise = resolveKisskhStream(title, releaseYear, season, episode, originalTitle);
+          const kisskhPromise = resolveKisskhStream(title, releaseYear, season, episode, originalTitle, mediaType);
           const kisskhRes = isUnlimited
             ? await kisskhPromise
             : await Promise.race([
