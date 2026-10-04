@@ -90,6 +90,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const [iframeKey, setIframeKey] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
+  const [providerErrorDetail, setProviderErrorDetail] = useState<{ title?: string; message?: string; badge?: string } | null>(null);
   const [adShieldEnabled, setAdShieldEnabled] = useState(true);
   const [streamResolver, setStreamResolver] = useState<StreamResolverType>('embed');
   const [playerMode, setPlayerMode] = useState<'loading' | 'embed' | 'direct' | 'error'>('loading');
@@ -186,8 +187,8 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const [upNextTriggerPercent, setUpNextTriggerPercent] = useState(90);
   const [upNextTimeout, setUpNextTimeout] = useState(10);
   const [tickerIntervalSec, setTickerIntervalSec] = useState(5);
-  const [streamResolverTimeout, setStreamResolverTimeout] = useState(5);
-  const streamResolverTimeoutRef = useRef(5);
+  const [streamResolverTimeout, setStreamResolverTimeout] = useState(30);
+  const streamResolverTimeoutRef = useRef(30);
   const [streamResolverRetries, setStreamResolverRetries] = useState(1);
   const streamResolverRetriesRef = useRef(1);
 
@@ -259,12 +260,20 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const forceFreshTelegramRef = useRef(false);
   const hasRetriedTelegramForceRef = useRef(false);
 
-  // Auto-Cycle Provider until first working stream state
-  const [autoCycle, setAutoCycle] = useState(true);
+  // Auto-Cycle Provider until first working stream state (disabled when user manually selects provider)
+  const [autoCycle, setAutoCycle] = useState(!isUserSelected);
   const [isProbing, setIsProbing] = useState(true);
   const [triedProviders, setTriedProviders] = useState<string[]>([]);
   const [allFailed, setAllFailed] = useState(false);
   const autoCycleTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const watchdogActiveProviderRef = useRef<string | null>(null);
+
+  // Disable auto-cycling if provider was manually selected by user
+  useEffect(() => {
+    if (isUserSelected) {
+      setAutoCycle(false);
+    }
+  }, [isUserSelected]);
 
   const playerContainerRef = useRef<HTMLDivElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -379,7 +388,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           setTickerIntervalSec(s.watchProgressTickerInterval);
           tickerIntervalRef.current = s.watchProgressTickerInterval;
         }
-        if (typeof s.streamResolverTimeout === 'number' && (s.streamResolverTimeout === 0 || (s.streamResolverTimeout >= 2 && s.streamResolverTimeout <= 30))) {
+        if (typeof s.streamResolverTimeout === 'number') {
           setStreamResolverTimeout(s.streamResolverTimeout);
           streamResolverTimeoutRef.current = s.streamResolverTimeout;
         }
@@ -584,6 +593,8 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             setDirectStreamUrl(finalUrl);
             setDirectStreamLabel('Telegram (MSM32)');
             setPlayerMode('direct');
+            setHasError(false);
+            setProviderErrorDetail(null);
             setIsExtracting(false);
             setExtractionFailed(false);
             setIsLoading(false);
@@ -1178,13 +1189,15 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       const { isPlaying, currentTime, duration } = e.detail || {};
       if (isPlaying !== undefined) {
         isPlayingRef.current = !!isPlaying;
-        if (isPlaying) {
+        if (isPlaying && currentTime > 0) {
           setIsLoading(false);
           setHasError(false);
           setIsProbing(false);
           if (autoCycleTimeoutRef.current) {
+            console.log(`[AutoCycle Watchdog] ✅ Active video playback verified (time: ${currentTime}s). Watchdog cleared.`);
             clearTimeout(autoCycleTimeoutRef.current);
             autoCycleTimeoutRef.current = null;
+            watchdogActiveProviderRef.current = null;
           }
         }
         if (duration > 0 && currentTime > 0) {
@@ -1481,6 +1494,11 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             if (current > 0) {
               lastPostMessageTimeRef.current = Date.now();
               recordProgress(current, dur);
+              setIsProbing(false);
+              if (autoCycleTimeoutRef.current) {
+                clearTimeout(autoCycleTimeoutRef.current);
+                autoCycleTimeoutRef.current = null;
+              }
             }
             return;
           }
@@ -1499,6 +1517,11 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           if (current > 0) {
             lastPostMessageTimeRef.current = Date.now();
             recordProgress(current, dur);
+            setIsProbing(false);
+            if (autoCycleTimeoutRef.current) {
+              clearTimeout(autoCycleTimeoutRef.current);
+              autoCycleTimeoutRef.current = null;
+            }
           }
         }
       } catch {}
@@ -1757,7 +1780,6 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         setAllFailed(true);
         setIsProbing(false);
         setIsLoading(false);
-        setHasError(true);
       } else {
         setIsLoading(true);
         setHasError(false);
@@ -1766,6 +1788,9 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       return updated;
     });
   }, [providerId, onProviderChange, resetControlsTimer, orderedProviders]);
+
+  const cycleToNextProviderRef = useRef(cycleToNextProvider);
+  cycleToNextProviderRef.current = cycleToNextProvider;
 
   const restartAutoCycle = () => {
     setTriedProviders([]);
@@ -1776,33 +1801,203 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     onProviderChange(orderedProviders[0] || STREAM_PROVIDERS[0]);
   };
 
-  // Failover watchdog timer: gives current provider 8s to establish playback, otherwise auto-cycles
+  // Failover watchdog timer: gives current provider configured timeout seconds to establish playback
+  // In AUTO mode: auto-cycles to next server. In MANUAL mode or last server: displays custom TMDB error overlay.
   useEffect(() => {
-    if (!autoCycle || !isProbing || allFailed || playerMode !== 'embed') return;
+    if (playerMode !== 'embed' || hasError || allFailed) return;
+
+    // If watchdog is already actively counting down for this provider, do NOT reset or interrupt it!
+    if (watchdogActiveProviderRef.current === providerId && autoCycleTimeoutRef.current) {
+      return;
+    }
+
+    const rawTimeout = typeof streamResolverTimeoutRef.current === 'number'
+      ? streamResolverTimeoutRef.current
+      : (typeof streamResolverTimeout === 'number' ? streamResolverTimeout : 30);
+
+    const timeoutSec = rawTimeout > 0 ? rawTimeout : 30;
+
+    // If explicitly configured as 0 (Unlimited), disable watchdog
+    if (rawTimeout === 0) {
+      console.log(`[AutoCycle Watchdog] Watchdog disabled for "${providerId}" (timeout set to unlimited).`);
+      return;
+    }
 
     if (autoCycleTimeoutRef.current) {
       clearTimeout(autoCycleTimeoutRef.current);
+      autoCycleTimeoutRef.current = null;
     }
 
-    autoCycleTimeoutRef.current = setTimeout(() => {
-      console.warn(`[AutoCycle] Server ${providerId} did not respond in 8s. Auto-cycling to next server...`);
-      cycleToNextProvider();
-    }, 8000);
+    watchdogActiveProviderRef.current = providerId;
+    console.log(`[AutoCycle Watchdog] ⏱️ Watchdog started for "${providerId}": ${timeoutSec}s threshold (mode: ${isUserSelected ? 'manual' : 'auto'}).`);
 
+    autoCycleTimeoutRef.current = setTimeout(() => {
+      console.warn(`[AutoCycle Watchdog] ⏱️ Server "${providerId}" did not establish active video in ${timeoutSec}s.`);
+      autoCycleTimeoutRef.current = null;
+      watchdogActiveProviderRef.current = null;
+
+      // 1. In AUTO mode: if there are more providers to try, auto-cycle immediately!
+      if (autoCycle && !isUserSelected && !allFailed) {
+        console.warn(`[AutoCycle Watchdog] Auto-cycling to next server...`);
+        cycleToNextProviderRef.current();
+        return;
+      }
+
+      // 2. In MANUAL mode or LAST provider: show the custom TMDB error screen!
+      console.warn(`[AutoCycle Watchdog] Manual selection or last provider timed out. Displaying custom TMDB error screen.`);
+      setProviderErrorDetail({
+        title: 'Stream Playback Failed',
+        badge: 'Playback Failed',
+        message: `The server (${provider.name}) responded, but failed to start stream playback within ${timeoutSec}s. Please try switching to another server.`,
+      });
+      setHasError(true);
+      setIsLoading(false);
+      setIsProbing(false);
+    }, timeoutSec * 1000);
+  }, [providerId, autoCycle, isUserSelected, allFailed, playerMode, hasError, provider.name]);
+
+  // Clean up watchdog timer only when providerId changes or player unmounts
+  useEffect(() => {
     return () => {
       if (autoCycleTimeoutRef.current) {
         clearTimeout(autoCycleTimeoutRef.current);
+        autoCycleTimeoutRef.current = null;
+        watchdogActiveProviderRef.current = null;
       }
     };
-  }, [providerId, autoCycle, isProbing, allFailed, playerMode, cycleToNextProvider, iframeKey]);
+  }, [providerId]);
+
+  // Reset provider error details and clear error state whenever active provider changes (e.g. from header dropdown)
+  useEffect(() => {
+    setProviderErrorDetail(null);
+    setHasError(false);
+    setIsLoading(true);
+    setIsProbing(false);
+    setIframeKey((prev) => prev + 1);
+  }, [provider.id, providerId]);
+
+  // When playing direct streams (e.g. Telegram MSM), ensure error overlay is dismissed
+  useEffect(() => {
+    if (playerMode === 'direct') {
+      setHasError(false);
+      setProviderErrorDetail(null);
+    }
+  }, [playerMode]);
+
+  // Intercept native Android iframe connection errors (e.g. ERR_CONNECTION_REFUSED, X-Frame-Options)
+  useEffect(() => {
+    const handleNativeIframeError = (e: Event) => {
+      // Iframe errors only apply when active player is in embed mode
+      if (playerMode !== 'embed') return;
+
+      const customEvent = e as CustomEvent<{ url?: string; code?: number; description?: string }>;
+      const detail = customEvent.detail;
+      console.warn('[VideoPlayer] Intercepted native iframe error:', detail?.url, detail);
+
+      // Verify that the error URL actually relates to the active streamUrl domain
+      if (detail?.url && streamUrl) {
+        try {
+          const errHost = new URL(detail.url).hostname.replace(/^www\./, '');
+          const streamHost = new URL(streamUrl).hostname.replace(/^www\./, '');
+          if (!detail.url.includes(streamHost) && !streamUrl.includes(errHost)) {
+            console.log('[VideoPlayer] Ignoring iframe error for unrelated host:', detail.url);
+            return;
+          }
+        } catch {
+          // If URL parsing fails, ignore domain check
+        }
+      }
+
+      const descLower = (detail?.description || '').toLowerCase();
+      const isConnectionRefused = descLower.includes('refused') || detail?.code === -6;
+      const isXfoBlocked = descLower.includes('x-frame-options');
+
+      setProviderErrorDetail({
+        title: isXfoBlocked ? 'Embedding Blocked by Provider' : 'Unable to Connect to Server',
+        badge: isXfoBlocked ? 'Embed Blocked' : (isConnectionRefused ? 'Connection Refused' : 'Server Stream Unavailable'),
+        message: isXfoBlocked
+          ? `The streaming server (${provider.name}) has disabled third-party embedding. Please switch to another server.`
+          : `The selected server (${provider.name}) refused the connection or is currently unreachable. Please try switching to another server.`,
+      });
+
+      // In AUTO mode: if there are more providers to try, auto-cycle immediately!
+      if (autoCycle && !isUserSelected && !allFailed) {
+        console.warn(`[AutoCycle] Provider ${provider.name} failed to connect. Auto-cycling to next provider...`);
+        if (autoCycleTimeoutRef.current) {
+          clearTimeout(autoCycleTimeoutRef.current);
+          autoCycleTimeoutRef.current = null;
+        }
+        cycleToNextProvider();
+        return;
+      }
+
+      // If MANUAL trigger or LAST provider failed to connect: show TMDB error screen
+      setHasError(true);
+      setIsLoading(false);
+      setIsProbing(false);
+      if (autoCycleTimeoutRef.current) {
+        clearTimeout(autoCycleTimeoutRef.current);
+        autoCycleTimeoutRef.current = null;
+      }
+    };
+
+    window.addEventListener('tmdb_iframe_load_error', handleNativeIframeError);
+    return () => {
+      window.removeEventListener('tmdb_iframe_load_error', handleNativeIframeError);
+    };
+  }, [provider.name, playerMode, streamUrl, autoCycle, isUserSelected, allFailed, cycleToNextProvider]);
+
+  // Proactive pre-flight connection test for embed providers
+  // Catches hard TCP connection refusals within 1.5s before Chromium displays native sad document
+  useEffect(() => {
+    if (playerMode !== 'embed' || !streamUrl) return;
+
+    let isCurrent = true;
+    const controller = new AbortController();
+
+    fetch(streamUrl, { mode: 'no-cors', signal: controller.signal })
+      .catch((err) => {
+        if (!isCurrent) return;
+        if (err.name === 'AbortError') return;
+        console.warn(`[VideoPlayer] Embed pre-flight connection failed for ${provider.id} (${streamUrl}):`, err);
+        setProviderErrorDetail({
+          title: 'Unable to Connect to Server',
+          badge: 'Connection Refused',
+          message: `The server (${provider.name}) refused the connection or is currently unreachable. Please switch to another streaming server.`,
+        });
+
+        // In AUTO mode: if there are more providers to try, auto-cycle immediately!
+        if (autoCycle && !isUserSelected && !allFailed) {
+          console.warn(`[AutoCycle] Pre-flight connection failed for ${provider.name}. Auto-cycling to next provider...`);
+          if (autoCycleTimeoutRef.current) {
+            clearTimeout(autoCycleTimeoutRef.current);
+            autoCycleTimeoutRef.current = null;
+          }
+          cycleToNextProvider();
+          return;
+        }
+
+        // If MANUAL trigger or LAST provider failed to connect: show TMDB error screen
+        setHasError(true);
+        setIsLoading(false);
+        setIsProbing(false);
+        if (autoCycleTimeoutRef.current) {
+          clearTimeout(autoCycleTimeoutRef.current);
+          autoCycleTimeoutRef.current = null;
+        }
+      });
+
+    return () => {
+      isCurrent = false;
+      controller.abort();
+    };
+  }, [streamUrl, playerMode, provider.id, provider.name, autoCycle, isUserSelected, allFailed, cycleToNextProvider]);
 
   const handleIframeLoaded = () => {
-    if (autoCycleTimeoutRef.current) {
-      clearTimeout(autoCycleTimeoutRef.current);
-    }
     setIsLoading(false);
-    setIsProbing(false);
-    setHasError(false);
+    if (!providerErrorDetail) {
+      setHasError(false);
+    }
 
     // Active un-muting routine across embedded video players (VidLink, VidSrc, Plyr, JWPlayer, Video.js)
     const sendUnmuteMessages = () => {
@@ -1920,6 +2115,8 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const handleIframeError = () => {
     if (autoCycleTimeoutRef.current) {
       clearTimeout(autoCycleTimeoutRef.current);
+      autoCycleTimeoutRef.current = null;
+      watchdogActiveProviderRef.current = null;
     }
 
     // If active provider is Dramacool and has backup servers (e.g. Streamtape, MixDrop), try next server first
@@ -1946,6 +2143,8 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
   const handleRefresh = () => {
     resetControlsTimer();
+    setHasError(false);
+    setProviderErrorDetail(null);
     if (playerMode === 'direct') {
       setIsExtracting(true);
       setExtractionFailed(false);
@@ -2192,8 +2391,8 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         />
       )}
 
-      {/* STATE 4: Protected Video Embed (ONLY rendered if embed is enabled) */}
-      {playerMode === 'embed' && enabledResolvers.includes('embed') && (
+      {/* STATE 4: Protected Video Embed (ONLY rendered if embed is enabled and no error) */}
+      {playerMode === 'embed' && enabledResolvers.includes('embed') && !hasError && (
         <iframe
           ref={iframeRef}
           key={`${streamUrl}-${iframeKey}-${adShieldEnabled}`}
@@ -2247,24 +2446,38 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       )}
 
       {/* Fallback Error Overlay */}
-      {hasError && (
-        <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-black/95 backdrop-blur-md p-6 text-center animate-fade-in">
-          <div className="mb-4">
+      {hasError && playerMode !== 'direct' && (
+        <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-black/95 backdrop-blur-md p-6 text-center animate-fade-in select-none">
+          <div className="mb-4 drop-shadow-[0_0_25px_rgba(103,58,183,0.5)]">
             <Logo size="lg" showText={true} />
           </div>
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-red-500/20 border border-red-500/40 text-red-400 text-xs font-bold mb-3">
+          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-red-500/20 border border-red-500/40 text-red-400 text-xs font-bold mb-3">
             <AlertCircle className="w-4 h-4" />
-            <span>{allFailed ? 'All Stream Servers Attempted' : 'Server Stream Unavailable'}</span>
+            <span>{providerErrorDetail?.badge || (allFailed ? 'All Stream Servers Attempted' : 'Server Stream Unavailable')}</span>
           </div>
           <h3 className="text-lg sm:text-xl font-black font-display text-white mb-2 tracking-tight">
-            Unable to Load Video Stream
+            {providerErrorDetail?.title || 'Unable to Load Video Stream'}
           </h3>
           <p className="text-xs sm:text-sm text-gray-400 max-w-md mb-6 leading-relaxed">
-            {allFailed
+            {providerErrorDetail?.message || (allFailed
               ? `We tested all ${STREAM_PROVIDERS.length} streaming servers, but none responded with an active video feed for this title right now.`
-              : `The selected server (${provider.name}) could not stream "${title}". Please try switching to another server.`}
+              : `The selected server (${provider.name}) could not stream "${title}". Please try switching to another server.`)}
           </p>
           <div className="flex flex-wrap items-center justify-center gap-3">
+            {resolvedMsm32Url && (
+              <button
+                onClick={() => {
+                  setPlayerMode('direct');
+                  setDirectStreamUrl(resolvedMsm32Url);
+                  setDirectStreamLabel('Telegram (MSM32)');
+                  setHasError(false);
+                  setProviderErrorDetail(null);
+                }}
+                className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 text-white font-bold text-xs sm:text-sm shadow-[0_0_20px_rgba(6,182,212,0.4)] hover:scale-105 transition tv-focus-target"
+              >
+                Play via Telegram (MSM32)
+              </button>
+            )}
             {provider.id === 'dramacool-kdrama' && dramacoolServers.length > 1 && (
               <button
                 onClick={() => {
@@ -2274,6 +2487,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                   setResolvedDramacoolUrl(nextServer.url);
                   setDirectStreamLabel(`Dramacool (${nextServer.name})`);
                   setHasError(false);
+                  setProviderErrorDetail(null);
                   setIsLoading(true);
                   setIframeKey((prev) => prev + 1);
                 }}
@@ -2283,16 +2497,16 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
               </button>
             )}
             <button
-              onClick={restartAutoCycle}
+              onClick={cycleToNextProvider}
               className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-hbo-purple to-hbo-cyan text-white font-bold text-xs sm:text-sm shadow-hbo-glow hover:scale-105 transition tv-focus-target"
             >
-              Restart Auto-Cycle (All Servers)
+              Switch to Next Server
             </button>
             <button
-              onClick={cycleToNextProvider}
+              onClick={handleRefresh}
               className="px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs sm:text-sm font-semibold border border-white/20 transition hover:scale-105 tv-focus-target"
             >
-              Try Next Server
+              Retry Server
             </button>
           </div>
         </div>
