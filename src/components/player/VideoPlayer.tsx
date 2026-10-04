@@ -946,9 +946,16 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
       if (!isMounted || abortController.signal.aborted) return;
 
-      // Final fallback to Embed Resolver ONLY if explicitly enabled
+      if (autoCycle && !isUserSelected && !allFailed) {
+        console.warn(`[Resolver] Stream not resolved for "${provider.name}", auto-cycling to next provider...`);
+        setResolvingStatus('Cycling to next provider...');
+        cycleToNextProvider();
+        return;
+      }
+
+      // If user manually selected this specific provider and embed is enabled, attempt embed
       if (enabledResolvers.includes('embed')) {
-        console.log('[Resolver] Fallback: Embed Resolver');
+        console.log('[Resolver] User selected provider fallback: Embed Resolver');
         const cleanName = provider.name.replace(/\s*\([^)]*\)/g, '').trim();
         setResolvingStatus(`Loading embed player (${cleanName})...`);
         setPlayerMode('embed');
@@ -2544,11 +2551,14 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
               setResolvedMsm32Url(transcodedUrl);
               return;
             }
-            if (enabledResolvers.includes('embed')) {
-              console.log('[DirectStream] Playback error on direct stream. Fallback to embed.');
+            if (autoCycle && !isUserSelected && !allFailed) {
+              console.log('[DirectStream] Playback error on direct stream. Auto-cycling to next provider...');
+              cycleToNextProvider();
+            } else if (enabledResolvers.includes('embed')) {
+              console.log('[DirectStream] Playback error on direct stream. Embed is enabled, switching to embed player.');
               setPlayerMode('embed');
             } else {
-              console.log('[DirectStream] Playback error on direct stream. Embed is disabled.');
+              console.log('[DirectStream] Playback error on direct stream. Direct stream failed.');
               setPlayerMode('error');
             }
             setDirectStreamUrl(null);
