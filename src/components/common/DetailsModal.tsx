@@ -4,6 +4,7 @@ import { X, Play, Heart, Bookmark, Star, Calendar, Clock, Film, ShieldAlert } fr
 import type { TMDBMediaItem, TMDBMovieDetails, TMDBTVDetails } from '../../types/tmdb';
 import { tmdbApi, tmdbImages, extractContentRating, isExplicitAdultCertification } from '../../services/tmdb';
 import { dbService } from '../../services/db';
+import { getMediaOriginCountries } from '../../services/streamProviders';
 
 interface DetailsModalProps {
   item: TMDBMediaItem | null;
@@ -15,6 +16,7 @@ export const DetailsModal: React.FC<DetailsModalProps> = ({ item, onClose }) => 
   const [isLoading, setIsLoading] = useState(false);
   const [isLiked, setIsLiked] = useState(false);
   const [isWatchlist, setIsWatchlist] = useState(false);
+  const originCountries = React.useMemo(() => getMediaOriginCountries(details || item), [details, item]);
 
   const mediaType: 'movie' | 'tv' = item?.media_type === 'tv' ? 'tv' : 'movie';
 
@@ -182,6 +184,23 @@ export const DetailsModal: React.FC<DetailsModalProps> = ({ item, onClose }) => 
             </div>
             <span>•</span>
             <span>{releaseYear}</span>
+            {originCountries.length > 0 && (
+              <>
+                <span>•</span>
+                <span className="inline-flex items-center gap-1.5 flex-wrap">
+                  {originCountries.map((c) => (
+                    <span
+                      key={c.code}
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white/[0.08] border border-white/15 text-white text-xs font-medium shadow-sm"
+                      title={`Country of Origin: ${c.name}`}
+                    >
+                      <span className="text-sm leading-none">{c.flag}</span>
+                      <span>{c.name}</span>
+                    </span>
+                  ))}
+                </span>
+              </>
+            )}
             {contentRating && (
               <>
                 <span>•</span>

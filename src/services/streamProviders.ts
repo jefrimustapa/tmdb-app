@@ -324,6 +324,101 @@ export const ORIGIN_COUNTRY_LABELS: Record<OriginCountryCode, string> = {
   GLOBAL: 'Global / Other 🌐',
 };
 
+export function getCountryFlag(isoCode: string): string {
+  if (!isoCode || isoCode.length !== 2) return '🌐';
+  const codePoints = isoCode
+    .toUpperCase()
+    .split('')
+    .map((char) => 127397 + char.charCodeAt(0));
+  try {
+    return String.fromCodePoint(...codePoints);
+  } catch {
+    return '🌐';
+  }
+}
+
+const regionDisplayNames = typeof Intl !== 'undefined' && Intl.DisplayNames
+  ? new Intl.DisplayNames(['en'], { type: 'region' })
+  : null;
+
+export function getCountryName(isoCode: string): string {
+  if (!isoCode) return '';
+  const code = isoCode.toUpperCase();
+  try {
+    return regionDisplayNames?.of(code) || code;
+  } catch {
+    return code;
+  }
+}
+
+export interface MediaOriginDisplay {
+  code: string;
+  name: string;
+  flag: string;
+}
+
+export function getMediaOriginCountries(media?: any): MediaOriginDisplay[] {
+  if (!media) return [];
+  const codes: string[] = [];
+
+  // 1. origin_country (array of ISO-3166-1 codes, e.g. ['MY'])
+  if (Array.isArray(media.origin_country)) {
+    for (const c of media.origin_country) {
+      if (typeof c === 'string' && c.trim()) {
+        const upper = c.trim().toUpperCase();
+        if (!codes.includes(upper)) codes.push(upper);
+      }
+    }
+  }
+
+  // 2. production_countries (array of objects { iso_3166_1, name })
+  if (codes.length === 0 && Array.isArray(media.production_countries)) {
+    for (const pc of media.production_countries) {
+      const c = pc?.iso_3166_1;
+      if (typeof c === 'string' && c.trim()) {
+        const upper = c.trim().toUpperCase();
+        if (!codes.includes(upper)) codes.push(upper);
+      }
+    }
+  }
+
+  // 3. Fallback from original_language if no explicit country was provided
+  if (codes.length === 0 && media.original_language) {
+    const lang = String(media.original_language).toLowerCase();
+    const langToCountry: Record<string, string> = {
+      ms: 'MY',
+      id: 'ID',
+      ko: 'KR',
+      ja: 'JP',
+      th: 'TH',
+      tl: 'PH',
+      vi: 'VN',
+      zh: 'CN',
+      en: 'US',
+      hi: 'IN',
+      es: 'ES',
+      fr: 'FR',
+      de: 'DE',
+      it: 'IT',
+      pt: 'BR',
+      tr: 'TR',
+      ru: 'RU',
+    };
+    if (langToCountry[lang]) {
+      codes.push(langToCountry[lang]);
+    }
+  }
+
+  return codes.map((code) => {
+    const prodMatch = Array.isArray(media.production_countries)
+      ? media.production_countries.find((pc: any) => pc?.iso_3166_1?.toUpperCase() === code)
+      : null;
+    const name = prodMatch?.name || getCountryName(code);
+    const flag = getCountryFlag(code);
+    return { code, name, flag };
+  });
+}
+
 export function getProviderById(id: string): StreamProvider {
   return STREAM_PROVIDERS.find(p => p.id === id) || STREAM_PROVIDERS[0];
 }
