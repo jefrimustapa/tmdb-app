@@ -2,8 +2,8 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20261004-1049';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.fix-embed-provider-e.20261004-1049';
+export const APP_BUILD_NUMBER = '20261004-1058';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.fix-embed-provider-e.20261004-1058';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
 export const APP_BRANCH = 'fix-embed-provider-e';
@@ -21,5 +21,4 @@ export const APP_CHANGELOG = `* fix(player): require sustained active media play
 * fix(player): dismiss error overlay on MSM direct stream and scope native error interception to iframe docs
 * fix(player): clear error state and remount iframe when selecting provider from header
 * feat(player): intercept native iframe connection errors and display custom TMDB error overlay
-* Merge pull request #181 from jefrimustapa/feat/improve-msm-series-search
-* fix(player): resolve seek state lock, extend transcode seek watchdog, and preserve touch activation`;
+* Merge pull request #181 from jefrimustapa/feat/improve-msm-series-search`;

@@ -1029,7 +1029,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const lastSaveTimeRef = useRef<number>(0);
 
   // Unified progress recorder (Throttled to 10s to guarantee 0% CPU & I/O overhead on TV)
-  const recordProgress = useCallback((currentSec: number, totalDurationSec: number, force = false) => {
+  const recordProgress = useCallback((currentSec: number, totalDurationSec: number, force = false, isLive = false) => {
     if ((!totalDurationSec || totalDurationSec <= 0) && episodeRuntimeMinutes) {
       totalDurationSec = episodeRuntimeMinutes * 60;
     }
@@ -1043,8 +1043,8 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
     currentTimeRef.current = currentSec;
 
-    // Immediately clear watchdog timeout whenever verified progress > 0 arrives from any provider
-    if (currentSec > 0 && autoCycleTimeoutRef.current) {
+    // Immediately clear watchdog timeout ONLY whenever verified LIVE playback progress > 0 arrives
+    if (isLive && currentSec > 0 && autoCycleTimeoutRef.current) {
       console.log(`[AutoCycle Watchdog] ✅ Active video playback verified (time: ${currentSec}s). Watchdog cleared.`);
       clearTimeout(autoCycleTimeoutRef.current);
       autoCycleTimeoutRef.current = null;
@@ -1052,6 +1052,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       setIsLoading(false);
       setHasError(false);
       setIsProbing(false);
+      isPlayingRef.current = true;
     }
     const now = Date.now();
 
@@ -1415,8 +1416,8 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           const evt = data.data.event;
           const current = data.data.currentTime ?? data.data.seconds ?? 0;
           const dur = data.data.duration ?? data.data.totalDuration ?? 0;
-          if (current > 0) {
-            recordProgress(current, dur, evt === 'ended');
+          if (current > 0 && (evt === 'timeupdate' || evt === 'time' || evt === 'playing')) {
+            recordProgress(current, dur, evt === 'ended', true);
             if (autoCycleTimeoutRef.current) {
               console.log(`[AutoCycle Watchdog] ✅ PLAYER_EVENT verified active playback (${current}s). Watchdog cleared.`);
               clearTimeout(autoCycleTimeoutRef.current);
@@ -1430,7 +1431,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           return;
         }
 
-        // 2. VidLink MEDIA_DATA dictionary
+        // 2. VidLink MEDIA_DATA dictionary (SAVED WATCH HISTORY - NOT LIVE PLAYBACK!)
         if (data.type === 'MEDIA_DATA' && data.data) {
           lastPostMessageTimeRef.current = Date.now();
           const item = data.data[tmdbId];
@@ -1439,10 +1440,10 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
               const epKey = `s${season}e${episode}`;
               const epProgress = item.show_progress[epKey]?.progress;
               if (epProgress && epProgress.watched > 0) {
-                recordProgress(epProgress.watched, epProgress.duration || 0);
+                recordProgress(epProgress.watched, epProgress.duration || 0, false, false);
               }
             } else if (item.progress && item.progress.watched > 0) {
-              recordProgress(item.progress.watched, item.progress.duration || 0);
+              recordProgress(item.progress.watched, item.progress.duration || 0, false, false);
             }
           }
           return;
@@ -1452,14 +1453,14 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         if (data.channel === 'megacloud' || data.channel === 'megaplay' || data.type === 'watching-log') {
           if (data.event === 'complete') {
             const endDur = durationRef.current || (episodeRuntimeMinutes ? episodeRuntimeMinutes * 60 : 1440);
-            recordProgress(endDur, endDur, true);
+            recordProgress(endDur, endDur, true, true);
             return;
           }
           const current = data.time ?? data.currentTime ?? data.seconds ?? 0;
           const dur = data.duration ?? data.totalDuration ?? 0;
           if (current > 0) {
             lastPostMessageTimeRef.current = Date.now();
-            recordProgress(current, dur);
+            recordProgress(current, dur, false, true);
           }
           return;
         }
@@ -1468,14 +1469,14 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         if (data.type === 'kisskh' || data.channel === 'kisskh') {
           if (data.event === 'ended') {
             const endDur = durationRef.current || data.duration || (episodeRuntimeMinutes ? episodeRuntimeMinutes * 60 : 0);
-            if (endDur > 0) recordProgress(endDur, endDur, true);
+            if (endDur > 0) recordProgress(endDur, endDur, true, true);
             return;
           }
           const current = data.currentTime ?? data.time ?? data.seconds ?? 0;
           const dur = data.duration ?? 0;
           if (current > 0) {
             lastPostMessageTimeRef.current = Date.now();
-            recordProgress(current, dur);
+            recordProgress(current, dur, false, true);
           }
           return;
         }
@@ -1484,14 +1485,14 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         if (data.type === 'dramacool' || data.channel === 'dramacool') {
           if (data.event === 'ended') {
             const endDur = durationRef.current || data.duration || (episodeRuntimeMinutes ? episodeRuntimeMinutes * 60 : 0);
-            if (endDur > 0) recordProgress(endDur, endDur, true);
+            if (endDur > 0) recordProgress(endDur, endDur, true, true);
             return;
           }
           const current = data.currentTime ?? data.time ?? data.seconds ?? 0;
           const dur = data.duration ?? 0;
           if (current > 0) {
             lastPostMessageTimeRef.current = Date.now();
-            recordProgress(current, dur);
+            recordProgress(current, dur, false, true);
           }
           return;
         }
@@ -1518,7 +1519,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           if (subType === 'ended') {
             isPlayingRef.current = false;
             const endDur = durationRef.current || data.duration || (episodeRuntimeMinutes ? episodeRuntimeMinutes * 60 : 0);
-            if (endDur > 0) recordProgress(endDur, endDur, true);
+            if (endDur > 0) recordProgress(endDur, endDur, true, true);
             return;
           }
 
@@ -1534,7 +1535,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             const dur = data.duration ?? 0;
             if (current > 0) {
               lastPostMessageTimeRef.current = Date.now();
-              recordProgress(current, dur);
+              recordProgress(current, dur, false, true);
               setIsProbing(false);
               if (autoCycleTimeoutRef.current) {
                 clearTimeout(autoCycleTimeoutRef.current);
@@ -1550,14 +1551,14 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         if (data.event === 'timeupdate' || data.event === 'progress' || data.event === 'time') {
           if (data.event === 'complete' || data.event === 'ended') {
             const endDur = durationRef.current || (episodeRuntimeMinutes ? episodeRuntimeMinutes * 60 : 0);
-            if (endDur > 0) recordProgress(endDur, endDur, true);
+            if (endDur > 0) recordProgress(endDur, endDur, true, true);
             return;
           }
           const current = data.currentTime ?? data.data?.currentTime ?? data.time ?? data.seconds ?? 0;
           const dur = data.duration ?? data.data?.duration ?? data.totalDuration ?? 0;
           if (current > 0) {
             lastPostMessageTimeRef.current = Date.now();
-            recordProgress(current, dur);
+            recordProgress(current, dur, false, true);
             setIsProbing(false);
             if (autoCycleTimeoutRef.current) {
               clearTimeout(autoCycleTimeoutRef.current);
