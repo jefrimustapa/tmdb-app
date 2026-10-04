@@ -42,9 +42,14 @@ export const Home: React.FC = () => {
 
   const handleHeroSlideChange = useCallback((item: TMDBMediaItem | null) => {
     if (!item) return;
-    const path = item.backdrop_path || item.poster_path;
-    if (path) {
-      const url = tmdbImages.backdrop(path, 'w300');
+    const isLandscape = typeof window !== 'undefined' ? window.innerWidth > window.innerHeight : false;
+
+    // In portrait (!isLandscape), extract dominant color from poster (w342). In landscape, use backdrop (w300).
+    const url = !isLandscape
+      ? (item.poster_path ? tmdbImages.poster(item.poster_path, 'w342') : tmdbImages.backdrop(item.backdrop_path, 'w300'))
+      : (item.backdrop_path ? tmdbImages.backdrop(item.backdrop_path, 'w300') : tmdbImages.poster(item.poster_path, 'w342'));
+
+    if (url) {
       extractDominantColor(url).then((color) => {
         if (color) setDominantColor(color);
       });
