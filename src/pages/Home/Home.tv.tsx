@@ -240,7 +240,7 @@ export const Home: React.FC = () => {
   return (
     <div
       className="min-h-screen pb-16 transition-colors duration-700 ease-in-out"
-      style={getAdaptiveBackgroundStyle(dominantColor, 0.42)}
+      style={getAdaptiveBackgroundStyle(dominantColor, 0.75)}
     >
       {/* Hero Billboard Full-Width Sliding Carousel */}
       <HeroBanner items={trending} onActiveItemChange={handleHeroSlideChange} />

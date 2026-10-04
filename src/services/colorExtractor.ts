@@ -81,15 +81,15 @@ export async function extractDominantColor(imageUrl: string | null | undefined):
           const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
 
           // Ignore extreme blacks (letterboxing/shadows) and blown-out whites/highlights
-          if (lum < 20 || lum > 230) continue;
+          if (lum < 25 || lum > 235) continue;
 
-          // Saturation weight: encourage vibrant cinematic hues over dull grays
+          // Saturation weight: strongly favor vibrant cinematic hues over dull neutrals/grays
           const max = Math.max(r, g, b);
           const min = Math.min(r, g, b);
           const saturation = max === 0 ? 0 : (max - min) / max;
 
-          // Weighting: pixels with rich color get exponentially higher weight
-          const weight = 1 + saturation * 3;
+          // Exponential saturation weighting (vivid colors dominate over muddy skin/background tones)
+          const weight = saturation > 0.20 ? Math.pow(saturation, 3) * 100 : 0.05;
 
           rAcc += r * weight;
           gAcc += g * weight;
@@ -101,18 +101,9 @@ export async function extractDominantColor(imageUrl: string | null | undefined):
           return finish(null);
         }
 
-        let r = Math.round(rAcc / totalWeight);
-        let g = Math.round(gAcc / totalWeight);
-        let b = Math.round(bAcc / totalWeight);
-
-        // Clamp brightness to keep the dark cinematic aesthetic
-        const finalLum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-        if (finalLum > 160) {
-          const scale = 160 / finalLum;
-          r = Math.round(r * scale);
-          g = Math.round(g * scale);
-          b = Math.round(b * scale);
-        }
+        const r = Math.round(rAcc / totalWeight);
+        const g = Math.round(gAcc / totalWeight);
+        const b = Math.round(bAcc / totalWeight);
 
         const dominant: DominantColor = {
           r,
@@ -132,19 +123,21 @@ export async function extractDominantColor(imageUrl: string | null | undefined):
       finish(null);
     };
 
-    img.src = imageUrl;
+    // Append ?cors=1 to prevent Chromium from reusing non-CORS cached images from DOM <img> tags
+    const corsSafeUrl = imageUrl.includes('?') ? `${imageUrl}&cors=1` : `${imageUrl}?cors=1`;
+    img.src = corsSafeUrl;
   });
 }
 
 /**
  * Returns a React CSS style object with an adaptive ambient background gradient.
- * - Under hero banner (0% - 48vh): Deep black (#050508) matching the original hero banner bottom tint seamlessly.
- * - After hero banner down to bottom (48vh -> 100%): Transitions continuously from dark (#050508)
- *   to a rich translucent ambient tint (lutsinar), so the very bottom is translucent dominant color.
+ * - Under hero banner (0% - 55vh): Deep black (#050508) matching the hero banner bottom tint seamlessly.
+ * - After hero banner down to bottom (55vh -> 100%): Transitions smoothly from dark (#050508)
+ *   to a rich translucent ambient tint, making the rails glow with the dominant color.
  */
 export function getAdaptiveBackgroundStyle(
   color: DominantColor | null,
-  accentOpacity = 0.52
+  accentOpacity = 0.70
 ): React.CSSProperties {
   if (!color) {
     return {
@@ -155,11 +148,11 @@ export function getAdaptiveBackgroundStyle(
 
   const { r, g, b } = color;
   const oPeak = accentOpacity.toFixed(3);
-  const oMid = (accentOpacity * 0.60).toFixed(3);
-  const oSubtle = (accentOpacity * 0.25).toFixed(3);
+  const oMid = (accentOpacity * 0.70).toFixed(3);
+  const oSubtle = (accentOpacity * 0.40).toFixed(3);
 
   return {
-    background: `linear-gradient(180deg, #050508 0%, #050508 70vh, rgba(${r}, ${g}, ${b}, ${oSubtle}) 85vh, rgba(${r}, ${g}, ${b}, ${oMid}) 105vh, rgba(${r}, ${g}, ${b}, ${oPeak}) 100%)`,
+    backgroundImage: `linear-gradient(180deg, #050508 0%, #050508 55vh, rgba(${r}, ${g}, ${b}, ${oSubtle}) 75vh, rgba(${r}, ${g}, ${b}, ${oMid}) 92vh, rgba(${r}, ${g}, ${b}, ${oPeak}) 100%)`,
     backgroundColor: '#050508',
     transition: 'background 0.8s cubic-bezier(0.16, 1, 0.3, 1)'
   };
