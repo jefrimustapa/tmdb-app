@@ -2,12 +2,13 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20261004-1519';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-adaptive-bg-col.20261004-1519';
+export const APP_BUILD_NUMBER = '20261004-1527';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-adaptive-bg-col.20261004-1527';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
 export const APP_BRANCH = 'feat-adaptive-bg-col';
-export const APP_CHANGELOG = `* Merge pull request #184 from jefrimustapa/fix/kisskh-selection-matching
+export const APP_CHANGELOG = `* feat(ui): implement dynamic adaptive background colors for home, details and modal
+* Merge pull request #184 from jefrimustapa/fix/kisskh-selection-matching
 * fix(kisskh): enforce English-first search queries and implement score-based candidate selection algorithm
 * Merge pull request #183 from jefrimustapa/fix/embed-provider-error-classification
 * chore: bump build version
@@ -20,5 +21,4 @@ export const APP_CHANGELOG = `* Merge pull request #184 from jefrimustapa/fix/ki
 * fix(player): add native audio playback detector and universal watchdog cancellation across embed providers
 * fix(player): accurately classify HTTP server errors vs embedding blocks and expand iframe error interception
 * Merge pull request #182 from jefrimustapa/feat/improve-provider-error-display
-* feat(settings): set timeout options to 30/60/90/180/240 with default 30s and refine playback failed message
-* fix(player): activate timeout in manual selection to display custom TMDB error overlay upon timeout`;
+* feat(settings): set timeout options to 30/60/90/180/240 with default 30s and refine playback failed message`;
