@@ -159,7 +159,7 @@ export function getAdaptiveBackgroundStyle(
   const oSubtle = (accentOpacity * 0.25).toFixed(3);
 
   return {
-    background: `linear-gradient(180deg, #050508 0%, #050508 115vh, rgba(${r}, ${g}, ${b}, ${oSubtle}) 145vh, rgba(${r}, ${g}, ${b}, ${oMid}) 185vh, rgba(${r}, ${g}, ${b}, ${oPeak}) 100%)`,
+    background: `linear-gradient(180deg, #050508 0%, #050508 70vh, rgba(${r}, ${g}, ${b}, ${oSubtle}) 85vh, rgba(${r}, ${g}, ${b}, ${oMid}) 105vh, rgba(${r}, ${g}, ${b}, ${oPeak}) 100%)`,
     backgroundColor: '#050508',
     transition: 'background 0.8s cubic-bezier(0.16, 1, 0.3, 1)'
   };
