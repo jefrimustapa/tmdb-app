@@ -153,33 +153,6 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     });
   }, [activeTopProviders, isAnime, activeAsean, isKorean, enabledResolvers, effectiveOriginCountries, telegramProviderCountries, enabledTelegramProviders]);
 
-  const getFallbackEmbedProvider = useCallback((): StreamProvider => {
-    // 1. First priority: First available embed provider from orderedProviders
-    const firstEligible = orderedProviders.find((p) => (p.engine || 'embed') === 'embed');
-    if (firstEligible) return firstEligible;
-
-    // 2. Context-aware top pick from user settings
-    if (activeAsean && topAseanProviders && topAseanProviders.length > 0) {
-      const aseanPick = topAseanProviders.find((id) => id !== 'telegram-msm32');
-      if (aseanPick) return getProviderById(aseanPick);
-    }
-    if (isAnime && topAnimeProviders && topAnimeProviders.length > 0) {
-      const animePick = topAnimeProviders.find((id) => id !== 'telegram-msm32');
-      if (animePick) return getProviderById(animePick);
-    }
-    if (isKorean && topKoreanProviders && topKoreanProviders.length > 0) {
-      const koreanPick = topKoreanProviders.find((id) => id !== 'telegram-msm32');
-      if (koreanPick) return getProviderById(koreanPick);
-    }
-    if (topProviders && topProviders.length > 0) {
-      const generalPick = topProviders.find((id) => id !== 'telegram-msm32');
-      if (generalPick) return getProviderById(generalPick);
-    }
-
-    // 3. Fallback safety net
-    return getProviderById('vidlink');
-  }, [orderedProviders, activeAsean, isAnime, isKorean, topAseanProviders, topAnimeProviders, topKoreanProviders, topProviders]);
-
   // Up Next state
   const [showUpNext, setShowUpNext] = useState(false);
   const [countdown, setCountdown] = useState(10);
@@ -305,6 +278,68 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       setShowControls(false);
     }, 3500);
   }, []);
+
+  const lastCycleAttemptRef = useRef<{ providerId: string; time: number }>({ providerId: '', time: 0 });
+
+  const cycleToNextProvider = useCallback(() => {
+    resetControlsTimer();
+    const now = Date.now();
+    // Guard against multiple rapid error triggers for the same provider (e.g. preflight fetch + native iframe error within 1500ms)
+    if (
+      lastCycleAttemptRef.current.providerId === providerId &&
+      now - lastCycleAttemptRef.current.time < 1500
+    ) {
+      console.warn(`[AutoCycle] 🛡️ Ignoring duplicate cycle trigger for "${providerId}" within debounce window.`);
+      return;
+    }
+    lastCycleAttemptRef.current = { providerId, time: now };
+
+    setTriedProviders((prev) => {
+      const updatedTried = Array.from(new Set([...prev, providerId]));
+      if (updatedTried.length >= orderedProviders.length) {
+        console.warn('[AutoCycle] ⚠️ All available providers have been tried and failed.');
+        setAllFailed(true);
+        setIsProbing(false);
+        setIsLoading(false);
+        return updatedTried;
+      }
+
+      // Find the next eligible provider in orderedProviders that has NOT been tried yet
+      const currentIndex = orderedProviders.findIndex((p) => p.id === providerId);
+      let nextProvider: StreamProvider | undefined;
+
+      // Start searching forward from current index
+      for (let offset = 1; offset < orderedProviders.length; offset++) {
+        const candidateIndex = (currentIndex + offset) % orderedProviders.length;
+        const candidate = orderedProviders[candidateIndex];
+        if (candidate && !updatedTried.includes(candidate.id)) {
+          nextProvider = candidate;
+          break;
+        }
+      }
+
+      // Fallback: pick any untried provider
+      if (!nextProvider) {
+        nextProvider = orderedProviders.find((p) => !updatedTried.includes(p.id));
+      }
+
+      if (nextProvider) {
+        console.log(`[AutoCycle] 🔄 Advancing from "${providerId}" to next untried provider "${nextProvider.id}" (${updatedTried.length + 1}/${orderedProviders.length})...`);
+        setIsLoading(true);
+        setHasError(false);
+        onProviderChange(nextProvider);
+      } else {
+        setAllFailed(true);
+        setIsProbing(false);
+        setIsLoading(false);
+      }
+
+      return updatedTried;
+    });
+  }, [providerId, onProviderChange, resetControlsTimer, orderedProviders]);
+
+  const cycleToNextProviderRef = useRef(cycleToNextProvider);
+  cycleToNextProviderRef.current = cycleToNextProvider;
 
   // Show controls on initial load or fullscreen change
   useEffect(() => {
@@ -443,10 +478,9 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       // 0. TELEGRAM PROVIDER (MovieSubMalay MSM32)
       if (providerId === 'telegram-msm32' || provider.engine === 'telegram') {
         if (!isTelegramOriginMatching && !isUserSelected) {
-          console.log(`[Resolver] Title origin (${effectiveOriginCountries.join(',') || 'unknown'}) is not within telegram-msm filter, skipping to next engine...`);
-          if (enabledResolvers.includes('embed')) {
-            const fallbackProvider = getFallbackEmbedProvider();
-            onProviderChange(fallbackProvider);
+          console.log(`[Resolver] Title origin (${effectiveOriginCountries.join(',') || 'unknown'}) is not within telegram-msm filter, auto-cycling to next provider...`);
+          if (autoCycle && !allFailed) {
+            cycleToNextProvider();
             return;
           } else {
             setResolvingStatus('Title origin is not supported by Telegram MSM filter.');
@@ -623,13 +657,12 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           }
 
           console.warn('[Resolver] Telegram stream not found');
-          if (enabledResolvers.includes('embed')) {
-            setResolvingStatus('Telegram stream not found, switching to primary embed...');
-            const fallbackProvider = getFallbackEmbedProvider();
-            onProviderChange(fallbackProvider);
+          if (autoCycle && !isUserSelected && !allFailed) {
+            setResolvingStatus('Telegram stream not found, cycling to next provider...');
+            cycleToNextProvider();
             return;
           } else {
-            console.log('[Resolver] Telegram stream not found and Embed Resolver is disabled.');
+            console.log('[Resolver] Telegram stream not found and auto-cycle is unavailable.');
             setResolvingStatus('No stream found in Telegram Provider.');
             setPlayerMode('error');
             setIsExtracting(false);
@@ -638,9 +671,9 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           }
         } catch (err) {
           console.warn('[Resolver] Telegram resolution error:', err);
-          if (enabledResolvers.includes('embed')) {
-            const fallbackProvider = getFallbackEmbedProvider();
-            onProviderChange(fallbackProvider);
+          if (autoCycle && !isUserSelected && !allFailed) {
+            setResolvingStatus('Telegram resolver error, cycling to next provider...');
+            cycleToNextProvider();
             return;
           } else {
             setResolvingStatus('Telegram resolver error.');
@@ -718,14 +751,18 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           }
         }
 
-        console.warn('[Resolver] PencuriMovie resolution exhausted all retries, auto-failover to next Asean provider...');
-        setResolvingStatus('Failing over to next Asean provider...');
-        const aseanFallbackId = (topAseanProviders && topAseanProviders.length > 0)
-          ? topAseanProviders.find(p => p !== 'pencurimovie-my') || 'vidlink'
-          : 'vidlink';
-        const fallbackProvider = getProviderById(aseanFallbackId);
-        onProviderChange(fallbackProvider);
-        return;
+        console.warn('[Resolver] PencuriMovie resolution exhausted all retries, auto-cycling to next provider...');
+        if (autoCycle && !isUserSelected && !allFailed) {
+          setResolvingStatus('Failing over to next provider...');
+          cycleToNextProvider();
+          return;
+        } else {
+          setResolvingStatus('No stream found in PencuriMovie (Abyss).');
+          setPlayerMode('error');
+          setIsExtracting(false);
+          setIsLoading(false);
+          return;
+        }
       }
 
 
@@ -757,20 +794,31 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             onActiveServerChange?.('LARI21', 'lari21-asian');
             return;
           }
-          console.warn('[Resolver] LARI21 resolution returned no stream or timed out, auto-failover to next Asean provider...');
-          setResolvingStatus('Failing over to next Asean provider...');
-          // Fast failover to next provider in Asean priority list
-          const aseanFallbackId = (topAseanProviders && topAseanProviders.length > 0)
-            ? topAseanProviders.find(p => p !== 'lari21-asian' && p !== 'lk21-asian') || 'vidlink'
-            : 'vidlink';
-          const fallbackProvider = getProviderById(aseanFallbackId);
-          onProviderChange(fallbackProvider);
-          return;
+          console.warn('[Resolver] LARI21 resolution returned no stream or timed out, auto-cycling to next provider...');
+          if (autoCycle && !isUserSelected && !allFailed) {
+            setResolvingStatus('Failing over to next provider...');
+            cycleToNextProvider();
+            return;
+          } else {
+            setResolvingStatus('No stream found in LARI21.');
+            setPlayerMode('error');
+            setIsExtracting(false);
+            setIsLoading(false);
+            return;
+          }
         } catch (err) {
           console.warn('[Resolver] LARI21 resolution error:', err);
-          const fallbackProvider = getFallbackEmbedProvider();
-          onProviderChange(fallbackProvider);
-          return;
+          if (autoCycle && !isUserSelected && !allFailed) {
+            setResolvingStatus('Failing over to next provider...');
+            cycleToNextProvider();
+            return;
+          } else {
+            setResolvingStatus('LARI21 resolver error.');
+            setPlayerMode('error');
+            setIsExtracting(false);
+            setIsLoading(false);
+            return;
+          }
         }
       }
 
@@ -800,23 +848,31 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             onActiveServerChange?.('KissKH', 'kisskh-kdrama');
             return;
           }
-          console.warn('[Resolver] KissKH resolution returned no stream or timed out, auto-failover to next Korean provider...');
-          setResolvingStatus('Failing over to next Korean provider...');
-          // Fast failover to next provider in Korean priority list
-          const koreanFallbackId = (topKoreanProviders && topKoreanProviders.length > 0)
-            ? topKoreanProviders.find(p => p !== 'kisskh-kdrama' && p !== 'kisskh') || 'cinesrc'
-            : 'cinesrc';
-          const fallbackProvider = getProviderById(koreanFallbackId);
-          onProviderChange(fallbackProvider);
-          return;
+          console.warn('[Resolver] KissKH resolution returned no stream or timed out, auto-cycling to next provider...');
+          if (autoCycle && !isUserSelected && !allFailed) {
+            setResolvingStatus('Failing over to next provider...');
+            cycleToNextProvider();
+            return;
+          } else {
+            setResolvingStatus('No stream found in KissKH.');
+            setPlayerMode('error');
+            setIsExtracting(false);
+            setIsLoading(false);
+            return;
+          }
         } catch (err) {
           console.warn('[Resolver] KissKH resolution error:', err);
-          const koreanFallbackId = (topKoreanProviders && topKoreanProviders.length > 0)
-            ? topKoreanProviders.find(p => p !== 'kisskh-kdrama' && p !== 'kisskh') || 'cinesrc'
-            : 'cinesrc';
-          const fallbackProvider = getProviderById(koreanFallbackId);
-          onProviderChange(fallbackProvider);
-          return;
+          if (autoCycle && !isUserSelected && !allFailed) {
+            setResolvingStatus('Failing over to next provider...');
+            cycleToNextProvider();
+            return;
+          } else {
+            setResolvingStatus('KissKH resolver error.');
+            setPlayerMode('error');
+            setIsExtracting(false);
+            setIsLoading(false);
+            return;
+          }
         }
       }
 
@@ -843,22 +899,31 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             onActiveServerChange?.(`DramaCool (${activeServer})`, 'dramacool-kdrama');
             return;
           }
-          console.warn('[Resolver] Dramacool resolution returned no stream, auto-failover to next Korean provider...');
-          setResolvingStatus('Failing over to next Korean provider...');
-          const koreanFallbackId = (topKoreanProviders && topKoreanProviders.length > 0)
-            ? topKoreanProviders.find(p => p !== 'dramacool-kdrama') || 'kisskh-kdrama'
-            : 'kisskh-kdrama';
-          const fallbackProvider = getProviderById(koreanFallbackId);
-          onProviderChange(fallbackProvider);
-          return;
+          console.warn('[Resolver] Dramacool resolution returned no stream, auto-cycling to next provider...');
+          if (autoCycle && !isUserSelected && !allFailed) {
+            setResolvingStatus('Failing over to next provider...');
+            cycleToNextProvider();
+            return;
+          } else {
+            setResolvingStatus('No stream found in Dramacool.');
+            setPlayerMode('error');
+            setIsExtracting(false);
+            setIsLoading(false);
+            return;
+          }
         } catch (err) {
           console.warn('[Resolver] Dramacool resolution error:', err);
-          const koreanFallbackId = (topKoreanProviders && topKoreanProviders.length > 0)
-            ? topKoreanProviders.find(p => p !== 'dramacool-kdrama') || 'kisskh-kdrama'
-            : 'kisskh-kdrama';
-          const fallbackProvider = getProviderById(koreanFallbackId);
-          onProviderChange(fallbackProvider);
-          return;
+          if (autoCycle && !isUserSelected && !allFailed) {
+            setResolvingStatus('Failing over to next provider...');
+            cycleToNextProvider();
+            return;
+          } else {
+            setResolvingStatus('Dramacool resolver error.');
+            setPlayerMode('error');
+            setIsExtracting(false);
+            setIsLoading(false);
+            return;
+          }
         }
       }
 
@@ -910,7 +975,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       isMounted = false;
       abortController.abort();
     };
-  }, [enabledResolvers, tmdbId, title, mediaType, season, episode, activeAsean, providerId, releaseYear, originalTitle, topAnimeProviders, topAseanProviders, isUserSelected, isTelegramOriginMatching, resolveTrigger, getFallbackEmbedProvider]);
+  }, [enabledResolvers, tmdbId, title, mediaType, season, episode, activeAsean, providerId, releaseYear, originalTitle, topAnimeProviders, topAseanProviders, isUserSelected, isTelegramOriginMatching, resolveTrigger, cycleToNextProvider, autoCycle, allFailed]);
 
   const [resumeTimestamp, setResumeTimestamp] = useState<number>(initialTimestamp || 0);
   const [resolvedAnimeMapping, setResolvedAnimeMapping] = useState<ResolvedAnimeMapping | null>(null);
@@ -1816,30 +1881,6 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       orderedProviders.length
     );
   }, [isProbing, providerId, onProbingStatusChange, orderedProviders]);
-
-  const cycleToNextProvider = useCallback(() => {
-    resetControlsTimer();
-    const currentIndex = orderedProviders.findIndex((p) => p.id === providerId);
-    const nextIndex = (currentIndex + 1) % orderedProviders.length;
-    const nextProvider = orderedProviders[nextIndex];
-
-    setTriedProviders((prev) => {
-      const updated = Array.from(new Set([...prev, providerId]));
-      if (updated.length >= orderedProviders.length) {
-        setAllFailed(true);
-        setIsProbing(false);
-        setIsLoading(false);
-      } else {
-        setIsLoading(true);
-        setHasError(false);
-        onProviderChange(nextProvider);
-      }
-      return updated;
-    });
-  }, [providerId, onProviderChange, resetControlsTimer, orderedProviders]);
-
-  const cycleToNextProviderRef = useRef(cycleToNextProvider);
-  cycleToNextProviderRef.current = cycleToNextProvider;
 
   const restartAutoCycle = () => {
     setTriedProviders([]);

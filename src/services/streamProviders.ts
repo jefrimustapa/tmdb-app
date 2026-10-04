@@ -431,9 +431,10 @@ export function getOrderedProviders(
 
   if (!topProviders || topProviders.length === 0) return baseList;
 
-  const topList = topProviders
+  const uniqueTopIds = Array.from(new Set(topProviders));
+  const topList = uniqueTopIds
     .map(id => STREAM_PROVIDERS.find(p => p.id === id))
     .filter((p): p is StreamProvider => Boolean(p));
-  const restList = baseList.filter(p => !topProviders.includes(p.id));
+  const restList = baseList.filter(p => !uniqueTopIds.includes(p.id));
   return [...topList, ...restList];
 }

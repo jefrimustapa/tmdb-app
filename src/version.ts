@@ -2,12 +2,13 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20261004-1105';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.fix-embed-provider-e.20261004-1105';
+export const APP_BUILD_NUMBER = '20261004-1236';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.fix-embed-provider-e.20261004-1236';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
 export const APP_BRANCH = 'fix-embed-provider-e';
-export const APP_CHANGELOG = `* fix(player): distinguish live playback from saved MEDIA_DATA progress to prevent premature watchdog clearance
+export const APP_CHANGELOG = `* feat(player): display live watchdog countdown timer badge during playback waiting
+* fix(player): distinguish live playback from saved MEDIA_DATA progress to prevent premature watchdog clearance
 * fix(player): require sustained active media playback and pulse center touch to prevent premature watchdog cancellation
 * fix(player): add native audio playback detector and universal watchdog cancellation across embed providers
 * fix(player): accurately classify HTTP server errors vs embedding blocks and expand iframe error interception
@@ -20,5 +21,4 @@ export const APP_CHANGELOG = `* fix(player): distinguish live playback from save
 * feat(settings): update streamResolverTimeout options to 60/90/120/180/unlimited (default 60s) and link to embed watchdog
 * feat(player): align fallback priority flow with auto-cycling on connection refusal and manual TMDB error display
 * fix(player): dismiss error overlay on MSM direct stream and scope native error interception to iframe docs
-* fix(player): clear error state and remount iframe when selecting provider from header
-* feat(player): intercept native iframe connection errors and display custom TMDB error overlay`;
+* fix(player): clear error state and remount iframe when selecting provider from header`;
