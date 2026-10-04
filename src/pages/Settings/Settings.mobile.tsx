@@ -2383,18 +2383,18 @@ export const Settings: React.FC = () => {
                   <span className="text-[10px] text-gray-400">Max wait time before auto-failover</span>
                 </div>
                 <span className="text-xs font-bold text-hbo-cyan">
-                  {(settings.streamResolverTimeout ?? 0) === 0 ? 'Unlimited' : `${settings.streamResolverTimeout}s`}
+                  {`${settings.streamResolverTimeout ?? 30}s`}
                 </span>
               </div>
               <div className="grid grid-cols-3 gap-1.5 pt-1">
                 {[
-                  { seconds: 60, label: '60s (Default)' },
+                  { seconds: 30, label: '30s (Default)' },
+                  { seconds: 60, label: '60s' },
                   { seconds: 90, label: '90s' },
-                  { seconds: 120, label: '120s' },
                   { seconds: 180, label: '180s' },
-                  { seconds: 0, label: 'Unlimited' },
+                  { seconds: 240, label: '240s' },
                 ].map((opt) => {
-                  const isSelected = (settings.streamResolverTimeout ?? 0) === opt.seconds;
+                  const isSelected = (settings.streamResolverTimeout ?? 30) === opt.seconds;
                   return (
                     <button
                       key={opt.seconds}

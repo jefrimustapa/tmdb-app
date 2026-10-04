@@ -187,8 +187,8 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const [upNextTriggerPercent, setUpNextTriggerPercent] = useState(90);
   const [upNextTimeout, setUpNextTimeout] = useState(10);
   const [tickerIntervalSec, setTickerIntervalSec] = useState(5);
-  const [streamResolverTimeout, setStreamResolverTimeout] = useState(60);
-  const streamResolverTimeoutRef = useRef(60);
+  const [streamResolverTimeout, setStreamResolverTimeout] = useState(30);
+  const streamResolverTimeoutRef = useRef(30);
   const [streamResolverRetries, setStreamResolverRetries] = useState(1);
   const streamResolverRetriesRef = useRef(1);
 
@@ -1813,9 +1813,9 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
     const rawTimeout = typeof streamResolverTimeoutRef.current === 'number'
       ? streamResolverTimeoutRef.current
-      : (typeof streamResolverTimeout === 'number' ? streamResolverTimeout : 60);
+      : (typeof streamResolverTimeout === 'number' ? streamResolverTimeout : 30);
 
-    const timeoutSec = rawTimeout > 0 ? rawTimeout : 60;
+    const timeoutSec = rawTimeout > 0 ? rawTimeout : 30;
 
     // If explicitly configured as 0 (Unlimited), disable watchdog
     if (rawTimeout === 0) {
@@ -1846,9 +1846,9 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       // 2. In MANUAL mode or LAST provider: show the custom TMDB error screen!
       console.warn(`[AutoCycle Watchdog] Manual selection or last provider timed out. Displaying custom TMDB error screen.`);
       setProviderErrorDetail({
-        title: 'Playback Timeout',
-        badge: 'Connection Timed Out',
-        message: `The server (${provider.name}) took longer than ${timeoutSec}s to respond and failed to start playback. Please try switching to another server.`,
+        title: 'Stream Playback Failed',
+        badge: 'Playback Failed',
+        message: `The server (${provider.name}) responded, but failed to start stream playback within ${timeoutSec}s. Please try switching to another server.`,
       });
       setHasError(true);
       setIsLoading(false);
