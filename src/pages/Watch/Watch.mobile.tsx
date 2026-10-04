@@ -8,7 +8,7 @@ import { WatchSettingsModal, type WatchSettingsTab } from '../../components/play
 import { searchSubtitles, fetchAndParseSubtitle, type SubtitleTrack, type SubtitleCue } from '../../services/subtitleService';
 import { dbService } from '../../services/db';
 import type { StreamResolverType } from '../../types/db';
-import type { OriginCountryCode } from '../../types/stream';
+import type { OriginCountryCode, StreamProvider } from '../../types/stream';
 import { getProviderById, extractMediaOriginCountries, isProviderMatchingMedia } from '../../services/streamProviders';
 import { isAnimeMedia } from '../../services/animeMappingService';
 import { isAseanMedia, isKoreanMedia } from '../../services/lariMappingService';
@@ -500,6 +500,11 @@ export const Watch: React.FC = () => {
     navigate(`/watch/tv/${tmdbId}?s=${prevEpisodeInfo.season}&e=${prevEpisodeInfo.episode}`, { replace: true });
   }, [prevEpisodeInfo, navigate, tmdbId]);
 
+  const handleProviderChange = useCallback((p: StreamProvider) => {
+    setActiveServerLabel('');
+    setProviderId(p.id);
+  }, []);
+
   // Dim-fade the episode title only when it extends past the horizontal centre of the screen.
   // Must live here (before any early return) to satisfy Rules of Hooks.
   const episodeTitleRef = useRef<HTMLSpanElement>(null);
@@ -803,10 +808,7 @@ export const Watch: React.FC = () => {
             telegramProviderCountries={telegramProviderCountries}
             releaseYear={releaseYear}
             originalTitle={details.original_title || details.original_name}
-            onProviderChange={(p) => {
-              setActiveServerLabel('');
-              setProviderId(p.id);
-            }}
+            onProviderChange={handleProviderChange}
             onActiveServerChange={(serverLabel, activeId) => {
               setActiveServerLabel(serverLabel);
               if (activeId && activeId !== providerId) {

@@ -1790,6 +1790,9 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     });
   }, [providerId, onProviderChange, resetControlsTimer, orderedProviders]);
 
+  const cycleToNextProviderRef = useRef(cycleToNextProvider);
+  cycleToNextProviderRef.current = cycleToNextProvider;
+
   const restartAutoCycle = () => {
     setTriedProviders([]);
     setAllFailed(false);
@@ -1810,21 +1813,27 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     // If unlimited (0), do not trigger watchdog auto-cycle
     if (timeoutSec <= 0) return;
 
+    console.log(`[AutoCycle Watchdog] ⏱️ Watchdog started for "${providerId}": ${timeoutSec}s threshold.`);
+
     if (autoCycleTimeoutRef.current) {
       clearTimeout(autoCycleTimeoutRef.current);
+      autoCycleTimeoutRef.current = null;
     }
 
-    autoCycleTimeoutRef.current = setTimeout(() => {
-      console.warn(`[AutoCycle] Server ${providerId} did not establish active video in ${timeoutSec}s. Auto-cycling to next server...`);
-      cycleToNextProvider();
+    const timer = setTimeout(() => {
+      console.warn(`[AutoCycle Watchdog] ⏱️ Server "${providerId}" did not establish active video in ${timeoutSec}s. Auto-cycling to next server...`);
+      cycleToNextProviderRef.current();
     }, timeoutSec * 1000);
 
+    autoCycleTimeoutRef.current = timer;
+
     return () => {
-      if (autoCycleTimeoutRef.current) {
-        clearTimeout(autoCycleTimeoutRef.current);
+      clearTimeout(timer);
+      if (autoCycleTimeoutRef.current === timer) {
+        autoCycleTimeoutRef.current = null;
       }
     };
-  }, [providerId, autoCycle, allFailed, playerMode, cycleToNextProvider, iframeKey, streamResolverTimeout]);
+  }, [providerId, autoCycle, allFailed, playerMode, iframeKey]);
 
   // Reset provider error details and clear error state whenever active provider changes (e.g. from header dropdown)
   useEffect(() => {

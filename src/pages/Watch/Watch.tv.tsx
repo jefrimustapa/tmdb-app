@@ -13,7 +13,7 @@ import { isAseanMedia, isKoreanMedia } from '../../services/lariMappingService';
 import { ArrowLeft, SkipForward, SkipBack, Settings, FastForward, Rewind } from 'lucide-react';
 
 import type { VirtualCursorStyle, StreamResolverType } from '../../types/db';
-import type { OriginCountryCode } from '../../types/stream';
+import type { OriginCountryCode, StreamProvider } from '../../types/stream';
 
 
 export const Watch: React.FC = () => {
@@ -474,6 +474,11 @@ export const Watch: React.FC = () => {
 
   const handleCloseCursor = React.useCallback(() => {
     setCursorActive(false);
+  }, []);
+
+  const handleProviderChange = React.useCallback((p: StreamProvider) => {
+    setActiveServerLabel('');
+    setProviderId(p.id);
   }, []);
 
   useEffect(() => {
@@ -961,10 +966,7 @@ export const Watch: React.FC = () => {
             telegramProviderCountries={telegramProviderCountries}
             releaseYear={releaseYear}
             originalTitle={details.original_title || details.original_name}
-            onProviderChange={(p) => {
-              setActiveServerLabel('');
-              setProviderId(p.id);
-            }}
+            onProviderChange={handleProviderChange}
             onActiveServerChange={(serverLabel, activeId) => {
               setActiveServerLabel(serverLabel);
               if (activeId && activeId !== providerId) {
