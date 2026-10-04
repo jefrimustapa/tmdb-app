@@ -5,6 +5,7 @@ import type { TMDBMediaItem, TMDBMovieDetails, TMDBTVDetails } from '../../types
 import { tmdbApi, tmdbImages, extractContentRating, isExplicitAdultCertification } from '../../services/tmdb';
 import { dbService } from '../../services/db';
 import { getMediaOriginCountries } from '../../services/streamProviders';
+import { extractDominantColor, getAdaptiveBackgroundStyle, type DominantColor } from '../../services/colorExtractor';
 
 interface DetailsModalProps {
   item: TMDBMediaItem | null;
@@ -108,9 +109,23 @@ export const DetailsModal: React.FC<DetailsModalProps> = ({ item, onClose }) => 
     setIsWatchlist(status);
   };
 
+  const [dominantColor, setDominantColor] = useState<DominantColor | null>(null);
+
+  useEffect(() => {
+    const targetImg = backdropUrl || (item.poster_path ? tmdbImages.poster(item.poster_path, 'w500') : null);
+    if (targetImg) {
+      extractDominantColor(targetImg).then((color) => {
+        if (color) setDominantColor(color);
+      });
+    }
+  }, [backdropUrl, item.poster_path]);
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fade-in">
-      <div className="relative w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-2xl bg-hbo-card border border-hbo-border shadow-2xl no-scrollbar">
+      <div
+        className="relative w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-2xl bg-hbo-card border border-hbo-border shadow-2xl no-scrollbar"
+        style={getAdaptiveBackgroundStyle(dominantColor, 0.45)}
+      >
         {/* Close Button */}
         <button
           data-modal-close="true"

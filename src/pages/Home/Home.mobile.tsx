@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { tmdbApi } from '../../services/tmdb';
 import type { TMDBMediaItem } from '../../types/tmdb';
@@ -8,6 +8,8 @@ import { getPersonalizedSuggestions } from '../../services/suggestionService';
 import { HeroBanner } from '../../components/common/HeroBanner';
 import { MediaRow } from '../../components/common/MediaRow';
 import { MediaCard } from '../../components/common/MediaCard';
+import { tmdbImages } from '../../services/tmdb';
+import { extractDominantColor, getAdaptiveBackgroundStyle, type DominantColor } from '../../services/colorExtractor';
 
 interface HomeFeedCache {
   trending: TMDBMediaItem[];
@@ -36,6 +38,18 @@ export const Home: React.FC = () => {
   const [newReleaseMovies, setNewReleaseMovies] = useState<TMDBMediaItem[]>(() => homeFeedCache?.newReleaseMovies || []);
   const [newReleaseTV, setNewReleaseTV] = useState<TMDBMediaItem[]>(() => homeFeedCache?.newReleaseTV || []);
   const [isLoading, setIsLoading] = useState(() => !homeFeedCache);
+  const [dominantColor, setDominantColor] = useState<DominantColor | null>(null);
+
+  const handleHeroSlideChange = useCallback((item: TMDBMediaItem | null) => {
+    if (!item) return;
+    const path = item.backdrop_path || item.poster_path;
+    if (path) {
+      const url = tmdbImages.backdrop(path, 'w300');
+      extractDominantColor(url).then((color) => {
+        if (color) setDominantColor(color);
+      });
+    }
+  }, []);
 
   const scrollContinueWatching = (direction: 'left' | 'right') => {
     if (continueWatchingRef.current) {
@@ -140,9 +154,12 @@ export const Home: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen pb-16 bg-hbo-dark">
+    <div
+      className="min-h-screen pb-16 transition-colors duration-700 ease-in-out"
+      style={getAdaptiveBackgroundStyle(dominantColor, 0.42)}
+    >
       {/* Hero Billboard Full-Width Sliding Carousel */}
-      <HeroBanner items={trending} />
+      <HeroBanner items={trending} onActiveItemChange={handleHeroSlideChange} />
 
       {/* Main Content Rails (Constrained to max-w-7xl on desktop web matching Movies, Series, and Space) */}
       <div className="max-w-7xl mx-auto">

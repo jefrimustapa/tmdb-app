@@ -8,9 +8,10 @@ import { RatingBadge } from './RatingBadge';
 interface HeroBannerProps {
   items: TMDBMediaItem[];
   onOpenDetails?: (item: TMDBMediaItem) => void;
+  onActiveItemChange?: (item: TMDBMediaItem | null) => void;
 }
 
-export const HeroBanner: React.FC<HeroBannerProps> = ({ items }) => {
+export const HeroBanner: React.FC<HeroBannerProps> = ({ items, onActiveItemChange }) => {
   const navigate = useNavigate();
   const [currentIndex, setCurrentIndex] = useState(0);
   const bannerRef = useRef<HTMLDivElement>(null);
@@ -20,6 +21,12 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ items }) => {
 
   const displayItems = items && items.length > 0 ? items.slice(0, 8) : [];
   const totalItems = displayItems.length;
+
+  useEffect(() => {
+    if (displayItems.length > 0) {
+      onActiveItemChange?.(displayItems[currentIndex] || null);
+    }
+  }, [currentIndex, displayItems, onActiveItemChange]);
 
   // Helper to pause for 5 seconds upon remote activity in billboard
   const trigger5sRemotePause = () => {
