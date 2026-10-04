@@ -2,12 +2,13 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20261004-1549';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-adaptive-bg-col.20261004-1549';
+export const APP_BUILD_NUMBER = '20261004-1553';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-adaptive-bg-col.20261004-1553';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
 export const APP_BRANCH = 'feat-adaptive-bg-col';
-export const APP_CHANGELOG = `* fix(ui): extend 100% solid black through Continue Watching to eliminate seam
+export const APP_CHANGELOG = `* feat(ui): implement smooth backdrop mask and lighter seamless ambient gradient
+* fix(ui): extend 100% solid black through Continue Watching to eliminate seam
 * fix(ui): eliminate hero banner cut-off seam with solid dark bottom fade
 * fix(ui): transition background continuously from dark under hero to translucent color at bottom
 * fix(ui): invert adaptive background to flow from black at hero into ambient tint below
@@ -20,5 +21,4 @@ export const APP_CHANGELOG = `* fix(ui): extend 100% solid black through Continu
 * feat(details): display country of origin with flag badge on mobile, TV, and preview modal
 * fix(player): eliminate hardcoded provider fallbacks and unify auto-cycle with debounce guard
 * feat(player): display live watchdog countdown timer badge during playback waiting
-* fix(player): distinguish live playback from saved MEDIA_DATA progress to prevent premature watchdog clearance
-* fix(player): require sustained active media playback and pulse center touch to prevent premature watchdog cancellation`;
+* fix(player): distinguish live playback from saved MEDIA_DATA progress to prevent premature watchdog clearance`;
