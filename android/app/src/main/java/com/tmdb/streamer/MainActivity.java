@@ -1940,10 +1940,20 @@ public class MainActivity extends BridgeActivity {
                 public void onReceivedError(WebView view, WebResourceRequest request, android.webkit.WebResourceError error) {
                     super.onReceivedError(view, request, error);
                     if (request != null && !request.isForMainFrame() && request.getUrl() != null) {
-                        String url = request.getUrl().toString();
-                        String desc = (error != null && error.getDescription() != null) ? error.getDescription().toString() : "Connection refused";
-                        int code = (error != null) ? error.getErrorCode() : -1;
-                        notifyIframeError(view, url, code, desc);
+                        Map<String, String> reqHeaders = request.getRequestHeaders();
+                        String fetchDest = reqHeaders != null ? reqHeaders.get("Sec-Fetch-Dest") : null;
+                        if (fetchDest == null && reqHeaders != null) fetchDest = reqHeaders.get("sec-fetch-dest");
+
+                        String accept = reqHeaders != null ? reqHeaders.get("Accept") : null;
+                        if (accept == null && reqHeaders != null) accept = reqHeaders.get("accept");
+
+                        boolean isIframeDoc = "iframe".equalsIgnoreCase(fetchDest) || (accept != null && accept.contains("text/html"));
+                        if (isIframeDoc) {
+                            String url = request.getUrl().toString();
+                            String desc = (error != null && error.getDescription() != null) ? error.getDescription().toString() : "Connection refused";
+                            int code = (error != null) ? error.getErrorCode() : -1;
+                            notifyIframeError(view, url, code, desc);
+                        }
                     }
                 }
 
@@ -1951,15 +1961,25 @@ public class MainActivity extends BridgeActivity {
                 public void onReceivedHttpError(WebView view, WebResourceRequest request, WebResourceResponse errorResponse) {
                     super.onReceivedHttpError(view, request, errorResponse);
                     if (request != null && !request.isForMainFrame() && request.getUrl() != null && errorResponse != null) {
-                        int status = errorResponse.getStatusCode();
-                        Map<String, String> headers = errorResponse.getResponseHeaders();
-                        boolean hasXfo = headers != null && (headers.containsKey("x-frame-options") || headers.containsKey("X-Frame-Options"));
-                        boolean hasCspFrame = headers != null && (headers.containsKey("content-security-policy") || headers.containsKey("Content-Security-Policy"));
+                        Map<String, String> reqHeaders = request.getRequestHeaders();
+                        String fetchDest = reqHeaders != null ? reqHeaders.get("Sec-Fetch-Dest") : null;
+                        if (fetchDest == null && reqHeaders != null) fetchDest = reqHeaders.get("sec-fetch-dest");
 
-                        if (status >= 400 || hasXfo || hasCspFrame) {
-                            String url = request.getUrl().toString();
-                            String reason = hasXfo ? "X-Frame-Options blocked embedding" : ("HTTP " + status);
-                            notifyIframeError(view, url, status, reason);
+                        String accept = reqHeaders != null ? reqHeaders.get("Accept") : null;
+                        if (accept == null && reqHeaders != null) accept = reqHeaders.get("accept");
+
+                        boolean isIframeDoc = "iframe".equalsIgnoreCase(fetchDest) || (accept != null && accept.contains("text/html"));
+                        if (isIframeDoc) {
+                            int status = errorResponse.getStatusCode();
+                            Map<String, String> headers = errorResponse.getResponseHeaders();
+                            boolean hasXfo = headers != null && (headers.containsKey("x-frame-options") || headers.containsKey("X-Frame-Options"));
+                            boolean hasCspFrame = headers != null && (headers.containsKey("content-security-policy") || headers.containsKey("Content-Security-Policy"));
+
+                            if (status >= 400 || hasXfo || hasCspFrame) {
+                                String url = request.getUrl().toString();
+                                String reason = hasXfo ? "X-Frame-Options blocked embedding" : ("HTTP " + status);
+                                notifyIframeError(view, url, status, reason);
+                            }
                         }
                     }
                 }
@@ -1970,8 +1990,7 @@ public class MainActivity extends BridgeActivity {
                     if (lower.contains("moviesapi") || lower.contains("vidlink") || lower.contains("cinesrc") || 
                         lower.contains("cinezo") || lower.contains("peestream") || lower.contains("flaxmovies") ||
                         lower.contains("vidsrc") || lower.contains("2embed") || lower.contains("superembed") ||
-                        lower.contains("smashystream") || lower.contains("embed") || lower.contains("player") ||
-                        lower.contains("stream") || lower.contains("movie") || lower.contains("tv/")) {
+                        lower.contains("smashystream") || lower.contains("autoembed") || lower.contains("multiembed")) {
                         
                         view.post(() -> {
                             try {

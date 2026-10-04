@@ -585,6 +585,8 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             setDirectStreamUrl(finalUrl);
             setDirectStreamLabel('Telegram (MSM32)');
             setPlayerMode('direct');
+            setHasError(false);
+            setProviderErrorDetail(null);
             setIsExtracting(false);
             setExtractionFailed(false);
             setIsLoading(false);
@@ -1806,12 +1808,37 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     setIframeKey((prev) => prev + 1);
   }, [provider.id, providerId]);
 
+  // When playing direct streams (e.g. Telegram MSM), ensure error overlay is dismissed
+  useEffect(() => {
+    if (playerMode === 'direct') {
+      setHasError(false);
+      setProviderErrorDetail(null);
+    }
+  }, [playerMode]);
+
   // Intercept native Android iframe connection errors (e.g. ERR_CONNECTION_REFUSED, X-Frame-Options)
   useEffect(() => {
     const handleNativeIframeError = (e: Event) => {
+      // Iframe errors only apply when active player is in embed mode
+      if (playerMode !== 'embed') return;
+
       const customEvent = e as CustomEvent<{ url?: string; code?: number; description?: string }>;
       const detail = customEvent.detail;
       console.warn('[VideoPlayer] Intercepted native iframe error:', detail?.url, detail);
+
+      // Verify that the error URL actually relates to the active streamUrl domain
+      if (detail?.url && streamUrl) {
+        try {
+          const errHost = new URL(detail.url).hostname.replace(/^www\./, '');
+          const streamHost = new URL(streamUrl).hostname.replace(/^www\./, '');
+          if (!detail.url.includes(streamHost) && !streamUrl.includes(errHost)) {
+            console.log('[VideoPlayer] Ignoring iframe error for unrelated host:', detail.url);
+            return;
+          }
+        } catch {
+          // If URL parsing fails, ignore domain check
+        }
+      }
 
       const descLower = (detail?.description || '').toLowerCase();
       const isConnectionRefused = descLower.includes('refused') || detail?.code === -6;
@@ -1837,7 +1864,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     return () => {
       window.removeEventListener('tmdb_iframe_load_error', handleNativeIframeError);
     };
-  }, [provider.name]);
+  }, [provider.name, playerMode, streamUrl]);
 
   // Proactive pre-flight connection test for embed providers
   // Catches hard TCP connection refusals within 1.5s before Chromium displays native sad document
@@ -2326,7 +2353,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       )}
 
       {/* Fallback Error Overlay */}
-      {hasError && (
+      {hasError && playerMode !== 'direct' && (
         <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-black/95 backdrop-blur-md p-6 text-center animate-fade-in select-none">
           <div className="mb-4 drop-shadow-[0_0_25px_rgba(103,58,183,0.5)]">
             <Logo size="lg" showText={true} />

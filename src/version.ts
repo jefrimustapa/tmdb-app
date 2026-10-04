@@ -2,12 +2,13 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20261004-0726';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-improve-provide.20261004-0726';
+export const APP_BUILD_NUMBER = '20261004-0807';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-improve-provide.20261004-0807';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
 export const APP_BRANCH = 'feat-improve-provide';
-export const APP_CHANGELOG = `* feat(player): intercept native iframe connection errors and display custom TMDB error overlay
+export const APP_CHANGELOG = `* fix(player): clear error state and remount iframe when selecting provider from header
+* feat(player): intercept native iframe connection errors and display custom TMDB error overlay
 * Merge pull request #181 from jefrimustapa/feat/improve-msm-series-search
 * fix(player): resolve seek state lock, extend transcode seek watchdog, and preserve touch activation
 * Merge pull request #180 from jefrimustapa/fix/embed-provider-fallback-priority
@@ -20,5 +21,4 @@ export const APP_CHANGELOG = `* feat(player): intercept native iframe connection
 * perf(client): optimize HLS buffers, hardware video teardown, and bound in-memory caches (#175)
 * feat(ui): use poster in portrait and backdrop in landscape for hero banner, bind backgrounds to object-top, and remove horizontal black tints (#174)
 * Merge pull request #173 from jefrimustapa/perf/msm-getter-memory-optimization
-* perf(msm-getter): optimize idle memory with allocator tuning, chunk cache eviction and watchdog
-* Merge pull request #172 from jefrimustapa/fix/msm-getter-episode-matching`;
+* perf(msm-getter): optimize idle memory with allocator tuning, chunk cache eviction and watchdog`;
