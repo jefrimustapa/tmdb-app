@@ -7,7 +7,7 @@ import { WatchSettingsModal, type WatchSettingsTab } from '../../components/play
 import { TVVirtualCursor } from '../../components/player/TVVirtualCursor';
 import { searchSubtitles, fetchAndParseSubtitle, type SubtitleTrack, type SubtitleCue } from '../../services/subtitleService';
 import { dbService } from '../../services/db';
-import { getProviderById, extractMediaOriginCountries, isProviderMatchingMedia } from '../../services/streamProviders';
+import { getProviderById, extractMediaOriginCountries, isProviderMatchingMedia, getOrderedProviders } from '../../services/streamProviders';
 import { isAnimeMedia } from '../../services/animeMappingService';
 import { isAseanMedia, isKoreanMedia } from '../../services/lariMappingService';
 import { ArrowLeft, SkipForward, SkipBack, Settings, FastForward, Rewind } from 'lucide-react';
@@ -233,26 +233,27 @@ export const Watch: React.FC = () => {
             const embedRank = priorityList.indexOf('embed');
             const prefersTelegramOverEmbed = telegramRank !== -1 && (embedRank === -1 || telegramRank < embedRank);
 
-            let defaultProvider = 'vidlink';
+            let defaultProvider = '';
             if (prefersTelegramOverEmbed && hasTelegram && isTelegramMatching) {
               defaultProvider = 'telegram-msm32';
             } else if (animeFlag) {
-              defaultProvider = s.topAnimeProviders?.[0] || 'megaplay-anime';
+              const animeList = s.topAnimeProviders?.length ? s.topAnimeProviders : getOrderedProviders(undefined, true).map((p: StreamProvider) => p.id);
+              defaultProvider = animeList[0];
             } else if (koreanFlag) {
-              defaultProvider = s.topKoreanProviders?.[0] || 'kisskh-kdrama';
+              const koreanList = s.topKoreanProviders?.length ? s.topKoreanProviders : getOrderedProviders(undefined, false, false, true).map((p: StreamProvider) => p.id);
+              defaultProvider = koreanList[0];
             } else if (!prefersTelegramOverEmbed && hasTelegram && isTelegramMatching && !hasEmbed) {
               defaultProvider = 'telegram-msm32';
             } else if (aseanFlag) {
-              defaultProvider = s.topAseanProviders?.[0] || (s as any).topAsianProviders?.[0] || 'vidlink';
+              const aseanList = s.topAseanProviders?.length ? s.topAseanProviders : (s as any).topAsianProviders?.length ? (s as any).topAsianProviders : getOrderedProviders(undefined, false, true).map((p: StreamProvider) => p.id);
+              defaultProvider = aseanList[0];
             } else {
-              const topPick = s.topProviders?.[0] || s.preferredProvider || 'vidlink';
-              if (topPick === 'telegram-msm32' && !isTelegramMatching) {
-                defaultProvider = s.topProviders?.find(p => p !== 'telegram-msm32') || 'vidlink';
-              } else {
-                defaultProvider = topPick;
-              }
+              const generalList = s.topProviders?.length ? s.topProviders : getOrderedProviders().map((p: StreamProvider) => p.id);
+              defaultProvider = (!isTelegramMatching ? generalList.find((p: string) => p !== 'telegram-msm32') : generalList[0]) || generalList[0];
             }
-            setProviderId(defaultProvider);
+            if (defaultProvider) {
+              setProviderId(defaultProvider);
+            }
           }
           if (s.streamHeaderTimeout !== undefined) {
             setHeaderTimeoutSeconds(s.streamHeaderTimeout);
