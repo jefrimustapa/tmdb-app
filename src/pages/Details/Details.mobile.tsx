@@ -528,13 +528,9 @@ export const Details: React.FC = () => {
       <div
         className={`absolute top-0 left-0 right-0 ${
           !isLandscape
-            ? 'w-full'
+            ? 'w-full h-[60vh] sm:h-[70vh]'
             : 'h-[65vh] sm:h-[80vh] lg:h-[90vh]'
         } overflow-hidden pointer-events-none z-0`}
-        style={{
-          maskImage: 'linear-gradient(180deg, black 0%, black 50%, transparent 100%)',
-          WebkitMaskImage: 'linear-gradient(180deg, black 0%, black 50%, transparent 100%)'
-        }}
       >
         {heroUrl && (
           <img
@@ -554,7 +550,7 @@ export const Details: React.FC = () => {
             }}
             className={`${
               !isLandscape
-                ? 'w-full h-auto block'
+                ? 'w-full h-full object-cover object-top'
                 : 'absolute inset-0 w-full h-full object-cover object-top'
             } transform-gpu will-change-[opacity] transition-opacity duration-700 ease-in-out ${
               isHeroLoaded ? 'opacity-100' : 'opacity-0'
@@ -562,7 +558,8 @@ export const Details: React.FC = () => {
           />
         )}
 
-        {/* Cinematic Vignette Layer (Ensures text readability without horizontal smoke bar) */}
+        {/* Cinematic Smooth Gradients Layer */}
+        <div className="absolute inset-0 hero-gradient-overlay" />
         {isLandscape ? (
           <div className="absolute inset-0 bg-gradient-to-r from-black/75 via-black/35 to-transparent max-w-3xl" />
         ) : (
