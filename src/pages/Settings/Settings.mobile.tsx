@@ -2388,12 +2388,11 @@ export const Settings: React.FC = () => {
               </div>
               <div className="grid grid-cols-3 gap-1.5 pt-1">
                 {[
+                  { seconds: 60, label: '60s (Default)' },
+                  { seconds: 90, label: '90s' },
+                  { seconds: 120, label: '120s' },
+                  { seconds: 180, label: '180s' },
                   { seconds: 0, label: 'Unlimited' },
-                  { seconds: 10, label: '10s' },
-                  { seconds: 15, label: '15s' },
-                  { seconds: 20, label: '20s' },
-                  { seconds: 25, label: '25s' },
-                  { seconds: 30, label: '30s' },
                 ].map((opt) => {
                   const isSelected = (settings.streamResolverTimeout ?? 0) === opt.seconds;
                   return (

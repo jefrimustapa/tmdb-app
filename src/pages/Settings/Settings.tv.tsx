@@ -4852,12 +4852,11 @@ export const Settings: React.FC = () => {
             <div className="flex-1 overflow-y-auto px-6 py-6 space-y-2.5 font-sans">
               {(() => {
                 const options = [
-                  { seconds: 0, label: 'Unlimited (Default)', desc: 'Wait until stream resolves without timing out prematurely.' },
-                  { seconds: 10, label: '10 Seconds', desc: 'Fast failover for high-speed fiber connections.' },
-                  { seconds: 15, label: '15 Seconds', desc: 'Quick handshake for standard broadband.' },
-                  { seconds: 20, label: '20 Seconds', desc: 'Balanced wait time for multi-step stream scrapers.' },
-                  { seconds: 25, label: '25 Seconds', desc: 'Relaxed connection for slower networks & busy Wi-Fi.' },
-                  { seconds: 30, label: '30 Seconds', desc: 'Maximum patience for high-latency mobile or VPN links.' },
+                  { seconds: 60, label: '60 Seconds (Default)', desc: 'Standard failover threshold for embed providers and stream handshakes.' },
+                  { seconds: 90, label: '90 Seconds', desc: 'Extended patience for slower servers and high-traffic periods.' },
+                  { seconds: 120, label: '120 Seconds', desc: 'Generous wait time for complex embed stream loading.' },
+                  { seconds: 180, label: '180 Seconds', desc: 'Maximum patience for high-latency mobile or congested networks.' },
+                  { seconds: 0, label: 'Unlimited', desc: 'Wait indefinitely until stream resolves without timing out prematurely.' },
                 ];
                 const currentVal = settings.streamResolverTimeout ?? 0;
 

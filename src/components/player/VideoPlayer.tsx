@@ -187,8 +187,8 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const [upNextTriggerPercent, setUpNextTriggerPercent] = useState(90);
   const [upNextTimeout, setUpNextTimeout] = useState(10);
   const [tickerIntervalSec, setTickerIntervalSec] = useState(5);
-  const [streamResolverTimeout, setStreamResolverTimeout] = useState(5);
-  const streamResolverTimeoutRef = useRef(5);
+  const [streamResolverTimeout, setStreamResolverTimeout] = useState(60);
+  const streamResolverTimeoutRef = useRef(60);
   const [streamResolverRetries, setStreamResolverRetries] = useState(1);
   const streamResolverRetriesRef = useRef(1);
 
@@ -391,7 +391,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           setTickerIntervalSec(s.watchProgressTickerInterval);
           tickerIntervalRef.current = s.watchProgressTickerInterval;
         }
-        if (typeof s.streamResolverTimeout === 'number' && (s.streamResolverTimeout === 0 || (s.streamResolverTimeout >= 2 && s.streamResolverTimeout <= 30))) {
+        if (typeof s.streamResolverTimeout === 'number') {
           setStreamResolverTimeout(s.streamResolverTimeout);
           streamResolverTimeoutRef.current = s.streamResolverTimeout;
         }
@@ -1789,25 +1789,32 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     onProviderChange(orderedProviders[0] || STREAM_PROVIDERS[0]);
   };
 
-  // Failover watchdog timer: gives current provider 8s to establish playback, otherwise auto-cycles
+  // Failover watchdog timer: gives current provider configured timeout seconds to establish playback, otherwise auto-cycles
   useEffect(() => {
     if (!autoCycle || !isProbing || allFailed || playerMode !== 'embed') return;
+
+    const timeoutSec = typeof streamResolverTimeoutRef.current === 'number'
+      ? streamResolverTimeoutRef.current
+      : (typeof streamResolverTimeout === 'number' ? streamResolverTimeout : 60);
+
+    // If unlimited (0), do not trigger watchdog auto-cycle
+    if (timeoutSec <= 0) return;
 
     if (autoCycleTimeoutRef.current) {
       clearTimeout(autoCycleTimeoutRef.current);
     }
 
     autoCycleTimeoutRef.current = setTimeout(() => {
-      console.warn(`[AutoCycle] Server ${providerId} did not respond in 8s. Auto-cycling to next server...`);
+      console.warn(`[AutoCycle] Server ${providerId} did not respond in ${timeoutSec}s. Auto-cycling to next server...`);
       cycleToNextProvider();
-    }, 8000);
+    }, timeoutSec * 1000);
 
     return () => {
       if (autoCycleTimeoutRef.current) {
         clearTimeout(autoCycleTimeoutRef.current);
       }
     };
-  }, [providerId, autoCycle, isProbing, allFailed, playerMode, cycleToNextProvider, iframeKey]);
+  }, [providerId, autoCycle, isProbing, allFailed, playerMode, cycleToNextProvider, iframeKey, streamResolverTimeout]);
 
   // Reset provider error details and clear error state whenever active provider changes (e.g. from header dropdown)
   useEffect(() => {
