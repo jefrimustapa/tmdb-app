@@ -2,23 +2,23 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20261004-0940';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-improve-provide.20261004-0940';
+export const APP_BUILD_NUMBER = '20261004-1329';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.fix-embed-provider-e.20261004-1329';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
-export const APP_BRANCH = 'feat-improve-provide';
-export const APP_CHANGELOG = `* fix(player): activate timeout in manual selection to display custom TMDB error overlay upon timeout
+export const APP_BRANCH = 'fix-embed-provider-e';
+export const APP_CHANGELOG = `* feat(details): display country of origin with flag badge on mobile, TV, and preview modal
+* fix(player): eliminate hardcoded provider fallbacks and unify auto-cycle with debounce guard
+* feat(player): display live watchdog countdown timer badge during playback waiting
+* fix(player): distinguish live playback from saved MEDIA_DATA progress to prevent premature watchdog clearance
+* fix(player): require sustained active media playback and pulse center touch to prevent premature watchdog cancellation
+* fix(player): add native audio playback detector and universal watchdog cancellation across embed providers
+* fix(player): accurately classify HTTP server errors vs embedding blocks and expand iframe error interception
+* Merge pull request #182 from jefrimustapa/feat/improve-provider-error-display
+* feat(settings): set timeout options to 30/60/90/180/240 with default 30s and refine playback failed message
+* fix(player): activate timeout in manual selection to display custom TMDB error overlay upon timeout
 * fix(player): prevent native video element from prematurely clearing watchdog before currentTime > 0 and guard countdown against re-renders
 * fix(player): decouple watchdog timer from render cycles and memoize provider change callbacks
 * fix(player): preserve watchdog timer until actual playback starts instead of aborting on iframe HTML load
 * feat(settings): update streamResolverTimeout options to 60/90/120/180/unlimited (default 60s) and link to embed watchdog
-* feat(player): align fallback priority flow with auto-cycling on connection refusal and manual TMDB error display
-* fix(player): dismiss error overlay on MSM direct stream and scope native error interception to iframe docs
-* fix(player): clear error state and remount iframe when selecting provider from header
-* feat(player): intercept native iframe connection errors and display custom TMDB error overlay
-* Merge pull request #181 from jefrimustapa/feat/improve-msm-series-search
-* fix(player): resolve seek state lock, extend transcode seek watchdog, and preserve touch activation
-* Merge pull request #180 from jefrimustapa/fix/embed-provider-fallback-priority
-* fix(settings): return to engine-embed instead of resolvers when closing priorityPicker drawer
-* fix(player): enforce context-aware and user-configured embed provider priority fallback after MSM failure
-* feat(player): continuous long-press seek on mobile FW/RW buttons (#179)`;
+* feat(player): align fallback priority flow with auto-cycling on connection refusal and manual TMDB error display`;

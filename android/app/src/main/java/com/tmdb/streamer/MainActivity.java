@@ -188,8 +188,7 @@ public class MainActivity extends BridgeActivity {
 
                 @JavascriptInterface
                 public boolean isAudioPlaying() {
-                    android.media.AudioManager audioManager = (android.media.AudioManager) getSystemService(AUDIO_SERVICE);
-                    return audioManager != null && audioManager.isMusicActive();
+                    return checkIsMediaAudioPlaying();
                 }
 
                 @JavascriptInterface
@@ -913,6 +912,8 @@ public class MainActivity extends BridgeActivity {
                     }
                 }
             }, "AndroidBridge");
+
+            setupAudioPlaybackDetector();
 
             // Handle alert, confirm, and multi-window popups
             webView.setWebChromeClient(new WebChromeClient() {
@@ -1977,7 +1978,18 @@ public class MainActivity extends BridgeActivity {
 
                             if (status >= 400 || hasXfo || hasCspFrame) {
                                 String url = request.getUrl().toString();
-                                String reason = hasXfo ? "X-Frame-Options blocked embedding" : ("HTTP " + status);
+                                String reason;
+                                if (status >= 500) {
+                                    reason = "Server Error (HTTP " + status + ")";
+                                } else if (status >= 400) {
+                                    reason = "HTTP " + status + " (" + (status == 404 ? "Not Found" : (status == 403 ? "Forbidden" : "Client Error")) + ")";
+                                } else if (hasXfo) {
+                                    reason = "X-Frame-Options blocked embedding";
+                                } else if (hasCspFrame) {
+                                    reason = "CSP frame-ancestors blocked embedding";
+                                } else {
+                                    reason = "HTTP " + status;
+                                }
                                 notifyIframeError(view, url, status, reason);
                             }
                         }
@@ -1986,21 +1998,14 @@ public class MainActivity extends BridgeActivity {
 
                 private void notifyIframeError(WebView view, String url, int code, String description) {
                     if (view == null || url == null) return;
-                    String lower = url.toLowerCase();
-                    if (lower.contains("moviesapi") || lower.contains("vidlink") || lower.contains("cinesrc") || 
-                        lower.contains("cinezo") || lower.contains("peestream") || lower.contains("flaxmovies") ||
-                        lower.contains("vidsrc") || lower.contains("2embed") || lower.contains("superembed") ||
-                        lower.contains("smashystream") || lower.contains("autoembed") || lower.contains("multiembed")) {
-                        
-                        view.post(() -> {
-                            try {
-                                String safeUrl = url.replace("'", "\\'");
-                                String safeDesc = description != null ? description.replace("'", "\\'") : "Error";
-                                String js = "window.dispatchEvent(new CustomEvent('tmdb_iframe_load_error', { detail: { url: '" + safeUrl + "', code: " + code + ", description: '" + safeDesc + "' } }));";
-                                view.evaluateJavascript(js, null);
-                            } catch (Exception ignored) {}
-                        });
-                    }
+                    view.post(() -> {
+                        try {
+                            String safeUrl = url.replace("'", "\\'");
+                            String safeDesc = description != null ? description.replace("'", "\\'") : "Error";
+                            String js = "window.dispatchEvent(new CustomEvent('tmdb_iframe_load_error', { detail: { url: '" + safeUrl + "', code: " + code + ", description: '" + safeDesc + "' } }));";
+                            view.evaluateJavascript(js, null);
+                        } catch (Exception ignored) {}
+                    });
                 }
             });
 
@@ -2746,11 +2751,78 @@ public class MainActivity extends BridgeActivity {
         wv.evaluateJavascript(jsDispatch, null);
     }
 
+    public boolean checkIsMediaAudioPlaying() {
+        try {
+            android.media.AudioManager audioManager = (android.media.AudioManager) getSystemService(AUDIO_SERVICE);
+            if (audioManager == null) return false;
+            if (!audioManager.isMusicActive()) return false;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                java.util.List<android.media.AudioPlaybackConfiguration> configs = audioManager.getActivePlaybackConfigurations();
+                if (configs != null && !configs.isEmpty()) {
+                    boolean hasMediaUsage = false;
+                    for (android.media.AudioPlaybackConfiguration config : configs) {
+                        android.media.AudioAttributes attrs = config.getAudioAttributes();
+                        if (attrs != null && (attrs.getUsage() == android.media.AudioAttributes.USAGE_MEDIA ||
+                                             attrs.getUsage() == android.media.AudioAttributes.USAGE_GAME ||
+                                             attrs.getUsage() == android.media.AudioAttributes.USAGE_UNKNOWN)) {
+                            hasMediaUsage = true;
+                            break;
+                        }
+                    }
+                    if (!hasMediaUsage) return false;
+                }
+            }
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private android.media.AudioManager.AudioPlaybackCallback audioPlaybackCallback;
+
+    private void setupAudioPlaybackDetector() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            try {
+                android.media.AudioManager am = (android.media.AudioManager) getSystemService(AUDIO_SERVICE);
+                if (am != null) {
+                    audioPlaybackCallback = new android.media.AudioManager.AudioPlaybackCallback() {
+                        @Override
+                        public void onPlaybackConfigChanged(java.util.List<android.media.AudioPlaybackConfiguration> configs) {
+                            super.onPlaybackConfigChanged(configs);
+                            if (checkIsMediaAudioPlaying()) {
+                                runOnUiThread(() -> {
+                                    WebView wv = bridge != null ? bridge.getWebView() : null;
+                                    if (wv != null) {
+                                        wv.evaluateJavascript(
+                                            "window.dispatchEvent(new CustomEvent('tmdb_native_audio_active', { detail: { active: true } }));",
+                                            null
+                                        );
+                                    }
+                                });
+                            }
+                        }
+                    };
+                    am.registerAudioPlaybackCallback(audioPlaybackCallback, new android.os.Handler(android.os.Looper.getMainLooper()));
+                }
+            } catch (Exception e) {
+                Log.w("TMDB_APP", "Could not register AudioPlaybackCallback: " + e.getMessage());
+            }
+        }
+    }
+
     @Override
     public void onDestroy() {
         super.onDestroy();
         if (orientationListener != null) {
             orientationListener.disable();
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && audioPlaybackCallback != null) {
+            try {
+                android.media.AudioManager am = (android.media.AudioManager) getSystemService(AUDIO_SERVICE);
+                if (am != null) {
+                    am.unregisterAudioPlaybackCallback(audioPlaybackCallback);
+                }
+            } catch (Exception ignored) {}
         }
     }
 }

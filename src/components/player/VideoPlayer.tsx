@@ -153,33 +153,6 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     });
   }, [activeTopProviders, isAnime, activeAsean, isKorean, enabledResolvers, effectiveOriginCountries, telegramProviderCountries, enabledTelegramProviders]);
 
-  const getFallbackEmbedProvider = useCallback((): StreamProvider => {
-    // 1. First priority: First available embed provider from orderedProviders
-    const firstEligible = orderedProviders.find((p) => (p.engine || 'embed') === 'embed');
-    if (firstEligible) return firstEligible;
-
-    // 2. Context-aware top pick from user settings
-    if (activeAsean && topAseanProviders && topAseanProviders.length > 0) {
-      const aseanPick = topAseanProviders.find((id) => id !== 'telegram-msm32');
-      if (aseanPick) return getProviderById(aseanPick);
-    }
-    if (isAnime && topAnimeProviders && topAnimeProviders.length > 0) {
-      const animePick = topAnimeProviders.find((id) => id !== 'telegram-msm32');
-      if (animePick) return getProviderById(animePick);
-    }
-    if (isKorean && topKoreanProviders && topKoreanProviders.length > 0) {
-      const koreanPick = topKoreanProviders.find((id) => id !== 'telegram-msm32');
-      if (koreanPick) return getProviderById(koreanPick);
-    }
-    if (topProviders && topProviders.length > 0) {
-      const generalPick = topProviders.find((id) => id !== 'telegram-msm32');
-      if (generalPick) return getProviderById(generalPick);
-    }
-
-    // 3. Fallback safety net
-    return getProviderById('vidlink');
-  }, [orderedProviders, activeAsean, isAnime, isKorean, topAseanProviders, topAnimeProviders, topKoreanProviders, topProviders]);
-
   // Up Next state
   const [showUpNext, setShowUpNext] = useState(false);
   const [countdown, setCountdown] = useState(10);
@@ -267,6 +240,20 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const [allFailed, setAllFailed] = useState(false);
   const autoCycleTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const watchdogActiveProviderRef = useRef<string | null>(null);
+  const watchdogStartTimeRef = useRef<number>(0);
+  const [watchdogCountdown, setWatchdogCountdown] = useState<number | null>(null);
+
+  const clearWatchdog = useCallback((reason?: string) => {
+    if (autoCycleTimeoutRef.current) {
+      clearTimeout(autoCycleTimeoutRef.current);
+      autoCycleTimeoutRef.current = null;
+    }
+    watchdogActiveProviderRef.current = null;
+    setWatchdogCountdown(null);
+    if (reason) {
+      console.log(`[AutoCycle Watchdog] ⏹️ Watchdog cleared (${reason}).`);
+    }
+  }, []);
 
   // Disable auto-cycling if provider was manually selected by user
   useEffect(() => {
@@ -291,6 +278,68 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       setShowControls(false);
     }, 3500);
   }, []);
+
+  const lastCycleAttemptRef = useRef<{ providerId: string; time: number }>({ providerId: '', time: 0 });
+
+  const cycleToNextProvider = useCallback(() => {
+    resetControlsTimer();
+    const now = Date.now();
+    // Guard against multiple rapid error triggers for the same provider (e.g. preflight fetch + native iframe error within 1500ms)
+    if (
+      lastCycleAttemptRef.current.providerId === providerId &&
+      now - lastCycleAttemptRef.current.time < 1500
+    ) {
+      console.warn(`[AutoCycle] 🛡️ Ignoring duplicate cycle trigger for "${providerId}" within debounce window.`);
+      return;
+    }
+    lastCycleAttemptRef.current = { providerId, time: now };
+
+    setTriedProviders((prev) => {
+      const updatedTried = Array.from(new Set([...prev, providerId]));
+      if (updatedTried.length >= orderedProviders.length) {
+        console.warn('[AutoCycle] ⚠️ All available providers have been tried and failed.');
+        setAllFailed(true);
+        setIsProbing(false);
+        setIsLoading(false);
+        return updatedTried;
+      }
+
+      // Find the next eligible provider in orderedProviders that has NOT been tried yet
+      const currentIndex = orderedProviders.findIndex((p) => p.id === providerId);
+      let nextProvider: StreamProvider | undefined;
+
+      // Start searching forward from current index
+      for (let offset = 1; offset < orderedProviders.length; offset++) {
+        const candidateIndex = (currentIndex + offset) % orderedProviders.length;
+        const candidate = orderedProviders[candidateIndex];
+        if (candidate && !updatedTried.includes(candidate.id)) {
+          nextProvider = candidate;
+          break;
+        }
+      }
+
+      // Fallback: pick any untried provider
+      if (!nextProvider) {
+        nextProvider = orderedProviders.find((p) => !updatedTried.includes(p.id));
+      }
+
+      if (nextProvider) {
+        console.log(`[AutoCycle] 🔄 Advancing from "${providerId}" to next untried provider "${nextProvider.id}" (${updatedTried.length + 1}/${orderedProviders.length})...`);
+        setIsLoading(true);
+        setHasError(false);
+        onProviderChange(nextProvider);
+      } else {
+        setAllFailed(true);
+        setIsProbing(false);
+        setIsLoading(false);
+      }
+
+      return updatedTried;
+    });
+  }, [providerId, onProviderChange, resetControlsTimer, orderedProviders]);
+
+  const cycleToNextProviderRef = useRef(cycleToNextProvider);
+  cycleToNextProviderRef.current = cycleToNextProvider;
 
   // Show controls on initial load or fullscreen change
   useEffect(() => {
@@ -429,10 +478,9 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       // 0. TELEGRAM PROVIDER (MovieSubMalay MSM32)
       if (providerId === 'telegram-msm32' || provider.engine === 'telegram') {
         if (!isTelegramOriginMatching && !isUserSelected) {
-          console.log(`[Resolver] Title origin (${effectiveOriginCountries.join(',') || 'unknown'}) is not within telegram-msm filter, skipping to next engine...`);
-          if (enabledResolvers.includes('embed')) {
-            const fallbackProvider = getFallbackEmbedProvider();
-            onProviderChange(fallbackProvider);
+          console.log(`[Resolver] Title origin (${effectiveOriginCountries.join(',') || 'unknown'}) is not within telegram-msm filter, auto-cycling to next provider...`);
+          if (autoCycle && !allFailed) {
+            cycleToNextProvider();
             return;
           } else {
             setResolvingStatus('Title origin is not supported by Telegram MSM filter.');
@@ -609,13 +657,12 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           }
 
           console.warn('[Resolver] Telegram stream not found');
-          if (enabledResolvers.includes('embed')) {
-            setResolvingStatus('Telegram stream not found, switching to primary embed...');
-            const fallbackProvider = getFallbackEmbedProvider();
-            onProviderChange(fallbackProvider);
+          if (autoCycle && !isUserSelected && !allFailed) {
+            setResolvingStatus('Telegram stream not found, cycling to next provider...');
+            cycleToNextProvider();
             return;
           } else {
-            console.log('[Resolver] Telegram stream not found and Embed Resolver is disabled.');
+            console.log('[Resolver] Telegram stream not found and auto-cycle is unavailable.');
             setResolvingStatus('No stream found in Telegram Provider.');
             setPlayerMode('error');
             setIsExtracting(false);
@@ -624,9 +671,9 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           }
         } catch (err) {
           console.warn('[Resolver] Telegram resolution error:', err);
-          if (enabledResolvers.includes('embed')) {
-            const fallbackProvider = getFallbackEmbedProvider();
-            onProviderChange(fallbackProvider);
+          if (autoCycle && !isUserSelected && !allFailed) {
+            setResolvingStatus('Telegram resolver error, cycling to next provider...');
+            cycleToNextProvider();
             return;
           } else {
             setResolvingStatus('Telegram resolver error.');
@@ -704,14 +751,18 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           }
         }
 
-        console.warn('[Resolver] PencuriMovie resolution exhausted all retries, auto-failover to next Asean provider...');
-        setResolvingStatus('Failing over to next Asean provider...');
-        const aseanFallbackId = (topAseanProviders && topAseanProviders.length > 0)
-          ? topAseanProviders.find(p => p !== 'pencurimovie-my') || 'vidlink'
-          : 'vidlink';
-        const fallbackProvider = getProviderById(aseanFallbackId);
-        onProviderChange(fallbackProvider);
-        return;
+        console.warn('[Resolver] PencuriMovie resolution exhausted all retries, auto-cycling to next provider...');
+        if (autoCycle && !isUserSelected && !allFailed) {
+          setResolvingStatus('Failing over to next provider...');
+          cycleToNextProvider();
+          return;
+        } else {
+          setResolvingStatus('No stream found in PencuriMovie (Abyss).');
+          setPlayerMode('error');
+          setIsExtracting(false);
+          setIsLoading(false);
+          return;
+        }
       }
 
 
@@ -743,20 +794,31 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             onActiveServerChange?.('LARI21', 'lari21-asian');
             return;
           }
-          console.warn('[Resolver] LARI21 resolution returned no stream or timed out, auto-failover to next Asean provider...');
-          setResolvingStatus('Failing over to next Asean provider...');
-          // Fast failover to next provider in Asean priority list
-          const aseanFallbackId = (topAseanProviders && topAseanProviders.length > 0)
-            ? topAseanProviders.find(p => p !== 'lari21-asian' && p !== 'lk21-asian') || 'vidlink'
-            : 'vidlink';
-          const fallbackProvider = getProviderById(aseanFallbackId);
-          onProviderChange(fallbackProvider);
-          return;
+          console.warn('[Resolver] LARI21 resolution returned no stream or timed out, auto-cycling to next provider...');
+          if (autoCycle && !isUserSelected && !allFailed) {
+            setResolvingStatus('Failing over to next provider...');
+            cycleToNextProvider();
+            return;
+          } else {
+            setResolvingStatus('No stream found in LARI21.');
+            setPlayerMode('error');
+            setIsExtracting(false);
+            setIsLoading(false);
+            return;
+          }
         } catch (err) {
           console.warn('[Resolver] LARI21 resolution error:', err);
-          const fallbackProvider = getFallbackEmbedProvider();
-          onProviderChange(fallbackProvider);
-          return;
+          if (autoCycle && !isUserSelected && !allFailed) {
+            setResolvingStatus('Failing over to next provider...');
+            cycleToNextProvider();
+            return;
+          } else {
+            setResolvingStatus('LARI21 resolver error.');
+            setPlayerMode('error');
+            setIsExtracting(false);
+            setIsLoading(false);
+            return;
+          }
         }
       }
 
@@ -786,23 +848,31 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             onActiveServerChange?.('KissKH', 'kisskh-kdrama');
             return;
           }
-          console.warn('[Resolver] KissKH resolution returned no stream or timed out, auto-failover to next Korean provider...');
-          setResolvingStatus('Failing over to next Korean provider...');
-          // Fast failover to next provider in Korean priority list
-          const koreanFallbackId = (topKoreanProviders && topKoreanProviders.length > 0)
-            ? topKoreanProviders.find(p => p !== 'kisskh-kdrama' && p !== 'kisskh') || 'cinesrc'
-            : 'cinesrc';
-          const fallbackProvider = getProviderById(koreanFallbackId);
-          onProviderChange(fallbackProvider);
-          return;
+          console.warn('[Resolver] KissKH resolution returned no stream or timed out, auto-cycling to next provider...');
+          if (autoCycle && !isUserSelected && !allFailed) {
+            setResolvingStatus('Failing over to next provider...');
+            cycleToNextProvider();
+            return;
+          } else {
+            setResolvingStatus('No stream found in KissKH.');
+            setPlayerMode('error');
+            setIsExtracting(false);
+            setIsLoading(false);
+            return;
+          }
         } catch (err) {
           console.warn('[Resolver] KissKH resolution error:', err);
-          const koreanFallbackId = (topKoreanProviders && topKoreanProviders.length > 0)
-            ? topKoreanProviders.find(p => p !== 'kisskh-kdrama' && p !== 'kisskh') || 'cinesrc'
-            : 'cinesrc';
-          const fallbackProvider = getProviderById(koreanFallbackId);
-          onProviderChange(fallbackProvider);
-          return;
+          if (autoCycle && !isUserSelected && !allFailed) {
+            setResolvingStatus('Failing over to next provider...');
+            cycleToNextProvider();
+            return;
+          } else {
+            setResolvingStatus('KissKH resolver error.');
+            setPlayerMode('error');
+            setIsExtracting(false);
+            setIsLoading(false);
+            return;
+          }
         }
       }
 
@@ -829,22 +899,31 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             onActiveServerChange?.(`DramaCool (${activeServer})`, 'dramacool-kdrama');
             return;
           }
-          console.warn('[Resolver] Dramacool resolution returned no stream, auto-failover to next Korean provider...');
-          setResolvingStatus('Failing over to next Korean provider...');
-          const koreanFallbackId = (topKoreanProviders && topKoreanProviders.length > 0)
-            ? topKoreanProviders.find(p => p !== 'dramacool-kdrama') || 'kisskh-kdrama'
-            : 'kisskh-kdrama';
-          const fallbackProvider = getProviderById(koreanFallbackId);
-          onProviderChange(fallbackProvider);
-          return;
+          console.warn('[Resolver] Dramacool resolution returned no stream, auto-cycling to next provider...');
+          if (autoCycle && !isUserSelected && !allFailed) {
+            setResolvingStatus('Failing over to next provider...');
+            cycleToNextProvider();
+            return;
+          } else {
+            setResolvingStatus('No stream found in Dramacool.');
+            setPlayerMode('error');
+            setIsExtracting(false);
+            setIsLoading(false);
+            return;
+          }
         } catch (err) {
           console.warn('[Resolver] Dramacool resolution error:', err);
-          const koreanFallbackId = (topKoreanProviders && topKoreanProviders.length > 0)
-            ? topKoreanProviders.find(p => p !== 'dramacool-kdrama') || 'kisskh-kdrama'
-            : 'kisskh-kdrama';
-          const fallbackProvider = getProviderById(koreanFallbackId);
-          onProviderChange(fallbackProvider);
-          return;
+          if (autoCycle && !isUserSelected && !allFailed) {
+            setResolvingStatus('Failing over to next provider...');
+            cycleToNextProvider();
+            return;
+          } else {
+            setResolvingStatus('Dramacool resolver error.');
+            setPlayerMode('error');
+            setIsExtracting(false);
+            setIsLoading(false);
+            return;
+          }
         }
       }
 
@@ -867,9 +946,16 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
       if (!isMounted || abortController.signal.aborted) return;
 
-      // Final fallback to Embed Resolver ONLY if explicitly enabled
+      if (autoCycle && !isUserSelected && !allFailed) {
+        console.warn(`[Resolver] Stream not resolved for "${provider.name}", auto-cycling to next provider...`);
+        setResolvingStatus('Cycling to next provider...');
+        cycleToNextProvider();
+        return;
+      }
+
+      // If user manually selected this specific provider and embed is enabled, attempt embed
       if (enabledResolvers.includes('embed')) {
-        console.log('[Resolver] Fallback: Embed Resolver');
+        console.log('[Resolver] User selected provider fallback: Embed Resolver');
         const cleanName = provider.name.replace(/\s*\([^)]*\)/g, '').trim();
         setResolvingStatus(`Loading embed player (${cleanName})...`);
         setPlayerMode('embed');
@@ -896,7 +982,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       isMounted = false;
       abortController.abort();
     };
-  }, [enabledResolvers, tmdbId, title, mediaType, season, episode, activeAsean, providerId, releaseYear, originalTitle, topAnimeProviders, topAseanProviders, isUserSelected, isTelegramOriginMatching, resolveTrigger, getFallbackEmbedProvider]);
+  }, [enabledResolvers, tmdbId, title, mediaType, season, episode, activeAsean, providerId, releaseYear, originalTitle, topAnimeProviders, topAseanProviders, isUserSelected, isTelegramOriginMatching, resolveTrigger, cycleToNextProvider, autoCycle, allFailed]);
 
   const [resumeTimestamp, setResumeTimestamp] = useState<number>(initialTimestamp || 0);
   const [resolvedAnimeMapping, setResolvedAnimeMapping] = useState<ResolvedAnimeMapping | null>(null);
@@ -1028,7 +1114,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const lastSaveTimeRef = useRef<number>(0);
 
   // Unified progress recorder (Throttled to 10s to guarantee 0% CPU & I/O overhead on TV)
-  const recordProgress = useCallback((currentSec: number, totalDurationSec: number, force = false) => {
+  const recordProgress = useCallback((currentSec: number, totalDurationSec: number, force = false, isLive = false) => {
     if ((!totalDurationSec || totalDurationSec <= 0) && episodeRuntimeMinutes) {
       totalDurationSec = episodeRuntimeMinutes * 60;
     }
@@ -1041,6 +1127,16 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     if (currentSec < 0) return;
 
     currentTimeRef.current = currentSec;
+
+    // Immediately clear watchdog timeout ONLY whenever verified LIVE playback progress > 0 arrives
+    if (isLive && currentSec > 0 && autoCycleTimeoutRef.current) {
+      console.log(`[AutoCycle Watchdog] ✅ Active video playback verified (time: ${currentSec}s). Watchdog cleared.`);
+      clearWatchdog(`live playback at ${currentSec}s`);
+      setIsLoading(false);
+      setHasError(false);
+      setIsProbing(false);
+      isPlayingRef.current = true;
+    }
     const now = Date.now();
 
     // PERFORMANCE OPTIMIZATION:
@@ -1356,11 +1452,27 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       executeSeek(targetTime, delta);
     };
 
+    const handleNativeAudioActive = () => {
+      // Guard against false positive audio spikes during the initial 2.5s iframe mount period
+      if (Date.now() - watchdogStartTimeRef.current < 2500) {
+        console.log('[AutoCycle Watchdog] 🔊 Native audio event ignored during initial 2.5s mount period.');
+        return;
+      }
+      console.log('[AutoCycle Watchdog] 🔊 Native audio playback verified! Clearing watchdog.');
+      setIsLoading(false);
+      setHasError(false);
+      setIsProbing(false);
+      isPlayingRef.current = true;
+      clearWatchdog('sustained native audio');
+    };
+
+    window.addEventListener('tmdb_native_audio_active', handleNativeAudioActive);
     window.addEventListener('tmdb_playback_state_changed', handlePlaybackStateChanged);
     window.addEventListener('tmdb_toggle_play_pause', handleTogglePlayPause);
     window.addEventListener('tmdb_pause_player', handlePausePlayer);
     window.addEventListener('tmdb_execute_seek', handleExecuteSeek);
     return () => {
+      window.removeEventListener('tmdb_native_audio_active', handleNativeAudioActive);
       window.removeEventListener('tmdb_playback_state_changed', handlePlaybackStateChanged);
       window.removeEventListener('tmdb_toggle_play_pause', handleTogglePlayPause);
       window.removeEventListener('tmdb_pause_player', handlePausePlayer);
@@ -1377,19 +1489,28 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         const data = typeof e.data === 'string' ? JSON.parse(e.data) : e.data;
         if (!data) return;
 
-        // 1. VidLink PLAYER_EVENT (event: 'timeupdate' | 'pause' | 'ended' | 'time')
+        // 1. VidLink & Cinezo PLAYER_EVENT (event: 'timeupdate' | 'pause' | 'ended' | 'time')
         if (data.type === 'PLAYER_EVENT' && data.data) {
           lastPostMessageTimeRef.current = Date.now();
           const evt = data.data.event;
           const current = data.data.currentTime ?? data.data.seconds ?? 0;
           const dur = data.data.duration ?? data.data.totalDuration ?? 0;
-          if (current > 0) {
-            recordProgress(current, dur, evt === 'ended');
+          if (current > 0 && (evt === 'timeupdate' || evt === 'time' || evt === 'playing')) {
+            recordProgress(current, dur, evt === 'ended', true);
+            if (autoCycleTimeoutRef.current) {
+              console.log(`[AutoCycle Watchdog] ✅ PLAYER_EVENT verified active playback (${current}s). Watchdog cleared.`);
+              clearTimeout(autoCycleTimeoutRef.current);
+              autoCycleTimeoutRef.current = null;
+              watchdogActiveProviderRef.current = null;
+              setIsLoading(false);
+              setHasError(false);
+              setIsProbing(false);
+            }
           }
           return;
         }
 
-        // 2. VidLink MEDIA_DATA dictionary
+        // 2. VidLink MEDIA_DATA dictionary (SAVED WATCH HISTORY - NOT LIVE PLAYBACK!)
         if (data.type === 'MEDIA_DATA' && data.data) {
           lastPostMessageTimeRef.current = Date.now();
           const item = data.data[tmdbId];
@@ -1398,10 +1519,10 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
               const epKey = `s${season}e${episode}`;
               const epProgress = item.show_progress[epKey]?.progress;
               if (epProgress && epProgress.watched > 0) {
-                recordProgress(epProgress.watched, epProgress.duration || 0);
+                recordProgress(epProgress.watched, epProgress.duration || 0, false, false);
               }
             } else if (item.progress && item.progress.watched > 0) {
-              recordProgress(item.progress.watched, item.progress.duration || 0);
+              recordProgress(item.progress.watched, item.progress.duration || 0, false, false);
             }
           }
           return;
@@ -1411,14 +1532,14 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         if (data.channel === 'megacloud' || data.channel === 'megaplay' || data.type === 'watching-log') {
           if (data.event === 'complete') {
             const endDur = durationRef.current || (episodeRuntimeMinutes ? episodeRuntimeMinutes * 60 : 1440);
-            recordProgress(endDur, endDur, true);
+            recordProgress(endDur, endDur, true, true);
             return;
           }
           const current = data.time ?? data.currentTime ?? data.seconds ?? 0;
           const dur = data.duration ?? data.totalDuration ?? 0;
           if (current > 0) {
             lastPostMessageTimeRef.current = Date.now();
-            recordProgress(current, dur);
+            recordProgress(current, dur, false, true);
           }
           return;
         }
@@ -1427,14 +1548,14 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         if (data.type === 'kisskh' || data.channel === 'kisskh') {
           if (data.event === 'ended') {
             const endDur = durationRef.current || data.duration || (episodeRuntimeMinutes ? episodeRuntimeMinutes * 60 : 0);
-            if (endDur > 0) recordProgress(endDur, endDur, true);
+            if (endDur > 0) recordProgress(endDur, endDur, true, true);
             return;
           }
           const current = data.currentTime ?? data.time ?? data.seconds ?? 0;
           const dur = data.duration ?? 0;
           if (current > 0) {
             lastPostMessageTimeRef.current = Date.now();
-            recordProgress(current, dur);
+            recordProgress(current, dur, false, true);
           }
           return;
         }
@@ -1443,14 +1564,14 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         if (data.type === 'dramacool' || data.channel === 'dramacool') {
           if (data.event === 'ended') {
             const endDur = durationRef.current || data.duration || (episodeRuntimeMinutes ? episodeRuntimeMinutes * 60 : 0);
-            if (endDur > 0) recordProgress(endDur, endDur, true);
+            if (endDur > 0) recordProgress(endDur, endDur, true, true);
             return;
           }
           const current = data.currentTime ?? data.time ?? data.seconds ?? 0;
           const dur = data.duration ?? 0;
           if (current > 0) {
             lastPostMessageTimeRef.current = Date.now();
-            recordProgress(current, dur);
+            recordProgress(current, dur, false, true);
           }
           return;
         }
@@ -1477,7 +1598,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           if (subType === 'ended') {
             isPlayingRef.current = false;
             const endDur = durationRef.current || data.duration || (episodeRuntimeMinutes ? episodeRuntimeMinutes * 60 : 0);
-            if (endDur > 0) recordProgress(endDur, endDur, true);
+            if (endDur > 0) recordProgress(endDur, endDur, true, true);
             return;
           }
 
@@ -1493,7 +1614,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             const dur = data.duration ?? 0;
             if (current > 0) {
               lastPostMessageTimeRef.current = Date.now();
-              recordProgress(current, dur);
+              recordProgress(current, dur, false, true);
               setIsProbing(false);
               if (autoCycleTimeoutRef.current) {
                 clearTimeout(autoCycleTimeoutRef.current);
@@ -1509,14 +1630,14 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         if (data.event === 'timeupdate' || data.event === 'progress' || data.event === 'time') {
           if (data.event === 'complete' || data.event === 'ended') {
             const endDur = durationRef.current || (episodeRuntimeMinutes ? episodeRuntimeMinutes * 60 : 0);
-            if (endDur > 0) recordProgress(endDur, endDur, true);
+            if (endDur > 0) recordProgress(endDur, endDur, true, true);
             return;
           }
           const current = data.currentTime ?? data.data?.currentTime ?? data.time ?? data.seconds ?? 0;
           const dur = data.duration ?? data.data?.duration ?? data.totalDuration ?? 0;
           if (current > 0) {
             lastPostMessageTimeRef.current = Date.now();
-            recordProgress(current, dur);
+            recordProgress(current, dur, false, true);
             setIsProbing(false);
             if (autoCycleTimeoutRef.current) {
               clearTimeout(autoCycleTimeoutRef.current);
@@ -1768,30 +1889,6 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     );
   }, [isProbing, providerId, onProbingStatusChange, orderedProviders]);
 
-  const cycleToNextProvider = useCallback(() => {
-    resetControlsTimer();
-    const currentIndex = orderedProviders.findIndex((p) => p.id === providerId);
-    const nextIndex = (currentIndex + 1) % orderedProviders.length;
-    const nextProvider = orderedProviders[nextIndex];
-
-    setTriedProviders((prev) => {
-      const updated = Array.from(new Set([...prev, providerId]));
-      if (updated.length >= orderedProviders.length) {
-        setAllFailed(true);
-        setIsProbing(false);
-        setIsLoading(false);
-      } else {
-        setIsLoading(true);
-        setHasError(false);
-        onProviderChange(nextProvider);
-      }
-      return updated;
-    });
-  }, [providerId, onProviderChange, resetControlsTimer, orderedProviders]);
-
-  const cycleToNextProviderRef = useRef(cycleToNextProvider);
-  cycleToNextProviderRef.current = cycleToNextProvider;
-
   const restartAutoCycle = () => {
     setTriedProviders([]);
     setAllFailed(false);
@@ -1829,12 +1926,59 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     }
 
     watchdogActiveProviderRef.current = providerId;
+    watchdogStartTimeRef.current = Date.now();
+    setWatchdogCountdown(timeoutSec);
     console.log(`[AutoCycle Watchdog] ⏱️ Watchdog started for "${providerId}": ${timeoutSec}s threshold (mode: ${isUserSelected ? 'manual' : 'auto'}).`);
+
+    const countdownInterval = setInterval(() => {
+      setWatchdogCountdown((prev) => {
+        if (prev === null || prev <= 1) {
+          return null;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    let consecutiveAudioActiveCount = 0;
+
+    // Universal Native Audio Poll: Catches audio playback from ANY embed provider (even without postMessage)
+    // Requires sustained media audio playback (consecutive ticks after 2.5s grace period) to eliminate false positives
+    const audioPoll = setInterval(() => {
+      if (!autoCycleTimeoutRef.current) {
+        clearInterval(audioPoll);
+        clearInterval(countdownInterval);
+        return;
+      }
+      // Grace period: ignore audio during the first 2.5s of iframe/page loading
+      if (Date.now() - watchdogStartTimeRef.current < 2500) {
+        return;
+      }
+      try {
+        const isAudioActive = Boolean((window as any).AndroidBridge?.isAudioPlaying?.());
+        if (isAudioActive) {
+          consecutiveAudioActiveCount += 1;
+          console.log(`[AutoCycle Watchdog] 🔊 Sustained audio check (${consecutiveAudioActiveCount}/2)...`);
+          if (consecutiveAudioActiveCount >= 2) {
+            console.log('[AutoCycle Watchdog] 🔊 Sustained audio playback verified! Clearing watchdog.');
+            clearInterval(audioPoll);
+            clearInterval(countdownInterval);
+            clearWatchdog('sustained audio poll');
+            setIsLoading(false);
+            setHasError(false);
+            setIsProbing(false);
+            isPlayingRef.current = true;
+          }
+        } else {
+          consecutiveAudioActiveCount = 0;
+        }
+      } catch {}
+    }, 1000);
 
     autoCycleTimeoutRef.current = setTimeout(() => {
       console.warn(`[AutoCycle Watchdog] ⏱️ Server "${providerId}" did not establish active video in ${timeoutSec}s.`);
-      autoCycleTimeoutRef.current = null;
-      watchdogActiveProviderRef.current = null;
+      clearInterval(audioPoll);
+      clearInterval(countdownInterval);
+      clearWatchdog('watchdog timeout expired');
 
       // 1. In AUTO mode: if there are more providers to try, auto-cycle immediately!
       if (autoCycle && !isUserSelected && !allFailed) {
@@ -1854,18 +1998,19 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       setIsLoading(false);
       setIsProbing(false);
     }, timeoutSec * 1000);
-  }, [providerId, autoCycle, isUserSelected, allFailed, playerMode, hasError, provider.name]);
+
+    return () => {
+      clearInterval(countdownInterval);
+      clearInterval(audioPoll);
+    };
+  }, [providerId, autoCycle, isUserSelected, allFailed, playerMode, hasError, provider.name, clearWatchdog]);
 
   // Clean up watchdog timer only when providerId changes or player unmounts
   useEffect(() => {
     return () => {
-      if (autoCycleTimeoutRef.current) {
-        clearTimeout(autoCycleTimeoutRef.current);
-        autoCycleTimeoutRef.current = null;
-        watchdogActiveProviderRef.current = null;
-      }
+      clearWatchdog('providerId change or unmount');
     };
-  }, [providerId]);
+  }, [providerId, clearWatchdog]);
 
   // Reset provider error details and clear error state whenever active provider changes (e.g. from header dropdown)
   useEffect(() => {
@@ -1910,14 +2055,27 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
       const descLower = (detail?.description || '').toLowerCase();
       const isConnectionRefused = descLower.includes('refused') || detail?.code === -6;
-      const isXfoBlocked = descLower.includes('x-frame-options');
+      const isXfoBlocked = descLower.includes('x-frame-options') || descLower.includes('blocked embedding');
+      const isServerHttpError = (detail?.code && detail.code >= 400) || descLower.includes('server error') || descLower.includes('http');
+
+      let errTitle = 'Unable to Connect to Server';
+      let errBadge = isConnectionRefused ? 'Connection Refused' : 'Server Stream Unavailable';
+      let errMsg = `The selected server (${provider.name}) refused the connection or is currently unreachable. Please try switching to another server.`;
+
+      if (isServerHttpError) {
+        errTitle = 'Server Unavailable';
+        errBadge = detail?.code && detail.code >= 400 ? `HTTP ${detail.code}` : 'Server Error';
+        errMsg = `The streaming server (${provider.name}) encountered an error (${detail?.description || `HTTP ${detail?.code}`}). Please try switching to another server.`;
+      } else if (isXfoBlocked) {
+        errTitle = 'Embedding Blocked by Provider';
+        errBadge = 'Embed Blocked';
+        errMsg = `The streaming server (${provider.name}) has disabled third-party embedding. Please switch to another server.`;
+      }
 
       setProviderErrorDetail({
-        title: isXfoBlocked ? 'Embedding Blocked by Provider' : 'Unable to Connect to Server',
-        badge: isXfoBlocked ? 'Embed Blocked' : (isConnectionRefused ? 'Connection Refused' : 'Server Stream Unavailable'),
-        message: isXfoBlocked
-          ? `The streaming server (${provider.name}) has disabled third-party embedding. Please switch to another server.`
-          : `The selected server (${provider.name}) refused the connection or is currently unreachable. Please try switching to another server.`,
+        title: errTitle,
+        badge: errBadge,
+        message: errMsg,
       });
 
       // In AUTO mode: if there are more providers to try, auto-cycle immediately!
@@ -2099,17 +2257,22 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       } catch {}
     };
 
-    // Attempt immediately, and retry at 500ms, 1200ms, 2500ms, and 4000ms once media buffer begins
+    // Attempt immediately, and retry unmuting + center touch activation at 600ms, 1500ms, 3000ms, and 4500ms
     sendUnmuteMessages();
     styleCineSrcIframe();
+    const pulsePlay = () => {
+      if (!isPlayingRef.current) {
+        activateCenterPlayButton();
+      }
+    };
     setTimeout(() => {
       sendUnmuteMessages();
-      activateCenterPlayButton();
+      pulsePlay();
       styleCineSrcIframe();
     }, 600);
-    setTimeout(() => { sendUnmuteMessages(); styleCineSrcIframe(); }, 1200);
-    setTimeout(() => { sendUnmuteMessages(); styleCineSrcIframe(); }, 2500);
-    setTimeout(() => { sendUnmuteMessages(); styleCineSrcIframe(); }, 4000);
+    setTimeout(() => { sendUnmuteMessages(); pulsePlay(); styleCineSrcIframe(); }, 1500);
+    setTimeout(() => { sendUnmuteMessages(); pulsePlay(); styleCineSrcIframe(); }, 3000);
+    setTimeout(() => { sendUnmuteMessages(); pulsePlay(); styleCineSrcIframe(); }, 4500);
   };
 
   const handleIframeError = () => {
@@ -2310,6 +2473,15 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           <p className="text-sm font-semibold text-gray-200">
             Loading stream via <span className="text-hbo-cyan font-bold">{provider.name}</span>...
           </p>
+          {typeof watchdogCountdown === 'number' && watchdogCountdown > 0 && (
+            <div className="mt-2.5 inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-hbo-purple/20 border border-hbo-cyan/30 text-xs font-semibold text-hbo-cyan tracking-wide animate-pulse">
+              <span className="w-2 h-2 rounded-full bg-hbo-cyan animate-ping" />
+              <span>Timeout in <strong className="text-white font-mono text-sm ml-0.5">{watchdogCountdown}s</strong></span>
+              {autoCycle && !isUserSelected && (
+                <span className="text-gray-400 font-normal border-l border-white/20 pl-2">Auto-cycle</span>
+              )}
+            </div>
+          )}
           {resolvingStatus && (
             <p className="text-xs text-hbo-cyan/80 font-medium mt-1.5 animate-pulse">
               {resolvingStatus}
@@ -2379,16 +2551,31 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
               setResolvedMsm32Url(transcodedUrl);
               return;
             }
-            if (enabledResolvers.includes('embed')) {
-              console.log('[DirectStream] Playback error on direct stream. Fallback to embed.');
+            if (autoCycle && !isUserSelected && !allFailed) {
+              console.log('[DirectStream] Playback error on direct stream. Auto-cycling to next provider...');
+              cycleToNextProvider();
+            } else if (enabledResolvers.includes('embed')) {
+              console.log('[DirectStream] Playback error on direct stream. Embed is enabled, switching to embed player.');
               setPlayerMode('embed');
             } else {
-              console.log('[DirectStream] Playback error on direct stream. Embed is disabled.');
+              console.log('[DirectStream] Playback error on direct stream. Direct stream failed.');
               setPlayerMode('error');
             }
             setDirectStreamUrl(null);
           }}
         />
+      )}
+
+      {/* Floating Watchdog Countdown Pill (Visible while iframe is mounted but still waiting for active video playback) */}
+      {playerMode === 'embed' && !isLoading && !hasError && typeof watchdogCountdown === 'number' && watchdogCountdown > 0 && (
+        <div className="absolute top-16 right-5 z-30 pointer-events-none flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/85 backdrop-blur-md border border-hbo-cyan/40 shadow-2xl text-xs font-medium text-gray-200 animate-fade-in">
+          <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+          <span>Starting <span className="text-hbo-cyan font-semibold">{provider.name}</span>:</span>
+          <span className="px-1.5 py-0.5 rounded bg-white/10 text-amber-300 font-mono font-bold text-xs">{watchdogCountdown}s</span>
+          {autoCycle && !isUserSelected && (
+            <span className="text-[10px] text-gray-400 border-l border-white/20 pl-2">Auto-cycle</span>
+          )}
+        </div>
       )}
 
       {/* STATE 4: Protected Video Embed (ONLY rendered if embed is enabled and no error) */}
