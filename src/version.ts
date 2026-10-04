@@ -2,12 +2,14 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20261004-0940';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-improve-provide.20261004-0940';
+export const APP_BUILD_NUMBER = '20261004-1008';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.fix-embed-provider-e.20261004-1008';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
-export const APP_BRANCH = 'feat-improve-provide';
-export const APP_CHANGELOG = `* fix(player): activate timeout in manual selection to display custom TMDB error overlay upon timeout
+export const APP_BRANCH = 'fix-embed-provider-e';
+export const APP_CHANGELOG = `* Merge pull request #182 from jefrimustapa/feat/improve-provider-error-display
+* feat(settings): set timeout options to 30/60/90/180/240 with default 30s and refine playback failed message
+* fix(player): activate timeout in manual selection to display custom TMDB error overlay upon timeout
 * fix(player): prevent native video element from prematurely clearing watchdog before currentTime > 0 and guard countdown against re-renders
 * fix(player): decouple watchdog timer from render cycles and memoize provider change callbacks
 * fix(player): preserve watchdog timer until actual playback starts instead of aborting on iframe HTML load
@@ -19,6 +21,4 @@ export const APP_CHANGELOG = `* fix(player): activate timeout in manual selectio
 * Merge pull request #181 from jefrimustapa/feat/improve-msm-series-search
 * fix(player): resolve seek state lock, extend transcode seek watchdog, and preserve touch activation
 * Merge pull request #180 from jefrimustapa/fix/embed-provider-fallback-priority
-* fix(settings): return to engine-embed instead of resolvers when closing priorityPicker drawer
-* fix(player): enforce context-aware and user-configured embed provider priority fallback after MSM failure
-* feat(player): continuous long-press seek on mobile FW/RW buttons (#179)`;
+* fix(settings): return to engine-embed instead of resolvers when closing priorityPicker drawer`;

@@ -1910,14 +1910,27 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
       const descLower = (detail?.description || '').toLowerCase();
       const isConnectionRefused = descLower.includes('refused') || detail?.code === -6;
-      const isXfoBlocked = descLower.includes('x-frame-options');
+      const isXfoBlocked = descLower.includes('x-frame-options') || descLower.includes('blocked embedding');
+      const isServerHttpError = (detail?.code && detail.code >= 400) || descLower.includes('server error') || descLower.includes('http');
+
+      let errTitle = 'Unable to Connect to Server';
+      let errBadge = isConnectionRefused ? 'Connection Refused' : 'Server Stream Unavailable';
+      let errMsg = `The selected server (${provider.name}) refused the connection or is currently unreachable. Please try switching to another server.`;
+
+      if (isServerHttpError) {
+        errTitle = 'Server Unavailable';
+        errBadge = detail?.code && detail.code >= 400 ? `HTTP ${detail.code}` : 'Server Error';
+        errMsg = `The streaming server (${provider.name}) encountered an error (${detail?.description || `HTTP ${detail?.code}`}). Please try switching to another server.`;
+      } else if (isXfoBlocked) {
+        errTitle = 'Embedding Blocked by Provider';
+        errBadge = 'Embed Blocked';
+        errMsg = `The streaming server (${provider.name}) has disabled third-party embedding. Please switch to another server.`;
+      }
 
       setProviderErrorDetail({
-        title: isXfoBlocked ? 'Embedding Blocked by Provider' : 'Unable to Connect to Server',
-        badge: isXfoBlocked ? 'Embed Blocked' : (isConnectionRefused ? 'Connection Refused' : 'Server Stream Unavailable'),
-        message: isXfoBlocked
-          ? `The streaming server (${provider.name}) has disabled third-party embedding. Please switch to another server.`
-          : `The selected server (${provider.name}) refused the connection or is currently unreachable. Please try switching to another server.`,
+        title: errTitle,
+        badge: errBadge,
+        message: errMsg,
       });
 
       // In AUTO mode: if there are more providers to try, auto-cycle immediately!
