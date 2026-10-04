@@ -268,6 +268,19 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const autoCycleTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const watchdogActiveProviderRef = useRef<string | null>(null);
   const watchdogStartTimeRef = useRef<number>(0);
+  const [watchdogCountdown, setWatchdogCountdown] = useState<number | null>(null);
+
+  const clearWatchdog = useCallback((reason?: string) => {
+    if (autoCycleTimeoutRef.current) {
+      clearTimeout(autoCycleTimeoutRef.current);
+      autoCycleTimeoutRef.current = null;
+    }
+    watchdogActiveProviderRef.current = null;
+    setWatchdogCountdown(null);
+    if (reason) {
+      console.log(`[AutoCycle Watchdog] ⏹️ Watchdog cleared (${reason}).`);
+    }
+  }, []);
 
   // Disable auto-cycling if provider was manually selected by user
   useEffect(() => {
@@ -1046,9 +1059,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     // Immediately clear watchdog timeout ONLY whenever verified LIVE playback progress > 0 arrives
     if (isLive && currentSec > 0 && autoCycleTimeoutRef.current) {
       console.log(`[AutoCycle Watchdog] ✅ Active video playback verified (time: ${currentSec}s). Watchdog cleared.`);
-      clearTimeout(autoCycleTimeoutRef.current);
-      autoCycleTimeoutRef.current = null;
-      watchdogActiveProviderRef.current = null;
+      clearWatchdog(`live playback at ${currentSec}s`);
       setIsLoading(false);
       setHasError(false);
       setIsProbing(false);
@@ -1380,11 +1391,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       setHasError(false);
       setIsProbing(false);
       isPlayingRef.current = true;
-      if (autoCycleTimeoutRef.current) {
-        clearTimeout(autoCycleTimeoutRef.current);
-        autoCycleTimeoutRef.current = null;
-        watchdogActiveProviderRef.current = null;
-      }
+      clearWatchdog('sustained native audio');
     };
 
     window.addEventListener('tmdb_native_audio_active', handleNativeAudioActive);
@@ -1872,7 +1879,17 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
     watchdogActiveProviderRef.current = providerId;
     watchdogStartTimeRef.current = Date.now();
+    setWatchdogCountdown(timeoutSec);
     console.log(`[AutoCycle Watchdog] ⏱️ Watchdog started for "${providerId}": ${timeoutSec}s threshold (mode: ${isUserSelected ? 'manual' : 'auto'}).`);
+
+    const countdownInterval = setInterval(() => {
+      setWatchdogCountdown((prev) => {
+        if (prev === null || prev <= 1) {
+          return null;
+        }
+        return prev - 1;
+      });
+    }, 1000);
 
     let consecutiveAudioActiveCount = 0;
 
@@ -1881,6 +1898,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     const audioPoll = setInterval(() => {
       if (!autoCycleTimeoutRef.current) {
         clearInterval(audioPoll);
+        clearInterval(countdownInterval);
         return;
       }
       // Grace period: ignore audio during the first 2.5s of iframe/page loading
@@ -1894,16 +1912,13 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           console.log(`[AutoCycle Watchdog] 🔊 Sustained audio check (${consecutiveAudioActiveCount}/2)...`);
           if (consecutiveAudioActiveCount >= 2) {
             console.log('[AutoCycle Watchdog] 🔊 Sustained audio playback verified! Clearing watchdog.');
-            if (autoCycleTimeoutRef.current) {
-              clearTimeout(autoCycleTimeoutRef.current);
-              autoCycleTimeoutRef.current = null;
-              watchdogActiveProviderRef.current = null;
-              setIsLoading(false);
-              setHasError(false);
-              setIsProbing(false);
-              isPlayingRef.current = true;
-            }
             clearInterval(audioPoll);
+            clearInterval(countdownInterval);
+            clearWatchdog('sustained audio poll');
+            setIsLoading(false);
+            setHasError(false);
+            setIsProbing(false);
+            isPlayingRef.current = true;
           }
         } else {
           consecutiveAudioActiveCount = 0;
@@ -1913,8 +1928,9 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
     autoCycleTimeoutRef.current = setTimeout(() => {
       console.warn(`[AutoCycle Watchdog] ⏱️ Server "${providerId}" did not establish active video in ${timeoutSec}s.`);
-      autoCycleTimeoutRef.current = null;
-      watchdogActiveProviderRef.current = null;
+      clearInterval(audioPoll);
+      clearInterval(countdownInterval);
+      clearWatchdog('watchdog timeout expired');
 
       // 1. In AUTO mode: if there are more providers to try, auto-cycle immediately!
       if (autoCycle && !isUserSelected && !allFailed) {
@@ -1934,18 +1950,19 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       setIsLoading(false);
       setIsProbing(false);
     }, timeoutSec * 1000);
-  }, [providerId, autoCycle, isUserSelected, allFailed, playerMode, hasError, provider.name]);
+
+    return () => {
+      clearInterval(countdownInterval);
+      clearInterval(audioPoll);
+    };
+  }, [providerId, autoCycle, isUserSelected, allFailed, playerMode, hasError, provider.name, clearWatchdog]);
 
   // Clean up watchdog timer only when providerId changes or player unmounts
   useEffect(() => {
     return () => {
-      if (autoCycleTimeoutRef.current) {
-        clearTimeout(autoCycleTimeoutRef.current);
-        autoCycleTimeoutRef.current = null;
-        watchdogActiveProviderRef.current = null;
-      }
+      clearWatchdog('providerId change or unmount');
     };
-  }, [providerId]);
+  }, [providerId, clearWatchdog]);
 
   // Reset provider error details and clear error state whenever active provider changes (e.g. from header dropdown)
   useEffect(() => {
@@ -2408,6 +2425,15 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           <p className="text-sm font-semibold text-gray-200">
             Loading stream via <span className="text-hbo-cyan font-bold">{provider.name}</span>...
           </p>
+          {typeof watchdogCountdown === 'number' && watchdogCountdown > 0 && (
+            <div className="mt-2.5 inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-hbo-purple/20 border border-hbo-cyan/30 text-xs font-semibold text-hbo-cyan tracking-wide animate-pulse">
+              <span className="w-2 h-2 rounded-full bg-hbo-cyan animate-ping" />
+              <span>Timeout in <strong className="text-white font-mono text-sm ml-0.5">{watchdogCountdown}s</strong></span>
+              {autoCycle && !isUserSelected && (
+                <span className="text-gray-400 font-normal border-l border-white/20 pl-2">Auto-cycle</span>
+              )}
+            </div>
+          )}
           {resolvingStatus && (
             <p className="text-xs text-hbo-cyan/80 font-medium mt-1.5 animate-pulse">
               {resolvingStatus}
@@ -2487,6 +2513,18 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             setDirectStreamUrl(null);
           }}
         />
+      )}
+
+      {/* Floating Watchdog Countdown Pill (Visible while iframe is mounted but still waiting for active video playback) */}
+      {playerMode === 'embed' && !isLoading && !hasError && typeof watchdogCountdown === 'number' && watchdogCountdown > 0 && (
+        <div className="absolute top-16 right-5 z-30 pointer-events-none flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/85 backdrop-blur-md border border-hbo-cyan/40 shadow-2xl text-xs font-medium text-gray-200 animate-fade-in">
+          <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+          <span>Starting <span className="text-hbo-cyan font-semibold">{provider.name}</span>:</span>
+          <span className="px-1.5 py-0.5 rounded bg-white/10 text-amber-300 font-mono font-bold text-xs">{watchdogCountdown}s</span>
+          {autoCycle && !isUserSelected && (
+            <span className="text-[10px] text-gray-400 border-l border-white/20 pl-2">Auto-cycle</span>
+          )}
+        </div>
       )}
 
       {/* STATE 4: Protected Video Embed (ONLY rendered if embed is enabled and no error) */}
