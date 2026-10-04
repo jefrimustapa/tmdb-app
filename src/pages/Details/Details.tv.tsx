@@ -481,9 +481,9 @@ export const Details: React.FC = () => {
           />
         )}
 
-        {/* Cinematic HBO Gradients Layer (Identical to HeroBanner) */}
-        <div className="absolute inset-0 hero-gradient-overlay" />
-        <div className="absolute inset-0 bg-gradient-to-t from-transparent via-transparent to-black/40" />
+        {/* Cinematic Vignette Layer (Ensures text readability without horizontal smoke bar) */}
+        <div className="absolute inset-0 bg-gradient-to-r from-black/75 via-black/35 to-transparent max-w-3xl" />
+        <div className="absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-black/50 to-transparent" />
       </div>
 
       {/* Main Content Area */}

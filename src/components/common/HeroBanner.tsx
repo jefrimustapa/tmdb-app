@@ -310,10 +310,10 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ items, onActiveItemChang
         })}
       </div>
 
-      {/* 2. Permanent Static Cinematic HBO Gradients Layer (Zero Seam Flickering) */}
+      {/* 2. Permanent Static Cinematic Vignette (Ensures text readability without creating a horizontal smoke line) */}
       <div className="absolute inset-0 z-20 pointer-events-none select-none">
-        <div className="absolute inset-0 hero-gradient-overlay" />
-        <div className="absolute inset-0 bg-gradient-to-t from-transparent via-transparent to-black/40" />
+        <div className="absolute inset-0 bg-gradient-to-r from-black/75 via-black/35 to-transparent max-w-3xl" />
+        <div className="absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-black/50 to-transparent" />
       </div>
 
       {/* 3. Hero Content & Indicators Layer (Constrained to max-w-7xl mx-auto to align with content rails) */}
