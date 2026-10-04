@@ -2,12 +2,13 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20261004-1307';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.fix-embed-provider-e.20261004-1307';
+export const APP_BUILD_NUMBER = '20261004-1329';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.fix-embed-provider-e.20261004-1329';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
 export const APP_BRANCH = 'fix-embed-provider-e';
-export const APP_CHANGELOG = `* fix(player): eliminate hardcoded provider fallbacks and unify auto-cycle with debounce guard
+export const APP_CHANGELOG = `* feat(details): display country of origin with flag badge on mobile, TV, and preview modal
+* fix(player): eliminate hardcoded provider fallbacks and unify auto-cycle with debounce guard
 * feat(player): display live watchdog countdown timer badge during playback waiting
 * fix(player): distinguish live playback from saved MEDIA_DATA progress to prevent premature watchdog clearance
 * fix(player): require sustained active media playback and pulse center touch to prevent premature watchdog cancellation
@@ -20,5 +21,4 @@ export const APP_CHANGELOG = `* fix(player): eliminate hardcoded provider fallba
 * fix(player): decouple watchdog timer from render cycles and memoize provider change callbacks
 * fix(player): preserve watchdog timer until actual playback starts instead of aborting on iframe HTML load
 * feat(settings): update streamResolverTimeout options to 60/90/120/180/unlimited (default 60s) and link to embed watchdog
-* feat(player): align fallback priority flow with auto-cycling on connection refusal and manual TMDB error display
-* fix(player): dismiss error overlay on MSM direct stream and scope native error interception to iframe docs`;
+* feat(player): align fallback priority flow with auto-cycling on connection refusal and manual TMDB error display`;
