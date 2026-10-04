@@ -458,6 +458,10 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
       activeSrcRef.current = newSrc;
       setIsBuffering(true);
 
+      // Immediately clear seek locks for UI so scrubber displays correct seek position
+      isSeekingRef.current = false;
+      targetSeekTimeRef.current = null;
+
       let isCurrentSeek = true;
       const triggerPlayAfterLoad = () => {
         if (!isCurrentSeek || !video) return;
@@ -469,6 +473,8 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
           setIsPlaying(true);
           isPlayingRef.current = true;
           setIsBuffering(false);
+          isSeekingRef.current = false;
+          targetSeekTimeRef.current = null;
           if (seekWatchdogTimerRef.current) {
             clearTimeout(seekWatchdogTimerRef.current);
             seekWatchdogTimerRef.current = null;
@@ -477,6 +483,8 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
           if (!isCurrentSeek) return;
           console.warn('[CustomDirectPlayer] Play after seek error:', err);
           setIsBuffering(false);
+          isSeekingRef.current = false;
+          targetSeekTimeRef.current = null;
           setShowControls(true);
         });
       };
@@ -484,36 +492,44 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
       video.src = newSrc;
 
       if (wasPlaying) {
-        if (video.readyState >= 2) {
-          triggerPlayAfterLoad();
-        } else {
-          const onReadyToPlay = () => {
-            video.removeEventListener('canplay', onReadyToPlay);
-            video.removeEventListener('loadeddata', onReadyToPlay);
+        // Trigger play immediately within gesture call stack to preserve mobile user activation
+        video.play().catch(() => {
+          // If browser rejects immediate play before metadata is ready, wait for ready events
+          if (video.readyState >= 2) {
             triggerPlayAfterLoad();
-          };
-          video.addEventListener('canplay', onReadyToPlay, { once: true });
-          video.addEventListener('loadeddata', onReadyToPlay, { once: true });
-        }
+          } else {
+            const onReadyToPlay = () => {
+              video.removeEventListener('canplay', onReadyToPlay);
+              video.removeEventListener('loadeddata', onReadyToPlay);
+              triggerPlayAfterLoad();
+            };
+            video.addEventListener('canplay', onReadyToPlay, { once: true });
+            video.addEventListener('loadeddata', onReadyToPlay, { once: true });
+          }
+        });
       } else {
         const onLoaded = () => {
           video.removeEventListener('loadeddata', onLoaded);
           video.removeEventListener('canplay', onLoaded);
           if (!isCurrentSeek) return;
           setIsBuffering(false);
+          isSeekingRef.current = false;
+          targetSeekTimeRef.current = null;
         };
         video.addEventListener('loadeddata', onLoaded, { once: true });
         video.addEventListener('canplay', onLoaded, { once: true });
       }
 
-      // 10s seek watchdog to prevent permanent buffer lock
+      // 25s seek watchdog for remote Telegram transcode negotiation
       seekWatchdogTimerRef.current = setTimeout(() => {
         if (isCurrentSeek) {
-          console.warn('[CustomDirectPlayer] Seek response took > 10s, clearing buffering state');
+          console.warn('[CustomDirectPlayer] Seek response took > 25s, clearing buffering state');
           setIsBuffering(false);
+          isSeekingRef.current = false;
+          targetSeekTimeRef.current = null;
           setShowControls(true);
         }
-      }, 10000);
+      }, 25000);
 
       setCurrentTime(clamped);
       onProgress?.(clamped, maxDur, !wasPlaying);
@@ -1014,6 +1030,8 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
           setIsInitialLoading(false);
           setIsBuffering(false);
           setIsPlaying(true);
+          isSeekingRef.current = false;
+          targetSeekTimeRef.current = null;
         }}
         onPause={(e) => {
           setIsPlaying(false);
