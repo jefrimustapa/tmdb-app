@@ -914,6 +914,8 @@ public class MainActivity extends BridgeActivity {
                 }
             }, "AndroidBridge");
 
+            setupAudioPlaybackDetector();
+
             // Handle alert, confirm, and multi-window popups
             webView.setWebChromeClient(new WebChromeClient() {
                 @Override
@@ -2750,11 +2752,53 @@ public class MainActivity extends BridgeActivity {
         wv.evaluateJavascript(jsDispatch, null);
     }
 
+    private android.media.AudioManager.AudioPlaybackCallback audioPlaybackCallback;
+
+    private void setupAudioPlaybackDetector() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            try {
+                android.media.AudioManager am = (android.media.AudioManager) getSystemService(AUDIO_SERVICE);
+                if (am != null) {
+                    audioPlaybackCallback = new android.media.AudioManager.AudioPlaybackCallback() {
+                        @Override
+                        public void onPlaybackConfigChanged(java.util.List<android.media.AudioPlaybackConfiguration> configs) {
+                            super.onPlaybackConfigChanged(configs);
+                            android.media.AudioManager audioMgr = (android.media.AudioManager) getSystemService(AUDIO_SERVICE);
+                            boolean isPlaying = (audioMgr != null && audioMgr.isMusicActive()) || (configs != null && !configs.isEmpty());
+                            if (isPlaying) {
+                                runOnUiThread(() -> {
+                                    WebView wv = bridge != null ? bridge.getWebView() : null;
+                                    if (wv != null) {
+                                        wv.evaluateJavascript(
+                                            "window.dispatchEvent(new CustomEvent('tmdb_native_audio_active', { detail: { active: true } }));",
+                                            null
+                                        );
+                                    }
+                                });
+                            }
+                        }
+                    };
+                    am.registerAudioPlaybackCallback(audioPlaybackCallback, new android.os.Handler(android.os.Looper.getMainLooper()));
+                }
+            } catch (Exception e) {
+                Log.w("TMDB_APP", "Could not register AudioPlaybackCallback: " + e.getMessage());
+            }
+        }
+    }
+
     @Override
     public void onDestroy() {
         super.onDestroy();
         if (orientationListener != null) {
             orientationListener.disable();
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && audioPlaybackCallback != null) {
+            try {
+                android.media.AudioManager am = (android.media.AudioManager) getSystemService(AUDIO_SERVICE);
+                if (am != null) {
+                    am.unregisterAudioPlaybackCallback(audioPlaybackCallback);
+                }
+            } catch (Exception ignored) {}
         }
     }
 }
