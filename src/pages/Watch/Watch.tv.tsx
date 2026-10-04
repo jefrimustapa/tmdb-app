@@ -1004,7 +1004,12 @@ export const Watch: React.FC = () => {
           currentProviderId={providerId}
           onSelectProvider={(p) => {
             setUserSelectedProvider(true);
-            setProviderId(p.id);
+            if (providerId === p.id) {
+              setProviderId('');
+              setTimeout(() => setProviderId(p.id), 10);
+            } else {
+              setProviderId(p.id);
+            }
           }}
           isProbing={isProbing}
           serverIndex={serverIndex}
