@@ -1041,6 +1041,17 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     if (currentSec < 0) return;
 
     currentTimeRef.current = currentSec;
+
+    // Immediately clear watchdog timeout whenever verified progress > 0 arrives from any provider
+    if (currentSec > 0 && autoCycleTimeoutRef.current) {
+      console.log(`[AutoCycle Watchdog] ✅ Active video playback verified (time: ${currentSec}s). Watchdog cleared.`);
+      clearTimeout(autoCycleTimeoutRef.current);
+      autoCycleTimeoutRef.current = null;
+      watchdogActiveProviderRef.current = null;
+      setIsLoading(false);
+      setHasError(false);
+      setIsProbing(false);
+    }
     const now = Date.now();
 
     // PERFORMANCE OPTIMIZATION:
@@ -1356,11 +1367,26 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       executeSeek(targetTime, delta);
     };
 
+    const handleNativeAudioActive = () => {
+      console.log('[AutoCycle Watchdog] 🔊 Native audio playback detected! Clearing watchdog.');
+      setIsLoading(false);
+      setHasError(false);
+      setIsProbing(false);
+      isPlayingRef.current = true;
+      if (autoCycleTimeoutRef.current) {
+        clearTimeout(autoCycleTimeoutRef.current);
+        autoCycleTimeoutRef.current = null;
+        watchdogActiveProviderRef.current = null;
+      }
+    };
+
+    window.addEventListener('tmdb_native_audio_active', handleNativeAudioActive);
     window.addEventListener('tmdb_playback_state_changed', handlePlaybackStateChanged);
     window.addEventListener('tmdb_toggle_play_pause', handleTogglePlayPause);
     window.addEventListener('tmdb_pause_player', handlePausePlayer);
     window.addEventListener('tmdb_execute_seek', handleExecuteSeek);
     return () => {
+      window.removeEventListener('tmdb_native_audio_active', handleNativeAudioActive);
       window.removeEventListener('tmdb_playback_state_changed', handlePlaybackStateChanged);
       window.removeEventListener('tmdb_toggle_play_pause', handleTogglePlayPause);
       window.removeEventListener('tmdb_pause_player', handlePausePlayer);
@@ -1377,7 +1403,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         const data = typeof e.data === 'string' ? JSON.parse(e.data) : e.data;
         if (!data) return;
 
-        // 1. VidLink PLAYER_EVENT (event: 'timeupdate' | 'pause' | 'ended' | 'time')
+        // 1. VidLink & Cinezo PLAYER_EVENT (event: 'timeupdate' | 'pause' | 'ended' | 'time')
         if (data.type === 'PLAYER_EVENT' && data.data) {
           lastPostMessageTimeRef.current = Date.now();
           const evt = data.data.event;
@@ -1385,6 +1411,15 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           const dur = data.data.duration ?? data.data.totalDuration ?? 0;
           if (current > 0) {
             recordProgress(current, dur, evt === 'ended');
+            if (autoCycleTimeoutRef.current) {
+              console.log(`[AutoCycle Watchdog] ✅ PLAYER_EVENT verified active playback (${current}s). Watchdog cleared.`);
+              clearTimeout(autoCycleTimeoutRef.current);
+              autoCycleTimeoutRef.current = null;
+              watchdogActiveProviderRef.current = null;
+              setIsLoading(false);
+              setHasError(false);
+              setIsProbing(false);
+            }
           }
           return;
         }
@@ -1830,6 +1865,29 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
     watchdogActiveProviderRef.current = providerId;
     console.log(`[AutoCycle Watchdog] ⏱️ Watchdog started for "${providerId}": ${timeoutSec}s threshold (mode: ${isUserSelected ? 'manual' : 'auto'}).`);
+
+    // Universal Native Audio Poll: Catches audio playback from ANY embed provider (even without postMessage)
+    const audioPoll = setInterval(() => {
+      if (!autoCycleTimeoutRef.current) {
+        clearInterval(audioPoll);
+        return;
+      }
+      try {
+        if ((window as any).AndroidBridge?.isAudioPlaying?.()) {
+          console.log('[AutoCycle Watchdog] 🔊 AndroidBridge.isAudioPlaying() returned true! Clearing watchdog.');
+          if (autoCycleTimeoutRef.current) {
+            clearTimeout(autoCycleTimeoutRef.current);
+            autoCycleTimeoutRef.current = null;
+            watchdogActiveProviderRef.current = null;
+            setIsLoading(false);
+            setHasError(false);
+            setIsProbing(false);
+            isPlayingRef.current = true;
+          }
+          clearInterval(audioPoll);
+        }
+      } catch {}
+    }, 1000);
 
     autoCycleTimeoutRef.current = setTimeout(() => {
       console.warn(`[AutoCycle Watchdog] ⏱️ Server "${providerId}" did not establish active video in ${timeoutSec}s.`);
