@@ -9,6 +9,7 @@ import { resolveSeriesPlaybackTarget, type SeriesPlaybackTarget } from '../../se
 import { MediaRow } from '../../components/common/MediaRow';
 import { EpisodeGrid } from '../../components/player/EpisodeGrid';
 import { useDevice } from '../../hooks/useDevice';
+import { getMediaOriginCountries } from '../../services/streamProviders';
 
 const pickRandomPoster = (
   item: { poster_path?: string | null; backdrop_path?: string | null; images?: { posters?: TMDBImageItem[] } } | null
@@ -101,6 +102,7 @@ export const Details: React.FC = () => {
   const [isHeroLoaded, setIsHeroLoaded] = useState(false);
   const [isPosterLoaded, setIsPosterLoaded] = useState(false);
   const [isLoading, setIsLoading] = useState(() => !initialPreview || initialPreview.id !== tmdbId);
+  const originCountries = React.useMemo(() => getMediaOriginCountries(details), [details]);
 
   useEffect(() => {
     if (!tmdbId) return;
@@ -668,6 +670,23 @@ export const Details: React.FC = () => {
               </div>
               <span>•</span>
               <span>{releaseYear}</span>
+              {originCountries.length > 0 && (
+                <>
+                  <span>•</span>
+                  <span className="inline-flex items-center gap-1.5 flex-wrap">
+                    {originCountries.map((c) => (
+                      <span
+                        key={c.code}
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white/[0.08] border border-white/15 text-white text-xs font-medium shadow-sm hover:border-hbo-cyan/50 transition-colors"
+                        title={`Country of Origin: ${c.name}`}
+                      >
+                        <span className="text-sm leading-none">{c.flag}</span>
+                        <span>{c.name}</span>
+                      </span>
+                    ))}
+                  </span>
+                </>
+              )}
               {details && 'runtime' in details && details.runtime > 0 ? (
                 <>
                   <span>•</span>
@@ -803,6 +822,19 @@ export const Details: React.FC = () => {
           <p className="text-sm sm:text-base text-gray-200 leading-relaxed">
             {details.overview || 'No synopsis provided for this title.'}
           </p>
+          {originCountries.length > 0 && (
+            <div className="flex items-center gap-2 pt-2 text-xs sm:text-sm text-gray-400">
+              <span className="font-semibold text-gray-300">Country of Origin:</span>
+              <div className="flex items-center gap-2 flex-wrap">
+                {originCountries.map((c) => (
+                  <span key={c.code} className="inline-flex items-center gap-1.5 text-gray-200 font-medium bg-white/[0.06] border border-white/10 px-2 py-0.5 rounded">
+                    <span className="text-sm leading-none">{c.flag}</span>
+                    <span>{c.name}</span>
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Series Seasons & Episode Selector Grid (TV Series only) */}
