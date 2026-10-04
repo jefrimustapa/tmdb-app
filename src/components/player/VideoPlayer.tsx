@@ -272,10 +272,6 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   useEffect(() => {
     if (isUserSelected) {
       setAutoCycle(false);
-      if (autoCycleTimeoutRef.current) {
-        clearTimeout(autoCycleTimeoutRef.current);
-        autoCycleTimeoutRef.current = null;
-      }
     }
   }, [isUserSelected]);
 
@@ -1805,9 +1801,10 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     onProviderChange(orderedProviders[0] || STREAM_PROVIDERS[0]);
   };
 
-  // Failover watchdog timer: gives current provider configured timeout seconds to establish playback, otherwise auto-cycles
+  // Failover watchdog timer: gives current provider configured timeout seconds to establish playback
+  // In AUTO mode: auto-cycles to next server. In MANUAL mode or last server: displays custom TMDB error overlay.
   useEffect(() => {
-    if (!autoCycle || allFailed || playerMode !== 'embed') return;
+    if (playerMode !== 'embed' || hasError || allFailed) return;
 
     // If watchdog is already actively counting down for this provider, do NOT reset or interrupt it!
     if (watchdogActiveProviderRef.current === providerId && autoCycleTimeoutRef.current) {
@@ -1832,15 +1829,32 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     }
 
     watchdogActiveProviderRef.current = providerId;
-    console.log(`[AutoCycle Watchdog] ⏱️ Watchdog started for "${providerId}": ${timeoutSec}s threshold.`);
+    console.log(`[AutoCycle Watchdog] ⏱️ Watchdog started for "${providerId}": ${timeoutSec}s threshold (mode: ${isUserSelected ? 'manual' : 'auto'}).`);
 
     autoCycleTimeoutRef.current = setTimeout(() => {
-      console.warn(`[AutoCycle Watchdog] ⏱️ Server "${providerId}" did not establish active video in ${timeoutSec}s. Auto-cycling to next server...`);
+      console.warn(`[AutoCycle Watchdog] ⏱️ Server "${providerId}" did not establish active video in ${timeoutSec}s.`);
       autoCycleTimeoutRef.current = null;
       watchdogActiveProviderRef.current = null;
-      cycleToNextProviderRef.current();
+
+      // 1. In AUTO mode: if there are more providers to try, auto-cycle immediately!
+      if (autoCycle && !isUserSelected && !allFailed) {
+        console.warn(`[AutoCycle Watchdog] Auto-cycling to next server...`);
+        cycleToNextProviderRef.current();
+        return;
+      }
+
+      // 2. In MANUAL mode or LAST provider: show the custom TMDB error screen!
+      console.warn(`[AutoCycle Watchdog] Manual selection or last provider timed out. Displaying custom TMDB error screen.`);
+      setProviderErrorDetail({
+        title: 'Playback Timeout',
+        badge: 'Connection Timed Out',
+        message: `The server (${provider.name}) took longer than ${timeoutSec}s to respond and failed to start playback. Please try switching to another server.`,
+      });
+      setHasError(true);
+      setIsLoading(false);
+      setIsProbing(false);
     }, timeoutSec * 1000);
-  }, [providerId, autoCycle, allFailed, playerMode]);
+  }, [providerId, autoCycle, isUserSelected, allFailed, playerMode, hasError, provider.name]);
 
   // Clean up watchdog timer only when providerId changes or player unmounts
   useEffect(() => {
