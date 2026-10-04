@@ -60,15 +60,100 @@ async function executeFetch(url: string, referer = 'https://kisskh.do/', timeout
   return Promise.race([fetchPromise, timeoutPromise]);
 }
 
-/**
- * Normalizes title for search string matching
- */
 function cleanSearchQuery(title: string): string {
   return title
     .replace(/[:\-–—].*$/, '') // remove subtitles/colons
-    .replace(/[^\w\s]/g, ' ')
+    .replace(/[^\p{L}\p{N}\s]/gu, ' ')
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+function cleanTitleForComparison(str: string): string {
+  return str
+    .toLowerCase()
+    .replace(/\s*\(\s*(movie|\d{4})\s*\)/gi, '')
+    .replace(/\s*season\s*\d+/gi, '')
+    .replace(/[^\p{L}\p{N}\s]/gu, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function getTitleTokens(str: string): Set<string> {
+  return new Set(cleanTitleForComparison(str).split(' ').filter(w => w.length > 0));
+}
+
+interface KisskhSearchResult {
+  id: number;
+  title: string;
+  episodesCount: number;
+  label?: string;
+  thumbnail?: string;
+}
+
+function scoreCandidate(
+  targetTitle: string,
+  candidate: KisskhSearchResult,
+  targetYear?: string | number,
+  mediaType: 'movie' | 'tv' = 'movie',
+  season = 1
+): number {
+  let score = 0;
+  const targetClean = cleanTitleForComparison(targetTitle);
+  const candClean = cleanTitleForComparison(candidate.title);
+
+  // 1. Exact normalized title match
+  if (targetClean === candClean) {
+    score += 70;
+  } else if (candClean.startsWith(targetClean) || targetClean.startsWith(candClean)) {
+    score += 45;
+  } else if (candClean.includes(targetClean)) {
+    score += 35;
+  }
+
+  // 2. Token Jaccard similarity (0 - 30 points)
+  const targetTokens = getTitleTokens(targetTitle);
+  const candTokens = getTitleTokens(candidate.title);
+  if (targetTokens.size > 0 && candTokens.size > 0) {
+    let intersection = 0;
+    targetTokens.forEach(t => {
+      if (candTokens.has(t)) intersection++;
+    });
+    const union = new Set([...targetTokens, ...candTokens]).size;
+    const jaccard = union > 0 ? intersection / union : 0;
+    score += Math.round(jaccard * 30);
+  }
+
+  // 3. Media Type discrimination (Movie vs TV Series)
+  if (mediaType === 'movie') {
+    if (candidate.episodesCount === 1 || /movie/i.test(candidate.title)) {
+      score += 25;
+    } else if (candidate.episodesCount > 1) {
+      score -= 35; // Heavy penalty: TV drama when looking for a movie
+    }
+  } else if (mediaType === 'tv') {
+    if (candidate.episodesCount > 1) {
+      score += 15;
+    }
+    // Season matching for TV
+    if (season > 1) {
+      const seasonRegex = new RegExp(`season\\s*${season}`, 'i');
+      if (seasonRegex.test(candidate.title)) {
+        score += 25;
+      }
+    } else {
+      // Season 1: penalize titles explicitly mentioning Season 2, 3, etc.
+      if (/season\s*[2-9]/i.test(candidate.title)) {
+        score -= 30;
+      }
+    }
+  }
+
+  // 4. Release Year bonus
+  if (targetYear && candidate.title.includes(String(targetYear))) {
+    score += 15;
+  }
+
+  return score;
 }
 
 /**
@@ -79,7 +164,8 @@ export async function resolveKisskhStream(
   year?: string | number,
   season = 1,
   episode = 1,
-  originalTitle?: string
+  originalTitle?: string,
+  mediaType: 'movie' | 'tv' = 'movie'
 ): Promise<{ embedUrl: string | null; dramaId?: number | null; episodeId?: number | null }> {
   if (!title || !title.trim()) {
     return { embedUrl: null };
@@ -116,15 +202,28 @@ export async function resolveKisskhStream(
   }
 
   try {
-    const hasDiffOriginal = Boolean(originalTitle && originalTitle.trim().toLowerCase() !== title.trim().toLowerCase());
-    const queries = (hasDiffOriginal && originalTitle
-      ? [originalTitle.trim(), cleanSearchQuery(originalTitle), title.trim(), cleanSearchQuery(title)]
-      : [title.trim(), cleanSearchQuery(title), ...(originalTitle ? [cleanSearchQuery(originalTitle)] : [])]
-    ).filter((q): q is string => Boolean(q && q.length > 1));
+    // Primary query: ALWAYS use English title for KissKH database
+    const cleanEn = cleanSearchQuery(title);
+    const queries = [title.trim()];
+    if (cleanEn && cleanEn.toLowerCase() !== title.trim().toLowerCase() && cleanEn.length >= 2) {
+      queries.push(cleanEn);
+    }
+
+    // Only add originalTitle as fallback if it contains Latin/English letters (e.g. romanized title)
+    if (originalTitle && /[A-Za-z]/.test(originalTitle)) {
+      const trimmedOrig = originalTitle.trim();
+      const cleanOrig = cleanSearchQuery(originalTitle);
+      if (trimmedOrig.toLowerCase() !== title.trim().toLowerCase()) {
+        queries.push(trimmedOrig);
+      }
+      if (cleanOrig && cleanOrig.toLowerCase() !== cleanEn.toLowerCase() && cleanOrig.length >= 2) {
+        queries.push(cleanOrig);
+      }
+    }
 
     const uniqueQueries = [...new Set(queries)];
 
-    let matchedDrama: { id: number; title: string } | null = null;
+    let matchedDrama: KisskhSearchResult | null = null;
 
     // Search KissKH API
     for (const query of uniqueQueries) {
@@ -133,28 +232,23 @@ export async function resolveKisskhStream(
         const resText = await executeFetch(searchApiUrl);
         if (!resText) continue;
 
-        const results = JSON.parse(resText);
+        const results = JSON.parse(resText) as KisskhSearchResult[];
         if (Array.isArray(results) && results.length > 0) {
-          // If season > 1, check if KissKH has a separated title like "Title Season X"
-          if (season > 1) {
-            const seasonRegex = new RegExp(`season\\s*${season}`, 'i');
-            const seasonMatch = results.find(d => seasonRegex.test(d.title));
-            if (seasonMatch) {
-              matchedDrama = seasonMatch;
-              break;
-            }
+          // Score all candidates
+          const scored = results.map(cand => ({
+            candidate: cand,
+            score: scoreCandidate(title, cand, year, mediaType, season)
+          }));
+
+          scored.sort((a, b) => b.score - a.score);
+          const best = scored[0];
+
+          console.log(`[KisskhResolver] Top match for query "${query}": "${best.candidate.title}" with score ${best.score} (Threshold: 60)`);
+
+          if (best.score >= 60) {
+            matchedDrama = best.candidate;
+            break;
           }
-
-          // Look for year match or clean match
-          const cleanQ = query.toLowerCase().replace(/[^\w]/g, '');
-          const perfectMatch = results.find(d => {
-            const cleanT = d.title.toLowerCase().replace(/[^\w]/g, '');
-            if (year && d.title.includes(String(year))) return true;
-            return cleanT.includes(cleanQ) || cleanQ.includes(cleanT);
-          });
-
-          matchedDrama = perfectMatch || results[0];
-          if (matchedDrama) break;
         }
       } catch (err) {
         console.warn(`[KisskhResolver] Search failed for query "${query}":`, err);
@@ -162,7 +256,7 @@ export async function resolveKisskhStream(
     }
 
     if (!matchedDrama) {
-      console.warn(`[KisskhResolver] No drama found for "${title}"`);
+      console.warn(`[KisskhResolver] No drama found exceeding confidence threshold for "${title}"`);
       return { embedUrl: null };
     }
 

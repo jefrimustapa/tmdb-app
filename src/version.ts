@@ -2,12 +2,15 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20261004-1329';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.fix-embed-provider-e.20261004-1329';
+export const APP_BUILD_NUMBER = '20261004-1452';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.fix-kisskh-selection.20261004-1452';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
-export const APP_BRANCH = 'fix-embed-provider-e';
-export const APP_CHANGELOG = `* feat(details): display country of origin with flag badge on mobile, TV, and preview modal
+export const APP_BRANCH = 'fix-kisskh-selection';
+export const APP_CHANGELOG = `* Merge pull request #183 from jefrimustapa/fix/embed-provider-error-classification
+* chore: bump build version
+* fix(player): completely eliminate all hardcoded provider fallbacks in favor of dynamic priority ordering
+* feat(details): display country of origin with flag badge on mobile, TV, and preview modal
 * fix(player): eliminate hardcoded provider fallbacks and unify auto-cycle with debounce guard
 * feat(player): display live watchdog countdown timer badge during playback waiting
 * fix(player): distinguish live playback from saved MEDIA_DATA progress to prevent premature watchdog clearance
@@ -18,7 +21,4 @@ export const APP_CHANGELOG = `* feat(details): display country of origin with fl
 * feat(settings): set timeout options to 30/60/90/180/240 with default 30s and refine playback failed message
 * fix(player): activate timeout in manual selection to display custom TMDB error overlay upon timeout
 * fix(player): prevent native video element from prematurely clearing watchdog before currentTime > 0 and guard countdown against re-renders
-* fix(player): decouple watchdog timer from render cycles and memoize provider change callbacks
-* fix(player): preserve watchdog timer until actual playback starts instead of aborting on iframe HTML load
-* feat(settings): update streamResolverTimeout options to 60/90/120/180/unlimited (default 60s) and link to embed watchdog
-* feat(player): align fallback priority flow with auto-cycling on connection refusal and manual TMDB error display`;
+* fix(player): decouple watchdog timer from render cycles and memoize provider change callbacks`;
