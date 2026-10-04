@@ -2,12 +2,14 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20261004-1025';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.fix-embed-provider-e.20261004-1025';
+export const APP_BUILD_NUMBER = '20261004-1049';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.fix-embed-provider-e.20261004-1049';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
 export const APP_BRANCH = 'fix-embed-provider-e';
-export const APP_CHANGELOG = `* fix(player): accurately classify HTTP server errors vs embedding blocks and expand iframe error interception
+export const APP_CHANGELOG = `* fix(player): require sustained active media playback and pulse center touch to prevent premature watchdog cancellation
+* fix(player): add native audio playback detector and universal watchdog cancellation across embed providers
+* fix(player): accurately classify HTTP server errors vs embedding blocks and expand iframe error interception
 * Merge pull request #182 from jefrimustapa/feat/improve-provider-error-display
 * feat(settings): set timeout options to 30/60/90/180/240 with default 30s and refine playback failed message
 * fix(player): activate timeout in manual selection to display custom TMDB error overlay upon timeout
@@ -20,5 +22,4 @@ export const APP_CHANGELOG = `* fix(player): accurately classify HTTP server err
 * fix(player): clear error state and remount iframe when selecting provider from header
 * feat(player): intercept native iframe connection errors and display custom TMDB error overlay
 * Merge pull request #181 from jefrimustapa/feat/improve-msm-series-search
-* fix(player): resolve seek state lock, extend transcode seek watchdog, and preserve touch activation
-* Merge pull request #180 from jefrimustapa/fix/embed-provider-fallback-priority`;
+* fix(player): resolve seek state lock, extend transcode seek watchdog, and preserve touch activation`;

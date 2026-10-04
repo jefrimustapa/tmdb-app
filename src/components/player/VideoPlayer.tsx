@@ -267,6 +267,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const [allFailed, setAllFailed] = useState(false);
   const autoCycleTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const watchdogActiveProviderRef = useRef<string | null>(null);
+  const watchdogStartTimeRef = useRef<number>(0);
 
   // Disable auto-cycling if provider was manually selected by user
   useEffect(() => {
@@ -1368,7 +1369,12 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     };
 
     const handleNativeAudioActive = () => {
-      console.log('[AutoCycle Watchdog] 🔊 Native audio playback detected! Clearing watchdog.');
+      // Guard against false positive audio spikes during the initial 2.5s iframe mount period
+      if (Date.now() - watchdogStartTimeRef.current < 2500) {
+        console.log('[AutoCycle Watchdog] 🔊 Native audio event ignored during initial 2.5s mount period.');
+        return;
+      }
+      console.log('[AutoCycle Watchdog] 🔊 Native audio playback verified! Clearing watchdog.');
       setIsLoading(false);
       setHasError(false);
       setIsProbing(false);
@@ -1864,27 +1870,42 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     }
 
     watchdogActiveProviderRef.current = providerId;
+    watchdogStartTimeRef.current = Date.now();
     console.log(`[AutoCycle Watchdog] ⏱️ Watchdog started for "${providerId}": ${timeoutSec}s threshold (mode: ${isUserSelected ? 'manual' : 'auto'}).`);
 
+    let consecutiveAudioActiveCount = 0;
+
     // Universal Native Audio Poll: Catches audio playback from ANY embed provider (even without postMessage)
+    // Requires sustained media audio playback (consecutive ticks after 2.5s grace period) to eliminate false positives
     const audioPoll = setInterval(() => {
       if (!autoCycleTimeoutRef.current) {
         clearInterval(audioPoll);
         return;
       }
+      // Grace period: ignore audio during the first 2.5s of iframe/page loading
+      if (Date.now() - watchdogStartTimeRef.current < 2500) {
+        return;
+      }
       try {
-        if ((window as any).AndroidBridge?.isAudioPlaying?.()) {
-          console.log('[AutoCycle Watchdog] 🔊 AndroidBridge.isAudioPlaying() returned true! Clearing watchdog.');
-          if (autoCycleTimeoutRef.current) {
-            clearTimeout(autoCycleTimeoutRef.current);
-            autoCycleTimeoutRef.current = null;
-            watchdogActiveProviderRef.current = null;
-            setIsLoading(false);
-            setHasError(false);
-            setIsProbing(false);
-            isPlayingRef.current = true;
+        const isAudioActive = Boolean((window as any).AndroidBridge?.isAudioPlaying?.());
+        if (isAudioActive) {
+          consecutiveAudioActiveCount += 1;
+          console.log(`[AutoCycle Watchdog] 🔊 Sustained audio check (${consecutiveAudioActiveCount}/2)...`);
+          if (consecutiveAudioActiveCount >= 2) {
+            console.log('[AutoCycle Watchdog] 🔊 Sustained audio playback verified! Clearing watchdog.');
+            if (autoCycleTimeoutRef.current) {
+              clearTimeout(autoCycleTimeoutRef.current);
+              autoCycleTimeoutRef.current = null;
+              watchdogActiveProviderRef.current = null;
+              setIsLoading(false);
+              setHasError(false);
+              setIsProbing(false);
+              isPlayingRef.current = true;
+            }
+            clearInterval(audioPoll);
           }
-          clearInterval(audioPoll);
+        } else {
+          consecutiveAudioActiveCount = 0;
         }
       } catch {}
     }, 1000);
@@ -2170,17 +2191,22 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       } catch {}
     };
 
-    // Attempt immediately, and retry at 500ms, 1200ms, 2500ms, and 4000ms once media buffer begins
+    // Attempt immediately, and retry unmuting + center touch activation at 600ms, 1500ms, 3000ms, and 4500ms
     sendUnmuteMessages();
     styleCineSrcIframe();
+    const pulsePlay = () => {
+      if (!isPlayingRef.current) {
+        activateCenterPlayButton();
+      }
+    };
     setTimeout(() => {
       sendUnmuteMessages();
-      activateCenterPlayButton();
+      pulsePlay();
       styleCineSrcIframe();
     }, 600);
-    setTimeout(() => { sendUnmuteMessages(); styleCineSrcIframe(); }, 1200);
-    setTimeout(() => { sendUnmuteMessages(); styleCineSrcIframe(); }, 2500);
-    setTimeout(() => { sendUnmuteMessages(); styleCineSrcIframe(); }, 4000);
+    setTimeout(() => { sendUnmuteMessages(); pulsePlay(); styleCineSrcIframe(); }, 1500);
+    setTimeout(() => { sendUnmuteMessages(); pulsePlay(); styleCineSrcIframe(); }, 3000);
+    setTimeout(() => { sendUnmuteMessages(); pulsePlay(); styleCineSrcIframe(); }, 4500);
   };
 
   const handleIframeError = () => {
