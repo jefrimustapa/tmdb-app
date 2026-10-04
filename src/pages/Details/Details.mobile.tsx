@@ -531,6 +531,10 @@ export const Details: React.FC = () => {
             ? 'w-full'
             : 'h-[65vh] sm:h-[80vh] lg:h-[90vh]'
         } overflow-hidden pointer-events-none z-0`}
+        style={{
+          maskImage: 'linear-gradient(180deg, black 0%, black 50%, transparent 100%)',
+          WebkitMaskImage: 'linear-gradient(180deg, black 0%, black 50%, transparent 100%)'
+        }}
       >
         {heroUrl && (
           <img
@@ -561,7 +565,6 @@ export const Details: React.FC = () => {
         {/* Cinematic HBO Gradients Layer (Identical to HeroBanner) */}
         <div className="absolute inset-0 hero-gradient-overlay" />
         <div className="absolute inset-0 bg-gradient-to-t from-transparent via-transparent to-black/40" />
-        <div className="absolute inset-x-0 bottom-0 h-44 sm:h-52 bg-gradient-to-t from-[#050508] via-[#050508]/90 to-transparent" />
       </div>
 
       {/* Hero Viewport Section (Portrait: dynamic flex-between anchored 15px above bottom nav; Landscape: standard flow) */}

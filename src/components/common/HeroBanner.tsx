@@ -266,7 +266,13 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ items, onActiveItemChang
       onTouchCancel={handleTouchCancel}
     >
       {/* 1. Cinematic Cross-Dissolving Backdrops Layer */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none select-none">
+      <div
+        className="absolute inset-0 overflow-hidden pointer-events-none select-none"
+        style={{
+          maskImage: 'linear-gradient(180deg, black 0%, black 50%, transparent 100%)',
+          WebkitMaskImage: 'linear-gradient(180deg, black 0%, black 50%, transparent 100%)'
+        }}
+      >
         {displayItems.map((featured, idx) => {
           const isCurrent = idx === currentIndex;
           const isNearby = Math.abs(idx - currentIndex) <= 1 || (idx === 0 && currentIndex === totalItems - 1) || (idx === totalItems - 1 && currentIndex === 0);
@@ -308,7 +314,6 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ items, onActiveItemChang
       <div className="absolute inset-0 z-20 pointer-events-none select-none">
         <div className="absolute inset-0 hero-gradient-overlay" />
         <div className="absolute inset-0 bg-gradient-to-t from-transparent via-transparent to-black/40" />
-        <div className="absolute inset-x-0 bottom-0 h-36 sm:h-52 bg-gradient-to-t from-[#050508] via-[#050508]/90 to-transparent" />
       </div>
 
       {/* 3. Hero Content & Indicators Layer (Constrained to max-w-7xl mx-auto to align with content rails) */}
