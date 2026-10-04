@@ -260,12 +260,23 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const forceFreshTelegramRef = useRef(false);
   const hasRetriedTelegramForceRef = useRef(false);
 
-  // Auto-Cycle Provider until first working stream state
-  const [autoCycle, setAutoCycle] = useState(true);
+  // Auto-Cycle Provider until first working stream state (disabled when user manually selects provider)
+  const [autoCycle, setAutoCycle] = useState(!isUserSelected);
   const [isProbing, setIsProbing] = useState(true);
   const [triedProviders, setTriedProviders] = useState<string[]>([]);
   const [allFailed, setAllFailed] = useState(false);
   const autoCycleTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Disable auto-cycling if provider was manually selected by user
+  useEffect(() => {
+    if (isUserSelected) {
+      setAutoCycle(false);
+      if (autoCycleTimeoutRef.current) {
+        clearTimeout(autoCycleTimeoutRef.current);
+        autoCycleTimeoutRef.current = null;
+      }
+    }
+  }, [isUserSelected]);
 
   const playerContainerRef = useRef<HTMLDivElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -1760,7 +1771,6 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         setAllFailed(true);
         setIsProbing(false);
         setIsLoading(false);
-        setHasError(true);
       } else {
         setIsLoading(true);
         setHasError(false);
@@ -1852,11 +1862,24 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           : `The selected server (${provider.name}) refused the connection or is currently unreachable. Please try switching to another server.`,
       });
 
+      // In AUTO mode: if there are more providers to try, auto-cycle immediately!
+      if (autoCycle && !isUserSelected && !allFailed) {
+        console.warn(`[AutoCycle] Provider ${provider.name} failed to connect. Auto-cycling to next provider...`);
+        if (autoCycleTimeoutRef.current) {
+          clearTimeout(autoCycleTimeoutRef.current);
+          autoCycleTimeoutRef.current = null;
+        }
+        cycleToNextProvider();
+        return;
+      }
+
+      // If MANUAL trigger or LAST provider failed to connect: show TMDB error screen
       setHasError(true);
       setIsLoading(false);
       setIsProbing(false);
       if (autoCycleTimeoutRef.current) {
         clearTimeout(autoCycleTimeoutRef.current);
+        autoCycleTimeoutRef.current = null;
       }
     };
 
@@ -1864,7 +1887,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     return () => {
       window.removeEventListener('tmdb_iframe_load_error', handleNativeIframeError);
     };
-  }, [provider.name, playerMode, streamUrl]);
+  }, [provider.name, playerMode, streamUrl, autoCycle, isUserSelected, allFailed, cycleToNextProvider]);
 
   // Proactive pre-flight connection test for embed providers
   // Catches hard TCP connection refusals within 1.5s before Chromium displays native sad document
@@ -1884,11 +1907,25 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           badge: 'Connection Refused',
           message: `The server (${provider.name}) refused the connection or is currently unreachable. Please switch to another streaming server.`,
         });
+
+        // In AUTO mode: if there are more providers to try, auto-cycle immediately!
+        if (autoCycle && !isUserSelected && !allFailed) {
+          console.warn(`[AutoCycle] Pre-flight connection failed for ${provider.name}. Auto-cycling to next provider...`);
+          if (autoCycleTimeoutRef.current) {
+            clearTimeout(autoCycleTimeoutRef.current);
+            autoCycleTimeoutRef.current = null;
+          }
+          cycleToNextProvider();
+          return;
+        }
+
+        // If MANUAL trigger or LAST provider failed to connect: show TMDB error screen
         setHasError(true);
         setIsLoading(false);
         setIsProbing(false);
         if (autoCycleTimeoutRef.current) {
           clearTimeout(autoCycleTimeoutRef.current);
+          autoCycleTimeoutRef.current = null;
         }
       });
 
@@ -1896,7 +1933,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       isCurrent = false;
       controller.abort();
     };
-  }, [streamUrl, playerMode, provider.id, provider.name]);
+  }, [streamUrl, playerMode, provider.id, provider.name, autoCycle, isUserSelected, allFailed, cycleToNextProvider]);
 
   const handleIframeLoaded = () => {
     if (autoCycleTimeoutRef.current) {
