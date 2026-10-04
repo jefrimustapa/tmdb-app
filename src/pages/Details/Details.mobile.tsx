@@ -670,7 +670,7 @@ export const Details: React.FC = () => {
               </h1>
               {hasAlternativeTitle && (
                 <div className="flex items-center justify-center sm:justify-start gap-2 pt-0.5 text-sm sm:text-base text-gray-300 font-medium">
-                  <span className="px-2 py-0.5 rounded bg-white/10 text-xs font-semibold uppercase tracking-wider text-hbo-cyan border border-white/15">
+                  <span className="px-2.5 py-0.5 rounded-md bg-black/60 text-xs font-semibold uppercase tracking-wider text-hbo-cyan border border-white/15 backdrop-blur-md shadow-sm">
                     Original Title
                   </span>
                   <span className="text-white/90 italic font-semibold">{originalTitle}</span>
@@ -680,13 +680,13 @@ export const Details: React.FC = () => {
 
             {/* Quick Meta Row */}
             <div className="flex items-center justify-center sm:justify-start gap-2 text-xs sm:text-sm text-gray-300 font-semibold flex-wrap min-h-[26px]">
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-white/[0.08] border border-white/15 text-xs font-semibold backdrop-blur-md shadow-sm">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-black/60 border border-white/15 text-xs font-semibold backdrop-blur-md shadow-sm">
                 <Star className="w-3.5 h-3.5 fill-current text-yellow-400" />
                 <span className="text-yellow-400 font-bold">{details.vote_average.toFixed(1)}</span>
               </span>
 
               {releaseYear && (
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-md bg-white/[0.08] border border-white/15 text-white text-xs font-medium backdrop-blur-md shadow-sm">
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-md bg-black/60 border border-white/15 text-white text-xs font-medium backdrop-blur-md shadow-sm">
                   {releaseYear}
                 </span>
               )}
@@ -695,7 +695,7 @@ export const Details: React.FC = () => {
                 originCountries.map((c) => (
                   <span
                     key={c.code}
-                    className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-white/[0.08] border border-white/15 text-white text-xs font-medium shadow-sm backdrop-blur-md hover:border-hbo-cyan/50 transition-colors"
+                    className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-black/60 border border-white/15 text-white text-xs font-medium shadow-sm backdrop-blur-md hover:border-hbo-cyan/50 transition-colors"
                     title={`Country of Origin: ${c.name}`}
                   >
                     <span className="text-sm leading-none">{c.flag}</span>
@@ -705,19 +705,19 @@ export const Details: React.FC = () => {
               )}
 
               {details && 'runtime' in details && details.runtime > 0 ? (
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-md bg-white/[0.08] border border-white/15 text-white text-xs font-medium backdrop-blur-md shadow-sm animate-fade-in">
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-md bg-black/60 border border-white/15 text-white text-xs font-medium backdrop-blur-md shadow-sm animate-fade-in">
                   {details.runtime} mins
                 </span>
               ) : details && 'number_of_seasons' in details && details.number_of_seasons > 0 ? (
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-md bg-white/[0.08] border border-white/15 text-white text-xs font-medium backdrop-blur-md shadow-sm animate-fade-in">
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-md bg-black/60 border border-white/15 text-white text-xs font-medium backdrop-blur-md shadow-sm animate-fade-in">
                   {details.number_of_seasons} Season{details.number_of_seasons > 1 ? 's' : ''}
                 </span>
               ) : isLoading ? (
-                <span className="inline-block w-14 h-5 rounded-md bg-white/10 animate-pulse my-auto" />
+                <span className="inline-block w-14 h-5 rounded-md bg-black/60 border border-white/10 animate-pulse my-auto" />
               ) : null}
 
               {details.genres && details.genres.length > 0 && (
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-md bg-white/[0.08] border border-white/15 text-gray-200 text-xs font-medium backdrop-blur-md shadow-sm">
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-md bg-black/60 border border-white/15 text-gray-200 text-xs font-medium backdrop-blur-md shadow-sm">
                   {details.genres.map(g => g.name).join(', ')}
                 </span>
               )}
