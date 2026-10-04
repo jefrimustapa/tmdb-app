@@ -10,6 +10,7 @@ import { MediaRow } from '../../components/common/MediaRow';
 import { EpisodeGrid } from '../../components/player/EpisodeGrid';
 import { useDevice } from '../../hooks/useDevice';
 import { getMediaOriginCountries } from '../../services/streamProviders';
+import { extractDominantColor, getAdaptiveBackgroundStyle, type DominantColor } from '../../services/colorExtractor';
 
 const pickRandomPoster = (
   item: { poster_path?: string | null; backdrop_path?: string | null; images?: { posters?: TMDBImageItem[] } } | null
@@ -489,6 +490,16 @@ export const Details: React.FC = () => {
     setIsPosterLoaded(false);
   }, [posterCardUrl]);
 
+  const [dominantColor, setDominantColor] = useState<DominantColor | null>(null);
+
+  useEffect(() => {
+    const targetImg = heroUrl || posterCardUrl;
+    if (targetImg) {
+      extractDominantColor(targetImg).then((color) => {
+        if (color) setDominantColor(color);
+      });
+    }
+  }, [heroUrl, posterCardUrl]);
 
   if (isLoading || !details) {
     return (
@@ -509,7 +520,10 @@ export const Details: React.FC = () => {
   const contentRating = extractContentRating(details);
 
   return (
-    <div className="relative min-h-screen bg-hbo-dark text-white pb-28 sm:pb-36 overflow-x-hidden">
+    <div
+      className="relative min-h-screen text-white pb-28 sm:pb-36 overflow-x-hidden transition-colors duration-700 ease-in-out"
+      style={getAdaptiveBackgroundStyle(dominantColor, 0.45)}
+    >
       {/* Top Hero Ambient Backdrop */}
       <div
         className={`absolute top-0 left-0 right-0 ${

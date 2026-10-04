@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { tmdbApi } from '../../services/tmdb';
+import React, { useState, useEffect, useCallback } from 'react';
+import { tmdbApi, tmdbImages } from '../../services/tmdb';
 import type { TMDBMediaItem } from '../../types/tmdb';
 import type { WatchHistoryItem } from '../../types/db';
 import { dbService } from '../../services/db';
@@ -7,6 +7,7 @@ import { getPersonalizedSuggestions, type SuggestionResult } from '../../service
 import { HeroBanner } from '../../components/common/HeroBanner';
 import { MediaRow } from '../../components/common/MediaRow';
 import { MediaCard } from '../../components/common/MediaCard';
+import { extractDominantColor, getAdaptiveBackgroundStyle, type DominantColor } from '../../services/colorExtractor';
 
 interface HomeFeedCache {
   trending: TMDBMediaItem[];
@@ -50,6 +51,18 @@ export const Home: React.FC = () => {
   const [newReleaseMovies, setNewReleaseMovies] = useState<TMDBMediaItem[]>(() => homeFeedCache?.newReleaseMovies || []);
   const [newReleaseTV, setNewReleaseTV] = useState<TMDBMediaItem[]>(() => homeFeedCache?.newReleaseTV || []);
   const [isLoading, setIsLoading] = useState(() => !homeFeedCache);
+  const [dominantColor, setDominantColor] = useState<DominantColor | null>(null);
+
+  const handleHeroSlideChange = useCallback((item: TMDBMediaItem | null) => {
+    if (!item) return;
+    const path = item.backdrop_path || item.poster_path;
+    if (path) {
+      const url = tmdbImages.backdrop(path, 'w300');
+      extractDominantColor(url).then((color) => {
+        if (color) setDominantColor(color);
+      });
+    }
+  }, []);
 
   // Progressive staged rail mounting: Mount top visible viewport in 0ms, then stage below-the-fold rails
   const [mountStage, setMountStage] = useState(1);
@@ -225,9 +238,12 @@ export const Home: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen pb-16 bg-hbo-dark">
+    <div
+      className="min-h-screen pb-16 transition-colors duration-700 ease-in-out"
+      style={getAdaptiveBackgroundStyle(dominantColor, 0.42)}
+    >
       {/* Hero Billboard Full-Width Sliding Carousel */}
-      <HeroBanner items={trending} />
+      <HeroBanner items={trending} onActiveItemChange={handleHeroSlideChange} />
 
       {/* Continue Watching Section (HBO Max 16:9 Landscape Widescreen Cards) */}
       {history.length > 0 && (
