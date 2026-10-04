@@ -193,13 +193,13 @@ export const DetailsModal: React.FC<DetailsModalProps> = ({ item, onClose }) => 
         <div className="p-6 sm:p-8 space-y-6">
           {/* Metadata Row */}
           <div className="flex items-center gap-2 text-xs sm:text-sm text-gray-300 font-semibold flex-wrap">
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-white/[0.08] border border-white/15 text-xs font-semibold backdrop-blur-md shadow-sm">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-black/60 border border-white/15 text-xs font-semibold backdrop-blur-md shadow-sm">
               <Star className="w-3.5 h-3.5 fill-current text-yellow-400" />
               <span className="text-yellow-400 font-bold">{item.vote_average.toFixed(1)}</span>
             </span>
 
             {releaseYear && (
-              <span className="inline-flex items-center px-2.5 py-0.5 rounded-md bg-white/[0.08] border border-white/15 text-white text-xs font-medium backdrop-blur-md shadow-sm">
+              <span className="inline-flex items-center px-2.5 py-0.5 rounded-md bg-black/60 border border-white/15 text-white text-xs font-medium backdrop-blur-md shadow-sm">
                 {releaseYear}
               </span>
             )}
@@ -208,7 +208,7 @@ export const DetailsModal: React.FC<DetailsModalProps> = ({ item, onClose }) => 
               originCountries.map((c) => (
                 <span
                   key={c.code}
-                  className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-white/[0.08] border border-white/15 text-white text-xs font-medium shadow-sm backdrop-blur-md hover:border-hbo-cyan/50 transition-colors"
+                  className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-black/60 border border-white/15 text-white text-xs font-medium shadow-sm backdrop-blur-md hover:border-hbo-cyan/50 transition-colors"
                   title={`Country of Origin: ${c.name}`}
                 >
                   <span className="text-sm leading-none">{c.flag}</span>
@@ -218,17 +218,17 @@ export const DetailsModal: React.FC<DetailsModalProps> = ({ item, onClose }) => 
             )}
 
             {contentRating && (
-              <span className="inline-flex items-center px-2.5 py-0.5 rounded-md bg-white/[0.08] border border-white/15 text-white text-xs font-medium backdrop-blur-md shadow-sm">
+              <span className="inline-flex items-center px-2.5 py-0.5 rounded-md bg-black/60 border border-white/15 text-white text-xs font-medium backdrop-blur-md shadow-sm">
                 {contentRating}
               </span>
             )}
 
             {details && 'runtime' in details && details.runtime > 0 ? (
-              <span className="inline-flex items-center px-2.5 py-0.5 rounded-md bg-white/[0.08] border border-white/15 text-white text-xs font-medium backdrop-blur-md shadow-sm">
+              <span className="inline-flex items-center px-2.5 py-0.5 rounded-md bg-black/60 border border-white/15 text-white text-xs font-medium backdrop-blur-md shadow-sm">
                 {details.runtime} mins
               </span>
             ) : details && 'number_of_seasons' in details && details.number_of_seasons > 0 ? (
-              <span className="inline-flex items-center px-2.5 py-0.5 rounded-md bg-white/[0.08] border border-white/15 text-white text-xs font-medium backdrop-blur-md shadow-sm">
+              <span className="inline-flex items-center px-2.5 py-0.5 rounded-md bg-black/60 border border-white/15 text-white text-xs font-medium backdrop-blur-md shadow-sm">
                 {details.number_of_seasons} Season{details.number_of_seasons > 1 ? 's' : ''}
               </span>
             ) : null}
