@@ -188,8 +188,7 @@ public class MainActivity extends BridgeActivity {
 
                 @JavascriptInterface
                 public boolean isAudioPlaying() {
-                    android.media.AudioManager audioManager = (android.media.AudioManager) getSystemService(AUDIO_SERVICE);
-                    return audioManager != null && audioManager.isMusicActive();
+                    return checkIsMediaAudioPlaying();
                 }
 
                 @JavascriptInterface
@@ -2752,6 +2751,33 @@ public class MainActivity extends BridgeActivity {
         wv.evaluateJavascript(jsDispatch, null);
     }
 
+    public boolean checkIsMediaAudioPlaying() {
+        try {
+            android.media.AudioManager audioManager = (android.media.AudioManager) getSystemService(AUDIO_SERVICE);
+            if (audioManager == null) return false;
+            if (!audioManager.isMusicActive()) return false;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                java.util.List<android.media.AudioPlaybackConfiguration> configs = audioManager.getActivePlaybackConfigurations();
+                if (configs != null && !configs.isEmpty()) {
+                    boolean hasMediaUsage = false;
+                    for (android.media.AudioPlaybackConfiguration config : configs) {
+                        android.media.AudioAttributes attrs = config.getAudioAttributes();
+                        if (attrs != null && (attrs.getUsage() == android.media.AudioAttributes.USAGE_MEDIA ||
+                                             attrs.getUsage() == android.media.AudioAttributes.USAGE_GAME ||
+                                             attrs.getUsage() == android.media.AudioAttributes.USAGE_UNKNOWN)) {
+                            hasMediaUsage = true;
+                            break;
+                        }
+                    }
+                    if (!hasMediaUsage) return false;
+                }
+            }
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
     private android.media.AudioManager.AudioPlaybackCallback audioPlaybackCallback;
 
     private void setupAudioPlaybackDetector() {
@@ -2763,9 +2789,7 @@ public class MainActivity extends BridgeActivity {
                         @Override
                         public void onPlaybackConfigChanged(java.util.List<android.media.AudioPlaybackConfiguration> configs) {
                             super.onPlaybackConfigChanged(configs);
-                            android.media.AudioManager audioMgr = (android.media.AudioManager) getSystemService(AUDIO_SERVICE);
-                            boolean isPlaying = (audioMgr != null && audioMgr.isMusicActive()) || (configs != null && !configs.isEmpty());
-                            if (isPlaying) {
+                            if (checkIsMediaAudioPlaying()) {
                                 runOnUiThread(() -> {
                                     WebView wv = bridge != null ? bridge.getWebView() : null;
                                     if (wv != null) {
