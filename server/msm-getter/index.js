@@ -67,7 +67,7 @@ let client = new TelegramClient(new StringSession(session), apiId, apiHash, {
   connectionRetries: 10,
   retryDelay: 1000,
   autoReconnect: true,
-  timeout: 30,
+  timeout: 60,
   deviceModel: 'MSM Getter Server',
   appVersion: '1.0.0',
   systemVersion: 'Linux/ASUS',
@@ -109,6 +109,14 @@ function patchExportedSenderProtection(c) {
 
     try {
       const sender = await originalBorrow(dcId, shouldReconnect, existingSender);
+      // Permanently cancel GramJS's naive 30-second disconnect/reconnect timer.
+      // GramJS was designed for quick one-off requests and assumes that any pending request after 30s
+      // is a "hanging state", forcefully killing and reconnecting the TCP socket every 30 seconds.
+      // During active video streaming, this timer severed the stream every 30s causing playback stutter.
+      if (this._exportedSenderReleaseTimeouts?.get(dcId)) {
+        clearTimeout(this._exportedSenderReleaseTimeouts.get(dcId));
+        this._exportedSenderReleaseTimeouts.delete(dcId);
+      }
       stats.count = 0;
       return sender;
     } catch (err) {
@@ -1283,19 +1291,22 @@ function purgeIdleMemory() {
   console.log(`[MEMORY PURGE] Idle stream purge executed: evicted ${evictedBlocks} blocks, pinned retained: ${pinnedHeaderCache.size}. RSS: ${beforeRssMB}MB -> ${afterRssMB}MB, Heap: ${beforeHeapMB}MB -> ${afterHeapMB}MB (GC: ${typeof global.gc === 'function' ? 'active' : 'disabled'})`);
 }
 
-// Automated garbage collector for orphaned stream handles & periodic idle watchdog
+// Automated garbage collector for orphaned stream handles & periodic idle watchdog (5-minute grace period)
+const STREAM_IDLE_TIMEOUT_MS = 5 * 60 * 1000;
+
 setInterval(() => {
   const now = Date.now();
   for (const [key, entry] of activeStreams.entries()) {
-    if (now - (entry.lastActive || entry.createdAt || now) > 2 * 3600 * 1000) {
-      console.warn(`[STREAM GC] Evicting orphaned activeStream: ${key}`);
+    const idleDuration = now - (entry.lastActive || entry.createdAt || now);
+    if (idleDuration > STREAM_IDLE_TIMEOUT_MS) {
+      console.warn(`[STREAM IDLE EVICT] Evicting stream idle for ${Math.round(idleDuration / 1000)}s (>5m grace period): ${key} [${entry.clientName || 'Client'} (${entry.ip || ''})]`);
       try { entry.abort(); } catch {}
       activeStreams.delete(key);
       if (activeStreams.size === 0) scheduleIdleMemoryPurge();
     }
   }
   for (const [wKey, wEntry] of internalWorkers.entries()) {
-    if (now - (wEntry.createdAt || now) > 30 * 60 * 1000) {
+    if (now - (wEntry.createdAt || now) > 15 * 60 * 1000) {
       try { wEntry.abort(); } catch {}
       internalWorkers.delete(wKey);
     }
@@ -1309,7 +1320,7 @@ setInterval(() => {
       purgeIdleMemory();
     }
   }
-}, 5 * 60 * 1000).unref();
+}, 30 * 1000).unref();
 
 // Network Client Device Resolver (Cached Asuswrt NVRAM + dnsmasq leases)
 let cachedClientMap = new Map();
@@ -1468,14 +1479,19 @@ app.get('/api/system/stats', (req, res) => {
   } catch {}
 
   const activeClients = [];
+  const now = Date.now();
   for (const [key, stream] of activeStreams.entries()) {
+    const idleMs = now - (stream.lastActive || stream.createdAt || now);
+    const isStreaming = stream.isSocketOpen !== false && idleMs < 15000;
     activeClients.push({
       sessionKey: key,
       ip: stream.ip || 'unknown',
       clientName: stream.clientName || stream.ip || 'Client',
       filename: stream.filename || 'media',
       mode: stream.mode || 'Direct Native',
-      connectedSec: Math.max(0, Math.round((Date.now() - (stream.createdAt || Date.now())) / 1000)),
+      status: isStreaming ? 'STREAMING' : 'IDLE',
+      idleSec: Math.max(0, Math.round(idleMs / 1000)),
+      connectedSec: Math.max(0, Math.round((now - (stream.createdAt || now)) / 1000)),
     });
   }
 
@@ -2026,11 +2042,17 @@ app.get('/logs', (req, res) => {
             let rowsHtml = '';
             for (let i = 0; i < clients.length; i++) {
               const c = clients[i];
+              const isStreaming = c.status === 'STREAMING';
+              const statusBadge = isStreaming
+                ? '<span class="inline-flex items-center gap-1 text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20 font-bold text-[10px]"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> Streaming</span>'
+                : '<span class="inline-flex items-center gap-1 text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20 font-medium text-[10px]">⏸ Idle (' + (c.idleSec || 0) + 's)</span>';
+
               rowsHtml += '<tr class="text-slate-300 hover:bg-slate-800/40 transition">' +
                 '<td class="py-1.5 px-2 font-bold text-sky-400 font-sans flex items-center gap-1.5">📺 ' + escapeHtml(c.clientName || 'Client') + '</td>' +
                 '<td class="py-1.5 px-2 text-slate-400 font-mono">' + escapeHtml(c.ip || '') + '</td>' +
                 '<td class="py-1.5 px-2 text-slate-200 truncate max-w-xs font-sans" title="' + escapeHtml(c.filename || '') + '">' + escapeHtml(c.filename || '') + '</td>' +
-                '<td class="py-1.5 px-2 text-emerald-400 font-sans text-[11px]">' + escapeHtml(c.mode || '') + '</td>' +
+                '<td class="py-1.5 px-2 text-sky-300 font-sans text-[11px]">' + escapeHtml(c.mode || '') + '</td>' +
+                '<td class="py-1.5 px-2 font-sans">' + statusBadge + '</td>' +
                 '<td class="py-1.5 px-2 text-slate-400 text-right font-mono">' + (c.connectedSec || 0) + 's</td>' +
               '</tr>';
             }
@@ -2040,6 +2062,7 @@ app.get('/logs', (req, res) => {
               '<th class="py-1 px-2 font-semibold">IP Address</th>' +
               '<th class="py-1 px-2 font-semibold">Media Filename</th>' +
               '<th class="py-1 px-2 font-semibold">Playback Mode</th>' +
+              '<th class="py-1 px-2 font-semibold">Status</th>' +
               '<th class="py-1 px-2 font-semibold text-right">Connected</th>' +
               '</tr></thead><tbody class="divide-y divide-slate-800/60 font-mono text-[11px]">' +
               rowsHtml + '</tbody></table></div>';
@@ -3109,11 +3132,12 @@ app.get('/api/resolve', async (req, res) => {
  * Write a buffer chunk to the HTTP response with strict TCP backpressure.
  * Pauses upstream fetching if the client's network buffer is full.
  */
-function writeWithBackpressure(res, chunk) {
+function writeWithBackpressure(res, chunk, onWrite) {
   if (res.destroyed || res.writableEnded) return Promise.resolve();
   let ok = false;
   try {
     ok = res.write(chunk);
+    if (typeof onWrite === 'function') onWrite();
   } catch (err) {
     return Promise.resolve();
   }
@@ -3251,14 +3275,14 @@ async function refreshDocumentFileReference(client, targetDoc) {
 async function streamTelegramPipelined(client, targetDoc, startByte, endByte, res, req, customChunkSize, customConcurrency, passedStreamKey) {
   // Map requested chunkSize to MTProto block size and concurrency
   let CHUNK_SIZE = 512 * 1024; // 512KB: Native Telegram MTProto block limit
-  let CONCURRENCY = 4;         // Default: 4 concurrent chunks (2MB sliding window)
+  let CONCURRENCY = 3;         // Balanced: 1.5MB sliding window
 
   if (customChunkSize === 262144) {
     CHUNK_SIZE = 256 * 1024;
     CONCURRENCY = 2; // Eco mode: 512KB sliding window (low bandwidth / mobile)
   } else if (customChunkSize === 1048576) {
     CHUNK_SIZE = 512 * 1024;
-    CONCURRENCY = 6; // Turbo mode: 3MB sliding window (high-bitrate 1080p)
+    CONCURRENCY = 4; // High-throughput: 2MB sliding window (avoids saturating high-latency TCP link)
   } else if (customConcurrency && typeof customConcurrency === 'number') {
     CONCURRENCY = customConcurrency;
   }
@@ -3273,12 +3297,12 @@ async function streamTelegramPipelined(client, targetDoc, startByte, endByte, re
 
   const streamKey = passedStreamKey || `${isInternal ? (parentSessionKey ? `worker-${parentSessionKey}` : `internal-${Date.now()}`) : clientIdentity.ip}:${targetDoc.id}`;
 
-  if (!isInternal && activeStreams.has(streamKey)) {
-    console.log(`[PIPELINE ABORT PREVIOUS] Aborting existing active stream for [${clientIdentity.name} (${clientIdentity.ip})] key ${streamKey}`);
-    try {
-      activeStreams.get(streamKey).abort();
-    } catch (e) {}
-    activeStreams.delete(streamKey);
+  if (!isInternal && !isProbe && activeStreams.has(streamKey)) {
+    const existing = activeStreams.get(streamKey);
+    if (existing && existing.isSocketOpen && existing.abort !== abortPipeline) {
+      console.log(`[PIPELINE ABORT PREVIOUS] Aborting existing active stream for [${clientIdentity.name} (${clientIdentity.ip})] key ${streamKey}`);
+      try { existing.abort(); } catch (e) {}
+    }
   }
 
   let aborted = false;
@@ -3307,6 +3331,7 @@ async function streamTelegramPipelined(client, targetDoc, startByte, endByte, re
       mode: 'Direct Native',
       createdAt: activeStreams.get(streamKey)?.createdAt || Date.now(),
       lastActive: Date.now(),
+      isSocketOpen: true,
       internalWorkers: new Map(),
       abort: abortPipeline,
     });
@@ -3329,11 +3354,11 @@ async function streamTelegramPipelined(client, targetDoc, startByte, endByte, re
     if (parentSession) {
       parentSession.internalWorkers.delete(workerId);
     } else if (!isInternal) {
-      if (activeStreams.get(streamKey)?.abort === abortPipeline) {
-        activeStreams.delete(streamKey);
-        if (activeStreams.size === 0) {
-          scheduleIdleMemoryPurge();
-        }
+      const entry = activeStreams.get(streamKey);
+      if (entry && entry.abort === abortPipeline) {
+        entry.isSocketOpen = false;
+        // Keep session in activeStreams marked as IDLE so dashboard displays Idle / Paused status
+        // during the 5-minute grace period. The 5-minute idle watchdog or /api/stream/close will evict it.
       }
     } else {
       internalWorkers.delete(streamKey);
@@ -3522,6 +3547,10 @@ async function streamTelegramPipelined(client, targetDoc, startByte, endByte, re
   }
 
   let nextBlockToFetch = startBlock;
+  const touchActive = () => {
+    const s = activeStreams.get(streamKey);
+    if (s) s.lastActive = Date.now();
+  };
 
   // 1. First-Chunk Express Delivery:
   // Immediately fetch & send the first block alone with 100% bandwidth.
@@ -3540,7 +3569,7 @@ async function streamTelegramPipelined(client, targetDoc, startByte, endByte, re
   const firstSliceStart = Math.max(0, startByte - firstBlockStart);
   const firstSliceEnd = Math.min(firstBlockData.length, (endByte - firstBlockStart) + 1);
   if (firstSliceStart < firstSliceEnd) {
-    await writeWithBackpressure(res, firstBlockData.subarray(firstSliceStart, firstSliceEnd));
+    await writeWithBackpressure(res, firstBlockData.subarray(firstSliceStart, firstSliceEnd), touchActive);
   }
   firstBlockData = null; // Explicitly release 512KB buffer immediately for GC
 
@@ -3582,7 +3611,7 @@ async function streamTelegramPipelined(client, targetDoc, startByte, endByte, re
 
     if (sliceStart < sliceEnd) {
       const slice = buffer.subarray(sliceStart, sliceEnd);
-      await writeWithBackpressure(res, slice);
+      await writeWithBackpressure(res, slice, touchActive);
     }
   }
 
@@ -3769,6 +3798,31 @@ async function resolveBestAudioTrack(docId, parentSessionKey) {
   }
 }
 
+
+// Endpoint to immediately evict a stream on explicit client exit (e.g. Back button to Detail page)
+app.all('/api/stream/close', (req, res) => {
+  const docId = req.query.docId || req.body?.docId;
+  const clientIdentity = resolveClientIdentity(req.headers['x-forwarded-for'] || req.ip || req.socket?.remoteAddress, req);
+  let closedCount = 0;
+
+  for (const [key, stream] of activeStreams.entries()) {
+    const matchDoc = !docId || String(stream.docId) === String(docId);
+    const matchIp = stream.ip === clientIdentity.ip || key.startsWith(`${clientIdentity.ip}:`);
+    if (matchDoc && matchIp) {
+      console.log(`[API STREAM CLOSE] Explicit close for [${clientIdentity.name} (${clientIdentity.ip})] key: ${key}`);
+      try { stream.abort(); } catch {}
+      activeStreams.delete(key);
+      closedCount++;
+    }
+  }
+
+  if (activeStreams.size === 0) {
+    scheduleIdleMemoryPurge();
+  }
+
+  res.json({ success: true, closed: closedCount });
+});
+
 // Stream endpoint with HTTP 206 Partial Content Range support
 app.get('/stream/:docId', async (req, res) => {
   try {
@@ -3799,9 +3853,11 @@ app.get('/stream/:docId', async (req, res) => {
       : (req.headers['x-client-id'] || clientIdentity.ip || 'client');
     const streamSessionKey = isInternal ? clientSession : `${clientSession}:${docId}`;
 
-    if (!isInternal && activeStreams.has(streamSessionKey)) {
-      console.log(`[STREAM CANCEL] Terminating previous in-flight stream for [${clientIdentity.name} (${clientIdentity.ip})] doc ${docId} on new seek.`);
-      try { activeStreams.get(streamSessionKey).abort(); } catch {}
+    // Only cancel if previous stream was an active transcode process replaced by a seek query (?ss=)
+    const existingStream = activeStreams.get(streamSessionKey);
+    if (!isInternal && existingStream && existingStream.isSocketOpen && existingStream.mode?.includes('Transcode') && req.query.ss !== undefined) {
+      console.log(`[STREAM CANCEL] Terminating previous transcode stream for [${clientIdentity.name} (${clientIdentity.ip})] doc ${docId} on new seek.`);
+      try { existingStream.abort(); } catch {}
       activeStreams.delete(streamSessionKey);
     }
 
@@ -3966,6 +4022,7 @@ app.get('/stream/:docId', async (req, res) => {
         mode: '1080p Transcode (Stereo AAC)',
         createdAt: activeStreams.get(streamSessionKey)?.createdAt || Date.now(),
         lastActive: Date.now(),
+        isSocketOpen: true,
         internalWorkers: new Map(),
         abort: () => {
           console.log(`[TRANSCODE ABORT] Killing ffmpeg process and workers for doc ${docId}`);
@@ -3982,13 +4039,10 @@ app.get('/stream/:docId', async (req, res) => {
       const cleanupFfmpeg = () => {
         req.off('close', cleanupFfmpeg);
         res.off('finish', cleanupFfmpeg);
-        if (activeStreams.get(streamSessionKey) === transcodeEntry) {
-          activeStreams.delete(streamSessionKey);
-          if (activeStreams.size === 0) {
-            scheduleIdleMemoryPurge();
-          }
-        }
         transcodeEntry.abort();
+        if (activeStreams.get(streamSessionKey) === transcodeEntry) {
+          transcodeEntry.isSocketOpen = false;
+        }
       };
 
       req.on('close', cleanupFfmpeg);
@@ -4009,6 +4063,7 @@ app.get('/stream/:docId', async (req, res) => {
           sendTranscodeHeaders();
         }
         try {
+          transcodeEntry.lastActive = Date.now();
           const ok = res.write(chunk);
           if (!ok) {
             ffmpegProc.stdout.pause();

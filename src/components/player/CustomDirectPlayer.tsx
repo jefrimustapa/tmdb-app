@@ -66,7 +66,7 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
   onToggleFullscreen,
   timeoutSeconds = 90,
 }) => {
-  const { isTV } = useDevice();
+  const { isTV, isDesktop } = useDevice();
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<Hls | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -178,16 +178,18 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
     }
   }, [isPlaying, resetControlsTimer]);
 
-  const BUFFERING_TIMEOUT_SEC = 20;
+  const BUFFERING_TIMEOUT_SEC = 30;
   const [loadTimedOut, setLoadTimedOut] = useState(false);
   const [bufferingCountdown, setBufferingCountdown] = useState<number>(BUFFERING_TIMEOUT_SEC);
+  const [retryBufferTrigger, setRetryBufferTrigger] = useState(0);
 
-  // 20s hardcoded buffering watchdog timeout with live countdown
+  // 30s hardcoded buffering watchdog timeout with live countdown
   useEffect(() => {
     if (!isInitialLoading) {
       setLoadTimedOut(false);
       return;
     }
+    setLoadTimedOut(false);
     setBufferingCountdown(BUFFERING_TIMEOUT_SEC);
     const interval = setInterval(() => {
       setBufferingCountdown((prev) => {
@@ -204,7 +206,7 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
     return () => {
       clearInterval(interval);
     };
-  }, [isInitialLoading]);
+  }, [isInitialLoading, retryBufferTrigger]);
 
   const attachedSrcRef = useRef<string | null>(null);
   const onErrorRef = useRef(onError);
@@ -413,38 +415,6 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
     }
   }, [src]);
 
-  // Handle Play/Pause
-  const handleTogglePlay = useCallback((fromRemote = false) => {
-    const video = videoRef.current;
-    if (!video) return;
-
-    if (video.paused) {
-      video.muted = false;
-      setIsMuted(false);
-      video.play().catch(console.warn);
-      setIsPlaying(true);
-      if (isTV && fromRemote) {
-        if (remoteHudTimerRef.current) clearTimeout(remoteHudTimerRef.current);
-        setRemoteHudFeedback({ type: 'play' });
-        remoteHudTimerRef.current = setTimeout(() => {
-          setRemoteHudFeedback(null);
-        }, 700);
-      }
-    } else {
-      video.pause();
-      setIsPlaying(false);
-      if (isTV && fromRemote) {
-        if (remoteHudTimerRef.current) clearTimeout(remoteHudTimerRef.current);
-        setRemoteHudFeedback({ type: 'pause' });
-        remoteHudTimerRef.current = setTimeout(() => {
-          setRemoteHudFeedback(null);
-        }, 700);
-      }
-    }
-
-    resetControlsTimer();
-  }, [isTV, resetControlsTimer]);
-
   // Option C: Universal seek execution for both direct and transcoded pipes
   const performSeek = useCallback((targetTime: number) => {
     const video = videoRef.current;
@@ -556,6 +526,79 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
       }, 400);
     }
   }, [isTranscoded, src, duration, totalDurationSec, onProgress]);
+
+  // Handle Play/Pause with automatic reconnection if idle stream was evicted by server
+  const handleTogglePlay = useCallback((fromRemote = false) => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    if (video.paused) {
+      video.muted = false;
+      setIsMuted(false);
+
+      // If stream was disconnected or dropped while paused/idle, re-connect cleanly at current position
+      if (isTranscoded && (video.error || video.networkState === HTMLMediaElement.NETWORK_NO_SOURCE || video.readyState <= 1)) {
+        const effectiveCurrent = baseOffsetRef.current + video.currentTime;
+        console.log(`[CustomDirectPlayer] Reconnecting idle transcode stream at ${effectiveCurrent}s...`);
+        performSeek(effectiveCurrent);
+        return;
+      }
+
+      video.play().catch((err) => {
+        console.warn('[CustomDirectPlayer] Video play failed, attempting auto-reconnect:', err);
+        if (isTranscoded) {
+          const effectiveCurrent = baseOffsetRef.current + video.currentTime;
+          performSeek(effectiveCurrent);
+        } else {
+          try {
+            video.load();
+            video.play().catch(console.warn);
+          } catch {}
+        }
+      });
+      setIsPlaying(true);
+      if (isTV && fromRemote) {
+        if (remoteHudTimerRef.current) clearTimeout(remoteHudTimerRef.current);
+        setRemoteHudFeedback({ type: 'play' });
+        remoteHudTimerRef.current = setTimeout(() => {
+          setRemoteHudFeedback(null);
+        }, 700);
+      }
+    } else {
+      video.pause();
+      setIsPlaying(false);
+      if (isTV && fromRemote) {
+        if (remoteHudTimerRef.current) clearTimeout(remoteHudTimerRef.current);
+        setRemoteHudFeedback({ type: 'pause' });
+        remoteHudTimerRef.current = setTimeout(() => {
+          setRemoteHudFeedback(null);
+        }, 700);
+      }
+    }
+
+    resetControlsTimer();
+  }, [isTV, isTranscoded, performSeek, resetControlsTimer]);
+
+  // Auto-pause playback when app goes to background (Android TV Home, user switches apps) - Excludes Web Desktop
+  useEffect(() => {
+    if (isDesktop) return; // Allow continuous background playback / multi-tabbing on Web Desktop
+    const handleVisibilityChange = () => {
+      const video = videoRef.current;
+      if (!video) return;
+      if (document.visibilityState === 'hidden') {
+        if (!video.paused) {
+          console.log('[CustomDirectPlayer] App moved to background, pausing playback');
+          video.pause();
+          setIsPlaying(false);
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [isDesktop]);
 
   // Handle Relative Seek (+10s or -10s) with 280ms commit debouncing
   // Updates the visual UI & HUD immediately, but debounces the actual hardware seek
@@ -1147,8 +1190,7 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
                   <button
                     type="button"
                     onClick={() => {
-                      setLoadTimedOut(false);
-                      setBufferingCountdown(BUFFERING_TIMEOUT_SEC);
+                      setRetryBufferTrigger((prev) => prev + 1);
                       if (videoRef.current) {
                         videoRef.current.load();
                         videoRef.current.play().catch(console.warn);

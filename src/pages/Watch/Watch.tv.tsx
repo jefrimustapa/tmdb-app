@@ -10,6 +10,7 @@ import { dbService } from '../../services/db';
 import { getProviderById, extractMediaOriginCountries, isProviderMatchingMedia, getOrderedProviders } from '../../services/streamProviders';
 import { isAnimeMedia } from '../../services/animeMappingService';
 import { isAseanMedia, isKoreanMedia } from '../../services/lariMappingService';
+import { msm32Service } from '../../services/msm32MappingService';
 import { ArrowLeft, SkipForward, SkipBack, Settings, FastForward, Rewind } from 'lucide-react';
 
 import type { VirtualCursorStyle, StreamResolverType } from '../../types/db';
@@ -312,6 +313,7 @@ export const Watch: React.FC = () => {
 
   // Robust exit watch navigation that cannot be trapped by iframe history
   const handleExitWatch = React.useCallback(() => {
+    msm32Service.closeActiveStream();
     const targetId = id || details?.id;
     if (mediaType && targetId) {
       navigate(`/details/${mediaType}/${targetId}`, { replace: true });
