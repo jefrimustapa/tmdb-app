@@ -2319,6 +2319,7 @@ app.get('/api/resolve', async (req, res) => {
       streamUrl: `${protocol}://${host}/stream/${cached.docId}`,
       filename: cached.filename,
       size: cached.size,
+      videoCodec: cached.videoCodec || undefined,
     });
   }
 
@@ -2337,6 +2338,7 @@ app.get('/api/resolve', async (req, res) => {
         streamUrl: `${protocol}://${host}/stream/${result.docId}`,
         filename: result.filename,
         size: result.size,
+        videoCodec: result.videoCodec || undefined,
       });
     } catch (err) {
       req.off('close', onClientClose);
@@ -3114,6 +3116,7 @@ app.get('/api/resolve', async (req, res) => {
       streamUrl: `${protocol}://${host}/stream/${result.docId}`,
       filename: result.filename,
       size: result.size,
+      videoCodec: result.videoCodec || undefined,
     });
   } catch (err) {
     inFlightResolutions.delete(cacheKey);
@@ -3292,7 +3295,7 @@ async function streamTelegramPipelined(client, targetDoc, startByte, endByte, re
   const parentSessionKey = req?.headers?.['x-parent-session'] || req?.query?.parentSession;
   const clientIdentity = resolveClientIdentity(req?.headers?.['x-forwarded-for'] || req?.ip || req?.socket?.remoteAddress, req);
   if (isProbe) {
-    CONCURRENCY = 1; // Prevent MTProto pipeline lookahead congestion during demuxer / metadata / cues probe
+    CONCURRENCY = 3; // Fast metadata & cues retrieval without timeout
   }
 
   const streamKey = passedStreamKey || `${isInternal ? (parentSessionKey ? `worker-${parentSessionKey}` : `internal-${Date.now()}`) : clientIdentity.ip}:${targetDoc.id}`;
@@ -3702,11 +3705,12 @@ app.post('/api/github-webhook', async (req, res) => {
 });
 
 // Cache for probed audio track stream specifiers per docId (capped to prevent memory growth)
-const docAudioTrackCache = new Map();
+// Cache for probed media details (audio track specifier, videoCodec, isHevc, etc.) per docId (capped to prevent memory growth)
+const docMediaDetailsCache = new Map();
 
-async function resolveBestAudioTrack(docId, parentSessionKey) {
-  if (docAudioTrackCache.has(docId)) {
-    return docAudioTrackCache.get(docId);
+async function resolveMediaDetails(docId, parentSessionKey) {
+  if (docMediaDetailsCache.has(docId)) {
+    return docMediaDetailsCache.get(docId);
   }
 
   const ffprobeBin = process.env.FFPROBE_PATH || (fs.existsSync('/opt/bin/ffprobe') ? '/opt/bin/ffprobe' : 'ffprobe');
@@ -3716,16 +3720,19 @@ async function resolveBestAudioTrack(docId, parentSessionKey) {
   }
   const probeArgs = [
     '-v', 'error',
+    '-seekable', '1',
+    '-reconnect', '1',
+    '-reconnect_streamed', '1',
     '-headers', probeHeaders.join('\r\n') + '\r\n',
-    '-probesize', '262144',
-    '-analyzeduration', '0',
-    '-show_entries', 'stream=index,codec_type,codec_name:stream_tags=language,title',
+    '-probesize', '524288',
+    '-analyzeduration', '1000000',
+    '-show_entries', 'stream=index,codec_type,codec_name,codec_tag_string:stream_tags=language,title',
     '-of', 'json',
     `http://127.0.0.1:${INTERNAL_HTTP_PORT}/stream/${docId}?direct=1&probe=1`,
   ];
 
   try {
-    const specifier = await new Promise((resolve, reject) => {
+    const details = await new Promise((resolve, reject) => {
       let stdout = '';
       let proc = null;
       try {
@@ -3736,8 +3743,8 @@ async function resolveBestAudioTrack(docId, parentSessionKey) {
 
       const timer = setTimeout(() => {
         try { proc.kill('SIGKILL'); } catch {}
-        reject(new Error('ffprobe timeout after 10s'));
-      }, 10000);
+        reject(new Error('ffprobe timeout after 15s'));
+      }, 15000);
 
       proc.stdout.on('data', (d) => { stdout += d.toString(); });
       proc.on('close', (code) => {
@@ -3745,36 +3752,45 @@ async function resolveBestAudioTrack(docId, parentSessionKey) {
         if (code !== 0) return reject(new Error(`ffprobe exited with code ${code}`));
         try {
           const data = JSON.parse(stdout);
+          const videoStream = data.streams?.find(s => s.codec_type === 'video');
+          const videoCodec = (videoStream?.codec_name || '').toLowerCase();
+          const videoTag = (videoStream?.codec_tag_string || '').toLowerCase();
+          const isHevc = videoCodec === 'hevc' || videoCodec === 'h265' || videoTag === 'hvc1';
+          const isLegacyVideo = /^(mpeg4|msmpeg4v3|wmv3|flv1|vp6f)$/i.test(videoCodec);
+
           const audioStreams = data.streams?.filter(s => s.codec_type === 'audio') || [];
-          if (audioStreams.length === 0) return resolve('0:a:0');
-          if (audioStreams.length === 1) return resolve(`0:${audioStreams[0].index}`);
-
-          // Prioritize English audio track (isolated to avoid layered commentary/dub tracks)
-          const engStream = audioStreams.find(s => {
-            const lang = String(s.tags?.language || '').toLowerCase();
-            const title = String(s.tags?.title || '').toLowerCase();
-            return /^(en|eng|english)$/.test(lang) || /\b(eng|english|original|orig)\b/.test(title);
-          });
-
-          if (engStream) {
-            console.log(`[AUDIO TRACK] Selected English track (stream ${engStream.index}, lang: ${engStream.tags?.language || 'unknown'}, title: "${engStream.tags?.title || ''}") for doc ${docId}`);
-            return resolve(`0:${engStream.index}`);
+          let audioSpec = '0:a:0';
+          if (audioStreams.length === 1) {
+            audioSpec = `0:${audioStreams[0].index}`;
+          } else if (audioStreams.length > 1) {
+            const engStream = audioStreams.find(s => {
+              const lang = String(s.tags?.language || '').toLowerCase();
+              const title = String(s.tags?.title || '').toLowerCase();
+              return /^(en|eng|english)$/.test(lang) || /\b(eng|english|original|orig)\b/.test(title);
+            });
+            if (engStream) {
+              audioSpec = `0:${engStream.index}`;
+            } else {
+              const origStream = audioStreams.find(s => {
+                const lang = String(s.tags?.language || '').toLowerCase();
+                const title = String(s.tags?.title || '').toLowerCase();
+                return /^(und|qaa)$/.test(lang) || /\b(orig|original)\b/.test(title);
+              });
+              audioSpec = origStream ? `0:${origStream.index}` : `0:${audioStreams[0].index}`;
+            }
           }
 
-          // If no explicit English, check for original / undetermined track
-          const origStream = audioStreams.find(s => {
-            const lang = String(s.tags?.language || '').toLowerCase();
-            const title = String(s.tags?.title || '').toLowerCase();
-            return /^(und|qaa)$/.test(lang) || /\b(orig|original)\b/.test(title);
-          });
-          if (origStream) {
-            console.log(`[AUDIO TRACK] Selected original/und track (stream ${origStream.index}) for doc ${docId}`);
-            return resolve(`0:${origStream.index}`);
+          if (videoCodec) {
+            db.updateVideoCodec(docId, videoCodec);
           }
 
-          // Fallback to the first audio stream
-          console.log(`[AUDIO TRACK] Fallback to primary audio track (stream ${audioStreams[0].index}) for doc ${docId}`);
-          return resolve(`0:${audioStreams[0].index}`);
+          console.log(`[MEDIA PROBE] Doc ${docId} probed: videoCodec=${videoCodec || 'none'} (isHevc: ${isHevc}), audioTrack=${audioSpec}`);
+          return resolve({
+            audioMapSpecifier: audioSpec,
+            videoCodec,
+            isHevc,
+            isLegacyVideo,
+          });
         } catch (err) {
           reject(err);
         }
@@ -3786,16 +3802,27 @@ async function resolveBestAudioTrack(docId, parentSessionKey) {
       });
     });
 
-    if (docAudioTrackCache.size > 500) {
-      const firstKey = docAudioTrackCache.keys().next().value;
-      docAudioTrackCache.delete(firstKey);
+    if (docMediaDetailsCache.size > 500) {
+      const firstKey = docMediaDetailsCache.keys().next().value;
+      docMediaDetailsCache.delete(firstKey);
     }
-    docAudioTrackCache.set(docId, specifier);
-    return specifier;
+    docMediaDetailsCache.set(docId, details);
+    return details;
   } catch (err) {
-    console.warn(`[AUDIO TRACK WARN] Failed to resolve track for doc ${docId} (${err.message}). Using fallback 0:a:0 without caching.`);
-    return '0:a:0';
+    console.warn(`[MEDIA PROBE WARN] Failed to resolve media details for doc ${docId} (${err.message}). Using defaults.`);
+    return {
+      audioMapSpecifier: '0:a:0',
+      videoCodec: '',
+      isHevc: false,
+      isLegacyVideo: false,
+    };
   }
+}
+
+// Backward compatibility alias for resolveBestAudioTrack
+async function resolveBestAudioTrack(docId, parentSessionKey) {
+  const details = await resolveMediaDetails(docId, parentSessionKey);
+  return details.audioMapSpecifier;
 }
 
 
@@ -3905,24 +3932,43 @@ app.get('/stream/:docId', async (req, res) => {
       return res.status(404).send('Media document not found or invalid media size');
     }
 
-    // OPTION C: On-demand Audio & Video Transcoding Pipe (?transcode=audio|video or automatic for .avi)
-    // Streams Matroska/fMP4 with audio transcoded to stereo AAC and legacy AVI/MPEG4 video transcoded to H.264 Baseline (1 thread, ~11% CPU)
+    // OPTION C: On-demand Audio & Video Transcoding Pipe (?transcode=audio|video or automatic for .avi / hevc)
+    // Streams Matroska/fMP4 with audio transcoded to stereo AAC and legacy AVI/MPEG4/HEVC video transcoded to H.264 Baseline
     const isAvi = /\.avi$/i.test(filename);
-    if (isAvi && !isInternalTranscoder && !req.query.transcode) {
+    const isHevcFilename = /\b(x265|hevc|h265)\b/i.test(filename);
+    const isHevcCached = dbRecord?.videoCodec === 'hevc' || dbRecord?.videoCodec === 'h265';
+    const isHevc = isHevcFilename || isHevcCached;
+
+    // Asynchronously probe media details in background if videoCodec is not yet cached in DB (0ms delay for direct stream!)
+    if (!isInternalTranscoder && !dbRecord?.videoCodec) {
+      resolveMediaDetails(docId, streamSessionKey).catch(() => {});
+    }
+
+    if ((isAvi || isHevc) && !isInternalTranscoder && !req.query.transcode) {
       const sep = req.url.includes('?') ? '&' : '?';
-      console.log(`[AVI REDIRECT] Redirecting untagged AVI request to transcode pipe for [${clientIdentity.name} (${clientIdentity.ip})] doc ${docId}`);
+      console.log(`[VIDEO TRANSCODE REDIRECT] Redirecting untagged ${isAvi ? 'AVI' : 'HEVC'} request to transcode pipe for [${clientIdentity.name} (${clientIdentity.ip})] doc ${docId}`);
       return res.redirect(307, `${req.url}${sep}transcode=audio&vcodec=h264`);
     }
 
-    const shouldTranscode = req.query.transcode === 'audio' || req.query.transcode === 'video' || (isAvi && !isInternalTranscoder);
+    const shouldTranscode = req.query.transcode === 'audio' || req.query.transcode === 'video' || (isAvi && !isInternalTranscoder) || (isHevc && !isInternalTranscoder);
 
     if (shouldTranscode) {
       const seekSec = Math.max(0, parseFloat(req.query.ss) || 0);
-      console.log(`[TRANSCODE ${isAvi ? 'AVI->H264' : 'AUDIO'}] Starting transcode for [${clientIdentity.name} (${clientIdentity.ip})] doc ${docId} (${filename}) at ${seekSec}s...`);
+      console.log(`[TRANSCODE ${isAvi ? 'AVI->H264' : (isHevc ? 'HEVC->H264' : 'AUDIO')}] Starting transcode for [${clientIdentity.name} (${clientIdentity.ip})] doc ${docId} (${filename}) at ${seekSec}s...`);
 
-      const isAviOrLegacyVideo = isAvi || req.query.vcodec === 'h264';
-      const outputMime = isAviOrLegacyVideo ? 'video/mp4' : 'video/x-matroska';
-      const outputExt = isAviOrLegacyVideo ? 'mp4' : 'mkv';
+      let mediaDetails = { audioMapSpecifier: '0:a:0', videoCodec: '', isHevc: false, isLegacyVideo: false };
+      try {
+        mediaDetails = await resolveMediaDetails(docId, streamSessionKey);
+      } catch (err) {
+        mediaDetails = { audioMapSpecifier: '0:a:0', videoCodec: '', isHevc: false, isLegacyVideo: false };
+      }
+
+      const isAviOrLegacyVideo = isAvi || req.query.vcodec === 'h264' || mediaDetails.isHevc || mediaDetails.isLegacyVideo || isHevcFilename || isHevcCached;
+      const isMp4Source = /\.mp4$/i.test(filename);
+      // For any video needing H.264 conversion OR any MP4 source: output fragmented MP4 for 100% universal browser compatibility.
+      const useMp4Muxer = isAviOrLegacyVideo || isMp4Source;
+      const outputMime = useMp4Muxer ? 'video/mp4' : 'video/x-matroska';
+      const outputExt = useMp4Muxer ? 'mp4' : 'mkv';
 
       if (req.method === 'HEAD') {
         res.writeHead(200, {
@@ -3936,23 +3982,19 @@ app.get('/stream/:docId', async (req, res) => {
 
       // Isolate preferred single audio track (default: English) so client doesn't play layered multi-language dubs
       const requestedTrack = req.query.audio || req.query.track;
-      let audioMapSpecifier = '0:a:0';
+      let audioMapSpecifier = mediaDetails.audioMapSpecifier;
       if (requestedTrack && requestedTrack !== 'auto') {
         audioMapSpecifier = requestedTrack.startsWith('0:') ? requestedTrack : `0:${requestedTrack}`;
-      } else {
-        try {
-          audioMapSpecifier = await resolveBestAudioTrack(docId, streamSessionKey);
-        } catch (err) {
-          audioMapSpecifier = '0:a:0';
-        }
       }
 
       // Video encoding strategy:
       // For AVI / legacy video: use single-thread baseline libx264 (pinned to 1 core, 57 fps, ~11% avg router CPU).
-      // For standard MKV/MP4: stream-copy 1:1 (-c:v copy, 0% CPU).
+      // For HEVC: use dual-thread baseline libx264 (2 cores, 28 fps real-time, ~18% avg router CPU).
+      // For standard H.264 MKV/MP4: stream-copy 1:1 (-c:v copy, 0% CPU).
+      const videoThreadCount = (mediaDetails.isHevc || isHevcFilename || isHevcCached) ? '2' : '1';
       const videoArgs = isAviOrLegacyVideo
         ? [
-            '-threads', '1',
+            '-threads', videoThreadCount,
             '-c:v', 'libx264',
             '-preset', 'ultrafast',
             '-tune', 'fastdecode',
@@ -3965,12 +4007,12 @@ app.get('/stream/:docId', async (req, res) => {
           ]
         : ['-c:v', 'copy'];
 
-      const muxerArgs = isAviOrLegacyVideo
+      const muxerArgs = useMp4Muxer
         ? ['-f', 'mp4', '-movflags', 'frag_keyframe+empty_moov+default_base_moof']
         : ['-flush_packets', '1', '-cluster_time_limit', '1000', '-cluster_size_limit', '524288', '-f', 'matroska'];
 
       const ffmpegBin = process.env.FFMPEG_PATH || (fs.existsSync('/opt/bin/ffmpeg') ? '/opt/bin/ffmpeg' : 'ffmpeg');
-      const inputSeekFlags = seekSec > 0 ? ['-ss', seekSec.toString()] : ['-seekable', '0'];
+      const inputSeekFlags = seekSec > 0 ? ['-ss', seekSec.toString(), '-seekable', '1'] : ['-seekable', '1'];
       const ffmpegArgs = [
         '-loglevel', 'error',
         ...inputSeekFlags,
