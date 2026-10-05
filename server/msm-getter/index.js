@@ -3936,12 +3936,23 @@ app.get('/stream/:docId', async (req, res) => {
     // Streams Matroska/fMP4 with audio transcoded to stereo AAC and legacy AVI/MPEG4/HEVC video transcoded to H.264 Baseline
     const isAvi = /\.avi$/i.test(filename);
     const isHevcFilename = /\b(x265|hevc|h265)\b/i.test(filename);
-    const isHevcCached = dbRecord?.videoCodec === 'hevc' || dbRecord?.videoCodec === 'h265';
-    const isHevc = isHevcFilename || isHevcCached;
+    let isHevc = isHevcFilename || dbRecord?.videoCodec === 'hevc' || dbRecord?.videoCodec === 'h265';
 
-    // Asynchronously probe media details in background if videoCodec is not yet cached in DB (0ms delay for direct stream!)
-    if (!isInternalTranscoder && !dbRecord?.videoCodec) {
-      resolveMediaDetails(docId, streamSessionKey).catch(() => {});
+    // If not known yet, check in-memory cache or probe media details before serving to prevent serving raw HEVC to Chrome
+    if (!isInternalTranscoder && !isAvi && !isHevc) {
+      const memCached = docMediaDetailsCache.get(docId);
+      if (memCached?.isHevc) {
+        isHevc = true;
+      } else if (!dbRecord?.videoCodec) {
+        try {
+          const probed = await resolveMediaDetails(docId, streamSessionKey);
+          if (probed?.isHevc) {
+            isHevc = true;
+          }
+        } catch (probeErr) {
+          console.warn(`[CODEC PROBE WARN] Failed to probe doc ${docId}:`, probeErr.message);
+        }
+      }
     }
 
     if ((isAvi || isHevc) && !isInternalTranscoder && !req.query.transcode) {
@@ -3963,7 +3974,7 @@ app.get('/stream/:docId', async (req, res) => {
         mediaDetails = { audioMapSpecifier: '0:a:0', videoCodec: '', isHevc: false, isLegacyVideo: false };
       }
 
-      const isAviOrLegacyVideo = isAvi || req.query.vcodec === 'h264' || mediaDetails.isHevc || mediaDetails.isLegacyVideo || isHevcFilename || isHevcCached;
+      const isAviOrLegacyVideo = isAvi || req.query.vcodec === 'h264' || mediaDetails.isHevc || mediaDetails.isLegacyVideo || isHevc;
       const isMp4Source = /\.mp4$/i.test(filename);
       // For any video needing H.264 conversion OR any MP4 source: output fragmented MP4 for 100% universal browser compatibility.
       const useMp4Muxer = isAviOrLegacyVideo || isMp4Source;
@@ -3991,7 +4002,7 @@ app.get('/stream/:docId', async (req, res) => {
       // For AVI / legacy video: use single-thread baseline libx264 (pinned to 1 core, 57 fps, ~11% avg router CPU).
       // For HEVC: use dual-thread baseline libx264 (2 cores, 28 fps real-time, ~18% avg router CPU).
       // For standard H.264 MKV/MP4: stream-copy 1:1 (-c:v copy, 0% CPU).
-      const videoThreadCount = (mediaDetails.isHevc || isHevcFilename || isHevcCached) ? '2' : '1';
+      const videoThreadCount = (mediaDetails.isHevc || isHevc) ? '2' : '1';
       const videoArgs = isAviOrLegacyVideo
         ? [
             '-threads', videoThreadCount,

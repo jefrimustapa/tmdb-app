@@ -93,6 +93,7 @@ class CentralDatabase {
   }
 
   set(queryKey, data) {
+    const existing = this.byDocId.get(String(data.docId));
     const record = {
       queryKey,
       docId: String(data.docId),
@@ -104,7 +105,7 @@ class CentralDatabase {
       dcId: data.dcId || 4,
       date: data.date || Math.floor(Date.now() / 1000),
       createdAt: data.createdAt || Date.now(),
-      videoCodec: data.videoCodec || undefined,
+      videoCodec: data.videoCodec || existing?.videoCodec || undefined,
     };
 
     // Prevent unbounded memory/disk growth by evicting oldest record if cap is reached
