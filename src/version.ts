@@ -2,12 +2,13 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20261005-0716';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.fix-msm-getter-stale.20261005-0716';
+export const APP_BUILD_NUMBER = '20261005-0723';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.fix-msm-getter-stale.20261005-0723';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
 export const APP_BRANCH = 'fix-msm-getter-stale';
-export const APP_CHANGELOG = `* feat(player): increase buffering timeout countdown to 30s
+export const APP_CHANGELOG = `* fix(stream): restore /api/stream/close and client exit beacon for instant session eviction
+* feat(player): increase buffering timeout countdown to 30s
 * fix(stream): prevent parallel range requests and idle sessions from aborting active playback
 * fix(player): re-trigger countdown timer on Retry Play click
 * fix(stream): cancel GramJS 30s sender release timer and tune concurrency for stable streaming
@@ -20,5 +21,4 @@ export const APP_CHANGELOG = `* feat(player): increase buffering timeout countdo
 * Merge pull request #185 from jefrimustapa/feat/adaptive-bg-color-home-details
 * style(details): unify all metadata and original title badges with uniform bg-black/60 grey boxes
 * fix(details): remove duplicate country of origin row below storyline
-* feat(details): style all metadata items with translucent grey boxes
-* fix(ui): extend dark tint to 105vh to eliminate Continue Watching seam`;
+* feat(details): style all metadata items with translucent grey boxes`;

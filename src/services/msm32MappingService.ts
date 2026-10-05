@@ -272,6 +272,18 @@ class Msm32MappingService {
       return false;
     }
   }
+
+  async closeActiveStream(docId?: string): Promise<void> {
+    try {
+      const baseUrl = await this.getBaseUrl();
+      const url = `${baseUrl.replace(/\/+$/, '')}/api/stream/close${docId ? `?docId=${docId}` : ''}`;
+      if (typeof navigator !== 'undefined' && navigator.sendBeacon) {
+        navigator.sendBeacon(url);
+      } else {
+        fetch(url, { method: 'POST', keepalive: true }).catch(() => {});
+      }
+    } catch {}
+  }
 }
 
 export const msm32Service = new Msm32MappingService();

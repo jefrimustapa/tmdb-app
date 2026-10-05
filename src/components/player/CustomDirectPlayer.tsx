@@ -225,20 +225,6 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
           video.load();
         } catch {}
       }
-      // Notify server of immediate stream close on actual page exit (unmount)
-      try {
-        if (src) {
-          const match = src.match(/\/stream\/(\d+)/);
-          const docId = match ? match[1] : '';
-          const urlObj = new URL(src, window.location.href);
-          const closeUrl = `${urlObj.origin}/api/stream/close?docId=${docId}`;
-          if (navigator.sendBeacon) {
-            navigator.sendBeacon(closeUrl);
-          } else {
-            fetch(closeUrl, { method: 'POST', keepalive: true }).catch(() => {});
-          }
-        }
-      } catch {}
       if (hlsRef.current) {
         hlsRef.current.destroy();
         hlsRef.current = null;
