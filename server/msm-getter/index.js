@@ -1423,16 +1423,22 @@ function resolveClientIdentity(rawIp, req) {
 
 function isDesktopWebClient(req) {
   const ua = req?.headers?.['user-agent'] || '';
+  const clientIdentity = getClientIdentity(req);
+  // If device is identified as mobile, phone, or TV from DHCP/DNS/User-Agent, never transcode
+  if (/S25|Galaxy|Phone|Android|iOS|iPad|iPhone|SmartTV|GoogleTV|AppleTV|Roku|Tizen|Web0S/i.test(clientIdentity?.name || '')) {
+    return false;
+  }
   if (!ua) return false;
   const isMobileOrTv = /Mobile|Android|iPhone|iPad|iPod|SmartTV|Tizen|Web0S|GoogleTV|AppleTV|Roku|ExoPlayer|Dalvik|okhttp/i.test(ua);
   const isDesktopOs = /Windows NT|Macintosh|X11; Linux x86_64|CrOS/i.test(ua);
   return isDesktopOs && !isMobileOrTv;
 }
 
-// CPU Usage Tracker (Router System CPU from /proc/stat, and msm-getter Process CPU from process.cpuUsage)
+// CPU Usage Tracker (Router System CPU from /proc/stat, msm-getter Node process from process.cpuUsage, and FFmpeg workers from /proc/[pid]/stat)
 let lastSystemCpu = null;
 let lastProcCpu = process.cpuUsage();
 let lastProcTime = process.hrtime.bigint();
+const activeFfmpegStats = new Map(); // pid -> { ticks, time }
 
 function getCpuMetrics() {
   const cores = os.cpus()?.length || 4;
@@ -1455,7 +1461,7 @@ function getCpuMetrics() {
     }
   } catch {}
 
-  // 2. msm-getter Process CPU (process.cpuUsage())
+  // 2. msm-getter Node Process CPU (process.cpuUsage())
   let nodeCpuPct = 0;
   try {
     const now = process.hrtime.bigint();
@@ -1469,7 +1475,53 @@ function getCpuMetrics() {
     lastProcTime = now;
   } catch {}
 
-  return { routerCpuPct, nodeCpuPct, cores, loadAvg1m };
+  // 3. Active FFmpeg Transcode Workers CPU (/proc/[pid]/stat)
+  let ffmpegCpuPct = 0;
+  try {
+    const currentFfmpegPids = new Set();
+    for (const s of activeStreams.values()) {
+      if (s.ffmpegProc?.pid) {
+        currentFfmpegPids.add(s.ffmpegProc.pid);
+      }
+    }
+
+    const nowMs = Date.now();
+    for (const pid of currentFfmpegPids) {
+      const statPath = `/proc/${pid}/stat`;
+      if (fs.existsSync(statPath)) {
+        const content = fs.readFileSync(statPath, 'utf8');
+        const closeParenIdx = content.lastIndexOf(')');
+        if (closeParenIdx !== -1) {
+          const rest = content.substring(closeParenIdx + 2).split(/\s+/);
+          const utime = parseInt(rest[11], 10) || 0;
+          const stime = parseInt(rest[12], 10) || 0;
+          const totalTicks = utime + stime;
+
+          if (activeFfmpegStats.has(pid)) {
+            const prev = activeFfmpegStats.get(pid);
+            const dtSec = (nowMs - prev.time) / 1000;
+            const dTicks = totalTicks - prev.ticks;
+            if (dtSec > 0.2 && dTicks >= 0) {
+              const pct = (dTicks / (100 * dtSec * cores)) * 100;
+              ffmpegCpuPct += Math.min(100, pct);
+            }
+          }
+          activeFfmpegStats.set(pid, { ticks: totalTicks, time: nowMs });
+        }
+      }
+    }
+
+    for (const storedPid of activeFfmpegStats.keys()) {
+      if (!currentFfmpegPids.has(storedPid)) {
+        activeFfmpegStats.delete(storedPid);
+      }
+    }
+  } catch {}
+
+  ffmpegCpuPct = Math.round(ffmpegCpuPct * 10) / 10;
+  const serviceCpuPct = Math.round((nodeCpuPct + ffmpegCpuPct) * 10) / 10;
+
+  return { routerCpuPct, nodeCpuPct, ffmpegCpuPct, serviceCpuPct, cores, loadAvg1m };
 }
 
 // System Stats Endpoint (Uptime, Memory RSS, Active Streams, Active Clients, Log Size)
@@ -1994,7 +2046,7 @@ app.get('/logs', (req, res) => {
         const d = await res.json();
         document.getElementById('metricUptime').textContent = Math.floor(d.uptime / 3600) + 'h ' + Math.floor((d.uptime % 3600) / 60) + 'm ' + (d.uptime % 60) + 's';
 
-        // 1. CPU Usage: msm-getter [router]
+        // 1. CPU Usage: msm-getter (Node + FFmpeg) [router]
         const cpu = d.cpu || {};
         const nodeCpuEl = document.getElementById('metricNodeCpu');
         const routerCpuEl = document.getElementById('metricRouterCpu');
@@ -2002,14 +2054,21 @@ app.get('/logs', (req, res) => {
         if (nodeCpuEl && routerCpuEl) {
           const nodeCpu = cpu.nodeCpuPct !== undefined ? cpu.nodeCpuPct : 0;
           const routerCpu = cpu.routerCpuPct !== undefined ? cpu.routerCpuPct : 0;
-          nodeCpuEl.textContent = nodeCpu + '%';
+          const ffmpegCpu = cpu.ffmpegCpuPct !== undefined ? cpu.ffmpegCpuPct : 0;
+          const serviceCpu = cpu.serviceCpuPct !== undefined ? cpu.serviceCpuPct : nodeCpu;
+          
+          nodeCpuEl.textContent = (ffmpegCpu > 0 ? serviceCpu : nodeCpu) + '%';
           routerCpuEl.textContent = routerCpu + '%';
-          if (nodeCpu > 50) nodeCpuEl.className = 'text-xs font-bold font-mono text-rose-400';
-          else if (nodeCpu > 20) nodeCpuEl.className = 'text-xs font-bold font-mono text-amber-400';
+          if (serviceCpu > 50 || routerCpu > 70) nodeCpuEl.className = 'text-xs font-bold font-mono text-rose-400';
+          else if (serviceCpu > 20 || routerCpu > 40) nodeCpuEl.className = 'text-xs font-bold font-mono text-amber-400';
           else nodeCpuEl.className = 'text-xs font-bold font-mono text-emerald-400';
 
           if (cpuDetailEl) {
-            cpuDetailEl.textContent = (cpu.cores || 4) + ' cores · load ' + (cpu.loadAvg1m || 0);
+            if (ffmpegCpu > 0) {
+              cpuDetailEl.textContent = 'FFmpeg: ' + ffmpegCpu + '% · Node: ' + nodeCpu + '% · load ' + (cpu.loadAvg1m || 0);
+            } else {
+              cpuDetailEl.textContent = (cpu.cores || 4) + ' cores · load ' + (cpu.loadAvg1m || 0);
+            }
           }
         }
 
@@ -4024,9 +4083,9 @@ app.get('/stream/:docId', async (req, res) => {
 
       // Video encoding strategy:
       // For AVI / legacy video: use single-thread baseline libx264 (pinned to 1 core, 57 fps).
-      // For HEVC: use 3-core baseline libx264 (pinned to 3 cores for maximum encoding throughput).
+      // For HEVC: use 2-core baseline libx264 (pinned to 2 cores, leaving 2 cores free for router/WiFi).
       // For standard H.264 MKV/MP4: stream-copy 1:1 (-c:v copy, 0% CPU).
-      const videoThreadCount = (mediaDetails.isHevc || isHevc) ? '3' : '1';
+      const videoThreadCount = (mediaDetails.isHevc || isHevc) ? '2' : '1';
       const videoArgs = isAviOrLegacyVideo
         ? [
             '-threads', videoThreadCount,
@@ -4048,7 +4107,7 @@ app.get('/stream/:docId', async (req, res) => {
 
       const ffmpegBin = process.env.FFMPEG_PATH || (fs.existsSync('/opt/bin/ffmpeg') ? '/opt/bin/ffmpeg' : 'ffmpeg');
       const inputSeekFlags = seekSec > 0 ? ['-ss', seekSec.toString(), '-seekable', '1'] : ['-seekable', '1'];
-      const inputDecoderThreads = (mediaDetails.isHevc || isHevc) ? ['-threads', '3'] : [];
+      const inputDecoderThreads = (mediaDetails.isHevc || isHevc) ? ['-threads', '2'] : [];
       const ffmpegArgs = [
         '-loglevel', 'error',
         ...inputDecoderThreads,
@@ -4094,6 +4153,7 @@ app.get('/stream/:docId', async (req, res) => {
 
       const transcodeEntry = {
         sessionKey: streamSessionKey,
+        ffmpegProc,
         ip: clientIdentity.ip,
         clientName: clientIdentity.name,
         docId,
