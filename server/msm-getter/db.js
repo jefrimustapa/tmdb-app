@@ -93,6 +93,7 @@ class CentralDatabase {
   }
 
   set(queryKey, data) {
+    const existing = this.byDocId.get(String(data.docId));
     const record = {
       queryKey,
       docId: String(data.docId),
@@ -104,6 +105,7 @@ class CentralDatabase {
       dcId: data.dcId || 4,
       date: data.date || Math.floor(Date.now() / 1000),
       createdAt: data.createdAt || Date.now(),
+      videoCodec: data.videoCodec || existing?.videoCodec || undefined,
     };
 
     // Prevent unbounded memory/disk growth by evicting oldest record if cap is reached
@@ -141,6 +143,18 @@ class CentralDatabase {
       if (existing.queryKey) this.byQuery.delete(existing.queryKey);
       this.save();
       console.log(`[DB] Evicted record by Doc ID: ${docIdStr} ("${existing.queryKey}")`);
+      return true;
+    }
+    return false;
+  }
+
+  updateVideoCodec(docId, videoCodec) {
+    const docIdStr = String(docId);
+    const existing = this.byDocId.get(docIdStr);
+    if (existing && existing.videoCodec !== videoCodec) {
+      existing.videoCodec = videoCodec;
+      this.save();
+      console.log(`[DB] Updated videoCodec for doc ${docIdStr}: ${videoCodec}`);
       return true;
     }
     return false;

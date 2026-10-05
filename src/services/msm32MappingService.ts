@@ -5,6 +5,7 @@ export interface Msm32ResolveResult {
   filename?: string;
   size?: number;
   cached?: boolean;
+  videoCodec?: string;
 }
 
 export interface Msm32HealthResult {
