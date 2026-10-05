@@ -82,6 +82,7 @@ export const DEFAULT_SETTINGS: UserSettings = {
   msm32GetterUrl: 'https://www.julietmike.net:3033',
   msm32ChunkSize: 524288,
   msm32MaxQuality: '1080',
+  msm32Timeout: 90,
   streamHeaderTimeout: 5,
   streamResolverTimeout: 30,
   streamResolverRetries: 1,

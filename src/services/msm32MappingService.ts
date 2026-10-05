@@ -123,9 +123,11 @@ class Msm32MappingService {
     const baseUrl = await this.getBaseUrl();
     if (signal?.aborted) return null;
 
+    const settings = await dbService.getSettings();
+    const timeoutSeconds = settings?.msm32Timeout || 90;
+
     const controller = new AbortController();
-    // Allow up to 65 seconds to accommodate sequential MTProto queue and candidate ad-gate stepping
-    const timer = setTimeout(() => controller.abort(), 65000);
+    const timer = setTimeout(() => controller.abort(), timeoutSeconds * 1000);
 
     const onExternalAbort = () => {
       clearTimeout(timer);
@@ -137,7 +139,6 @@ class Msm32MappingService {
     }
 
     try {
-      const settings = await dbService.getSettings();
       const maxQuality = settings?.msm32MaxQuality || '1080';
 
       const params = new URLSearchParams({ title });

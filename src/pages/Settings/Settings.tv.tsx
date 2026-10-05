@@ -172,6 +172,7 @@ export const Settings: React.FC = () => {
   const [showTelegramUrlDrawer, setShowTelegramUrlDrawer] = useState(false);
   const [showTelegramChunkDrawer, setShowTelegramChunkDrawer] = useState(false);
   const [showTelegramCountryDrawer, setShowTelegramCountryDrawer] = useState(false);
+  const [showTelegramTimeoutDrawer, setShowTelegramTimeoutDrawer] = useState(false);
   const [showEmbedResolverDrawer, setShowEmbedResolverDrawer] = useState(false);
   const [showEmbedTimeoutDrawer, setShowEmbedTimeoutDrawer] = useState(false);
   const [showEmbedRetryDrawer, setShowEmbedRetryDrawer] = useState(false);
@@ -188,7 +189,7 @@ export const Settings: React.FC = () => {
   const { detectedPlatform, activeLayout } = useDevice();
 
   const isPickerModalOpen = pickerModalSlot !== null;
-  const isAnyModalOpen = isPickerModalOpen || showMaturityDrawer || showTriggerDrawer || showAutoplayDrawer || showAutoplayTriggerDrawer || showAutoplayTimeoutDrawer || showEnginesDrawer || showEnginePriorityDrawer || showTelegramDrawer || showTelegramMsmDrawer || showTelegramUrlDrawer || showTelegramChunkDrawer || showTelegramCountryDrawer || showEmbedResolverDrawer || showEmbedTimeoutDrawer || showEmbedRetryDrawer || activePriorityDrawer !== null || showTickerDrawer || showHeaderTimeoutDrawer || showPerfHudDrawer || showBackupDrawer;
+  const isAnyModalOpen = isPickerModalOpen || showMaturityDrawer || showTriggerDrawer || showAutoplayDrawer || showAutoplayTriggerDrawer || showAutoplayTimeoutDrawer || showEnginesDrawer || showEnginePriorityDrawer || showTelegramDrawer || showTelegramMsmDrawer || showTelegramUrlDrawer || showTelegramChunkDrawer || showTelegramCountryDrawer || showTelegramTimeoutDrawer || showEmbedResolverDrawer || showEmbedTimeoutDrawer || showEmbedRetryDrawer || activePriorityDrawer !== null || showTickerDrawer || showHeaderTimeoutDrawer || showPerfHudDrawer || showBackupDrawer;
 
   // Viewport scroll helpers for TV remote navigation (snaps to absolute top / bottom)
   const scrollToPanelTop = () => {
@@ -451,7 +452,7 @@ export const Settings: React.FC = () => {
         (window as any).AndroidBridge?.setDropdownOpen?.(false);
       } catch {}
     };
-  }, [pickerModalSlot, isPickerModalOpen, showMaturityDrawer, showTriggerDrawer, showAutoplayDrawer, showAutoplayTriggerDrawer, showAutoplayTimeoutDrawer, showEnginesDrawer, showEnginePriorityDrawer, showTelegramDrawer, showTelegramMsmDrawer, showTelegramUrlDrawer, showTelegramChunkDrawer, showTelegramCountryDrawer, showEmbedResolverDrawer, showEmbedTimeoutDrawer, showEmbedRetryDrawer, activePriorityDrawer, showTickerDrawer, showHeaderTimeoutDrawer, showPerfHudDrawer, showBackupDrawer, isAnyModalOpen]);
+  }, [pickerModalSlot, isPickerModalOpen, showMaturityDrawer, showTriggerDrawer, showAutoplayDrawer, showAutoplayTriggerDrawer, showAutoplayTimeoutDrawer, showEnginesDrawer, showEnginePriorityDrawer, showTelegramDrawer, showTelegramMsmDrawer, showTelegramUrlDrawer, showTelegramChunkDrawer, showTelegramCountryDrawer, showTelegramTimeoutDrawer, showEmbedResolverDrawer, showEmbedTimeoutDrawer, showEmbedRetryDrawer, activePriorityDrawer, showTickerDrawer, showHeaderTimeoutDrawer, showPerfHudDrawer, showBackupDrawer, isAnyModalOpen]);
 
   // Handle remote Back button, tmdb_close_dropdowns, and Escape dismissal for modals / drawers
   useEffect(() => {
@@ -514,6 +515,14 @@ export const Settings: React.FC = () => {
         setShowTelegramMsmDrawer(true);
         setTimeout(() => {
           document.getElementById('drawer-msm32-sub-country')?.focus();
+        }, 50);
+        return;
+      }
+      if (showTelegramTimeoutDrawer) {
+        setShowTelegramTimeoutDrawer(false);
+        setShowTelegramMsmDrawer(true);
+        setTimeout(() => {
+          document.getElementById('drawer-msm32-sub-timeout')?.focus();
         }, 50);
         return;
       }
@@ -654,6 +663,7 @@ export const Settings: React.FC = () => {
     showTelegramUrlDrawer,
     showTelegramChunkDrawer,
     showTelegramCountryDrawer,
+    showTelegramTimeoutDrawer,
     showEmbedResolverDrawer,
     showEmbedTimeoutDrawer,
     showEmbedRetryDrawer,
@@ -4091,6 +4101,118 @@ export const Settings: React.FC = () => {
       )}
 
       {/* ========================================================================= */}
+      {/* Android TV Telegram MSM32 Timeout Drawer (Level 4)                       */}
+      {/* ========================================================================= */}
+      {showTelegramTimeoutDrawer && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          data-drawer-container="true"
+          className="fixed inset-0 z-[9999] flex justify-end bg-black/80 backdrop-blur-md animate-fade-in"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowTelegramTimeoutDrawer(false);
+              setShowTelegramMsmDrawer(true);
+            }
+          }}
+        >
+          {/* Left Side Parent Path Context */}
+          <div className="flex-1 hidden md:flex flex-col justify-center pl-16 pr-8 pointer-events-none select-none">
+            <div className="flex items-center gap-2 text-xs font-bold text-gray-400 tracking-wider uppercase mb-2">
+              <span className="text-gray-400">Settings</span>
+              <ChevronRight className="w-3.5 h-3.5 text-gray-500" />
+              <span className="text-gray-400">Playback &amp; Streaming</span>
+              <ChevronRight className="w-3.5 h-3.5 text-gray-500" />
+              <span className="text-gray-400">Stream Engines</span>
+              <ChevronRight className="w-3.5 h-3.5 text-gray-500" />
+              <span className="text-gray-400">Telegram</span>
+              <ChevronRight className="w-3.5 h-3.5 text-gray-500" />
+              <span className="text-hbo-cyan font-semibold">MSM32bot</span>
+            </div>
+            <h1 className="text-3xl font-extrabold text-white tracking-tight mb-2">Resolver Request Timeout</h1>
+            <p className="text-sm text-gray-400 max-w-md leading-relaxed">
+              Configure maximum waiting time for Telegram media searching and MTProto resolution before failover.
+            </p>
+          </div>
+
+          <div className="w-full max-w-md h-full bg-hbo-card/95 border-l border-hbo-border/80 shadow-2xl flex flex-col justify-between animate-slide-in-right overflow-hidden">
+            {/* Drawer Body: Single Column Options */}
+            <div className="flex-1 overflow-y-auto px-6 py-6 space-y-3 font-sans">
+              {(() => {
+                const timeoutOptions = [
+                  { val: 60 as const, label: '60 Seconds (Fast)', desc: '1.0 Minute • Quickly failover to embed providers if Telegram is unresponsive.' },
+                  { val: 90 as const, label: '90 Seconds (Standard)', desc: '1.5 Minutes • Recommended for multi-page Telegram queries and bot ad-gate.' },
+                  { val: 120 as const, label: '120 Seconds (Extended)', desc: '2.0 Minutes • Extended patience for complex series episode searching.' },
+                  { val: 150 as const, label: '150 Seconds (Deep)', desc: '2.5 Minutes • Deep search across multiple result pages on high-load bots.' },
+                  { val: 180 as const, label: '180 Seconds (Maximum)', desc: '3.0 Minutes • Maximum patience for congested networks and slow downloads.' },
+                ];
+                const currentVal = settings.msm32Timeout || 90;
+
+                return timeoutOptions.map((opt, idx) => {
+                  const isSelected = currentVal === opt.val;
+                  return (
+                    <button
+                      key={opt.val}
+                      id={`drawer-telegram-timeout-${opt.val}`}
+                      data-telegram-timeout-drawer-item="true"
+                      data-telegram-timeout-selected={isSelected ? 'true' : 'false'}
+                      type="button"
+                      onKeyDown={(e) => {
+                        if (e.key === 'ArrowUp' && idx > 0) {
+                          e.preventDefault();
+                          const target = document.getElementById(`drawer-telegram-timeout-${timeoutOptions[idx - 1].val}`);
+                          target?.focus();
+                          target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                        } else if (e.key === 'ArrowDown' && idx < timeoutOptions.length - 1) {
+                          e.preventDefault();
+                          const target = document.getElementById(`drawer-telegram-timeout-${timeoutOptions[idx + 1].val}`);
+                          target?.focus();
+                          target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                        }
+                      }}
+                      onClick={() => {
+                        handleUpdate({ msm32Timeout: opt.val });
+                        setShowTelegramTimeoutDrawer(false);
+                        setShowTelegramMsmDrawer(true);
+                        setTimeout(() => {
+                          document.getElementById('drawer-msm32-sub-timeout')?.focus();
+                        }, 50);
+                      }}
+                      className={`w-full p-4 rounded-xl border text-left transition-all tv-focus-target flex items-center justify-between gap-3 ${
+                        isSelected
+                          ? 'bg-sky-950/40 border-sky-400 text-white shadow-hbo-glow ring-1 ring-sky-400/40'
+                          : 'bg-black/30 border-hbo-border hover:border-gray-600 text-gray-400'
+                      }`}
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-bold text-sm text-white">{opt.label}</span>
+                          <span className="text-[10px] text-sky-400 font-mono font-bold bg-sky-500/10 px-1.5 py-0.5 rounded border border-sky-400/20">
+                            {opt.val}s
+                          </span>
+                        </div>
+                        <p className="text-xs text-gray-400 leading-relaxed">{opt.desc}</p>
+                      </div>
+                      <div className={`w-6 h-6 rounded-full border flex items-center justify-center flex-shrink-0 ${
+                        isSelected ? 'bg-sky-500 border-sky-400 text-black' : 'border-gray-600 bg-black/40 text-transparent'
+                      }`}>
+                        <Check className="w-3.5 h-3.5 stroke-[3]" />
+                      </div>
+                    </button>
+                  );
+                });
+              })()}
+            </div>
+
+            {/* Drawer Footer Hint */}
+            <div className="p-4 border-t border-hbo-border/50 bg-black/40 flex items-center justify-center text-xs text-gray-400 select-none">
+              <span>Press <strong className="text-white font-semibold">Back</strong> to return to MSM32bot Settings</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
       {/* Android TV Telegram MSM32 Sub-Drawer (Level 3)                            */}
       {/* ========================================================================= */}
       {showTelegramMsmDrawer && (
@@ -4417,7 +4539,7 @@ export const Settings: React.FC = () => {
                             target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
                           } else if (e.key === 'ArrowDown') {
                             e.preventDefault();
-                            const target = document.getElementById('drawer-msm32-btn-clear-cache');
+                            const target = document.getElementById('drawer-msm32-sub-timeout');
                             target?.focus();
                             target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
                           }
@@ -4430,6 +4552,40 @@ export const Settings: React.FC = () => {
                       >
                         <span className="text-sky-400 font-mono">
                           {((settings.telegramProviderCountries && settings.telegramProviderCountries['telegram-msm32']) || ['MY', 'ID', 'SG']).length} active
+                        </span>
+                        <ChevronRight className="w-3.5 h-3.5 text-gray-400" />
+                      </button>
+                    </div>
+
+                    {/* Sub-Drawer Item: Request Timeout */}
+                    <div className="bg-black/40 border border-hbo-border rounded-xl p-3.5 flex items-center justify-between">
+                      <div className="min-w-0 pr-2">
+                        <div className="font-bold text-xs text-white flex items-center gap-1.5 mb-0.5">
+                          <Clock className="w-3.5 h-3.5 text-sky-400" />
+                          <span>Request Timeout</span>
+                        </div>
+                        <p className="text-[10px] text-gray-400">Maximum search & resolution wait time before failover.</p>
+                      </div>
+                      <button
+                        id="drawer-msm32-sub-timeout"
+                        data-telegram-msm-drawer-item="true"
+                        type="button"
+                        onKeyDown={(e) => {
+                          if (e.key === 'ArrowUp') {
+                            e.preventDefault();
+                            const target = document.getElementById('drawer-msm32-sub-country');
+                            target?.focus();
+                            target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                          }
+                        }}
+                        onClick={() => {
+                          setShowTelegramMsmDrawer(false);
+                          setShowTelegramTimeoutDrawer(true);
+                        }}
+                        className="px-3 py-1.5 rounded-lg border text-xs font-bold transition-all tv-focus-target flex items-center gap-1.5 border-hbo-border bg-hbo-dark/80 hover:bg-hbo-hover text-white flex-shrink-0"
+                      >
+                        <span className="text-sky-400 font-mono">
+                          {`${settings.msm32Timeout || 90}s`}
                         </span>
                         <ChevronRight className="w-3.5 h-3.5 text-gray-400" />
                       </button>
