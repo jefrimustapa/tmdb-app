@@ -67,7 +67,7 @@ let client = new TelegramClient(new StringSession(session), apiId, apiHash, {
   connectionRetries: 10,
   retryDelay: 1000,
   autoReconnect: true,
-  timeout: 30,
+  timeout: 60,
   deviceModel: 'MSM Getter Server',
   appVersion: '1.0.0',
   systemVersion: 'Linux/ASUS',
@@ -109,6 +109,14 @@ function patchExportedSenderProtection(c) {
 
     try {
       const sender = await originalBorrow(dcId, shouldReconnect, existingSender);
+      // Permanently cancel GramJS's naive 30-second disconnect/reconnect timer.
+      // GramJS was designed for quick one-off requests and assumes that any pending request after 30s
+      // is a "hanging state", forcefully killing and reconnecting the TCP socket every 30 seconds.
+      // During active video streaming, this timer severed the stream every 30s causing playback stutter.
+      if (this._exportedSenderReleaseTimeouts?.get(dcId)) {
+        clearTimeout(this._exportedSenderReleaseTimeouts.get(dcId));
+        this._exportedSenderReleaseTimeouts.delete(dcId);
+      }
       stats.count = 0;
       return sender;
     } catch (err) {
@@ -3267,14 +3275,14 @@ async function refreshDocumentFileReference(client, targetDoc) {
 async function streamTelegramPipelined(client, targetDoc, startByte, endByte, res, req, customChunkSize, customConcurrency, passedStreamKey) {
   // Map requested chunkSize to MTProto block size and concurrency
   let CHUNK_SIZE = 512 * 1024; // 512KB: Native Telegram MTProto block limit
-  let CONCURRENCY = 4;         // Default: 4 concurrent chunks (2MB sliding window)
+  let CONCURRENCY = 3;         // Balanced: 1.5MB sliding window
 
   if (customChunkSize === 262144) {
     CHUNK_SIZE = 256 * 1024;
     CONCURRENCY = 2; // Eco mode: 512KB sliding window (low bandwidth / mobile)
   } else if (customChunkSize === 1048576) {
     CHUNK_SIZE = 512 * 1024;
-    CONCURRENCY = 6; // Turbo mode: 3MB sliding window (high-bitrate 1080p)
+    CONCURRENCY = 4; // High-throughput: 2MB sliding window (avoids saturating high-latency TCP link)
   } else if (customConcurrency && typeof customConcurrency === 'number') {
     CONCURRENCY = customConcurrency;
   }
