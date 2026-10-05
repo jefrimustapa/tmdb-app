@@ -12,6 +12,7 @@ import type { OriginCountryCode, StreamProvider } from '../../types/stream';
 import { getProviderById, extractMediaOriginCountries, isProviderMatchingMedia, getOrderedProviders } from '../../services/streamProviders';
 import { isAnimeMedia } from '../../services/animeMappingService';
 import { isAseanMedia, isKoreanMedia } from '../../services/lariMappingService';
+import { msm32Service } from '../../services/msm32MappingService';
 import { ArrowLeft, SkipForward, SkipBack, Cast, Tv, X, Settings, Maximize, Minimize } from 'lucide-react';
 import { useDevice } from '../../hooks/useDevice';
 
@@ -320,6 +321,7 @@ export const Watch: React.FC = () => {
 
   // Robust exit watch navigation that cannot be trapped by iframe history
   const handleExitWatch = React.useCallback(() => {
+    msm32Service.closeActiveStream();
     try {
       if (document.fullscreenElement || (document as any).webkitFullscreenElement) {
         if (document.exitFullscreen) {

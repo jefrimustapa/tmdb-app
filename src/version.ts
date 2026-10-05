@@ -2,23 +2,23 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20261005-0417';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.fix-buffering-timeou.20261005-0417';
+export const APP_BUILD_NUMBER = '20261005-0731';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.fix-msm-getter-stale.20261005-0731';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
-export const APP_BRANCH = 'fix-buffering-timeou';
-export const APP_CHANGELOG = `* fix(msm-getter): prevent GramJS infinite reconnect recursion and socket exhaustion (EMFILE) (#187)
+export const APP_BRANCH = 'fix-msm-getter-stale';
+export const APP_CHANGELOG = `* fix(player): eliminate countdown buffering reset loop and isolate close beacon to explicit back navigation
+* fix(stream): restore /api/stream/close and client exit beacon for instant session eviction
+* feat(player): increase buffering timeout countdown to 30s
+* fix(stream): prevent parallel range requests and idle sessions from aborting active playback
+* fix(player): re-trigger countdown timer on Retry Play click
+* fix(stream): cancel GramJS 30s sender release timer and tune concurrency for stable streaming
+* fix(stream): retain session in IDLE state on pause, add unmount beacon close
+* fix(stream): implement 5m idle grace period with auto-resume and status indicator
+* feat(player): separate resolver timeout (follows settings) and hardcoded 20s buffering timeout with retry/switch options (#188)
+* fix(msm-getter): prevent GramJS infinite reconnect recursion and socket exhaustion (EMFILE) (#187)
 * Merge pull request #186 from jefrimustapa/feat/msm-getter-search-improvement
 * feat(msm-getter): add bidirectional pagination navigation and configurable request timeout
 * Merge pull request #185 from jefrimustapa/feat/adaptive-bg-color-home-details
 * style(details): unify all metadata and original title badges with uniform bg-black/60 grey boxes
-* fix(details): remove duplicate country of origin row below storyline
-* feat(details): style all metadata items with translucent grey boxes
-* fix(ui): extend dark tint to 105vh to eliminate Continue Watching seam
-* fix(home): extract dominant color from poster in portrait and restore ambient visibility
-* fix(home): extract dominant color from poster in portrait and restore ambient visibility
-* fix(ui): implement smooth quintic hero gradient and seamless ambient transition
-* fix(ui): eliminate full-width horizontal smoke bar using targeted text vignette
-* feat(ui): implement smooth backdrop mask and lighter seamless ambient gradient
-* fix(ui): extend 100% solid black through Continue Watching to eliminate seam
-* fix(ui): eliminate hero banner cut-off seam with solid dark bottom fade`;
+* fix(details): remove duplicate country of origin row below storyline`;
