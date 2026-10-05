@@ -2505,7 +2505,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             {typeof resolverRequestCountdown === 'number' && resolverRequestCountdown > 0 && (
               <div className="my-2 inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-hbo-purple/20 border border-hbo-cyan/30 text-xs font-semibold text-hbo-cyan tracking-wide animate-pulse">
                 <span className="w-2 h-2 rounded-full bg-hbo-cyan animate-ping" />
-                <span>Request Timeout in <strong className="text-white font-mono text-sm ml-0.5">{resolverRequestCountdown}s</strong></span>
+                <span>Resolver Timeout in <strong className="text-white font-mono text-sm ml-0.5">{resolverRequestCountdown}s</strong></span>
                 {autoCycle && !isUserSelected && (
                   <span className="text-gray-400 font-normal border-l border-white/20 pl-2">Auto-cycle</span>
                 )}
@@ -2565,7 +2565,6 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           episodeTitle={episodeTitle}
           mediaType={mediaType}
           providerLabel={directStreamLabel || provider.name}
-          timeoutSeconds={directStreamLabel === 'Telegram (MSM32)' ? (msm32TimeoutRef.current || 90) : (streamResolverTimeoutRef.current || 30)}
           initialTimestamp={currentTimeRef.current || initialTimestamp}
           totalDurationSec={((episodeRuntimeMinutes || details?.runtime || 0) * 60)}
           isFullscreen={isFullscreen}

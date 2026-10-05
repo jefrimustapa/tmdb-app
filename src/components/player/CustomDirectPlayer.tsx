@@ -178,22 +178,22 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
     }
   }, [isPlaying, resetControlsTimer]);
 
+  const BUFFERING_TIMEOUT_SEC = 20;
   const [loadTimedOut, setLoadTimedOut] = useState(false);
-  const effectiveTimeoutSec = typeof timeoutSeconds === 'number' && timeoutSeconds > 0 ? timeoutSeconds : 90;
-  const [bufferingCountdown, setBufferingCountdown] = useState<number>(effectiveTimeoutSec);
+  const [bufferingCountdown, setBufferingCountdown] = useState<number>(BUFFERING_TIMEOUT_SEC);
 
-  // Dynamic buffering watchdog timeout with live countdown
+  // 20s hardcoded buffering watchdog timeout with live countdown
   useEffect(() => {
     if (!isInitialLoading) {
       setLoadTimedOut(false);
       return;
     }
-    setBufferingCountdown(effectiveTimeoutSec);
+    setBufferingCountdown(BUFFERING_TIMEOUT_SEC);
     const interval = setInterval(() => {
       setBufferingCountdown((prev) => {
         if (prev <= 1) {
           clearInterval(interval);
-          console.warn(`[CustomDirectPlayer] Load took > ${effectiveTimeoutSec}s, enabling manual controls`);
+          console.warn(`[CustomDirectPlayer] Load took > ${BUFFERING_TIMEOUT_SEC}s, enabling manual controls`);
           setLoadTimedOut(true);
           return 0;
         }
@@ -204,7 +204,7 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
     return () => {
       clearInterval(interval);
     };
-  }, [isInitialLoading, effectiveTimeoutSec]);
+  }, [isInitialLoading]);
 
   const attachedSrcRef = useRef<string | null>(null);
   const onErrorRef = useRef(onError);
@@ -1148,6 +1148,7 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
                     type="button"
                     onClick={() => {
                       setLoadTimedOut(false);
+                      setBufferingCountdown(BUFFERING_TIMEOUT_SEC);
                       if (videoRef.current) {
                         videoRef.current.load();
                         videoRef.current.play().catch(console.warn);
@@ -1174,7 +1175,7 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
                 {bufferingCountdown > 0 && (
                   <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-hbo-purple/20 border border-hbo-cyan/30 text-xs font-semibold text-hbo-cyan tracking-wide animate-pulse">
                     <span className="w-2 h-2 rounded-full bg-hbo-cyan animate-ping" />
-                    <span>Timeout in <strong className="text-white font-mono text-sm ml-0.5">{bufferingCountdown}s</strong></span>
+                    <span>Buffer Timeout in <strong className="text-white font-mono text-sm ml-0.5">{bufferingCountdown}s</strong></span>
                   </div>
                 )}
                 <p className="text-xs text-gray-300 font-medium tracking-wide animate-pulse">
