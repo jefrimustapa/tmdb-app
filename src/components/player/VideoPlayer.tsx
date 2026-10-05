@@ -164,7 +164,6 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const streamResolverTimeoutRef = useRef(30);
   const [msm32Timeout, setMsm32Timeout] = useState(90);
   const msm32TimeoutRef = useRef(90);
-  const tgCountdownIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [streamResolverRetries, setStreamResolverRetries] = useState(1);
   const streamResolverRetriesRef = useRef(1);
 
@@ -244,8 +243,38 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const autoCycleTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const watchdogActiveProviderRef = useRef<string | null>(null);
   const watchdogStartTimeRef = useRef<number>(0);
-  const [watchdogCountdown, setWatchdogCountdown] = useState<number | null>(null);
   const [resolverRequestCountdown, setResolverRequestCountdown] = useState<number | null>(null);
+
+  // Dedicated self-contained resolving countdown timer (decoupled from async resolution lifecycle)
+  useEffect(() => {
+    if (playerMode !== 'loading') {
+      setResolverRequestCountdown(null);
+      return;
+    }
+
+    const currentProvider = getProviderById(providerId);
+    const effectiveTimeoutSec = (providerId === 'telegram-msm32' || currentProvider.engine === 'telegram')
+      ? (msm32TimeoutRef.current || 90)
+      : (streamResolverTimeoutRef.current || 30);
+
+    setResolverRequestCountdown(effectiveTimeoutSec);
+
+    const interval = setInterval(() => {
+      setResolverRequestCountdown((prev) => {
+        if (prev === null || prev <= 1) {
+          clearInterval(interval);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => {
+      clearInterval(interval);
+    };
+  }, [playerMode, providerId]);
+
+  const [watchdogCountdown, setWatchdogCountdown] = useState<number | null>(null);
 
   const clearWatchdog = useCallback((reason?: string) => {
     if (autoCycleTimeoutRef.current) {
@@ -498,24 +527,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             return;
           }
         }
-        const tgTimeoutSec = msm32TimeoutRef.current || 90;
-        setResolverRequestCountdown(tgTimeoutSec);
-        if (tgCountdownIntervalRef.current) {
-          clearInterval(tgCountdownIntervalRef.current);
-        }
-        tgCountdownIntervalRef.current = setInterval(() => {
-          setResolverRequestCountdown((prev) => {
-            if (prev === null || prev <= 1) return null;
-            return prev - 1;
-          });
-        }, 1000);
-        const clearTgCountdown = () => {
-          if (tgCountdownIntervalRef.current) {
-            clearInterval(tgCountdownIntervalRef.current);
-            tgCountdownIntervalRef.current = null;
-          }
-          setResolverRequestCountdown(null);
-        };
+        const clearTgCountdown = () => {};
 
         try {
           console.log(`[Resolver] Telegram Provider (${provider.name})...`);
@@ -596,6 +608,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
               return;
             }
             console.log(`[Resolver] Telegram Provider (${provider.name}) searching for "${searchTitle}" (year: ${queryYear || 'none'}, s: ${querySeason}, e: ${queryEpisode}, forceFresh: ${isForceFresh})...`);
+            setResolvingStatus(`Searching @msm32bot for "${searchTitle}"...`);
             const res = await msm32Service.resolveStream(
               searchTitle,
               queryYear,
@@ -1017,11 +1030,6 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     return () => {
       isMounted = false;
       abortController.abort();
-      if (tgCountdownIntervalRef.current) {
-        clearInterval(tgCountdownIntervalRef.current);
-        tgCountdownIntervalRef.current = null;
-      }
-      setResolverRequestCountdown(null);
     };
   }, [enabledResolvers, tmdbId, title, mediaType, season, episode, activeAsean, providerId, releaseYear, originalTitle, topAnimeProviders, topAseanProviders, isUserSelected, isTelegramOriginMatching, resolveTrigger, cycleToNextProvider, autoCycle, allFailed]);
 
