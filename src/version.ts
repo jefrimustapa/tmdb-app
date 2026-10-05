@@ -2,12 +2,14 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20261005-0633';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.fix-msm-getter-stale.20261005-0633';
+export const APP_BUILD_NUMBER = '20261005-0713';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.fix-msm-getter-stale.20261005-0713';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
 export const APP_BRANCH = 'fix-msm-getter-stale';
-export const APP_CHANGELOG = `* fix(stream): cancel GramJS 30s sender release timer and tune concurrency for stable streaming
+export const APP_CHANGELOG = `* fix(stream): prevent parallel range requests and idle sessions from aborting active playback
+* fix(player): re-trigger countdown timer on Retry Play click
+* fix(stream): cancel GramJS 30s sender release timer and tune concurrency for stable streaming
 * fix(stream): retain session in IDLE state on pause, add unmount beacon close
 * fix(stream): implement 5m idle grace period with auto-resume and status indicator
 * feat(player): separate resolver timeout (follows settings) and hardcoded 20s buffering timeout with retry/switch options (#188)
@@ -19,6 +21,4 @@ export const APP_CHANGELOG = `* fix(stream): cancel GramJS 30s sender release ti
 * fix(details): remove duplicate country of origin row below storyline
 * feat(details): style all metadata items with translucent grey boxes
 * fix(ui): extend dark tint to 105vh to eliminate Continue Watching seam
-* fix(home): extract dominant color from poster in portrait and restore ambient visibility
-* fix(home): extract dominant color from poster in portrait and restore ambient visibility
-* fix(ui): implement smooth quintic hero gradient and seamless ambient transition`;
+* fix(home): extract dominant color from poster in portrait and restore ambient visibility`;

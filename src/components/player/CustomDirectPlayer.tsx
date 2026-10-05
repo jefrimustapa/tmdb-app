@@ -178,12 +178,12 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
     }
   }, [isPlaying, resetControlsTimer]);
 
-  const BUFFERING_TIMEOUT_SEC = 20;
+  const BUFFERING_TIMEOUT_SEC = 30;
   const [loadTimedOut, setLoadTimedOut] = useState(false);
   const [bufferingCountdown, setBufferingCountdown] = useState<number>(BUFFERING_TIMEOUT_SEC);
   const [retryBufferTrigger, setRetryBufferTrigger] = useState(0);
 
-  // 20s hardcoded buffering watchdog timeout with live countdown
+  // 30s hardcoded buffering watchdog timeout with live countdown
   useEffect(() => {
     if (!isInitialLoading) {
       setLoadTimedOut(false);
