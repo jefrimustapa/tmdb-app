@@ -423,7 +423,8 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
     const clamped = Math.max(0, maxDur > 0 ? Math.min(maxDur - 0.5, targetTime) : targetTime);
     const seekSeconds = Math.floor(clamped);
 
-    if (isTranscoded) {
+    const isTranscodeActive = isTranscoded || Boolean(video.currentSrc && video.currentSrc.includes('transcode='));
+    if (isTranscodeActive) {
       if (seekWatchdogTimerRef.current) {
         clearTimeout(seekWatchdogTimerRef.current);
         seekWatchdogTimerRef.current = null;
@@ -431,7 +432,7 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
 
       const wasPlaying = isPlayingRef.current || !video.paused;
       baseOffsetRef.current = seekSeconds;
-      const rawSrc = activeSrcRef.current || src;
+      const rawSrc = activeSrcRef.current || video.currentSrc || src;
       const urlObj = new URL(rawSrc, window.location.href);
       urlObj.searchParams.set('ss', seekSeconds.toString());
       const newSrc = urlObj.toString();
@@ -607,7 +608,8 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
     const video = videoRef.current;
     if (!video) return;
 
-    const effectiveCurrent = isTranscoded ? (baseOffsetRef.current + video.currentTime) : video.currentTime;
+    const isTranscodeActive = isTranscoded || Boolean(video.currentSrc && video.currentSrc.includes('transcode='));
+    const effectiveCurrent = isTranscodeActive ? (baseOffsetRef.current + video.currentTime) : video.currentTime;
     const currentBase = targetSeekTimeRef.current !== null ? targetSeekTimeRef.current : effectiveCurrent;
     const maxDur = duration || (totalDurationSec || 0) || video.duration || 0;
     const newTime = Math.max(0, maxDur > 0 ? Math.min(maxDur, currentBase + seconds) : currentBase + seconds);
@@ -1089,7 +1091,8 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
         onPause={(e) => {
           setIsPlaying(false);
           const el = e.currentTarget;
-          const effectiveCurrent = isTranscoded ? (baseOffsetRef.current + el.currentTime) : el.currentTime;
+          const isTranscodeActive = isTranscoded || Boolean(el.currentSrc && el.currentSrc.includes('transcode='));
+          const effectiveCurrent = isTranscodeActive ? (baseOffsetRef.current + el.currentTime) : el.currentTime;
           const effectiveDuration = (totalDurationSec && totalDurationSec > 0) ? totalDurationSec : (duration > 0 ? duration : el.duration);
           onProgress?.(effectiveCurrent, effectiveDuration, true);
         }}
@@ -1104,7 +1107,8 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
           if (!hasSeekedInitialRef.current && initialTimestamp > 5 && el.currentTime < 2 && el.readyState >= 2) {
             attemptInitialSeek(el);
           }
-          const effectiveCurrent = isTranscoded ? (baseOffsetRef.current + el.currentTime) : el.currentTime;
+          const isTranscodeActive = isTranscoded || Boolean(el.currentSrc && el.currentSrc.includes('transcode='));
+          const effectiveCurrent = isTranscodeActive ? (baseOffsetRef.current + el.currentTime) : el.currentTime;
           const effectiveDuration = (totalDurationSec && totalDurationSec > 0) ? totalDurationSec : (duration > 0 ? duration : el.duration);
           
           // CRITICAL: Block background playback time updates while actively holding seek or dragging scrubber
@@ -1115,7 +1119,7 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
           // Compute buffered percentage
           if (el.buffered.length > 0 && effectiveDuration > 0) {
             const bufferedEnd = el.buffered.end(el.buffered.length - 1);
-            const totalBuffered = isTranscoded ? (baseOffsetRef.current + bufferedEnd) : bufferedEnd;
+            const totalBuffered = isTranscodeActive ? (baseOffsetRef.current + bufferedEnd) : bufferedEnd;
             setBufferedPercent(Math.min(100, (totalBuffered / effectiveDuration) * 100));
           }
           onProgress?.(effectiveCurrent, effectiveDuration, el.paused);

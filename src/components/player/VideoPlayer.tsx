@@ -667,14 +667,17 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             const isAviOrLegacy = msmRes.filename
               ? /(\.avi$|avi\b|xvid|divx)/i.test(msmRes.filename)
               : false;
+            const isHevc = msmRes.videoCodec === 'hevc' || msmRes.videoCodec === 'h265' || (msmRes.filename && /(x265|hevc|h265)/i.test(msmRes.filename));
             const isSurroundOrDolbyAudio = msmRes.filename
               ? /(\.mkv$|mkv\b|ddp|dd\+|ac3|ac-3|eac3|e-ac-3|atmos|dts|truehd|thd|5[._-]1|7[._-]1|[345678]ch|surround)/i.test(msmRes.filename)
               : false;
             let finalUrl = msmRes.streamUrl;
-            if (isAviOrLegacy) {
+            if (isAviOrLegacy || isHevc) {
               const sep = finalUrl.includes('?') ? '&' : '?';
-              finalUrl = `${finalUrl}${sep}transcode=audio&vcodec=h264`;
-              console.log('[Resolver] 🎬 Detected AVI/XviD legacy video in Telegram stream. Enabling H.264 video + AAC transcode pipe:', finalUrl);
+              if (!finalUrl.includes('transcode=')) {
+                finalUrl = `${finalUrl}${sep}transcode=audio&vcodec=h264`;
+              }
+              console.log('[Resolver] 🎬 Detected AVI/HEVC video in Telegram stream. Enabling H.264 video + AAC transcode pipe:', finalUrl);
             } else if (isSurroundOrDolbyAudio) {
               const sep = finalUrl.includes('?') ? '&' : '?';
               finalUrl = `${finalUrl}${sep}transcode=audio`;

@@ -2313,13 +2313,16 @@ app.get('/api/resolve', async (req, res) => {
     req.off('close', onClientClose);
     const host = req.get('host');
     const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'https';
+    const isAvi = /\.avi$/i.test(cached.filename || '');
+    const isHevc = cached.videoCodec === 'hevc' || cached.videoCodec === 'h265' || /\b(x265|hevc|h265)\b/i.test(cached.filename || '');
+    const transcodeQuery = (isAvi || isHevc) ? '?transcode=audio&vcodec=h264' : '';
     return res.json({
       success: true,
       cached: true,
-      streamUrl: `${protocol}://${host}/stream/${cached.docId}`,
+      streamUrl: `${protocol}://${host}/stream/${cached.docId}${transcodeQuery}`,
       filename: cached.filename,
       size: cached.size,
-      videoCodec: cached.videoCodec || undefined,
+      videoCodec: cached.videoCodec || (isHevc ? 'hevc' : undefined),
     });
   }
 
@@ -3109,14 +3112,17 @@ app.get('/api/resolve', async (req, res) => {
 
     const host = req.get('host');
     const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'https';
+    const isAvi = /\.avi$/i.test(result.filename || '');
+    const isHevc = result.videoCodec === 'hevc' || result.videoCodec === 'h265' || /\b(x265|hevc|h265)\b/i.test(result.filename || '');
+    const transcodeQuery = (isAvi || isHevc) ? '?transcode=audio&vcodec=h264' : '';
 
     return res.json({
       success: true,
       cached: false,
-      streamUrl: `${protocol}://${host}/stream/${result.docId}`,
+      streamUrl: `${protocol}://${host}/stream/${result.docId}${transcodeQuery}`,
       filename: result.filename,
       size: result.size,
-      videoCodec: result.videoCodec || undefined,
+      videoCodec: result.videoCodec || (isHevc ? 'hevc' : undefined),
     });
   } catch (err) {
     inFlightResolutions.delete(cacheKey);
