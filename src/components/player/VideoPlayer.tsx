@@ -667,7 +667,8 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             const isAviOrLegacy = msmRes.filename
               ? /(\.avi$|avi\b|xvid|divx)/i.test(msmRes.filename)
               : false;
-            const isHevc = msmRes.videoCodec === 'hevc' || msmRes.videoCodec === 'h265' || (msmRes.filename && /(x265|hevc|h265)/i.test(msmRes.filename));
+            const isDesktopWeb = typeof window !== 'undefined' && !/Mobile|Android|iPhone|iPad|iPod|SmartTV|Tizen|Web0S/i.test(navigator.userAgent);
+            const isHevc = isDesktopWeb && (msmRes.videoCodec === 'hevc' || msmRes.videoCodec === 'h265' || (msmRes.filename && /(x265|hevc|h265)/i.test(msmRes.filename)));
             const isSurroundOrDolbyAudio = msmRes.filename
               ? /(\.mkv$|mkv\b|ddp|dd\+|ac3|ac-3|eac3|e-ac-3|atmos|dts|truehd|thd|5[._-]1|7[._-]1|[345678]ch|surround)/i.test(msmRes.filename)
               : false;

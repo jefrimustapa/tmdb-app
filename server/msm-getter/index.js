@@ -1421,6 +1421,14 @@ function resolveClientIdentity(rawIp, req) {
   return { ip, name };
 }
 
+function isDesktopWebClient(req) {
+  const ua = req?.headers?.['user-agent'] || '';
+  if (!ua) return false;
+  const isMobileOrTv = /Mobile|Android|iPhone|iPad|iPod|SmartTV|Tizen|Web0S|GoogleTV|AppleTV|Roku|ExoPlayer|Dalvik|okhttp/i.test(ua);
+  const isDesktopOs = /Windows NT|Macintosh|X11; Linux x86_64|CrOS/i.test(ua);
+  return isDesktopOs && !isMobileOrTv;
+}
+
 // CPU Usage Tracker (Router System CPU from /proc/stat, and msm-getter Process CPU from process.cpuUsage)
 let lastSystemCpu = null;
 let lastProcCpu = process.cpuUsage();
@@ -2313,9 +2321,11 @@ app.get('/api/resolve', async (req, res) => {
     req.off('close', onClientClose);
     const host = req.get('host');
     const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'https';
+    const isDesktopWeb = isDesktopWebClient(req);
     const isAvi = /\.avi$/i.test(cached.filename || '');
     const isHevc = cached.videoCodec === 'hevc' || cached.videoCodec === 'h265' || /\b(x265|hevc|h265)\b/i.test(cached.filename || '');
-    const transcodeQuery = (isAvi || isHevc) ? '?transcode=audio&vcodec=h264' : '';
+    // Only transcode for desktop web. Non-desktop web devices (S25, Smart TV) receive direct stream
+    const transcodeQuery = (isDesktopWeb && (isAvi || isHevc)) ? '?transcode=audio&vcodec=h264' : '';
     return res.json({
       success: true,
       cached: true,
@@ -2335,13 +2345,17 @@ app.get('/api/resolve', async (req, res) => {
       if (isAborted || res.writableEnded) return;
       const host = req.get('host');
       const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'https';
+      const isDesktopWeb = isDesktopWebClient(req);
+      const isAvi = /\.avi$/i.test(result.filename || '');
+      const isHevc = result.videoCodec === 'hevc' || result.videoCodec === 'h265' || /\b(x265|hevc|h265)\b/i.test(result.filename || '');
+      const transcodeQuery = (isDesktopWeb && (isAvi || isHevc)) ? '?transcode=audio&vcodec=h264' : '';
       return res.json({
         success: true,
         cached: true,
-        streamUrl: `${protocol}://${host}/stream/${result.docId}`,
+        streamUrl: `${protocol}://${host}/stream/${result.docId}${transcodeQuery}`,
         filename: result.filename,
         size: result.size,
-        videoCodec: result.videoCodec || undefined,
+        videoCodec: result.videoCodec || (isHevc ? 'hevc' : undefined),
       });
     } catch (err) {
       req.off('close', onClientClose);
@@ -3112,9 +3126,10 @@ app.get('/api/resolve', async (req, res) => {
 
     const host = req.get('host');
     const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'https';
+    const isDesktopWeb = isDesktopWebClient(req);
     const isAvi = /\.avi$/i.test(result.filename || '');
     const isHevc = result.videoCodec === 'hevc' || result.videoCodec === 'h265' || /\b(x265|hevc|h265)\b/i.test(result.filename || '');
-    const transcodeQuery = (isAvi || isHevc) ? '?transcode=audio&vcodec=h264' : '';
+    const transcodeQuery = (isDesktopWeb && (isAvi || isHevc)) ? '?transcode=audio&vcodec=h264' : '';
 
     return res.json({
       success: true,
@@ -3961,17 +3976,20 @@ app.get('/stream/:docId', async (req, res) => {
       }
     }
 
-    if ((isAvi || isHevc) && !isInternalTranscoder && !req.query.transcode) {
+    const isDesktopWeb = isDesktopWebClient(req);
+
+    // Only redirect to transcode pipe for desktop web browsers. Non-desktop devices (S25, Smart TV) stream direct.
+    if ((isAvi || isHevc) && !isInternalTranscoder && !req.query.transcode && isDesktopWeb) {
       const sep = req.url.includes('?') ? '&' : '?';
-      console.log(`[VIDEO TRANSCODE REDIRECT] Redirecting untagged ${isAvi ? 'AVI' : 'HEVC'} request to transcode pipe for [${clientIdentity.name} (${clientIdentity.ip})] doc ${docId}`);
+      console.log(`[VIDEO TRANSCODE REDIRECT] Redirecting untagged ${isAvi ? 'AVI' : 'HEVC'} request to 3-core transcode pipe for desktop web [${clientIdentity.name} (${clientIdentity.ip})] doc ${docId}`);
       return res.redirect(307, `${req.url}${sep}transcode=audio&vcodec=h264`);
     }
 
-    const shouldTranscode = req.query.transcode === 'audio' || req.query.transcode === 'video' || (isAvi && !isInternalTranscoder) || (isHevc && !isInternalTranscoder);
+    const shouldTranscode = (req.query.transcode === 'audio' || req.query.transcode === 'video' || (isAvi && !isInternalTranscoder) || (isHevc && !isInternalTranscoder)) && (isDesktopWeb || req.query.transcode === 'audio' || req.query.transcode === 'video');
 
     if (shouldTranscode) {
       const seekSec = Math.max(0, parseFloat(req.query.ss) || 0);
-      console.log(`[TRANSCODE ${isAvi ? 'AVI->H264' : (isHevc ? 'HEVC->H264' : 'AUDIO')}] Starting transcode for [${clientIdentity.name} (${clientIdentity.ip})] doc ${docId} (${filename}) at ${seekSec}s...`);
+      console.log(`[TRANSCODE ${isAvi ? 'AVI->H264' : (isHevc ? 'HEVC->H264 (3-core)' : 'AUDIO')}] Starting transcode for [${clientIdentity.name} (${clientIdentity.ip})] doc ${docId} (${filename}) at ${seekSec}s...`);
 
       let mediaDetails = { audioMapSpecifier: '0:a:0', videoCodec: '', isHevc: false, isLegacyVideo: false };
       try {
@@ -4005,10 +4023,10 @@ app.get('/stream/:docId', async (req, res) => {
       }
 
       // Video encoding strategy:
-      // For AVI / legacy video: use single-thread baseline libx264 (pinned to 1 core, 57 fps, ~11% avg router CPU).
-      // For HEVC: use dual-thread baseline libx264 (2 cores, 28 fps real-time, ~18% avg router CPU).
+      // For AVI / legacy video: use single-thread baseline libx264 (pinned to 1 core, 57 fps).
+      // For HEVC: use 3-core baseline libx264 (pinned to 3 cores for maximum encoding throughput).
       // For standard H.264 MKV/MP4: stream-copy 1:1 (-c:v copy, 0% CPU).
-      const videoThreadCount = (mediaDetails.isHevc || isHevc) ? '2' : '1';
+      const videoThreadCount = (mediaDetails.isHevc || isHevc) ? '3' : '1';
       const videoArgs = isAviOrLegacyVideo
         ? [
             '-threads', videoThreadCount,
@@ -4030,8 +4048,10 @@ app.get('/stream/:docId', async (req, res) => {
 
       const ffmpegBin = process.env.FFMPEG_PATH || (fs.existsSync('/opt/bin/ffmpeg') ? '/opt/bin/ffmpeg' : 'ffmpeg');
       const inputSeekFlags = seekSec > 0 ? ['-ss', seekSec.toString(), '-seekable', '1'] : ['-seekable', '1'];
+      const inputDecoderThreads = (mediaDetails.isHevc || isHevc) ? ['-threads', '3'] : [];
       const ffmpegArgs = [
         '-loglevel', 'error',
+        ...inputDecoderThreads,
         ...inputSeekFlags,
         '-headers', `x-internal-transcoder: 1\r\nx-parent-session: ${streamSessionKey}\r\n`,
         '-reconnect', '1',
