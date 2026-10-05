@@ -75,6 +75,52 @@ let client = new TelegramClient(new StringSession(session), apiId, apiHash, {
 });
 try { client.setLogLevel('error'); } catch {}
 
+function patchExportedSenderProtection(c) {
+  if (!c || typeof c._borrowExportedSender !== 'function') return;
+  const originalBorrow = c._borrowExportedSender.bind(c);
+  const reconnectStats = new Map(); // dcId -> { count: number, lastAttempt: number }
+
+  c._borrowExportedSender = async function(dcId, shouldReconnect, existingSender) {
+    const now = Date.now();
+    let stats = reconnectStats.get(dcId);
+    if (!stats || now - stats.lastAttempt > 15000) {
+      stats = { count: 0, lastAttempt: now };
+      reconnectStats.set(dcId, stats);
+    }
+    stats.lastAttempt = now;
+
+    if (shouldReconnect) {
+      stats.count++;
+      if (stats.count > 5) {
+        console.error(`[TG DC GUARD] Max consecutive reconnect attempts (5) reached for DC ${dcId}. Halting socket storm.`);
+        if (existingSender) {
+          try { await existingSender.disconnect().catch(() => {}); } catch {}
+        }
+        this._exportedSenderPromises?.delete(dcId);
+        stats.count = 0;
+        throw new Error(`[TG DC GUARD] Unable to connect to DC ${dcId} after 5 retries. Aborting.`);
+      }
+      // Progressive backoff delay (300ms, 600ms, 1200ms, 2400ms, 3000ms)
+      const delay = Math.min(stats.count * 600, 3000);
+      await new Promise(r => setTimeout(r, delay));
+    } else {
+      stats.count = 0;
+    }
+
+    try {
+      const sender = await originalBorrow(dcId, shouldReconnect, existingSender);
+      stats.count = 0;
+      return sender;
+    } catch (err) {
+      if (existingSender) {
+        try { await existingSender.disconnect().catch(() => {}); } catch {}
+      }
+      this._exportedSenderPromises?.delete(dcId);
+      throw err;
+    }
+  };
+}
+
 function attachClientErrorHandler(c) {
   if (!c) return;
   c.onError = (err) => {
@@ -91,6 +137,7 @@ function attachClientErrorHandler(c) {
     }
     console.error('[TG CLIENT ERROR]', err);
   };
+  patchExportedSenderProtection(c);
 }
 attachClientErrorHandler(client);
 
@@ -1408,7 +1455,10 @@ function getCpuMetrics() {
 
 // System Stats Endpoint (Uptime, Memory RSS, Active Streams, Active Clients, Log Size)
 app.get('/api/system/stats', (req, res) => {
-  const mem = process.memoryUsage();
+  let mem = { rss: 0, heapUsed: 0, heapTotal: 0, external: 0 };
+  try {
+    mem = process.memoryUsage();
+  } catch {}
   let logSizeKB = 0;
   try {
     const logPath = getLogFilePath();
@@ -3300,6 +3350,30 @@ async function streamTelegramPipelined(client, targetDoc, startByte, endByte, re
   try {
     let dcId = targetDoc.dcId || 4;
     let sender = null; // Lazily acquired on first network fetch; cached blocks return in 0ms!
+    let senderAcquisitionPromise = null;
+
+    async function getOrAcquireSender(targetDc, forceReconnect = false) {
+      if (aborted) return null;
+      if (!forceReconnect && sender && sender.isConnected() && sender.dcId === targetDc) {
+        return sender;
+      }
+      if (!senderAcquisitionPromise) {
+        senderAcquisitionPromise = (async () => {
+          try {
+            if (forceReconnect && sender) {
+              try { await sender.disconnect().catch(() => {}); } catch {}
+              sender = null;
+            }
+            const s = await client.getSender(targetDc);
+            sender = s;
+            return s;
+          } finally {
+            senderAcquisitionPromise = null;
+          }
+        })();
+      }
+      return await senderAcquisitionPromise;
+    }
 
   const fileRef = Buffer.isBuffer(targetDoc.fileReference)
     ? targetDoc.fileReference
@@ -3339,10 +3413,8 @@ async function streamTelegramPipelined(client, targetDoc, startByte, endByte, re
 
     try {
       if (aborted) return null;
-      if (!sender) {
-        sender = await client.getSender(dcId);
-      }
-      if (aborted) return null;
+      sender = await getOrAcquireSender(dcId);
+      if (aborted || !sender) return null;
       const result = await client.invokeWithSender(request, sender);
       if (aborted) return null;
       const bytes = result.bytes;
@@ -3351,7 +3423,6 @@ async function streamTelegramPipelined(client, targetDoc, startByte, endByte, re
       }
       return bytes;
     } catch (err) {
-      sender = null;
       if (aborted) return null;
       const msg = `${err.errorMessage || ''} ${err.message || ''}`;
       const dcMatch = msg.match(/(?:FILE_MIGRATE_|stored in DC\s*)(\d+)/i);
@@ -3361,8 +3432,8 @@ async function streamTelegramPipelined(client, targetDoc, startByte, endByte, re
         dcId = newDc;
         targetDoc.dcId = newDc;
         if (aborted) return null;
-        sender = await client.getSender(newDc);
-        if (aborted) return null;
+        sender = await getOrAcquireSender(newDc, true);
+        if (aborted || !sender) return null;
         const result = await client.invokeWithSender(request, sender);
         if (aborted) return null;
         const bytes = result.bytes;
@@ -3377,23 +3448,14 @@ async function streamTelegramPipelined(client, targetDoc, startByte, endByte, re
       // which occurs when the router NAT table silently kills idle DC TCP connections after ~30s.
       if (msg.includes('CONNECTION_NOT_INITED') || msg.includes('disconnected') || msg.includes('Not connected')) {
         console.warn(`[STREAM RECONNECT] Sender connection on DC ${dcId} invalid (${err.errorMessage || err.message}). Re-initializing...`);
-        try {
-          if (sender) {
-            await sender.disconnect().catch(() => {});
-          }
-        } catch {}
-        if (client._exportedSenderPromises?.has(dcId)) {
-          client._exportedSenderPromises.delete(dcId);
-        }
-        sender = null;
         if (aborted) return null;
 
-        let retryDelay = 250;
+        let retryDelay = 500;
         for (let reconnAttempt = 0; reconnAttempt < 3; reconnAttempt++) {
           if (aborted) return null;
           try {
-            sender = await client.getSender(dcId);
-            if (aborted) return null;
+            sender = await getOrAcquireSender(dcId, true);
+            if (aborted || !sender) return null;
             const result = await client.invokeWithSender(request, sender);
             if (aborted) return null;
             const bytes = result.bytes;
@@ -3402,10 +3464,6 @@ async function streamTelegramPipelined(client, targetDoc, startByte, endByte, re
             }
             return bytes;
           } catch (e2) {
-            sender = null;
-            if (client._exportedSenderPromises?.has(dcId)) {
-              client._exportedSenderPromises.delete(dcId);
-            }
             const e2msg = `${e2.errorMessage || ''} ${e2.message || ''}`;
             console.warn(`[STREAM RECONNECT] Re-init attempt ${reconnAttempt + 1}/3 failed (${e2.message}). Retrying in ${retryDelay}ms...`);
             if (reconnAttempt < 2) {
@@ -3426,8 +3484,8 @@ async function streamTelegramPipelined(client, targetDoc, startByte, endByte, re
           request.location.fileReference = freshRef;
           console.log(`[STREAM RECOVERY] Successfully swapped fresh fileReference. Retrying block ${blockIdx}...`);
           if (aborted) return null;
-          sender = await client.getSender(dcId);
-          if (aborted) return null;
+          sender = await getOrAcquireSender(dcId);
+          if (aborted || !sender) return null;
           const result = await client.invokeWithSender(request, sender);
           if (aborted) return null;
           const bytes = result.bytes;
@@ -4088,6 +4146,11 @@ process.on('uncaughtException', (err) => {
     code === 'ENETUNREACH' ||
     code === 'EHOSTUNREACH' ||
     code === 'ECONNREFUSED' ||
+    code === 'EMFILE' ||
+    code === 'ENFILE' ||
+    msg.includes('EMFILE') ||
+    msg.includes('ENFILE') ||
+    msg.includes('too many open files') ||
     msg.includes('socket hang up') ||
     msg.includes('Connection closed') ||
     msg.includes('Not connected') ||
@@ -4105,7 +4168,11 @@ process.on('unhandledRejection', (reason) => {
     msg.includes('Connection closed') ||
     msg.includes('socket hang up') ||
     msg.includes('ECONNRESET') ||
-    msg.includes('ETIMEDOUT')
+    msg.includes('ETIMEDOUT') ||
+    msg.includes('EMFILE') ||
+    msg.includes('ENFILE') ||
+    msg.includes('too many open files') ||
+    msg.includes('hanging states')
   ) {
     return;
   }
