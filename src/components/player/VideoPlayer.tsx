@@ -2557,6 +2557,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           episodeTitle={episodeTitle}
           mediaType={mediaType}
           providerLabel={directStreamLabel || provider.name}
+          timeoutSeconds={directStreamLabel === 'Telegram (MSM32)' ? (msm32TimeoutRef.current || 90) : (streamResolverTimeoutRef.current || 30)}
           initialTimestamp={currentTimeRef.current || initialTimestamp}
           totalDurationSec={((episodeRuntimeMinutes || details?.runtime || 0) * 60)}
           isFullscreen={isFullscreen}
