@@ -1474,7 +1474,7 @@ app.get('/api/system/stats', (req, res) => {
   const now = Date.now();
   for (const [key, stream] of activeStreams.entries()) {
     const idleMs = now - (stream.lastActive || stream.createdAt || now);
-    const isStreaming = idleMs < 20000; // Received/sent data chunks within 20s
+    const isStreaming = stream.isSocketOpen !== false && idleMs < 15000;
     activeClients.push({
       sessionKey: key,
       ip: stream.ip || 'unknown',
@@ -3323,6 +3323,7 @@ async function streamTelegramPipelined(client, targetDoc, startByte, endByte, re
       mode: 'Direct Native',
       createdAt: activeStreams.get(streamKey)?.createdAt || Date.now(),
       lastActive: Date.now(),
+      isSocketOpen: true,
       internalWorkers: new Map(),
       abort: abortPipeline,
     });
@@ -3345,11 +3346,11 @@ async function streamTelegramPipelined(client, targetDoc, startByte, endByte, re
     if (parentSession) {
       parentSession.internalWorkers.delete(workerId);
     } else if (!isInternal) {
-      if (activeStreams.get(streamKey)?.abort === abortPipeline) {
-        activeStreams.delete(streamKey);
-        if (activeStreams.size === 0) {
-          scheduleIdleMemoryPurge();
-        }
+      const entry = activeStreams.get(streamKey);
+      if (entry && entry.abort === abortPipeline) {
+        entry.isSocketOpen = false;
+        // Keep session in activeStreams marked as IDLE so dashboard displays Idle / Paused status
+        // during the 5-minute grace period. The 5-minute idle watchdog or /api/stream/close will evict it.
       }
     } else {
       internalWorkers.delete(streamKey);
@@ -3789,6 +3790,30 @@ async function resolveBestAudioTrack(docId, parentSessionKey) {
   }
 }
 
+// Endpoint to immediately evict a stream on explicit client exit (e.g. Back button to Detail page)
+app.all('/api/stream/close', (req, res) => {
+  const docId = req.query.docId || req.body?.docId;
+  const clientIdentity = resolveClientIdentity(req.headers['x-forwarded-for'] || req.ip || req.socket?.remoteAddress, req);
+  let closedCount = 0;
+
+  for (const [key, stream] of activeStreams.entries()) {
+    const matchDoc = !docId || String(stream.docId) === String(docId);
+    const matchIp = stream.ip === clientIdentity.ip || key.startsWith(`${clientIdentity.ip}:`);
+    if (matchDoc && matchIp) {
+      console.log(`[API STREAM CLOSE] Explicit close for [${clientIdentity.name} (${clientIdentity.ip})] key: ${key}`);
+      try { stream.abort(); } catch {}
+      activeStreams.delete(key);
+      closedCount++;
+    }
+  }
+
+  if (activeStreams.size === 0) {
+    scheduleIdleMemoryPurge();
+  }
+
+  res.json({ success: true, closed: closedCount });
+});
+
 // Stream endpoint with HTTP 206 Partial Content Range support
 app.get('/stream/:docId', async (req, res) => {
   try {
@@ -3986,6 +4011,7 @@ app.get('/stream/:docId', async (req, res) => {
         mode: '1080p Transcode (Stereo AAC)',
         createdAt: activeStreams.get(streamSessionKey)?.createdAt || Date.now(),
         lastActive: Date.now(),
+        isSocketOpen: true,
         internalWorkers: new Map(),
         abort: () => {
           console.log(`[TRANSCODE ABORT] Killing ffmpeg process and workers for doc ${docId}`);
@@ -4002,13 +4028,10 @@ app.get('/stream/:docId', async (req, res) => {
       const cleanupFfmpeg = () => {
         req.off('close', cleanupFfmpeg);
         res.off('finish', cleanupFfmpeg);
-        if (activeStreams.get(streamSessionKey) === transcodeEntry) {
-          activeStreams.delete(streamSessionKey);
-          if (activeStreams.size === 0) {
-            scheduleIdleMemoryPurge();
-          }
-        }
         transcodeEntry.abort();
+        if (activeStreams.get(streamSessionKey) === transcodeEntry) {
+          transcodeEntry.isSocketOpen = false;
+        }
       };
 
       req.on('close', cleanupFfmpeg);
