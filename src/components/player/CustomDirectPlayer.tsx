@@ -32,6 +32,7 @@ interface CustomDirectPlayerProps {
   onError?: (err: any) => void;
   isFullscreen: boolean;
   onToggleFullscreen: () => void;
+  timeoutSeconds?: number;
 }
 
 const formatTime = (seconds: number): string => {
@@ -63,6 +64,7 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
   onError,
   isFullscreen,
   onToggleFullscreen,
+  timeoutSeconds = 90,
 }) => {
   const { isTV } = useDevice();
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -177,24 +179,32 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
   }, [isPlaying, resetControlsTimer]);
 
   const [loadTimedOut, setLoadTimedOut] = useState(false);
+  const effectiveTimeoutSec = typeof timeoutSeconds === 'number' && timeoutSeconds > 0 ? timeoutSeconds : 90;
+  const [bufferingCountdown, setBufferingCountdown] = useState<number>(effectiveTimeoutSec);
 
-  // 15s watchdog timeout
+  // Dynamic buffering watchdog timeout with live countdown
   useEffect(() => {
     if (!isInitialLoading) {
       setLoadTimedOut(false);
       return;
     }
-    const timeout = setTimeout(() => {
-      if (isInitialLoading) {
-        console.warn('[CustomDirectPlayer] Load took > 15s, enabling manual controls');
-        setLoadTimedOut(true);
-      }
-    }, 15000);
+    setBufferingCountdown(effectiveTimeoutSec);
+    const interval = setInterval(() => {
+      setBufferingCountdown((prev) => {
+        if (prev <= 1) {
+          clearInterval(interval);
+          console.warn(`[CustomDirectPlayer] Load took > ${effectiveTimeoutSec}s, enabling manual controls`);
+          setLoadTimedOut(true);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
 
     return () => {
-      clearTimeout(timeout);
+      clearInterval(interval);
     };
-  }, [isInitialLoading]);
+  }, [isInitialLoading, effectiveTimeoutSec]);
 
   const attachedSrcRef = useRef<string | null>(null);
   const onErrorRef = useRef(onError);
@@ -1160,9 +1170,17 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
                 </div>
               </div>
             ) : (
-              <p className="text-xs text-gray-300 font-medium tracking-wide animate-pulse">
-                {loadingStatus}
-              </p>
+              <div className="flex flex-col items-center gap-2">
+                {bufferingCountdown > 0 && (
+                  <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-hbo-purple/20 border border-hbo-cyan/30 text-xs font-semibold text-hbo-cyan tracking-wide animate-pulse">
+                    <span className="w-2 h-2 rounded-full bg-hbo-cyan animate-ping" />
+                    <span>Timeout in <strong className="text-white font-mono text-sm ml-0.5">{bufferingCountdown}s</strong></span>
+                  </div>
+                )}
+                <p className="text-xs text-gray-300 font-medium tracking-wide animate-pulse">
+                  {loadingStatus}
+                </p>
+              </div>
             )}
           </div>
         </div>
