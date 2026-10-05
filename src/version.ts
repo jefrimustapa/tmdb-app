@@ -2,12 +2,14 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20261005-0326';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.fix-msm-getter-crash.20261005-0326';
+export const APP_BUILD_NUMBER = '20261005-0349';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.fix-msm-getter-crash.20261005-0349';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
 export const APP_BRANCH = 'fix-msm-getter-crash';
-export const APP_CHANGELOG = `* fix(msm-getter): prevent GramJS infinite reconnect recursion and socket exhaustion (EMFILE)
+export const APP_CHANGELOG = `* feat(player): display live buffering timeout countdown badge on direct player screen
+* feat(player): show dedicated resolver request timeout countdown for msm32 bot
+* fix(msm-getter): prevent GramJS infinite reconnect recursion and socket exhaustion (EMFILE)
 * Merge pull request #186 from jefrimustapa/feat/msm-getter-search-improvement
 * feat(msm-getter): add bidirectional pagination navigation and configurable request timeout
 * Merge pull request #185 from jefrimustapa/feat/adaptive-bg-color-home-details
@@ -19,6 +21,4 @@ export const APP_CHANGELOG = `* fix(msm-getter): prevent GramJS infinite reconne
 * fix(home): extract dominant color from poster in portrait and restore ambient visibility
 * fix(ui): implement smooth quintic hero gradient and seamless ambient transition
 * fix(ui): eliminate full-width horizontal smoke bar using targeted text vignette
-* feat(ui): implement smooth backdrop mask and lighter seamless ambient gradient
-* fix(ui): extend 100% solid black through Continue Watching to eliminate seam
-* fix(ui): eliminate hero banner cut-off seam with solid dark bottom fade`;
+* feat(ui): implement smooth backdrop mask and lighter seamless ambient gradient`;
