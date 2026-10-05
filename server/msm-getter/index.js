@@ -3799,6 +3799,30 @@ async function resolveBestAudioTrack(docId, parentSessionKey) {
 }
 
 
+// Endpoint to immediately evict a stream on explicit client exit (e.g. Back button to Detail page)
+app.all('/api/stream/close', (req, res) => {
+  const docId = req.query.docId || req.body?.docId;
+  const clientIdentity = resolveClientIdentity(req.headers['x-forwarded-for'] || req.ip || req.socket?.remoteAddress, req);
+  let closedCount = 0;
+
+  for (const [key, stream] of activeStreams.entries()) {
+    const matchDoc = !docId || String(stream.docId) === String(docId);
+    const matchIp = stream.ip === clientIdentity.ip || key.startsWith(`${clientIdentity.ip}:`);
+    if (matchDoc && matchIp) {
+      console.log(`[API STREAM CLOSE] Explicit close for [${clientIdentity.name} (${clientIdentity.ip})] key: ${key}`);
+      try { stream.abort(); } catch {}
+      activeStreams.delete(key);
+      closedCount++;
+    }
+  }
+
+  if (activeStreams.size === 0) {
+    scheduleIdleMemoryPurge();
+  }
+
+  res.json({ success: true, closed: closedCount });
+});
+
 // Stream endpoint with HTTP 206 Partial Content Range support
 app.get('/stream/:docId', async (req, res) => {
   try {
