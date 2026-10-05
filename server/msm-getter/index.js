@@ -3297,12 +3297,12 @@ async function streamTelegramPipelined(client, targetDoc, startByte, endByte, re
 
   const streamKey = passedStreamKey || `${isInternal ? (parentSessionKey ? `worker-${parentSessionKey}` : `internal-${Date.now()}`) : clientIdentity.ip}:${targetDoc.id}`;
 
-  if (!isInternal && activeStreams.has(streamKey)) {
-    console.log(`[PIPELINE ABORT PREVIOUS] Aborting existing active stream for [${clientIdentity.name} (${clientIdentity.ip})] key ${streamKey}`);
-    try {
-      activeStreams.get(streamKey).abort();
-    } catch (e) {}
-    activeStreams.delete(streamKey);
+  if (!isInternal && !isProbe && activeStreams.has(streamKey)) {
+    const existing = activeStreams.get(streamKey);
+    if (existing && existing.isSocketOpen && existing.abort !== abortPipeline) {
+      console.log(`[PIPELINE ABORT PREVIOUS] Aborting existing active stream for [${clientIdentity.name} (${clientIdentity.ip})] key ${streamKey}`);
+      try { existing.abort(); } catch (e) {}
+    }
   }
 
   let aborted = false;
@@ -3798,29 +3798,6 @@ async function resolveBestAudioTrack(docId, parentSessionKey) {
   }
 }
 
-// Endpoint to immediately evict a stream on explicit client exit (e.g. Back button to Detail page)
-app.all('/api/stream/close', (req, res) => {
-  const docId = req.query.docId || req.body?.docId;
-  const clientIdentity = resolveClientIdentity(req.headers['x-forwarded-for'] || req.ip || req.socket?.remoteAddress, req);
-  let closedCount = 0;
-
-  for (const [key, stream] of activeStreams.entries()) {
-    const matchDoc = !docId || String(stream.docId) === String(docId);
-    const matchIp = stream.ip === clientIdentity.ip || key.startsWith(`${clientIdentity.ip}:`);
-    if (matchDoc && matchIp) {
-      console.log(`[API STREAM CLOSE] Explicit close for [${clientIdentity.name} (${clientIdentity.ip})] key: ${key}`);
-      try { stream.abort(); } catch {}
-      activeStreams.delete(key);
-      closedCount++;
-    }
-  }
-
-  if (activeStreams.size === 0) {
-    scheduleIdleMemoryPurge();
-  }
-
-  res.json({ success: true, closed: closedCount });
-});
 
 // Stream endpoint with HTTP 206 Partial Content Range support
 app.get('/stream/:docId', async (req, res) => {
@@ -3852,9 +3829,11 @@ app.get('/stream/:docId', async (req, res) => {
       : (req.headers['x-client-id'] || clientIdentity.ip || 'client');
     const streamSessionKey = isInternal ? clientSession : `${clientSession}:${docId}`;
 
-    if (!isInternal && activeStreams.has(streamSessionKey)) {
-      console.log(`[STREAM CANCEL] Terminating previous in-flight stream for [${clientIdentity.name} (${clientIdentity.ip})] doc ${docId} on new seek.`);
-      try { activeStreams.get(streamSessionKey).abort(); } catch {}
+    // Only cancel if previous stream was an active transcode process replaced by a seek query (?ss=)
+    const existingStream = activeStreams.get(streamSessionKey);
+    if (!isInternal && existingStream && existingStream.isSocketOpen && existingStream.mode?.includes('Transcode') && req.query.ss !== undefined) {
+      console.log(`[STREAM CANCEL] Terminating previous transcode stream for [${clientIdentity.name} (${clientIdentity.ip})] doc ${docId} on new seek.`);
+      try { existingStream.abort(); } catch {}
       activeStreams.delete(streamSessionKey);
     }
 
