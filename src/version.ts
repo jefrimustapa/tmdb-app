@@ -2,12 +2,15 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20261005-0225';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-msm-getter-sear.20261005-0225';
+export const APP_BUILD_NUMBER = '20261005-0326';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.fix-msm-getter-crash.20261005-0326';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
-export const APP_BRANCH = 'feat-msm-getter-sear';
-export const APP_CHANGELOG = `* Merge pull request #185 from jefrimustapa/feat/adaptive-bg-color-home-details
+export const APP_BRANCH = 'fix-msm-getter-crash';
+export const APP_CHANGELOG = `* fix(msm-getter): prevent GramJS infinite reconnect recursion and socket exhaustion (EMFILE)
+* Merge pull request #186 from jefrimustapa/feat/msm-getter-search-improvement
+* feat(msm-getter): add bidirectional pagination navigation and configurable request timeout
+* Merge pull request #185 from jefrimustapa/feat/adaptive-bg-color-home-details
 * style(details): unify all metadata and original title badges with uniform bg-black/60 grey boxes
 * fix(details): remove duplicate country of origin row below storyline
 * feat(details): style all metadata items with translucent grey boxes
@@ -18,7 +21,4 @@ export const APP_CHANGELOG = `* Merge pull request #185 from jefrimustapa/feat/a
 * fix(ui): eliminate full-width horizontal smoke bar using targeted text vignette
 * feat(ui): implement smooth backdrop mask and lighter seamless ambient gradient
 * fix(ui): extend 100% solid black through Continue Watching to eliminate seam
-* fix(ui): eliminate hero banner cut-off seam with solid dark bottom fade
-* fix(ui): transition background continuously from dark under hero to translucent color at bottom
-* fix(ui): invert adaptive background to flow from black at hero into ambient tint below
-* feat(ui): implement dynamic adaptive background colors for home, details and modal`;
+* fix(ui): eliminate hero banner cut-off seam with solid dark bottom fade`;

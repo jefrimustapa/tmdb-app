@@ -162,6 +162,9 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const [tickerIntervalSec, setTickerIntervalSec] = useState(5);
   const [streamResolverTimeout, setStreamResolverTimeout] = useState(30);
   const streamResolverTimeoutRef = useRef(30);
+  const [msm32Timeout, setMsm32Timeout] = useState(90);
+  const msm32TimeoutRef = useRef(90);
+  const tgCountdownIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [streamResolverRetries, setStreamResolverRetries] = useState(1);
   const streamResolverRetriesRef = useRef(1);
 
@@ -242,6 +245,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const watchdogActiveProviderRef = useRef<string | null>(null);
   const watchdogStartTimeRef = useRef<number>(0);
   const [watchdogCountdown, setWatchdogCountdown] = useState<number | null>(null);
+  const [resolverRequestCountdown, setResolverRequestCountdown] = useState<number | null>(null);
 
   const clearWatchdog = useCallback((reason?: string) => {
     if (autoCycleTimeoutRef.current) {
@@ -441,6 +445,10 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           setStreamResolverTimeout(s.streamResolverTimeout);
           streamResolverTimeoutRef.current = s.streamResolverTimeout;
         }
+        if (typeof s.msm32Timeout === 'number') {
+          setMsm32Timeout(s.msm32Timeout);
+          msm32TimeoutRef.current = s.msm32Timeout;
+        }
         if (typeof s.streamResolverRetries === 'number' && s.streamResolverRetries >= 0 && s.streamResolverRetries <= 3) {
           setStreamResolverRetries(s.streamResolverRetries);
           streamResolverRetriesRef.current = s.streamResolverRetries;
@@ -490,6 +498,25 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             return;
           }
         }
+        const tgTimeoutSec = msm32TimeoutRef.current || 90;
+        setResolverRequestCountdown(tgTimeoutSec);
+        if (tgCountdownIntervalRef.current) {
+          clearInterval(tgCountdownIntervalRef.current);
+        }
+        tgCountdownIntervalRef.current = setInterval(() => {
+          setResolverRequestCountdown((prev) => {
+            if (prev === null || prev <= 1) return null;
+            return prev - 1;
+          });
+        }, 1000);
+        const clearTgCountdown = () => {
+          if (tgCountdownIntervalRef.current) {
+            clearInterval(tgCountdownIntervalRef.current);
+            tgCountdownIntervalRef.current = null;
+          }
+          setResolverRequestCountdown(null);
+        };
+
         try {
           console.log(`[Resolver] Telegram Provider (${provider.name})...`);
 
@@ -564,7 +591,10 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
           let msmRes: Msm32ResolveResult | null = null;
           for (const searchTitle of telegramSearchTitles) {
-            if (!isMounted || abortController.signal.aborted) return;
+            if (!isMounted || abortController.signal.aborted) {
+              clearTgCountdown();
+              return;
+            }
             console.log(`[Resolver] Telegram Provider (${provider.name}) searching for "${searchTitle}" (year: ${queryYear || 'none'}, s: ${querySeason}, e: ${queryEpisode}, forceFresh: ${isForceFresh})...`);
             const res = await msm32Service.resolveStream(
               searchTitle,
@@ -576,7 +606,10 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
               effectiveTotalSeasons
             );
 
-            if (!isMounted || abortController.signal.aborted) return;
+            if (!isMounted || abortController.signal.aborted) {
+              clearTgCountdown();
+              return;
+            }
 
             if (res && res.streamUrl) {
               // Guard: If resolving a movie and the filename contains S01E02 / S1E1, it is a false-positive TV episode match
@@ -612,6 +645,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           }
 
           if (msmRes && msmRes.streamUrl) {
+            clearTgCountdown();
             // Request real-time audio transcoding (?transcode=audio) if the stream has multi-channel surround sound
             // (6CH, 8CH, 5.1, 7.1, 5CH, 4CH) or Dolby/DTS/Atmos codecs.
             // Android Chromium/WebView does not downmix 6CH/surround to 2CH stereo, dropping the Center channel (dialogue).
@@ -656,6 +690,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             return;
           }
 
+          clearTgCountdown();
           console.warn('[Resolver] Telegram stream not found');
           if (autoCycle && !isUserSelected && !allFailed) {
             setResolvingStatus('Telegram stream not found, cycling to next provider...');
@@ -670,6 +705,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             return;
           }
         } catch (err) {
+          clearTgCountdown();
           console.warn('[Resolver] Telegram resolution error:', err);
           if (autoCycle && !isUserSelected && !allFailed) {
             setResolvingStatus('Telegram resolver error, cycling to next provider...');
@@ -981,6 +1017,11 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     return () => {
       isMounted = false;
       abortController.abort();
+      if (tgCountdownIntervalRef.current) {
+        clearInterval(tgCountdownIntervalRef.current);
+        tgCountdownIntervalRef.current = null;
+      }
+      setResolverRequestCountdown(null);
     };
   }, [enabledResolvers, tmdbId, title, mediaType, season, episode, activeAsean, providerId, releaseYear, originalTitle, topAnimeProviders, topAseanProviders, isUserSelected, isTelegramOriginMatching, resolveTrigger, cycleToNextProvider, autoCycle, allFailed]);
 
@@ -2451,6 +2492,16 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
               <p className="text-xs text-hbo-purple-light font-bold mb-1">
                 S{season} • E{episode} {episodeTitle ? `• ${episodeTitle}` : ''}
               </p>
+            )}
+
+            {typeof resolverRequestCountdown === 'number' && resolverRequestCountdown > 0 && (
+              <div className="my-2 inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-hbo-purple/20 border border-hbo-cyan/30 text-xs font-semibold text-hbo-cyan tracking-wide animate-pulse">
+                <span className="w-2 h-2 rounded-full bg-hbo-cyan animate-ping" />
+                <span>Request Timeout in <strong className="text-white font-mono text-sm ml-0.5">{resolverRequestCountdown}s</strong></span>
+                {autoCycle && !isUserSelected && (
+                  <span className="text-gray-400 font-normal border-l border-white/20 pl-2">Auto-cycle</span>
+                )}
+              </div>
             )}
 
             {resolvingStatus ? (
