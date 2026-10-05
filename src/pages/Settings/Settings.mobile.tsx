@@ -184,8 +184,11 @@ export const Settings: React.FC = () => {
     | 'telegram-url'
     | 'telegram-chunk'
     | 'telegram-country'
+    | 'telegram-timeout'
     | 'telegram-cache'
     | 'engine-embed'
+    | 'embed-timeout'
+    | 'embed-retries'
     | 'priorityPicker'
     | 'adblock'
     | 'headerTimeout'
@@ -1830,6 +1833,24 @@ export const Settings: React.FC = () => {
             </div>
           </button>
 
+          {/* Navigation to Resolver Request Timeout Sub-Drawer */}
+          <button
+            type="button"
+            onClick={() => setActiveDrawer('telegram-timeout')}
+            className="w-full flex items-center justify-between p-3.5 rounded-xl bg-white/5 border border-white/10 hover:border-sky-400/50 hover:bg-white/10 transition-all text-left"
+          >
+            <div className="space-y-0.5">
+              <span className="text-xs font-semibold text-white block">Resolver Request Timeout</span>
+              <span className="text-[11px] text-gray-400">Maximum search & resolution wait time</span>
+            </div>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <span className="text-[10px] text-sky-400 font-mono font-bold bg-sky-500/10 px-2 py-0.5 rounded border border-sky-400/20">
+                {`${settings.msm32Timeout || 90}s`}
+              </span>
+              <ChevronRight className="w-4 h-4 text-gray-400" />
+            </div>
+          </button>
+
           {/* Navigation to Persistent Stream Cache Manager Sub-Drawer */}
           <button
             type="button"
@@ -2361,6 +2382,65 @@ export const Settings: React.FC = () => {
         </div>
       </SettingsDrawer>
 
+      {/* 3a-TG-TIMEOUT. Sub-Drawer: MSM32 Resolver Request Timeout */}
+      <SettingsDrawer
+        isOpen={activeDrawer === 'telegram-timeout'}
+        onClose={() => setActiveDrawer(null)}
+        onBack={() => setActiveDrawer('telegram-msm32')}
+        title="Resolver Request Timeout"
+        subtitle="Maximum wait time for Telegram title searching and resolution."
+        categoryLabel="Telegram > MSM32bot > Request Timeout"
+      >
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-gray-300 block">Current Timeout:</span>
+            <span className="text-xs text-sky-400 font-mono font-bold">
+              {`${settings.msm32Timeout || 90}s`}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 gap-2">
+            {[
+              { label: '60 Seconds', desc: '1.0 Minute • Fast timeout, quickly failover to fallback providers', val: 60 as const },
+              { label: '90 Seconds', desc: '1.5 Minutes • Balanced wait time for multi-page Telegram queries (Default)', val: 90 as const },
+              { label: '120 Seconds', desc: '2.0 Minutes • Extended time for complex multi-episode series searching', val: 120 as const },
+              { label: '150 Seconds', desc: '2.5 Minutes • Deep search across extensive page results and high-load bots', val: 150 as const },
+              { label: '180 Seconds', desc: '3.0 Minutes • Maximum patience for congested networks and large TV series', val: 180 as const },
+            ].map((opt) => {
+              const isCurrent = (settings.msm32Timeout || 90) === opt.val;
+              return (
+                <button
+                  key={opt.val}
+                  type="button"
+                  onClick={() => {
+                    handleUpdate({ msm32Timeout: opt.val });
+                    setActiveDrawer('telegram-msm32');
+                  }}
+                  className={`p-3.5 rounded-xl border text-left transition-all flex items-center justify-between ${
+                    isCurrent
+                      ? 'bg-sky-500/20 border-sky-400 text-white'
+                      : 'bg-white/5 border-white/10 text-gray-400 hover:text-white'
+                  }`}
+                >
+                  <div className="space-y-0.5 pr-2">
+                    <span className="text-xs font-bold block text-white">{opt.label}</span>
+                    <span className="text-[11px] text-gray-400 block leading-snug">{opt.desc}</span>
+                  </div>
+                  <div className={`w-5 h-5 rounded-full border flex items-center justify-center flex-shrink-0 ${
+                    isCurrent ? 'bg-sky-500 border-sky-400 text-black' : 'border-gray-600 bg-black/40 text-transparent'
+                  }`}>
+                    <Check className="w-3 h-3 stroke-[3]" />
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+          <p className="text-[11px] text-gray-500 leading-relaxed">
+            If resolution takes longer than this duration, the request will automatically abort and fall back to alternative stream providers.
+          </p>
+        </div>
+      </SettingsDrawer>
+
 
 
       {/* 3a-EM. Sub-Drawer: Embed Resolver Settings */}
@@ -2373,82 +2453,43 @@ export const Settings: React.FC = () => {
         categoryLabel="Stream Engines > Embed"
       >
         <div className="space-y-4">
-          {/* Timeout & Retries Config */}
-          <div className="space-y-3 pb-3 border-b border-white/10">
-            {/* Stream Resolver Timeout */}
-            <div className="bg-black/30 border border-hbo-border rounded-xl p-3 space-y-2">
-              <div className="flex items-center justify-between">
-                <div>
-                  <span className="text-xs font-semibold text-white block">Resolver Timeout</span>
-                  <span className="text-[10px] text-gray-400">Max wait time before auto-failover</span>
-                </div>
-                <span className="text-xs font-bold text-hbo-cyan">
+          {/* Timeout & Retries Sub-Drawer Buttons */}
+          <div className="space-y-2 pb-3 border-b border-white/10">
+            {/* Stream Resolver Timeout Sub-Drawer Button */}
+            <button
+              type="button"
+              onClick={() => setActiveDrawer('embed-timeout')}
+              className="w-full flex items-center justify-between p-3.5 rounded-xl bg-white/5 border border-white/10 hover:border-hbo-cyan/50 hover:bg-white/10 transition-all text-left"
+            >
+              <div className="space-y-0.5">
+                <span className="text-xs font-semibold text-white block">Resolver Timeout</span>
+                <span className="text-[11px] text-gray-400">Max wait time before auto-failover</span>
+              </div>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <span className="text-[10px] text-hbo-cyan font-mono font-bold bg-hbo-cyan/10 px-2 py-0.5 rounded border border-hbo-cyan/20">
                   {`${settings.streamResolverTimeout ?? 30}s`}
                 </span>
+                <ChevronRight className="w-4 h-4 text-gray-400" />
               </div>
-              <div className="grid grid-cols-3 gap-1.5 pt-1">
-                {[
-                  { seconds: 30, label: '30s (Default)' },
-                  { seconds: 60, label: '60s' },
-                  { seconds: 90, label: '90s' },
-                  { seconds: 180, label: '180s' },
-                  { seconds: 240, label: '240s' },
-                ].map((opt) => {
-                  const isSelected = (settings.streamResolverTimeout ?? 30) === opt.seconds;
-                  return (
-                    <button
-                      key={opt.seconds}
-                      type="button"
-                      onClick={() => handleUpdate({ streamResolverTimeout: opt.seconds })}
-                      className={`py-1.5 px-2 rounded-lg text-xs font-bold transition-all border ${
-                        isSelected
-                          ? 'bg-hbo-cyan/20 border-hbo-cyan text-hbo-cyan shadow-sm'
-                          : 'bg-white/5 border-white/10 text-gray-400 hover:text-white'
-                      }`}
-                    >
-                      {opt.label}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
+            </button>
 
-            {/* Stream Resolver Retries */}
-            <div className="bg-black/30 border border-hbo-border rounded-xl p-3 space-y-2">
-              <div className="flex items-center justify-between">
-                <div>
-                  <span className="text-xs font-semibold text-white block">Resolver Retries</span>
-                  <span className="text-[10px] text-gray-400">Retry count on failure before failover</span>
-                </div>
-                <span className="text-xs font-bold text-hbo-cyan">
+            {/* Stream Resolver Retries Sub-Drawer Button */}
+            <button
+              type="button"
+              onClick={() => setActiveDrawer('embed-retries')}
+              className="w-full flex items-center justify-between p-3.5 rounded-xl bg-white/5 border border-white/10 hover:border-hbo-cyan/50 hover:bg-white/10 transition-all text-left"
+            >
+              <div className="space-y-0.5">
+                <span className="text-xs font-semibold text-white block">Resolver Retries</span>
+                <span className="text-[11px] text-gray-400">Retry count on failure before failover</span>
+              </div>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <span className="text-[10px] text-hbo-cyan font-mono font-bold bg-hbo-cyan/10 px-2 py-0.5 rounded border border-hbo-cyan/20">
                   {(settings.streamResolverRetries ?? 1) === 0 ? 'No Retry' : `${settings.streamResolverRetries ?? 1}× Attempts`}
                 </span>
+                <ChevronRight className="w-4 h-4 text-gray-400" />
               </div>
-              <div className="grid grid-cols-4 gap-1.5 pt-1">
-                {[
-                  { retries: 0, label: '0×' },
-                  { retries: 1, label: '1×' },
-                  { retries: 2, label: '2×' },
-                  { retries: 3, label: '3×' },
-                ].map((opt) => {
-                  const isSelected = (settings.streamResolverRetries ?? 1) === opt.retries;
-                  return (
-                    <button
-                      key={opt.retries}
-                      type="button"
-                      onClick={() => handleUpdate({ streamResolverRetries: opt.retries })}
-                      className={`py-1.5 px-2 rounded-lg text-xs font-bold transition-all border ${
-                        isSelected
-                          ? 'bg-hbo-cyan/20 border-hbo-cyan text-hbo-cyan shadow-sm'
-                          : 'bg-white/5 border-white/10 text-gray-400 hover:text-white'
-                      }`}
-                    >
-                      {opt.label}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
+            </button>
           </div>
 
           <span className="text-xs font-semibold text-gray-300 block">Embed Failover Priority Servers</span>
@@ -2511,6 +2552,123 @@ export const Settings: React.FC = () => {
               );
             })}
           </div>
+        </div>
+      </SettingsDrawer>
+
+      {/* 3a-EM-TIMEOUT. Sub-Drawer: Embed Resolver Timeout */}
+      <SettingsDrawer
+        isOpen={activeDrawer === 'embed-timeout'}
+        onClose={() => setActiveDrawer(null)}
+        onBack={() => setActiveDrawer('engine-embed')}
+        title="Resolver Timeout"
+        subtitle="Maximum wait time for each embed provider before auto-failover."
+        categoryLabel="Stream Engines > Embed > Timeout"
+      >
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-gray-300 block">Current Timeout:</span>
+            <span className="text-xs text-hbo-cyan font-mono font-bold">
+              {`${settings.streamResolverTimeout ?? 30}s`}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 gap-2">
+            {[
+              { label: '30 Seconds (Default)', desc: 'Standard balance between quick playback start and reliable failover', val: 30 },
+              { label: '60 Seconds', desc: '1.0 Minute • Recommended for slower mobile connections', val: 60 },
+              { label: '90 Seconds', desc: '1.5 Minutes • Extended patience for high-latency networks', val: 90 },
+              { label: '180 Seconds', desc: '3.0 Minutes • Deep patience for throttled connections', val: 180 },
+              { label: '240 Seconds', desc: '4.0 Minutes • Maximum timeout before skipping to next server', val: 240 },
+            ].map((opt) => {
+              const isSelected = (settings.streamResolverTimeout ?? 30) === opt.val;
+              return (
+                <button
+                  key={opt.val}
+                  type="button"
+                  onClick={() => {
+                    handleUpdate({ streamResolverTimeout: opt.val });
+                    setActiveDrawer('engine-embed');
+                  }}
+                  className={`p-3.5 rounded-xl border text-left transition-all flex items-center justify-between ${
+                    isSelected
+                      ? 'bg-hbo-cyan/20 border-hbo-cyan text-white'
+                      : 'bg-white/5 border-white/10 text-gray-400 hover:text-white'
+                  }`}
+                >
+                  <div className="space-y-0.5 pr-2">
+                    <span className="text-xs font-bold block text-white">{opt.label}</span>
+                    <span className="text-[11px] text-gray-400 block leading-snug">{opt.desc}</span>
+                  </div>
+                  <div className={`w-5 h-5 rounded-full border flex items-center justify-center flex-shrink-0 ${
+                    isSelected ? 'bg-hbo-cyan border-hbo-cyan text-black' : 'border-gray-600 bg-black/40 text-transparent'
+                  }`}>
+                    <Check className="w-3 h-3 stroke-[3]" />
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+          <p className="text-[11px] text-gray-500 leading-relaxed">
+            If an embed provider takes longer than this limit to extract a video stream, the system will automatically fail over to your next priority provider.
+          </p>
+        </div>
+      </SettingsDrawer>
+
+      {/* 3a-EM-RETRIES. Sub-Drawer: Embed Resolver Retries */}
+      <SettingsDrawer
+        isOpen={activeDrawer === 'embed-retries'}
+        onClose={() => setActiveDrawer(null)}
+        onBack={() => setActiveDrawer('engine-embed')}
+        title="Resolver Retries"
+        subtitle="Number of retry attempts on provider failure before failover."
+        categoryLabel="Stream Engines > Embed > Retries"
+      >
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-gray-300 block">Current Retries:</span>
+            <span className="text-xs text-hbo-cyan font-mono font-bold">
+              {(settings.streamResolverRetries ?? 1) === 0 ? 'No Retry' : `${settings.streamResolverRetries ?? 1}× Attempts`}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 gap-2">
+            {[
+              { label: '0× Attempts (No Retry)', desc: 'Fail over immediately on the first network error or timeout', val: 0 },
+              { label: '1× Attempt (Default)', desc: 'Retry once to bypass transient connection hiccups before failover', val: 1 },
+              { label: '2× Attempts', desc: 'Retry twice with cache refresh before moving to next provider', val: 2 },
+              { label: '3× Attempts', desc: 'Maximum retry resilience for unstable or congested Wi-Fi', val: 3 },
+            ].map((opt) => {
+              const isSelected = (settings.streamResolverRetries ?? 1) === opt.val;
+              return (
+                <button
+                  key={opt.val}
+                  type="button"
+                  onClick={() => {
+                    handleUpdate({ streamResolverRetries: opt.val });
+                    setActiveDrawer('engine-embed');
+                  }}
+                  className={`p-3.5 rounded-xl border text-left transition-all flex items-center justify-between ${
+                    isSelected
+                      ? 'bg-hbo-cyan/20 border-hbo-cyan text-white'
+                      : 'bg-white/5 border-white/10 text-gray-400 hover:text-white'
+                  }`}
+                >
+                  <div className="space-y-0.5 pr-2">
+                    <span className="text-xs font-bold block text-white">{opt.label}</span>
+                    <span className="text-[11px] text-gray-400 block leading-snug">{opt.desc}</span>
+                  </div>
+                  <div className={`w-5 h-5 rounded-full border flex items-center justify-center flex-shrink-0 ${
+                    isSelected ? 'bg-hbo-cyan border-hbo-cyan text-black' : 'border-gray-600 bg-black/40 text-transparent'
+                  }`}>
+                    <Check className="w-3 h-3 stroke-[3]" />
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+          <p className="text-[11px] text-gray-500 leading-relaxed">
+            Retrying can recover streams when a provider temporarily throttles a request; set to 0× for the fastest failover to alternative servers.
+          </p>
         </div>
       </SettingsDrawer>
 

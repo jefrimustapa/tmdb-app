@@ -2,12 +2,14 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20261004-1717';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-adaptive-bg-col.20261004-1717';
+export const APP_BUILD_NUMBER = '20261005-0225';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-msm-getter-sear.20261005-0225';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
-export const APP_BRANCH = 'feat-adaptive-bg-col';
-export const APP_CHANGELOG = `* fix(details): remove duplicate country of origin row below storyline
+export const APP_BRANCH = 'feat-msm-getter-sear';
+export const APP_CHANGELOG = `* Merge pull request #185 from jefrimustapa/feat/adaptive-bg-color-home-details
+* style(details): unify all metadata and original title badges with uniform bg-black/60 grey boxes
+* fix(details): remove duplicate country of origin row below storyline
 * feat(details): style all metadata items with translucent grey boxes
 * fix(ui): extend dark tint to 105vh to eliminate Continue Watching seam
 * fix(home): extract dominant color from poster in portrait and restore ambient visibility
@@ -19,6 +21,4 @@ export const APP_CHANGELOG = `* fix(details): remove duplicate country of origin
 * fix(ui): eliminate hero banner cut-off seam with solid dark bottom fade
 * fix(ui): transition background continuously from dark under hero to translucent color at bottom
 * fix(ui): invert adaptive background to flow from black at hero into ambient tint below
-* feat(ui): implement dynamic adaptive background colors for home, details and modal
-* Merge pull request #184 from jefrimustapa/fix/kisskh-selection-matching
-* fix(kisskh): enforce English-first search queries and implement score-based candidate selection algorithm`;
+* feat(ui): implement dynamic adaptive background colors for home, details and modal`;

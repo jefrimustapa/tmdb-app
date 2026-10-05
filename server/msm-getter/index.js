@@ -2561,6 +2561,101 @@ app.get('/api/resolve', async (req, res) => {
       return null;
     }
 
+    // Helper: Find pagination button to navigate towards targetPage (supports direct numbers, first page, and relative arrows)
+    function findPageButton(replyMarkup, targetPage, currentPage) {
+      if (!replyMarkup?.rows) return null;
+
+      // 1. Direct number button match (e.g. "1", "2", "3", or "【1】")
+      for (const row of replyMarkup.rows) {
+        for (const btn of row.buttons) {
+          if (btn.className === 'KeyboardButtonCallback' && btn.data) {
+            const txt = (btn.text || '').trim();
+            if (txt === String(targetPage) || txt === `【${targetPage}】`) {
+              return btn;
+            }
+          }
+        }
+      }
+
+      // 2. Direct first-page button if targeting page 1
+      if (targetPage === 1) {
+        for (const row of replyMarkup.rows) {
+          for (const btn of row.buttons) {
+            if (btn.className === 'KeyboardButtonCallback' && btn.data) {
+              const txt = (btn.text || '').trim();
+              if (txt === '⏮️' || txt === '1' || txt === '<<') {
+                return btn;
+              }
+            }
+          }
+        }
+      }
+
+      // 3. Relative arrow navigation: Previous (⬅️) or Next (➡️)
+      for (const row of replyMarkup.rows) {
+        for (const btn of row.buttons) {
+          if (btn.className === 'KeyboardButtonCallback' && btn.data) {
+            const txt = (btn.text || '').toLowerCase().trim();
+            if (targetPage < currentPage && (txt.includes('⬅️') || txt.includes('⬅') || txt.includes('prev') || txt.includes('kembali'))) {
+              return btn;
+            }
+            if (targetPage > currentPage && (txt.includes('➡️') || txt.includes('➡') || txt.includes('next') || txt.includes('seterusnya'))) {
+              return btn;
+            }
+          }
+        }
+      }
+
+      return null;
+    }
+
+    // Helper: Navigate message in-place to targetPage via bot callback answer
+    async function navigateToPage(client, msgId, targetPage, currentMsg, currentMsgPage) {
+      let activeMsg = currentMsg;
+      let activePage = currentMsgPage;
+      let steps = 0;
+      const MAX_STEPS = 6;
+
+      while (activeMsg && activePage !== targetPage && steps < MAX_STEPS) {
+        if (isAborted || req.destroyed) break;
+        steps++;
+        const navBtn = findPageButton(activeMsg.replyMarkup, targetPage, activePage);
+        if (!navBtn) {
+          console.warn(`[RESOLVE] No navigation callback button found to reach page ${targetPage} from page ${activePage}`);
+          break;
+        }
+
+        console.log(`[RESOLVE] Navigating message ${msgId} from page ${activePage} towards page ${targetPage} via callback ("${navBtn.text}")...`);
+        try {
+          await client.invoke(new Api.messages.GetBotCallbackAnswer({
+            peer: 'msm32bot',
+            msgId: msgId,
+            data: navBtn.data,
+          }));
+          await new Promise(r => setTimeout(r, 1200));
+          const refreshed = await client.getMessages('msm32bot', { ids: [msgId] });
+          if (refreshed && refreshed[0]) {
+            activeMsg = refreshed[0];
+            const btnText = (navBtn.text || '').trim();
+            if (btnText === String(targetPage) || (targetPage === 1 && (btnText === '⏮️' || btnText === '1'))) {
+              activePage = targetPage;
+            } else if (btnText.includes('⬅️') || btnText.includes('⬅')) {
+              activePage = Math.max(1, activePage - 1);
+            } else if (btnText.includes('➡️') || btnText.includes('➡')) {
+              activePage = activePage + 1;
+            }
+          } else {
+            break;
+          }
+        } catch (err) {
+          console.warn(`[RESOLVE] Navigation callback error on page ${activePage}:`, err.message);
+          break;
+        }
+      }
+
+      return { msg: activeMsg, page: activePage };
+    }
+
     // Execute Ad-Gate HTTP handshake with automatic retry for transient Cloudflare / network timeouts
     async function axiosWithRetry(fn, desc, maxRetries = 2, delayMs = 1000) {
       let lastErr;
@@ -2604,6 +2699,9 @@ app.get('/api/resolve', async (req, res) => {
         const msgs = await client.getMessages('msm32bot', { limit: 5 });
         const candidates = [];
 
+        let activeBotMsg = null;
+        let activeBotPage = 1;
+
         for (const m of msgs) {
           if (m.id > sentMsgId) {
             const textLower = (m.message || '').toLowerCase();
@@ -2624,6 +2722,8 @@ app.get('/api/resolve', async (req, res) => {
               while (currentMsg && pageCount < MAX_PAGES) {
                 if (isAborted || req.destroyed) break;
                 pageCount++;
+                activeBotMsg = currentMsg;
+                activeBotPage = pageCount;
                 if (currentMsg.replyMarkup?.rows) {
                   for (const row of currentMsg.replyMarkup.rows) {
                     for (const btn of row.buttons) {
@@ -2635,6 +2735,7 @@ app.get('/api/resolve', async (req, res) => {
                           url: btn.url,
                           text: btn.text,
                           score,
+                          page: pageCount,
                         });
                       }
                     }
@@ -2658,6 +2759,8 @@ app.get('/api/resolve', async (req, res) => {
                     const refreshed = await client.getMessages('msm32bot', { ids: [currentMsg.id] });
                     if (refreshed && refreshed[0]) {
                       currentMsg = refreshed[0];
+                      activeBotMsg = currentMsg;
+                      activeBotPage = pageCount + 1;
                     } else {
                       break;
                     }
@@ -2693,10 +2796,10 @@ app.get('/api/resolve', async (req, res) => {
           for (let candIdx = 0; candIdx < candidatesToTry.length; candIdx++) {
             if (isAborted || req.destroyed) break;
             const cand = candidatesToTry[candIdx];
-            console.log(`[RESOLVE] Trying candidate (${candIdx + 1}/${candidatesToTry.length}): "${cand.text}" (score: ${cand.score})...`);
+            console.log(`[RESOLVE] Trying candidate (${candIdx + 1}/${candidatesToTry.length}): "${cand.text}" (score: ${cand.score}, page: ${cand.page || 1})...`);
 
             const targetMsgId = cand.msgId;
-            const targetButtonId = cand.buttonId;
+            let targetButtonId = cand.buttonId;
             const candidateFilename = cand.text.replace(/^[🔥🎞📎\s]+/, '').replace(/\s+\d+(\.\d+)?\s*(mb|gb).*$/i, '').trim();
             const linkMatch = cand.url ? cand.url.match(/\/link\/([a-zA-Z0-9_-]+)/) : null;
             const candShortcode = linkMatch ? linkMatch[1] : null;
@@ -2706,9 +2809,30 @@ app.get('/api/resolve', async (req, res) => {
               continue;
             }
 
+            // Bidirectional Page Navigation: Ensure Telegram message displays candidate's origin page before auth
+            const candTargetPage = cand.page || 1;
+            if (activeBotMsg && activeBotPage !== candTargetPage) {
+              console.log(`[RESOLVE] Candidate "${cand.text}" belongs to page ${candTargetPage} (current view: page ${activeBotPage}). Navigating message ${targetMsgId} to page ${candTargetPage}...`);
+              const navResult = await navigateToPage(client, targetMsgId, candTargetPage, activeBotMsg, activeBotPage);
+              activeBotMsg = navResult.msg;
+              activeBotPage = navResult.page;
+            }
+
+            // Sync active buttonId from refreshed message markup
+            if (activeBotMsg?.replyMarkup?.rows) {
+              for (const row of activeBotMsg.replyMarkup.rows) {
+                for (const btn of row.buttons) {
+                  if ((cand.url && btn.url === cand.url) || (cand.text && btn.text === cand.text)) {
+                    targetButtonId = btn.buttonId;
+                    break;
+                  }
+                }
+              }
+            }
+
             let authRes;
             try {
-              console.log(`[RESOLVE] Authorizing button (msgId: ${targetMsgId}, buttonId: ${targetButtonId})...`);
+              console.log(`[RESOLVE] Authorizing button (msgId: ${targetMsgId}, buttonId: ${targetButtonId}, page: ${activeBotPage})...`);
               authRes = await client.invoke(new Api.messages.RequestUrlAuth({
                 peer: 'msm32bot',
                 msgId: targetMsgId,
