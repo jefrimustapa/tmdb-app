@@ -2,12 +2,13 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20261005-0723';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.fix-msm-getter-stale.20261005-0723';
+export const APP_BUILD_NUMBER = '20261005-0731';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.fix-msm-getter-stale.20261005-0731';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
 export const APP_BRANCH = 'fix-msm-getter-stale';
-export const APP_CHANGELOG = `* fix(stream): restore /api/stream/close and client exit beacon for instant session eviction
+export const APP_CHANGELOG = `* fix(player): eliminate countdown buffering reset loop and isolate close beacon to explicit back navigation
+* fix(stream): restore /api/stream/close and client exit beacon for instant session eviction
 * feat(player): increase buffering timeout countdown to 30s
 * fix(stream): prevent parallel range requests and idle sessions from aborting active playback
 * fix(player): re-trigger countdown timer on Retry Play click
@@ -20,5 +21,4 @@ export const APP_CHANGELOG = `* fix(stream): restore /api/stream/close and clien
 * feat(msm-getter): add bidirectional pagination navigation and configurable request timeout
 * Merge pull request #185 from jefrimustapa/feat/adaptive-bg-color-home-details
 * style(details): unify all metadata and original title badges with uniform bg-black/60 grey boxes
-* fix(details): remove duplicate country of origin row below storyline
-* feat(details): style all metadata items with translucent grey boxes`;
+* fix(details): remove duplicate country of origin row below storyline`;

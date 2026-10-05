@@ -66,7 +66,7 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
   onToggleFullscreen,
   timeoutSeconds = 90,
 }) => {
-  const { isTV } = useDevice();
+  const { isTV, isDesktop } = useDevice();
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<Hls | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -579,8 +579,9 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
     resetControlsTimer();
   }, [isTV, isTranscoded, performSeek, resetControlsTimer]);
 
-  // Auto-pause playback when app goes to background (Android TV Home, user switches apps)
+  // Auto-pause playback when app goes to background (Android TV Home, user switches apps) - Excludes Web Desktop
   useEffect(() => {
+    if (isDesktop) return; // Allow continuous background playback / multi-tabbing on Web Desktop
     const handleVisibilityChange = () => {
       const video = videoRef.current;
       if (!video) return;
@@ -597,7 +598,7 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, []);
+  }, [isDesktop]);
 
   // Handle Relative Seek (+10s or -10s) with 280ms commit debouncing
   // Updates the visual UI & HUD immediately, but debounces the actual hardware seek
