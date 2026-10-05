@@ -181,6 +181,7 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
   const BUFFERING_TIMEOUT_SEC = 20;
   const [loadTimedOut, setLoadTimedOut] = useState(false);
   const [bufferingCountdown, setBufferingCountdown] = useState<number>(BUFFERING_TIMEOUT_SEC);
+  const [retryBufferTrigger, setRetryBufferTrigger] = useState(0);
 
   // 20s hardcoded buffering watchdog timeout with live countdown
   useEffect(() => {
@@ -188,6 +189,7 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
       setLoadTimedOut(false);
       return;
     }
+    setLoadTimedOut(false);
     setBufferingCountdown(BUFFERING_TIMEOUT_SEC);
     const interval = setInterval(() => {
       setBufferingCountdown((prev) => {
@@ -204,7 +206,7 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
     return () => {
       clearInterval(interval);
     };
-  }, [isInitialLoading]);
+  }, [isInitialLoading, retryBufferTrigger]);
 
   const attachedSrcRef = useRef<string | null>(null);
   const onErrorRef = useRef(onError);
@@ -1201,8 +1203,7 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
                   <button
                     type="button"
                     onClick={() => {
-                      setLoadTimedOut(false);
-                      setBufferingCountdown(BUFFERING_TIMEOUT_SEC);
+                      setRetryBufferTrigger((prev) => prev + 1);
                       if (videoRef.current) {
                         videoRef.current.load();
                         videoRef.current.play().catch(console.warn);
