@@ -1423,7 +1423,7 @@ function resolveClientIdentity(rawIp, req) {
 
 function isDesktopWebClient(req) {
   const ua = req?.headers?.['user-agent'] || '';
-  const clientIdentity = getClientIdentity(req);
+  const clientIdentity = resolveClientIdentity(null, req);
   // If device is identified as mobile, phone, or TV from DHCP/DNS/User-Agent, never transcode
   if (/S25|Galaxy|Phone|Android|iOS|iPad|iPhone|SmartTV|GoogleTV|AppleTV|Roku|Tizen|Web0S/i.test(clientIdentity?.name || '')) {
     return false;
@@ -4040,15 +4040,21 @@ app.get('/stream/:docId', async (req, res) => {
     // Only redirect to transcode pipe for desktop web browsers. Non-desktop devices (S25, Smart TV) stream direct.
     if ((isAvi || isHevc) && !isInternalTranscoder && !req.query.transcode && isDesktopWeb) {
       const sep = req.url.includes('?') ? '&' : '?';
-      console.log(`[VIDEO TRANSCODE REDIRECT] Redirecting untagged ${isAvi ? 'AVI' : 'HEVC'} request to 3-core transcode pipe for desktop web [${clientIdentity.name} (${clientIdentity.ip})] doc ${docId}`);
+      console.log(`[VIDEO TRANSCODE REDIRECT] Redirecting untagged ${isAvi ? 'AVI' : 'HEVC'} request to 2-core transcode pipe for desktop web [${clientIdentity.name} (${clientIdentity.ip})] doc ${docId}`);
       return res.redirect(307, `${req.url}${sep}transcode=audio&vcodec=h264`);
     }
 
-    const shouldTranscode = (req.query.transcode === 'audio' || req.query.transcode === 'video' || (isAvi && !isInternalTranscoder) || (isHevc && !isInternalTranscoder)) && (isDesktopWeb || req.query.transcode === 'audio' || req.query.transcode === 'video');
+    // STRICT: Non-desktop devices (phones, Android TV, tablets) ALWAYS receive 100% direct native stream without transcoding
+    const shouldTranscode = isDesktopWeb && !isInternalTranscoder && (
+      req.query.transcode === 'audio' ||
+      req.query.transcode === 'video' ||
+      isAvi ||
+      isHevc
+    );
 
     if (shouldTranscode) {
       const seekSec = Math.max(0, parseFloat(req.query.ss) || 0);
-      console.log(`[TRANSCODE ${isAvi ? 'AVI->H264' : (isHevc ? 'HEVC->H264 (3-core)' : 'AUDIO')}] Starting transcode for [${clientIdentity.name} (${clientIdentity.ip})] doc ${docId} (${filename}) at ${seekSec}s...`);
+      console.log(`[TRANSCODE ${isAvi ? 'AVI->H264' : (isHevc ? 'HEVC->H264 (2-core)' : 'AUDIO')}] Starting transcode for [${clientIdentity.name} (${clientIdentity.ip})] doc ${docId} (${filename}) at ${seekSec}s...`);
 
       let mediaDetails = { audioMapSpecifier: '0:a:0', videoCodec: '', isHevc: false, isLegacyVideo: false };
       try {
