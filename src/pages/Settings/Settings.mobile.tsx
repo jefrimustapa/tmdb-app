@@ -185,6 +185,7 @@ export const Settings: React.FC = () => {
     | 'telegram-chunk'
     | 'telegram-country'
     | 'telegram-timeout'
+    | 'telegram-buffer-timeout'
     | 'telegram-cache'
     | 'engine-embed'
     | 'embed-timeout'
@@ -1851,6 +1852,24 @@ export const Settings: React.FC = () => {
             </div>
           </button>
 
+          {/* Navigation to Buffering Timeout Sub-Drawer */}
+          <button
+            type="button"
+            onClick={() => setActiveDrawer('telegram-buffer-timeout')}
+            className="w-full flex items-center justify-between p-3.5 rounded-xl bg-white/5 border border-white/10 hover:border-sky-400/50 hover:bg-white/10 transition-all text-left"
+          >
+            <div className="space-y-0.5">
+              <span className="text-xs font-semibold text-white block">Buffering Timeout</span>
+              <span className="text-[11px] text-gray-400">Stream buffer wait time before warning</span>
+            </div>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <span className="text-[10px] text-sky-400 font-mono font-bold bg-sky-500/10 px-2 py-0.5 rounded border border-sky-400/20">
+                {`${settings.msm32BufferTimeout || 60}s`}
+              </span>
+              <ChevronRight className="w-4 h-4 text-gray-400" />
+            </div>
+          </button>
+
           {/* Navigation to Persistent Stream Cache Manager Sub-Drawer */}
           <button
             type="button"
@@ -2437,6 +2456,64 @@ export const Settings: React.FC = () => {
           </div>
           <p className="text-[11px] text-gray-500 leading-relaxed">
             If resolution takes longer than this duration, the request will automatically abort and fall back to alternative stream providers.
+          </p>
+        </div>
+      </SettingsDrawer>
+
+      {/* 3a-TG-BUFFER-TIMEOUT. Sub-Drawer: MSM32 Buffering Timeout */}
+      <SettingsDrawer
+        isOpen={activeDrawer === 'telegram-buffer-timeout'}
+        onClose={() => setActiveDrawer(null)}
+        onBack={() => setActiveDrawer('telegram-msm32')}
+        title="Buffering Timeout"
+        subtitle="Maximum wait time for Telegram video stream buffering before warning/failover."
+        categoryLabel="Telegram > MSM32bot > Buffering Timeout"
+      >
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-gray-300 block">Current Timeout:</span>
+            <span className="text-xs text-sky-400 font-mono font-bold">
+              {`${settings.msm32BufferTimeout || 60}s`}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 gap-2">
+            {[
+              { label: '30 Seconds', desc: 'Fast timeout • Quickly flag slow or stalled stream chunks', val: 30 as const },
+              { label: '60 Seconds (Default)', desc: '1.0 Minute • Recommended balance for buffer startup and seeking', val: 60 as const },
+              { label: '90 Seconds', desc: '1.5 Minutes • Extended patience for high-bitrate 1080p streams', val: 90 as const },
+              { label: '120 Seconds', desc: '2.0 Minutes • Deep patience for congested or throttled networks', val: 120 as const },
+            ].map((opt) => {
+              const isCurrent = (settings.msm32BufferTimeout || 60) === opt.val;
+              return (
+                <button
+                  key={opt.val}
+                  type="button"
+                  onClick={() => {
+                    handleUpdate({ msm32BufferTimeout: opt.val });
+                    setActiveDrawer('telegram-msm32');
+                  }}
+                  className={`p-3.5 rounded-xl border text-left transition-all flex items-center justify-between ${
+                    isCurrent
+                      ? 'bg-sky-500/20 border-sky-400 text-white'
+                      : 'bg-white/5 border-white/10 text-gray-400 hover:text-white'
+                  }`}
+                >
+                  <div className="space-y-0.5 pr-2">
+                    <span className="text-xs font-bold block text-white">{opt.label}</span>
+                    <span className="text-[11px] text-gray-400 block leading-snug">{opt.desc}</span>
+                  </div>
+                  <div className={`w-5 h-5 rounded-full border flex items-center justify-center flex-shrink-0 ${
+                    isCurrent ? 'bg-sky-500 border-sky-400 text-black' : 'border-gray-600 bg-black/40 text-transparent'
+                  }`}>
+                    <Check className="w-3 h-3 stroke-[3]" />
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+          <p className="text-[11px] text-gray-500 leading-relaxed">
+            If video stream buffering takes longer than this duration, controls will unlock allowing manual server failover or retry.
           </p>
         </div>
       </SettingsDrawer>
