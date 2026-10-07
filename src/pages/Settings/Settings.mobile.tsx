@@ -1845,7 +1845,7 @@ export const Settings: React.FC = () => {
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">
               <span className="text-[10px] text-sky-400 font-mono font-bold bg-sky-500/10 px-2 py-0.5 rounded border border-sky-400/20">
-                {`${settings.msm32Timeout || 60}s`}
+                {`${settings.msm32Timeout || 90}s`}
               </span>
               <ChevronRight className="w-4 h-4 text-gray-400" />
             </div>
@@ -2395,19 +2395,19 @@ export const Settings: React.FC = () => {
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-gray-300 block">Current Timeout:</span>
             <span className="text-xs text-sky-400 font-mono font-bold">
-              {`${settings.msm32Timeout || 60}s`}
+              {`${settings.msm32Timeout || 90}s`}
             </span>
           </div>
 
           <div className="grid grid-cols-1 gap-2">
             {[
-              { label: '60 Seconds', desc: '1.0 Minute • Fast timeout, quickly failover to fallback providers (Default)', val: 60 as const },
-              { label: '90 Seconds', desc: '1.5 Minutes • Balanced wait time for multi-page Telegram queries', val: 90 as const },
+              { label: '60 Seconds', desc: '1.0 Minute • Fast timeout, quickly failover to fallback providers', val: 60 as const },
+              { label: '90 Seconds', desc: '1.5 Minutes • Balanced wait time for multi-page Telegram queries (Default)', val: 90 as const },
               { label: '120 Seconds', desc: '2.0 Minutes • Extended time for complex multi-episode series searching', val: 120 as const },
               { label: '150 Seconds', desc: '2.5 Minutes • Deep search across extensive page results and high-load bots', val: 150 as const },
               { label: '180 Seconds', desc: '3.0 Minutes • Maximum patience for congested networks and large TV series', val: 180 as const },
             ].map((opt) => {
-              const isCurrent = (settings.msm32Timeout || 60) === opt.val;
+              const isCurrent = (settings.msm32Timeout || 90) === opt.val;
               return (
                 <button
                   key={opt.val}
@@ -2467,7 +2467,7 @@ export const Settings: React.FC = () => {
               </div>
               <div className="flex items-center gap-2 flex-shrink-0">
                 <span className="text-[10px] text-hbo-cyan font-mono font-bold bg-hbo-cyan/10 px-2 py-0.5 rounded border border-hbo-cyan/20">
-                  {`${settings.streamResolverTimeout ?? 30}s`}
+                  {`${settings.streamResolverTimeout ?? 60}s`}
                 </span>
                 <ChevronRight className="w-4 h-4 text-gray-400" />
               </div>
@@ -2568,19 +2568,19 @@ export const Settings: React.FC = () => {
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-gray-300 block">Current Timeout:</span>
             <span className="text-xs text-hbo-cyan font-mono font-bold">
-              {`${settings.streamResolverTimeout ?? 30}s`}
+              {`${settings.streamResolverTimeout ?? 60}s`}
             </span>
           </div>
 
           <div className="grid grid-cols-1 gap-2">
             {[
-              { label: '30 Seconds (Default)', desc: 'Standard balance between quick playback start and reliable failover', val: 30 },
-              { label: '60 Seconds', desc: '1.0 Minute • Recommended for slower mobile connections', val: 60 },
+              { label: '30 Seconds', desc: 'Fast timeout • Quickly skip unresponsive embed mirrors', val: 30 },
+              { label: '60 Seconds (Default)', desc: '1.0 Minute • Recommended balance before auto-failover', val: 60 },
               { label: '90 Seconds', desc: '1.5 Minutes • Extended patience for high-latency networks', val: 90 },
               { label: '180 Seconds', desc: '3.0 Minutes • Deep patience for throttled connections', val: 180 },
               { label: '240 Seconds', desc: '4.0 Minutes • Maximum timeout before skipping to next server', val: 240 },
             ].map((opt) => {
-              const isSelected = (settings.streamResolverTimeout ?? 30) === opt.val;
+              const isSelected = (settings.streamResolverTimeout ?? 60) === opt.val;
               return (
                 <button
                   key={opt.val}
