@@ -4140,13 +4140,13 @@ export const Settings: React.FC = () => {
             <div className="flex-1 overflow-y-auto px-6 py-6 space-y-3 font-sans">
               {(() => {
                 const timeoutOptions = [
-                  { val: 60 as const, label: '60 Seconds (Fast)', desc: '1.0 Minute • Quickly failover to embed providers if Telegram is unresponsive.' },
-                  { val: 90 as const, label: '90 Seconds (Standard)', desc: '1.5 Minutes • Recommended for multi-page Telegram queries and bot ad-gate.' },
+                  { val: 60 as const, label: '60 Seconds (Default)', desc: '1.0 Minute • Quickly failover to embed providers if Telegram is unresponsive.' },
+                  { val: 90 as const, label: '90 Seconds (Balanced)', desc: '1.5 Minutes • Recommended for multi-page Telegram queries and bot ad-gate.' },
                   { val: 120 as const, label: '120 Seconds (Extended)', desc: '2.0 Minutes • Extended patience for complex series episode searching.' },
                   { val: 150 as const, label: '150 Seconds (Deep)', desc: '2.5 Minutes • Deep search across multiple result pages on high-load bots.' },
                   { val: 180 as const, label: '180 Seconds (Maximum)', desc: '3.0 Minutes • Maximum patience for congested networks and slow downloads.' },
                 ];
-                const currentVal = settings.msm32Timeout || 90;
+                const currentVal = settings.msm32Timeout || 60;
 
                 return timeoutOptions.map((opt, idx) => {
                   const isSelected = currentVal === opt.val;
@@ -4585,7 +4585,7 @@ export const Settings: React.FC = () => {
                         className="px-3 py-1.5 rounded-lg border text-xs font-bold transition-all tv-focus-target flex items-center gap-1.5 border-hbo-border bg-hbo-dark/80 hover:bg-hbo-hover text-white flex-shrink-0"
                       >
                         <span className="text-sky-400 font-mono">
-                          {`${settings.msm32Timeout || 90}s`}
+                          {`${settings.msm32Timeout || 60}s`}
                         </span>
                         <ChevronRight className="w-3.5 h-3.5 text-gray-400" />
                       </button>
