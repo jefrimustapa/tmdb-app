@@ -125,7 +125,7 @@ class Msm32MappingService {
     if (signal?.aborted) return null;
 
     const settings = await dbService.getSettings();
-    const timeoutSeconds = settings?.msm32Timeout || 90;
+    const timeoutSeconds = settings?.msm32Timeout || 60;
 
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutSeconds * 1000);

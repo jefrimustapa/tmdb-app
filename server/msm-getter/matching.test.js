@@ -172,33 +172,58 @@ it('disqualifies un-versioned candidates with no matching year when Season > 1 i
 });
 
 console.log('\n7. Search Query Generation (generateSeriesSearchQueries)');
-it('generates the streamlined 12 query patterns without season prefix', () => {
-  const queries = generateSeriesSearchQueries('Reacher', 1, 1, 1, '2022');
+it('generates the adaptive 12 query patterns without episode/episod for Season 1', () => {
+  const queries = generateSeriesSearchQueries('Kelas Cikgu Hiragi', 1, 3, 1, '2024');
   const expectedPatterns = [
-    'Reacher 2022 E01',
-    'Reacher 2022 EP01',
-    'Reacher 2022 E1',
-    'Reacher 2022 EP1',
-    'Reacher 2022 Episod01',
-    'Reacher 2022 Episod 01',
-    'Reacher 2022 Episod1',
-    'Reacher 2022 Episod 1',
-    'Reacher 2022 Episode01',
-    'Reacher 2022 Episode 01',
-    'Reacher 2022 Episode1',
-    'Reacher 2022 Episode 1'
+    'Kelas Cikgu Hiragi EP03',
+    'Kelas Cikgu Hiragi E03',
+    'Kelas Cikgu Hiragi S01E03',
+    'Kelas Cikgu Hiragi 2024 EP03',
+    'Kelas Cikgu Hiragi 2024 E03',
+    'Kelas Cikgu Hiragi 2024 S01E03',
+    'Kelas Cikgu Hiragi EP3',
+    'Kelas Cikgu Hiragi E3',
+    'Kelas Cikgu Hiragi S1E3',
+    'Kelas Cikgu Hiragi 2024',
+    'Kelas Cikgu Hiragi S01',
+    'Kelas Cikgu Hiragi'
   ];
 
-  // Verify the first 12 queries match expectedPatterns in exact order
+  assert.strictEqual(queries.length, expectedPatterns.length, `Queries count should be ${expectedPatterns.length}`);
   for (let i = 0; i < expectedPatterns.length; i++) {
     assert.strictEqual(queries[i], expectedPatterns[i], `Query pattern index ${i} should be ${expectedPatterns[i]}`);
   }
+  // Ensure no 'episode' or 'episod' appears anywhere in generated queries
+  for (const q of queries) {
+    assert.ok(!/\bepisod/i.test(q), `Query "${q}" should not contain episod or episode`);
+  }
+});
 
-  // Also verify fallback without year is included later
-  assert.ok(queries.includes('Reacher E01'), 'Must include non-year fallback query');
-  assert.ok(queries.includes('Reacher Episode 1'), 'Must include non-year episode fallback query');
-  assert.ok(queries.includes('Reacher 2022 S01E01'), 'Must include scene fallback with year');
-  assert.ok(queries.includes('Reacher S01E01'), 'Must include scene fallback without year');
+it('generates the adaptive 12 query patterns without episode/episod for Multi-Season (sNum > 1)', () => {
+  const queries = generateSeriesSearchQueries('Ted Lasso', 4, 9, 4, '2026');
+  const expectedPatterns = [
+    'Ted Lasso S04E09',
+    'Ted Lasso 2026 S04E09',
+    'Ted Lasso S4 EP09',
+    'Ted Lasso S04 EP09',
+    'Ted Lasso 2026 EP09',
+    'Ted Lasso 2026 E09',
+    'Ted Lasso S04E9',
+    'Ted Lasso EP09',
+    'Ted Lasso E09',
+    'Ted Lasso EP9',
+    'Ted Lasso 2026',
+    'Ted Lasso'
+  ];
+
+  assert.strictEqual(queries.length, expectedPatterns.length, `Queries count should be ${expectedPatterns.length}`);
+  for (let i = 0; i < expectedPatterns.length; i++) {
+    assert.strictEqual(queries[i], expectedPatterns[i], `Query pattern index ${i} should be ${expectedPatterns[i]}`);
+  }
+  // Ensure no 'episode' or 'episod' appears anywhere in generated queries
+  for (const q of queries) {
+    assert.ok(!/\bepisod/i.test(q), `Query "${q}" should not contain episod or episode`);
+  }
 });
 
 console.log(`\nResults: ${passed}/${total} tests passed!\n`);
