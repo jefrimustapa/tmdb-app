@@ -56,7 +56,7 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
   episode,
   episodeTitle,
   mediaType,
-  providerLabel = 'Telegram (MSM32)',
+  providerLabel = 'Telegram (MSM)',
   initialTimestamp = 0,
   totalDurationSec,
   onProgress,
@@ -342,7 +342,7 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
         attachedSrcRef.current = null;
       };
     } else {
-      // Direct stream URL (MP4 / MKV from MSM32)
+      // Direct stream URL (MP4 / MKV from MSM)
       video.muted = false;
       video.volume = 1;
       setIsMuted(false);

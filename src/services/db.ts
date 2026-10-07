@@ -77,13 +77,13 @@ export const DEFAULT_SETTINGS: UserSettings = {
   streamResolver: 'embed',
   enabledResolvers: ['embed'],
   enginePriority: ['telegram', 'embed'],
-  enabledTelegramProviders: ['telegram-msm32'],
-  telegramProviderCountries: { 'telegram-msm32': ['MY', 'ID', 'SG'] },
-  msm32GetterUrl: 'https://www.julietmike.net:3033',
-  msm32ChunkSize: 524288,
-  msm32MaxQuality: '1080',
-  msm32Timeout: 90,
-  msm32BufferTimeout: 60,
+  enabledTelegramProviders: ['telegram-msm'],
+  telegramProviderCountries: { 'telegram-msm': ['MY', 'ID', 'SG'] },
+  msmGetterUrl: 'https://www.julietmike.net:3033',
+  msmChunkSize: 524288,
+  msmMaxQuality: '1080',
+  msmTimeout: 90,
+  msmBufferTimeout: 60,
   streamHeaderTimeout: 5,
   streamResolverTimeout: 60,
   streamResolverRetries: 1,
@@ -350,8 +350,43 @@ export const dbService = {
       await db.settings.put(settings);
     }
     const validBufferTimeouts = [30, 60, 90, 120];
-    if (settings.msm32BufferTimeout === undefined || !validBufferTimeouts.includes(settings.msm32BufferTimeout)) {
-      settings.msm32BufferTimeout = 60;
+    if (settings.msmBufferTimeout === undefined) {
+      settings.msmBufferTimeout = (settings.msm32BufferTimeout !== undefined && validBufferTimeouts.includes(settings.msm32BufferTimeout))
+        ? settings.msm32BufferTimeout
+        : 60;
+      await db.settings.put(settings);
+    } else if (!validBufferTimeouts.includes(settings.msmBufferTimeout)) {
+      settings.msmBufferTimeout = 60;
+      await db.settings.put(settings);
+    }
+    if (settings.msmGetterUrl === undefined) {
+      settings.msmGetterUrl = settings.msm32GetterUrl || 'https://www.julietmike.net:3033';
+      await db.settings.put(settings);
+    }
+    if (settings.msmChunkSize === undefined) {
+      settings.msmChunkSize = settings.msm32ChunkSize || 524288;
+      await db.settings.put(settings);
+    }
+    if (settings.msmMaxQuality === undefined) {
+      settings.msmMaxQuality = settings.msm32MaxQuality || '1080';
+      await db.settings.put(settings);
+    }
+    if (settings.msmTimeout === undefined) {
+      settings.msmTimeout = settings.msm32Timeout || 90;
+      await db.settings.put(settings);
+    }
+    if (settings.enabledTelegramProviders) {
+      const idx = settings.enabledTelegramProviders.indexOf('telegram-msm32');
+      if (idx !== -1) {
+        settings.enabledTelegramProviders[idx] = 'telegram-msm';
+        await db.settings.put(settings);
+      }
+    }
+    if (settings.telegramProviderCountries?.['telegram-msm32']) {
+      if (!settings.telegramProviderCountries['telegram-msm']) {
+        settings.telegramProviderCountries['telegram-msm'] = settings.telegramProviderCountries['telegram-msm32'];
+      }
+      delete settings.telegramProviderCountries['telegram-msm32'];
       await db.settings.put(settings);
     }
     if (settings.streamResolverRetries === undefined || settings.streamResolverRetries < 0 || settings.streamResolverRetries > 3) {

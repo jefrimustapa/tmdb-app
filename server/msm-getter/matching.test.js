@@ -101,28 +101,28 @@ const contextTvEp1 = {
 };
 
 it('disqualifies Episode 16 when Episode 1 is searched (THE USER BUG)', () => {
-  const btnEp16 = { className: 'KeyboardButtonUrlAuth', url: 'https://t.me/msm32bot/link/ep16', text: 'Ep 16 1080p' };
+  const btnEp16 = { className: 'KeyboardButtonUrlAuth', url: 'https://t.me/msmbot/link/ep16', text: 'Ep 16 1080p' };
   const msg = { message: 'Hantu Punya Boss' };
   const score = scoreCandidateButton(btnEp16, msg, contextTvEp1);
   assert.strictEqual(score, -999, 'Ep 16 button must be hard disqualified (-999)');
 });
 
 it('disqualifies Episode 10 when Episode 1 is searched', () => {
-  const btnEp10 = { className: 'KeyboardButtonUrlAuth', url: 'https://t.me/msm32bot/link/ep10', text: 'Ep 10 720p' };
+  const btnEp10 = { className: 'KeyboardButtonUrlAuth', url: 'https://t.me/msmbot/link/ep10', text: 'Ep 10 720p' };
   const msg = { message: 'Hantu Punya Boss' };
   const score = scoreCandidateButton(btnEp10, msg, contextTvEp1);
   assert.strictEqual(score, -999, 'Ep 10 button must be hard disqualified (-999)');
 });
 
 it('awards high score for matching Episode 1 buttons', () => {
-  const btnEp1 = { className: 'KeyboardButtonUrlAuth', url: 'https://t.me/msm32bot/link/ep1', text: 'Hantu Punya Boss Ep 1 720p' };
+  const btnEp1 = { className: 'KeyboardButtonUrlAuth', url: 'https://t.me/msmbot/link/ep1', text: 'Hantu Punya Boss Ep 1 720p' };
   const msg = { message: 'Hantu Punya Boss' };
   const score = scoreCandidateButton(btnEp1, msg, contextTvEp1);
   assert.ok(score >= 200, `Ep 1 button should score >= 200, got ${score}`);
 });
 
 it('correctly handles bare buttons by checking parent message context', () => {
-  const btnBare = { className: 'KeyboardButtonUrlAuth', url: 'https://t.me/msm32bot/link/bare', text: '[ WebRip 720p ]' };
+  const btnBare = { className: 'KeyboardButtonUrlAuth', url: 'https://t.me/msmbot/link/bare', text: '[ WebRip 720p ]' };
   
   // Bare button where parent message is Ep 16 -> MUST DISQUALIFY
   const msgEp16 = { message: 'Hantu Punya Boss Episod 16' };
@@ -136,14 +136,14 @@ it('correctly handles bare buttons by checking parent message context', () => {
 });
 
 it('disqualifies Ep 16 even when bot echoes search query in header', () => {
-  const btnBare = { className: 'KeyboardButtonUrlAuth', url: 'https://t.me/msm32bot/link/bare', text: '[ 720p ]' };
+  const btnBare = { className: 'KeyboardButtonUrlAuth', url: 'https://t.me/msmbot/link/bare', text: '[ 720p ]' };
   const msgWithEcho = { message: '🔍 Hasil carian untuk "Hantu Punya Boss Episod 1":\nHantu Punya Boss Episod 16' };
   const score = scoreCandidateButton(btnBare, msgWithEcho, contextTvEp1);
   assert.strictEqual(score, -999, 'Bot echo must be stripped and Ep 16 must be disqualified');
 });
 
 it('disqualifies conflicting Season 10 when Season 1 is requested', () => {
-  const btnSeason10 = { className: 'KeyboardButtonUrlAuth', url: 'https://t.me/msm32bot/link/s10', text: 'Show Name Season 10 Ep 1' };
+  const btnSeason10 = { className: 'KeyboardButtonUrlAuth', url: 'https://t.me/msmbot/link/s10', text: 'Show Name Season 10 Ep 1' };
   const msg = { message: 'Show Name' };
   const score = scoreCandidateButton(btnSeason10, msg, { isTv: true, title: 'Show Name', sNum: 1, eNum: 1 });
   assert.strictEqual(score, -999, 'Season 10 candidate must be disqualified when searching Season 1');
@@ -151,8 +151,8 @@ it('disqualifies conflicting Season 10 when Season 1 is requested', () => {
 
 it('disqualifies conflicting release years for movie reboots/remakes', () => {
   const contextMovie2024 = { isTv: false, title: 'Avatar', year: '2024', targetQuality: 720 };
-  const btn2005 = { className: 'KeyboardButtonUrlAuth', url: 'https://t.me/msm32bot/link/2005', text: 'Avatar 2005 720p' };
-  const btn2024 = { className: 'KeyboardButtonUrlAuth', url: 'https://t.me/msm32bot/link/2024', text: 'Avatar 2024 720p' };
+  const btn2005 = { className: 'KeyboardButtonUrlAuth', url: 'https://t.me/msmbot/link/2005', text: 'Avatar 2005 720p' };
+  const btn2024 = { className: 'KeyboardButtonUrlAuth', url: 'https://t.me/msmbot/link/2024', text: 'Avatar 2024 720p' };
   const msg = { message: '' };
 
   assert.strictEqual(scoreCandidateButton(btn2005, msg, contextMovie2024), -999, '2005 movie must be disqualified when 2024 requested');
@@ -161,9 +161,9 @@ it('disqualifies conflicting release years for movie reboots/remakes', () => {
 
 it('disqualifies un-versioned candidates with no matching year when Season > 1 is requested', () => {
   const contextS2 = { isTv: true, title: 'Reacher', year: '2023', sNum: 2, eNum: 1, totalSeasons: 2, targetQuality: 720 };
-  const btnBareS1 = { className: 'KeyboardButtonUrlAuth', url: 'https://t.me/msm32bot/link/bare', text: 'Reacher Episod 1 720p' };
-  const btnMatchedS2 = { className: 'KeyboardButtonUrlAuth', url: 'https://t.me/msm32bot/link/s2', text: 'Reacher S02E01 720p' };
-  const btnMatchedYear = { className: 'KeyboardButtonUrlAuth', url: 'https://t.me/msm32bot/link/year', text: 'Reacher 2023 Episod 1 720p' };
+  const btnBareS1 = { className: 'KeyboardButtonUrlAuth', url: 'https://t.me/msmbot/link/bare', text: 'Reacher Episod 1 720p' };
+  const btnMatchedS2 = { className: 'KeyboardButtonUrlAuth', url: 'https://t.me/msmbot/link/s2', text: 'Reacher S02E01 720p' };
+  const btnMatchedYear = { className: 'KeyboardButtonUrlAuth', url: 'https://t.me/msmbot/link/year', text: 'Reacher 2023 Episod 1 720p' };
   const msg = { message: '' };
 
   assert.strictEqual(scoreCandidateButton(btnBareS1, msg, contextS2), -999, 'Un-versioned episode must be disqualified for Season 2');

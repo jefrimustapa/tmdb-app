@@ -10,7 +10,7 @@ import { dbService } from '../../services/db';
 import { getProviderById, extractMediaOriginCountries, isProviderMatchingMedia, getOrderedProviders } from '../../services/streamProviders';
 import { isAnimeMedia } from '../../services/animeMappingService';
 import { isAseanMedia, isKoreanMedia } from '../../services/lariMappingService';
-import { msm32Service } from '../../services/msm32MappingService';
+import { msmService } from '../../services/msmMappingService';
 import { ArrowLeft, SkipForward, SkipBack, Settings, FastForward, Rewind } from 'lucide-react';
 
 import type { VirtualCursorStyle, StreamResolverType } from '../../types/db';
@@ -223,7 +223,7 @@ export const Watch: React.FC = () => {
             const aseanFlag = isAseanMedia(fetchedDetails);
             const mediaOrigins = extractMediaOriginCountries(fetchedDetails, animeFlag, koreanFlag, aseanFlag);
             const isTelegramMatching = isProviderMatchingMedia(
-              getProviderById('telegram-msm32'),
+              getProviderById('telegram-msm'),
               mediaOrigins,
               s.telegramProviderCountries,
               s.enabledTelegramProviders
@@ -236,7 +236,7 @@ export const Watch: React.FC = () => {
 
             let defaultProvider = '';
             if (prefersTelegramOverEmbed && hasTelegram && isTelegramMatching) {
-              defaultProvider = 'telegram-msm32';
+              defaultProvider = 'telegram-msm';
             } else if (animeFlag) {
               const animeList = s.topAnimeProviders?.length ? s.topAnimeProviders : getOrderedProviders(undefined, true).map((p: StreamProvider) => p.id);
               defaultProvider = animeList[0];
@@ -244,13 +244,13 @@ export const Watch: React.FC = () => {
               const koreanList = s.topKoreanProviders?.length ? s.topKoreanProviders : getOrderedProviders(undefined, false, false, true).map((p: StreamProvider) => p.id);
               defaultProvider = koreanList[0];
             } else if (!prefersTelegramOverEmbed && hasTelegram && isTelegramMatching && !hasEmbed) {
-              defaultProvider = 'telegram-msm32';
+              defaultProvider = 'telegram-msm';
             } else if (aseanFlag) {
               const aseanList = s.topAseanProviders?.length ? s.topAseanProviders : (s as any).topAsianProviders?.length ? (s as any).topAsianProviders : getOrderedProviders(undefined, false, true).map((p: StreamProvider) => p.id);
               defaultProvider = aseanList[0];
             } else {
               const generalList = s.topProviders?.length ? s.topProviders : getOrderedProviders().map((p: StreamProvider) => p.id);
-              defaultProvider = (!isTelegramMatching ? generalList.find((p: string) => p !== 'telegram-msm32') : generalList[0]) || generalList[0];
+              defaultProvider = (!isTelegramMatching ? generalList.find((p: string) => p !== 'telegram-msm' && p !== 'telegram-msm32') : generalList[0]) || generalList[0];
             }
             if (defaultProvider) {
               setProviderId(defaultProvider);
@@ -313,7 +313,7 @@ export const Watch: React.FC = () => {
 
   // Robust exit watch navigation that cannot be trapped by iframe history
   const handleExitWatch = React.useCallback(() => {
-    msm32Service.closeActiveStream();
+    msmService.closeActiveStream();
     const targetId = id || details?.id;
     if (mediaType && targetId) {
       navigate(`/details/${mediaType}/${targetId}`, { replace: true });

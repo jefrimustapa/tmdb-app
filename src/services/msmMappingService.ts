@@ -1,6 +1,6 @@
 import { dbService } from './db';
 
-export interface Msm32ResolveResult {
+export interface MsmResolveResult {
   streamUrl: string;
   filename?: string;
   size?: number;
@@ -8,7 +8,9 @@ export interface Msm32ResolveResult {
   videoCodec?: string;
 }
 
-export interface Msm32HealthResult {
+export type Msm32ResolveResult = MsmResolveResult;
+
+export interface MsmHealthResult {
   ok: boolean;
   status?: string;
   uptime?: number;
@@ -16,6 +18,8 @@ export interface Msm32HealthResult {
   cachedStreams?: number;
   error?: string;
 }
+
+export type Msm32HealthResult = MsmHealthResult;
 
 export interface CachedStreamRecord {
   queryKey: string;
@@ -35,7 +39,7 @@ export interface CachedStreamsResponse {
   items: CachedStreamRecord[];
 }
 
-class Msm32MappingService {
+class MsmMappingService {
   constructor() {
     this.purgeLegacyClientStorage();
   }
@@ -43,6 +47,8 @@ class Msm32MappingService {
   private purgeLegacyClientStorage() {
     try {
       if (typeof window !== 'undefined' && window.localStorage) {
+        localStorage.removeItem('msm_client_cache');
+        localStorage.removeItem('msm_client_cache_v2');
         localStorage.removeItem('msm32_client_cache');
         localStorage.removeItem('msm32_client_cache_v2');
       }
@@ -51,7 +57,7 @@ class Msm32MappingService {
 
   private async getBaseUrl(): Promise<string> {
     const settings = await dbService.getSettings();
-    let url = settings?.msm32GetterUrl?.trim();
+    let url = (settings?.msmGetterUrl || settings?.msm32GetterUrl)?.trim();
     
     if (!url) {
       url = 'https://www.julietmike.net:3033';
@@ -63,7 +69,7 @@ class Msm32MappingService {
   /**
    * Test connectivity to the MSM Getter microservice (/health)
    */
-  async testConnection(customUrl?: string): Promise<Msm32HealthResult> {
+  async testConnection(customUrl?: string): Promise<MsmHealthResult> {
     let target = customUrl?.trim();
     if (!target) {
       target = await this.getBaseUrl();
@@ -115,9 +121,9 @@ class Msm32MappingService {
     signal?: AbortSignal,
     force?: boolean,
     totalSeasons?: number
-  ): Promise<Msm32ResolveResult | null> {
+  ): Promise<MsmResolveResult | null> {
     if (signal?.aborted) {
-      console.log(`[MSM32] Resolution aborted prior to request for "${title}"`);
+      console.log(`[MSM] Resolution aborted prior to request for "${title}"`);
       return null;
     }
 
@@ -125,7 +131,7 @@ class Msm32MappingService {
     if (signal?.aborted) return null;
 
     const settings = await dbService.getSettings();
-    const timeoutSeconds = settings?.msm32Timeout || 90;
+    const timeoutSeconds = settings?.msmTimeout || settings?.msm32Timeout || 90;
 
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutSeconds * 1000);
@@ -140,7 +146,7 @@ class Msm32MappingService {
     }
 
     try {
-      const maxQuality = settings?.msm32MaxQuality || '1080';
+      const maxQuality = settings?.msmMaxQuality || settings?.msm32MaxQuality || '1080';
 
       const params = new URLSearchParams({ title });
       if (year) params.append('year', String(year));
@@ -161,7 +167,7 @@ class Msm32MappingService {
 
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));
-        console.warn('[MSM32] Resolve returned error status:', res.status, errorData);
+        console.warn('[MSM] Resolve returned error status:', res.status, errorData);
         return null;
       }
 
@@ -170,7 +176,7 @@ class Msm32MappingService {
 
       if (data.success && data.streamUrl) {
         let finalStreamUrl = data.streamUrl;
-        const chunkSize = settings?.msm32ChunkSize || 524288;
+        const chunkSize = settings?.msmChunkSize || settings?.msm32ChunkSize || 524288;
         try {
           const u = new URL(finalStreamUrl);
           u.searchParams.set('chunkSize', String(chunkSize));
@@ -188,7 +194,7 @@ class Msm32MappingService {
           finalStreamUrl = u.toString();
         } catch {}
 
-        const resolved: Msm32ResolveResult = {
+        const resolved: MsmResolveResult = {
           streamUrl: finalStreamUrl,
           filename: data.filename,
           size: data.size,
@@ -201,10 +207,10 @@ class Msm32MappingService {
       return null;
     } catch (err: any) {
       if (signal?.aborted || err?.name === 'AbortError') {
-        console.log(`[MSM32] Stream resolution cancelled for "${title}"`);
+        console.log(`[MSM] Stream resolution cancelled for "${title}"`);
         return null;
       }
-      console.error('[MSM32] Resolution request failed:', err);
+      console.error('[MSM] Resolution request failed:', err);
       return null;
     } finally {
       clearTimeout(timer);
@@ -227,7 +233,7 @@ class Msm32MappingService {
       }
       return await res.json();
     } catch (err: any) {
-      console.error('[MSM32] Failed to fetch cached streams:', err);
+      console.error('[MSM] Failed to fetch cached streams:', err);
       return { success: false, total: 0, totalSizeBytes: 0, items: [] };
     }
   }
@@ -250,7 +256,7 @@ class Msm32MappingService {
       const data = await res.json();
       return !!data.evicted;
     } catch (err) {
-      console.error('[MSM32] Failed to evict cached stream:', err);
+      console.error('[MSM] Failed to evict cached stream:', err);
       return false;
     }
   }
@@ -269,7 +275,7 @@ class Msm32MappingService {
       const data = await res.json();
       return !!data.success;
     } catch (err) {
-      console.error('[MSM32] Failed to clear cached streams:', err);
+      console.error('[MSM] Failed to clear cached streams:', err);
       return false;
     }
   }
@@ -287,7 +293,8 @@ class Msm32MappingService {
   }
 }
 
-export const msm32Service = new Msm32MappingService();
+export const msmService = new MsmMappingService();
+export const msm32Service = msmService;
 
 /**
  * Returns a human-friendly label for the MSM server badge
