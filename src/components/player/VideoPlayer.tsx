@@ -162,8 +162,8 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const [tickerIntervalSec, setTickerIntervalSec] = useState(5);
   const [streamResolverTimeout, setStreamResolverTimeout] = useState(30);
   const streamResolverTimeoutRef = useRef(30);
-  const [msm32Timeout, setMsm32Timeout] = useState(90);
-  const msm32TimeoutRef = useRef(90);
+  const [msm32Timeout, setMsm32Timeout] = useState(60);
+  const msm32TimeoutRef = useRef(60);
   const [streamResolverRetries, setStreamResolverRetries] = useState(1);
   const streamResolverRetriesRef = useRef(1);
 
@@ -244,6 +244,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const watchdogActiveProviderRef = useRef<string | null>(null);
   const watchdogStartTimeRef = useRef<number>(0);
   const [resolverRequestCountdown, setResolverRequestCountdown] = useState<number | null>(null);
+  const watchdogCountdownIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Dedicated self-contained resolving countdown timer (decoupled from async resolution lifecycle)
   useEffect(() => {
@@ -254,8 +255,8 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
     const currentProvider = getProviderById(providerId);
     const effectiveTimeoutSec = (providerId === 'telegram-msm32' || currentProvider.engine === 'telegram')
-      ? (msm32TimeoutRef.current || 90)
-      : (streamResolverTimeoutRef.current || 30);
+      ? (msm32Timeout || msm32TimeoutRef.current || 60)
+      : (streamResolverTimeout || streamResolverTimeoutRef.current || 30);
 
     setResolverRequestCountdown(effectiveTimeoutSec);
 
@@ -272,7 +273,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     return () => {
       clearInterval(interval);
     };
-  }, [playerMode, providerId]);
+  }, [playerMode, providerId, msm32Timeout, streamResolverTimeout]);
 
   const [watchdogCountdown, setWatchdogCountdown] = useState<number | null>(null);
 
@@ -280,6 +281,10 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     if (autoCycleTimeoutRef.current) {
       clearTimeout(autoCycleTimeoutRef.current);
       autoCycleTimeoutRef.current = null;
+    }
+    if (watchdogCountdownIntervalRef.current) {
+      clearInterval(watchdogCountdownIntervalRef.current);
+      watchdogCountdownIntervalRef.current = null;
     }
     watchdogActiveProviderRef.current = null;
     setWatchdogCountdown(null);
@@ -1669,14 +1674,54 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
               lastPostMessageTimeRef.current = Date.now();
               recordProgress(current, dur, false, true);
               setIsProbing(false);
-              if (autoCycleTimeoutRef.current) {
-                clearTimeout(autoCycleTimeoutRef.current);
-                autoCycleTimeoutRef.current = null;
-              }
+              clearWatchdog('CineSrc playback verified');
             }
             return;
           }
           return;
+        }
+
+        // 3d. MoviesAPI / VidSpark player events (https://moviesapi.to & mirrors)
+        if (data.source === 'moviesapi-player' || data.source === 'vidspark-player') {
+          lastPostMessageTimeRef.current = Date.now();
+          if (data.event === 'play' || data.event === 'playing') {
+            isPlayingRef.current = true;
+            setIsLoading(false);
+            setHasError(false);
+            setIsProbing(false);
+            clearWatchdog('MoviesAPI play event');
+          } else if (data.event === 'pause') {
+            isPlayingRef.current = false;
+          } else if (data.event === 'ended') {
+            isPlayingRef.current = false;
+            const endDur = durationRef.current || data.duration || (episodeRuntimeMinutes ? episodeRuntimeMinutes * 60 : 0);
+            if (endDur > 0) recordProgress(endDur, endDur, true, true);
+            return;
+          }
+
+          const current = data.currentTime ?? data.time ?? data.seconds ?? 0;
+          const dur = data.duration ?? data.totalDuration ?? 0;
+          if (current > 0 || data.event === 'timeupdate') {
+            clearWatchdog('MoviesAPI timeupdate/playback');
+            setIsLoading(false);
+            setHasError(false);
+            setIsProbing(false);
+            isPlayingRef.current = true;
+            if (current > 0) {
+              recordProgress(current, dur, false, true);
+            }
+          }
+          return;
+        }
+
+        // 3e. Generic embed 'play' or 'playing' event from any video player
+        if (data.event === 'play' || data.event === 'playing') {
+          lastPostMessageTimeRef.current = Date.now();
+          isPlayingRef.current = true;
+          setIsLoading(false);
+          setHasError(false);
+          setIsProbing(false);
+          clearWatchdog('Generic embed play event');
         }
 
         // 4. PlayerJS, Plyr, vidsrc, or standard event postMessages
@@ -1692,10 +1737,10 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             lastPostMessageTimeRef.current = Date.now();
             recordProgress(current, dur, false, true);
             setIsProbing(false);
-            if (autoCycleTimeoutRef.current) {
-              clearTimeout(autoCycleTimeoutRef.current);
-              autoCycleTimeoutRef.current = null;
-            }
+            clearWatchdog('Standard player timeupdate');
+            setIsLoading(false);
+            setHasError(false);
+            isPlayingRef.current = true;
           }
         }
       } catch {}
@@ -1703,7 +1748,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
     window.addEventListener('message', handlePostMessage);
     return () => window.removeEventListener('message', handlePostMessage);
-  }, [recordProgress, tmdbId, mediaType, season, episode, episodeRuntimeMinutes]);
+  }, [recordProgress, tmdbId, mediaType, season, episode, episodeRuntimeMinutes, clearWatchdog]);
 
   // Universal Fallback Elapsed Watch Session Ticker (For Sandboxed Embed Providers)
   useEffect(() => {
@@ -1991,6 +2036,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         return prev - 1;
       });
     }, 1000);
+    watchdogCountdownIntervalRef.current = countdownInterval;
 
     let consecutiveAudioActiveCount = 0;
 
@@ -2053,7 +2099,10 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     }, timeoutSec * 1000);
 
     return () => {
-      clearInterval(countdownInterval);
+      if (watchdogCountdownIntervalRef.current) {
+        clearInterval(watchdogCountdownIntervalRef.current);
+        watchdogCountdownIntervalRef.current = null;
+      }
       clearInterval(audioPoll);
     };
   }, [providerId, autoCycle, isUserSelected, allFailed, playerMode, hasError, provider.name, clearWatchdog]);

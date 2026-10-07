@@ -305,7 +305,7 @@ function toRoman(num) {
   return map[num] || String(num);
 }
 
-// Generate TV series prioritized search queries without season tags for faster, high-yield retrieval
+// Generate TV series prioritized search queries (Adaptive 12 Queries without 'episode'/'episod')
 function generateSeriesSearchQueries(cleanT, sNum, eNum, totalSeasons, year) {
   const s2 = String(sNum).padStart(2, '0');
   const e2 = String(eNum).padStart(2, '0');
@@ -319,45 +319,59 @@ function generateSeriesSearchQueries(cleanT, sNum, eNum, totalSeasons, year) {
     }
   };
 
-  // Helper to append the 12 strict episode patterns without season for a given prefix (either `${cleanT} ${year}` or `${cleanT}`)
-  const appendPatterns = (prefix) => {
-    // 1. E{%2d}
-    addQuery(`${prefix} E${e2}`);
-    // 2. EP{%2d}
-    addQuery(`${prefix} EP${e2}`);
-    // 3. E{%d}
-    addQuery(`${prefix} E${e1}`);
-    // 4. EP{%d}
-    addQuery(`${prefix} EP${e1}`);
-    // 5. Episod{%2d} (unspaced & spaced)
-    addQuery(`${prefix} Episod${e2}`);
-    addQuery(`${prefix} Episod ${e2}`);
-    // 6. Episod{%d} (unspaced & spaced)
-    addQuery(`${prefix} Episod${e1}`);
-    addQuery(`${prefix} Episod ${e1}`);
-    // 7. Episode{%2d} (unspaced & spaced)
-    addQuery(`${prefix} Episode${e2}`);
-    addQuery(`${prefix} Episode ${e2}`);
-    // 8. Episode{%d} (unspaced & spaced)
-    addQuery(`${prefix} Episode${e1}`);
-    addQuery(`${prefix} Episode ${e1}`);
-  };
-
-  // 1. Primary: 12 strict patterns WITH Year (if year is provided)
-  if (year) {
-    appendPatterns(`${cleanT} ${year}`);
+  if (sNum > 1) {
+    // Multi-Season (sNum > 1): Season tags are crucial to prevent picking wrong season
+    // 1. Scene standard
+    addQuery(`${cleanT} S${s2}E${e2}`);
+    // 2. Scene standard with year
+    if (year) addQuery(`${cleanT} ${year} S${s2}E${e2}`);
+    // 3. Single digit season + EP
+    addQuery(`${cleanT} S${sNum} EP${e2}`);
+    // 4. Double digit season + EP
+    addQuery(`${cleanT} S${s2} EP${e2}`);
+    // 5. Year + EP (uploader might use year to distinguish season)
+    if (year) addQuery(`${cleanT} ${year} EP${e2}`);
+    // 6. Year + E
+    if (year) addQuery(`${cleanT} ${year} E${e2}`);
+    // 7. Scene standard single digit episode
+    addQuery(`${cleanT} S${s2}E${e1}`);
+    // 8. Base EP double digit
+    addQuery(`${cleanT} EP${e2}`);
+    // 9. Base E double digit
+    addQuery(`${cleanT} E${e2}`);
+    // 10. Base EP single digit
+    addQuery(`${cleanT} EP${e1}`);
+    // 11. Year alone
+    if (year) addQuery(`${cleanT} ${year}`);
+    // 12. Title alone
+    addQuery(cleanT);
+  } else {
+    // Season 1 (sNum === 1): Asian / local dramas rarely tag S01; they use EPxx / Exx
+    // 1. Base EP double digit
+    addQuery(`${cleanT} EP${e2}`);
+    // 2. Base E double digit
+    addQuery(`${cleanT} E${e2}`);
+    // 3. S01 standard
+    addQuery(`${cleanT} S01E${e2}`);
+    // 4. Year + EP
+    if (year) addQuery(`${cleanT} ${year} EP${e2}`);
+    // 5. Year + E
+    if (year) addQuery(`${cleanT} ${year} E${e2}`);
+    // 6. Year + S01 standard
+    if (year) addQuery(`${cleanT} ${year} S01E${e2}`);
+    // 7. Base EP single digit
+    addQuery(`${cleanT} EP${e1}`);
+    // 8. Base E single digit
+    addQuery(`${cleanT} E${e1}`);
+    // 9. S1 standard single digit
+    addQuery(`${cleanT} S1E${e1}`);
+    // 10. Year alone
+    if (year) addQuery(`${cleanT} ${year}`);
+    // 11. Season 1 alone
+    addQuery(`${cleanT} S01`);
+    // 12. Title alone
+    addQuery(cleanT);
   }
-
-  // 2. Fallback: 12 strict patterns WITHOUT Year (in case uploader omitted the year)
-  appendPatterns(cleanT);
-
-  // 3. Final Fallbacks: Standard scene SxxExx with year, base title with year, then base title alone
-  if (year) {
-    addQuery(`${cleanT} ${year} S${s2}E${e2}`);
-    addQuery(`${cleanT} ${year}`);
-  }
-  addQuery(`${cleanT} S${s2}E${e2}`);
-  addQuery(cleanT);
 
   return queries;
 }
