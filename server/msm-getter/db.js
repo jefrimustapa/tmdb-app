@@ -8,8 +8,10 @@ const __dirname = path.dirname(__filename);
 const DATA_DIR = path.join(__dirname, 'data');
 const DB_FILE = path.join(DATA_DIR, 'streams.json');
 
-if (!fs.existsSync(DATA_DIR)) {
+try {
   fs.mkdirSync(DATA_DIR, { recursive: true });
+} catch {
+  // Directory already exists or created
 }
 
 class CentralDatabase {
