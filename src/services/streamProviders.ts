@@ -299,8 +299,8 @@ export const STREAM_PROVIDERS: StreamProvider[] = [
     getTVUrl: () => ''
   },
   {
-    id: 'telegram-msm32',
-    name: 'MovieSubMalay (MSM32)',
+    id: 'telegram-msm',
+    name: 'MovieSubMalay (MSM)',
     tagline: 'Direct Telegram stream resolver for Malay & Southeast Asian cinema',
     engine: 'telegram',
     countries: ['MY', 'ID', 'SG'],
@@ -420,7 +420,8 @@ export function getMediaOriginCountries(media?: any): MediaOriginDisplay[] {
 }
 
 export function getProviderById(id: string): StreamProvider {
-  return STREAM_PROVIDERS.find(p => p.id === id) || STREAM_PROVIDERS[0];
+  const normalizedId = id === 'telegram-msm32' ? 'telegram-msm' : id;
+  return STREAM_PROVIDERS.find(p => p.id === normalizedId) || STREAM_PROVIDERS[0];
 }
 
 export function getProvidersByEngine(
@@ -481,7 +482,7 @@ export function isProviderMatchingMedia(
   enabledTelegramProviders?: string[]
 ): boolean {
   if (provider.engine === 'telegram') {
-    const enabledTg = enabledTelegramProviders || ['telegram-msm32'];
+    const enabledTg = enabledTelegramProviders?.map(p => p === 'telegram-msm32' ? 'telegram-msm' : p) || ['telegram-msm'];
     if (!enabledTg.includes(provider.id)) return false;
 
     const effective = getEffectiveCountries(provider, customCountries);

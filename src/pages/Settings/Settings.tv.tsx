@@ -3,7 +3,7 @@ import { dbService } from '../../services/db';
 import type { UserSettings, StreamResolverType } from '../../types/db';
 import { STREAM_PROVIDERS, CATEGORY_BADGE_CONFIG, ORIGIN_COUNTRY_LABELS } from '../../services/streamProviders';
 import type { OriginCountryCode } from '../../types/stream';
-import { msm32Service, getMsmServerLabel, type Msm32HealthResult } from '../../services/msm32MappingService';
+import { msmService, getMsmServerLabel, type MsmHealthResult } from '../../services/msmMappingService';
 import { useDevice } from '../../hooks/useDevice';
 import { Logo } from '../../components/common/Logo';
 import { APP_VERSION, APP_BUILD_NUMBER, APP_VERSION_FULL, APP_BUILD_CHANNEL, APP_CHANGELOG } from '../../version';
@@ -182,8 +182,8 @@ export const Settings: React.FC = () => {
   const [showHeaderTimeoutDrawer, setShowHeaderTimeoutDrawer] = useState(false);
   const [showPerfHudDrawer, setShowPerfHudDrawer] = useState(false);
   const [showBackupDrawer, setShowBackupDrawer] = useState(false);
-  const [testingMsm32, setTestingMsm32] = useState(false);
-  const [msm32TestResult, setMsm32TestResult] = useState<Msm32HealthResult | null>(null);
+  const [testingMsm, setTestingMsm] = useState(false);
+  const [msmTestResult, setMsmTestResult] = useState<MsmHealthResult | null>(null);
   const [msmUrlInput, setMsmUrlInput] = useState<string>('');
   const clickCountRef = useRef(0);
   const clickTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -214,29 +214,30 @@ export const Settings: React.FC = () => {
 
   // Keep local msmUrlInput in sync with persisted settings
   useEffect(() => {
-    if (settings?.msm32GetterUrl !== undefined) {
-      setMsmUrlInput(settings.msm32GetterUrl || 'https://www.julietmike.net:3033');
+    const url = settings?.msmGetterUrl || settings?.msm32GetterUrl;
+    if (url !== undefined) {
+      setMsmUrlInput(url || 'https://www.julietmike.net:3033');
     }
-  }, [settings?.msm32GetterUrl]);
+  }, [settings?.msmGetterUrl, settings?.msm32GetterUrl]);
 
-  // Auto-ping MSM Getter microservice whenever the user enters the Telegram provider or MSM32 drawer
+  // Auto-ping MSM Getter microservice whenever the user enters the Telegram provider or MSM drawer
   useEffect(() => {
     if (showTelegramDrawer || showTelegramMsmDrawer) {
-      setTestingMsm32(true);
-      setMsm32TestResult(null);
-      const url = settings?.msm32GetterUrl;
-      msm32Service.testConnection(url)
+      setTestingMsm(true);
+      setMsmTestResult(null);
+      const url = settings?.msmGetterUrl || settings?.msm32GetterUrl;
+      msmService.testConnection(url)
         .then((res) => {
-          setMsm32TestResult(res);
+          setMsmTestResult(res);
         })
         .catch((err: any) => {
-          setMsm32TestResult({ ok: false, error: err?.message || 'Connection failed' });
+          setMsmTestResult({ ok: false, error: err?.message || 'Connection failed' });
         })
         .finally(() => {
-          setTestingMsm32(false);
+          setTestingMsm(false);
         });
     }
-  }, [showTelegramDrawer, showTelegramMsmDrawer, settings?.msm32GetterUrl]);
+  }, [showTelegramDrawer, showTelegramMsmDrawer, settings?.msmGetterUrl, settings?.msm32GetterUrl]);
 
   useEffect(() => {
     try {
@@ -329,7 +330,7 @@ export const Settings: React.FC = () => {
     } else if (showTelegramMsmDrawer) {
       setTimeout(() => {
         const defaultEl = document.getElementById('drawer-msm-toggle') ||
-                          document.getElementById('drawer-msm32-sub-url') ||
+                          document.getElementById('drawer-msm-sub-url') ||
                           document.querySelector<HTMLElement>('[data-telegram-msm-drawer-item="true"]');
         if (defaultEl) {
           defaultEl.focus();
@@ -491,7 +492,7 @@ export const Settings: React.FC = () => {
         setShowTelegramMsmDrawer(false);
         setShowTelegramDrawer(true);
         setTimeout(() => {
-          document.getElementById('drawer-msm32-sub')?.focus();
+          document.getElementById('drawer-msm-sub')?.focus();
         }, 50);
         return;
       }
@@ -499,7 +500,7 @@ export const Settings: React.FC = () => {
         setShowTelegramUrlDrawer(false);
         setShowTelegramMsmDrawer(true);
         setTimeout(() => {
-          document.getElementById('drawer-msm32-sub-url')?.focus();
+          document.getElementById('drawer-msm-sub-url')?.focus();
         }, 50);
         return;
       }
@@ -507,7 +508,7 @@ export const Settings: React.FC = () => {
         setShowTelegramChunkDrawer(false);
         setShowTelegramMsmDrawer(true);
         setTimeout(() => {
-          document.getElementById('drawer-msm32-sub-chunk')?.focus();
+          document.getElementById('drawer-msm-sub-chunk')?.focus();
         }, 50);
         return;
       }
@@ -515,7 +516,7 @@ export const Settings: React.FC = () => {
         setShowTelegramCountryDrawer(false);
         setShowTelegramMsmDrawer(true);
         setTimeout(() => {
-          document.getElementById('drawer-msm32-sub-country')?.focus();
+          document.getElementById('drawer-msm-sub-country')?.focus();
         }, 50);
         return;
       }
@@ -523,7 +524,7 @@ export const Settings: React.FC = () => {
         setShowTelegramTimeoutDrawer(false);
         setShowTelegramMsmDrawer(true);
         setTimeout(() => {
-          document.getElementById('drawer-msm32-sub-timeout')?.focus();
+          document.getElementById('drawer-msm-sub-timeout')?.focus();
         }, 50);
         return;
       }
@@ -531,7 +532,7 @@ export const Settings: React.FC = () => {
         setShowTelegramBufferTimeoutDrawer(false);
         setShowTelegramMsmDrawer(true);
         setTimeout(() => {
-          document.getElementById('drawer-msm32-sub-buffer-timeout')?.focus();
+          document.getElementById('drawer-msm-sub-buffer-timeout')?.focus();
         }, 50);
         return;
       }
@@ -3304,7 +3305,7 @@ export const Settings: React.FC = () => {
                             Direct MTProto
                           </span>
                         </div>
-                        <p className="text-[11px] text-gray-400 mb-1.5 leading-snug">Direct in-app video streaming from Telegram bots (MovieSubMalay / @msm32bot).</p>
+                        <p className="text-[11px] text-gray-400 mb-1.5 leading-snug">Direct in-app video streaming from Telegram bots (MovieSubMalay / @msmbot).</p>
                         <div className="flex items-center gap-2 text-xs font-semibold">
                           {isTelegramEnabled ? (
                             <span className="text-sky-400 flex items-center gap-1">
@@ -3435,7 +3436,7 @@ export const Settings: React.FC = () => {
                   telegram: {
                     title: 'Telegram Provider',
                     tag: 'Direct MTProto',
-                    desc: 'Direct in-app video streaming from Telegram bots (MovieSubMalay / @msm32bot).',
+                    desc: 'Direct in-app video streaming from Telegram bots (MovieSubMalay / @msmbot).',
                     tagClass: 'bg-sky-500/20 text-sky-300 border-sky-500/40',
                   },
                   embed: {
@@ -3632,10 +3633,10 @@ export const Settings: React.FC = () => {
                   ? settings.enabledResolvers
                   : ['embed'];
                 const isTelegramEnabled = currentEnabled.includes('telegram');
-                const enabledTg = settings.enabledTelegramProviders || ['telegram-msm32'];
-                const isMsmEnabled = enabledTg.includes('telegram-msm32');
+                const enabledTg = settings.enabledTelegramProviders || ['telegram-msm'];
+                const isMsmEnabled = enabledTg.includes('telegram-msm') || enabledTg.includes('telegram-msm32');
                 const currentCountries: OriginCountryCode[] =
-                  (settings.telegramProviderCountries && settings.telegramProviderCountries['telegram-msm32']) ||
+                  (settings.telegramProviderCountries && (settings.telegramProviderCountries['telegram-msm'] || settings.telegramProviderCountries['telegram-msm32'])) ||
                   ['MY', 'ID', 'SG'];
                 const availableCodes: OriginCountryCode[] = ['MY', 'ID', 'SG', 'TH', 'KR', 'JP', 'GLOBAL'];
 
@@ -3649,7 +3650,7 @@ export const Settings: React.FC = () => {
                       onKeyDown={(e) => {
                         if (e.key === 'ArrowDown') {
                           e.preventDefault();
-                          const target = document.getElementById('drawer-msm32-sub');
+                          const target = document.getElementById('drawer-msm-sub');
                           target?.focus();
                           target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
                         }
@@ -3685,9 +3686,9 @@ export const Settings: React.FC = () => {
                       </div>
                     </button>
 
-                    {/* MSM32 Sub-drawer Entry */}
+                    {/* MSM Sub-drawer Entry */}
                     <button
-                      id="drawer-msm32-sub"
+                      id="drawer-msm-sub"
                       data-telegram-drawer-item="true"
                       type="button"
                       onKeyDown={(e) => {
@@ -3705,7 +3706,7 @@ export const Settings: React.FC = () => {
                       <div className="min-w-0 pr-3">
                         <div className="font-bold text-sm text-white mb-0.5 flex items-center gap-2">
                           <Send className="w-4 h-4 text-sky-400 flex-shrink-0" />
-                          <span>MovieSubMalay (@msm32bot)</span>
+                          <span>MovieSubMalay (@msmbot)</span>
                         </div>
                         <p className="text-[11px] text-gray-400">
                           Configure microservice URL, server ping, chunk slice buffer, and bot settings.
@@ -3761,7 +3762,7 @@ export const Settings: React.FC = () => {
               <ChevronRight className="w-3.5 h-3.5 text-gray-500" />
               <span className="text-gray-400">Telegram</span>
               <ChevronRight className="w-3.5 h-3.5 text-gray-500" />
-              <span className="text-hbo-cyan font-semibold">MSM32bot</span>
+              <span className="text-hbo-cyan font-semibold">MSMbot</span>
             </div>
             <h1 className="text-3xl font-extrabold text-white tracking-tight mb-2">Stream Chunk Buffer</h1>
             <p className="text-sm text-gray-400 max-w-md leading-relaxed">
@@ -3778,7 +3779,7 @@ export const Settings: React.FC = () => {
                   { val: 524288, label: '512 KB (Standard Pipeline)', desc: '4 parallel streams (2MB in-flight) • Optimum balance between seek response and stable throughput.' },
                   { val: 1048576, label: '1 MB (Turbo Pipeline)', desc: '6 parallel streams (3MB in-flight) • Maximum prefetch throughput for smooth, zero-stutter 1080p.' },
                 ];
-                const currentVal = settings.msm32ChunkSize || 524288;
+                const currentVal = settings.msmChunkSize || settings.msm32ChunkSize || 524288;
 
                 return chunkOptions.map((opt, idx) => {
                   const isSelected = currentVal === opt.val;
@@ -3803,11 +3804,11 @@ export const Settings: React.FC = () => {
                         }
                       }}
                       onClick={() => {
-                        handleUpdate({ msm32ChunkSize: opt.val });
+                        handleUpdate({ msmChunkSize: opt.val });
                         setShowTelegramChunkDrawer(false);
                         setShowTelegramMsmDrawer(true);
                         setTimeout(() => {
-                          document.getElementById('drawer-msm32-sub-chunk')?.focus();
+                          document.getElementById('drawer-msm-sub-chunk')?.focus();
                         }, 50);
                       }}
                       className={`w-full p-4 rounded-xl border text-left transition-all tv-focus-target flex items-center justify-between gap-3 ${
@@ -3871,11 +3872,11 @@ export const Settings: React.FC = () => {
               <ChevronRight className="w-3.5 h-3.5 text-gray-500" />
               <span className="text-gray-400">Telegram</span>
               <ChevronRight className="w-3.5 h-3.5 text-gray-500" />
-              <span className="text-hbo-cyan font-semibold">MSM32bot</span>
+              <span className="text-hbo-cyan font-semibold">MSMbot</span>
             </div>
             <h1 className="text-3xl font-extrabold text-white tracking-tight mb-2">Country Origin Filters</h1>
             <p className="text-sm text-gray-400 max-w-md leading-relaxed">
-              Select which content origin countries trigger Telegram MSM32 provider resolution.
+              Select which content origin countries trigger Telegram MSM provider resolution.
             </p>
           </div>
 
@@ -3883,11 +3884,11 @@ export const Settings: React.FC = () => {
             {/* Drawer Body: Single Column Options */}
             <div className="flex-1 overflow-y-auto px-6 py-6 space-y-2.5 font-sans">
               <p className="text-xs text-gray-400 mb-2 leading-relaxed">
-                Telegram MSM32 specializes in Southeast Asian releases. Select the content origin countries where MSM32 should probe for matching streams:
+                Telegram MSM specializes in Southeast Asian releases. Select the content origin countries where MSM should probe for matching streams:
               </p>
               {(() => {
                 const currentCountries: OriginCountryCode[] =
-                  (settings.telegramProviderCountries && settings.telegramProviderCountries['telegram-msm32']) ||
+                  (settings.telegramProviderCountries && (settings.telegramProviderCountries['telegram-msm'] || settings.telegramProviderCountries['telegram-msm32'])) ||
                   ['MY', 'ID', 'SG'];
                 const availableCodes: OriginCountryCode[] = ['MY', 'ID', 'SG', 'TH', 'KR', 'JP', 'US', 'GLOBAL'];
 
@@ -3925,7 +3926,7 @@ export const Settings: React.FC = () => {
                         handleUpdate({
                           telegramProviderCountries: {
                             ...existingMap,
-                            'telegram-msm32': updated
+                            'telegram-msm': updated
                           }
                         });
                       }}
@@ -3987,7 +3988,7 @@ export const Settings: React.FC = () => {
               <ChevronRight className="w-3.5 h-3.5 text-gray-500" />
               <span className="text-gray-400">Telegram</span>
               <ChevronRight className="w-3.5 h-3.5 text-gray-500" />
-              <span className="text-hbo-cyan font-semibold">MSM32bot</span>
+              <span className="text-hbo-cyan font-semibold">MSMbot</span>
             </div>
             <h1 className="text-3xl font-extrabold text-white tracking-tight mb-2">Microservice Endpoint URL</h1>
             <p className="text-sm text-gray-400 max-w-md leading-relaxed">
@@ -3999,21 +4000,21 @@ export const Settings: React.FC = () => {
             {/* Drawer Body */}
             <div className="flex-1 overflow-y-auto px-6 py-6 space-y-4 font-sans">
               {(() => {
-                const currentUrl = settings.msm32GetterUrl || 'https://www.julietmike.net:3033';
+                const currentUrl = settings.msmGetterUrl || settings.msm32GetterUrl || 'https://www.julietmike.net:3033';
                 const isJmSelected = currentUrl === 'https://www.julietmike.net:3033';
 
                 const applyUrl = (url: string) => {
                   const trimmed = url.trim().replace(/\/+$/, '');
                   const finalUrl = trimmed || 'https://www.julietmike.net:3033';
-                  msm32Service.clearCache();
-                  handleUpdate({ msm32GetterUrl: finalUrl });
+                  msmService.clearCache();
+                  handleUpdate({ msmGetterUrl: finalUrl });
                   setMsmUrlInput(finalUrl);
-                  setTestingMsm32(true);
-                  setMsm32TestResult(null);
-                  msm32Service.testConnection(finalUrl)
-                    .then((res) => setMsm32TestResult(res))
-                    .catch((err: any) => setMsm32TestResult({ ok: false, error: err?.message || 'Connection failed' }))
-                    .finally(() => setTestingMsm32(false));
+                  setTestingMsm(true);
+                  setMsmTestResult(null);
+                  msmService.testConnection(finalUrl)
+                    .then((res) => setMsmTestResult(res))
+                    .catch((err: any) => setMsmTestResult({ ok: false, error: err?.message || 'Connection failed' }))
+                    .finally(() => setTestingMsm(false));
                 };
 
                 return (
@@ -4088,7 +4089,7 @@ export const Settings: React.FC = () => {
                         }}
                         onBlur={() => {
                           const trimmed = msmUrlInput.trim().replace(/\/+$/, '');
-                          if (trimmed && trimmed !== settings.msm32GetterUrl) {
+                          if (trimmed && trimmed !== settings.msmGetterUrl) {
                             applyUrl(trimmed);
                           }
                         }}
@@ -4110,7 +4111,7 @@ export const Settings: React.FC = () => {
       )}
 
       {/* ========================================================================= */}
-      {/* Android TV Telegram MSM32 Timeout Drawer (Level 4)                       */}
+      {/* Android TV Telegram MSM Timeout Drawer (Level 4)                          */}
       {/* ========================================================================= */}
       {showTelegramTimeoutDrawer && (
         <div
@@ -4136,7 +4137,7 @@ export const Settings: React.FC = () => {
               <ChevronRight className="w-3.5 h-3.5 text-gray-500" />
               <span className="text-gray-400">Telegram</span>
               <ChevronRight className="w-3.5 h-3.5 text-gray-500" />
-              <span className="text-hbo-cyan font-semibold">MSM32bot</span>
+              <span className="text-hbo-cyan font-semibold">MSMbot</span>
             </div>
             <h1 className="text-3xl font-extrabold text-white tracking-tight mb-2">Resolver Request Timeout</h1>
             <p className="text-sm text-gray-400 max-w-md leading-relaxed">
@@ -4155,7 +4156,7 @@ export const Settings: React.FC = () => {
                   { val: 150 as const, label: '150 Seconds (Deep)', desc: '2.5 Minutes • Deep search across multiple result pages on high-load bots.' },
                   { val: 180 as const, label: '180 Seconds (Maximum)', desc: '3.0 Minutes • Maximum patience for congested networks and slow downloads.' },
                 ];
-                const currentVal = settings.msm32Timeout || 90;
+                const currentVal = settings.msmTimeout || settings.msm32Timeout || 90;
 
                 return timeoutOptions.map((opt, idx) => {
                   const isSelected = currentVal === opt.val;
@@ -4180,11 +4181,11 @@ export const Settings: React.FC = () => {
                         }
                       }}
                       onClick={() => {
-                        handleUpdate({ msm32Timeout: opt.val });
+                        handleUpdate({ msmTimeout: opt.val });
                         setShowTelegramTimeoutDrawer(false);
                         setShowTelegramMsmDrawer(true);
                         setTimeout(() => {
-                          document.getElementById('drawer-msm32-sub-timeout')?.focus();
+                          document.getElementById('drawer-msm-sub-timeout')?.focus();
                         }, 50);
                       }}
                       className={`w-full p-4 rounded-xl border text-left transition-all tv-focus-target flex items-center justify-between gap-3 ${
@@ -4215,14 +4216,14 @@ export const Settings: React.FC = () => {
 
             {/* Drawer Footer Hint */}
             <div className="p-4 border-t border-hbo-border/50 bg-black/40 flex items-center justify-center text-xs text-gray-400 select-none">
-              <span>Press <strong className="text-white font-semibold">Back</strong> to return to MSM32bot Settings</span>
+              <span>Press <strong className="text-white font-semibold">Back</strong> to return to MSMbot Settings</span>
             </div>
           </div>
         </div>
       )}
 
       {/* ========================================================================= */}
-      {/* Android TV Telegram MSM32 Buffering Timeout Drawer (Level 4)             */}
+      {/* Android TV Telegram MSM Buffering Timeout Drawer (Level 4)               */}
       {/* ========================================================================= */}
       {showTelegramBufferTimeoutDrawer && (
         <div
@@ -4248,7 +4249,7 @@ export const Settings: React.FC = () => {
               <ChevronRight className="w-3.5 h-3.5 text-gray-500" />
               <span className="text-gray-400">Telegram</span>
               <ChevronRight className="w-3.5 h-3.5 text-gray-500" />
-              <span className="text-hbo-cyan font-semibold">MSM32bot</span>
+              <span className="text-hbo-cyan font-semibold">MSMbot</span>
             </div>
             <h2 className="text-4xl font-extrabold text-white tracking-tight mb-2">Buffering Timeout</h2>
             <p className="text-sm text-gray-300 max-w-md leading-relaxed">
@@ -4266,7 +4267,7 @@ export const Settings: React.FC = () => {
                   { val: 90 as const, label: '90 Seconds (Extended)', desc: '1.5 Minutes • Extended patience for high-bitrate 1080p streams.' },
                   { val: 120 as const, label: '120 Seconds (Maximum)', desc: '2.0 Minutes • Deep patience for congested or throttled networks.' },
                 ];
-                const currentVal = settings.msm32BufferTimeout || 60;
+                const currentVal = settings.msmBufferTimeout || settings.msm32BufferTimeout || 60;
 
                 return timeoutOptions.map((opt, idx) => {
                   const isSelected = currentVal === opt.val;
@@ -4291,11 +4292,11 @@ export const Settings: React.FC = () => {
                         }
                       }}
                       onClick={() => {
-                        handleUpdate({ msm32BufferTimeout: opt.val });
+                        handleUpdate({ msmBufferTimeout: opt.val });
                         setShowTelegramBufferTimeoutDrawer(false);
                         setShowTelegramMsmDrawer(true);
                         setTimeout(() => {
-                          document.getElementById('drawer-msm32-sub-buffer-timeout')?.focus();
+                          document.getElementById('drawer-msm-sub-buffer-timeout')?.focus();
                         }, 50);
                       }}
                       className={`w-full p-4 rounded-xl border text-left transition-all tv-focus-target flex items-center justify-between gap-3 ${
@@ -4316,7 +4317,7 @@ export const Settings: React.FC = () => {
                       <div className={`w-6 h-6 rounded-full border flex items-center justify-center flex-shrink-0 ${
                         isSelected ? 'bg-sky-500 border-sky-400 text-black' : 'border-gray-600 bg-black/40 text-transparent'
                       }`}>
-                        <Check className="w-3.5 h-3.5 stroke-[3]" />
+                        <Check className="w-3 h-3 stroke-[3]" />
                       </div>
                     </button>
                   );
@@ -4326,14 +4327,14 @@ export const Settings: React.FC = () => {
 
             {/* Drawer Footer Hint */}
             <div className="p-4 border-t border-hbo-border/50 bg-black/40 flex items-center justify-center text-xs text-gray-400 select-none">
-              <span>Press <strong className="text-white font-semibold">Back</strong> to return to MSM32bot Settings</span>
+              <span>Press <strong className="text-white font-semibold">Back</strong> to return to MSMbot Settings</span>
             </div>
           </div>
         </div>
       )}
 
       {/* ========================================================================= */}
-      {/* Android TV Telegram MSM32 Sub-Drawer (Level 3)                            */}
+      {/* Android TV Telegram MSM Sub-Drawer (Level 3)                              */}
       {/* ========================================================================= */}
       {showTelegramMsmDrawer && (
         <div
@@ -4357,9 +4358,9 @@ export const Settings: React.FC = () => {
               <ChevronRight className="w-3.5 h-3.5 text-gray-500" />
               <span className="text-gray-400">Telegram</span>
               <ChevronRight className="w-3.5 h-3.5 text-gray-500" />
-              <span className="text-sky-400 font-semibold">MSM32bot</span>
+              <span className="text-sky-400 font-semibold">MSMbot</span>
             </div>
-            <h1 className="text-3xl font-extrabold text-white tracking-tight mb-2">MovieSubMalay (@msm32bot)</h1>
+            <h1 className="text-3xl font-extrabold text-white tracking-tight mb-2">MovieSubMalay (@msmbot)</h1>
             <p className="text-sm text-gray-400 max-w-md leading-relaxed">
               Configure MSM Getter microservice endpoint, connection test, and bot stream settings.
             </p>
@@ -4369,13 +4370,13 @@ export const Settings: React.FC = () => {
             {/* Drawer Body */}
             <div className="flex-1 overflow-y-auto px-6 py-6 space-y-4 font-sans">
               {(() => {
-                const enabledTg = settings.enabledTelegramProviders || ['telegram-msm32'];
-                const isMsmEnabled = enabledTg.includes('telegram-msm32');
-                const currentUrl = settings.msm32GetterUrl || 'https://www.julietmike.net:3033';
+                const enabledTg = settings.enabledTelegramProviders || ['telegram-msm'];
+                const isMsmEnabled = enabledTg.includes('telegram-msm') || enabledTg.includes('telegram-msm32');
+                const currentUrl = settings.msmGetterUrl || settings.msm32GetterUrl || 'https://www.julietmike.net:3033';
 
                 return (
                   <>
-                    {/* Item 0: Enable / Disable @msm32bot Toggle */}
+                    {/* Item 0: Enable / Disable @msmbot Toggle */}
                     <button
                       id="drawer-msm-toggle"
                       data-telegram-msm-drawer-item="true"
@@ -4383,15 +4384,15 @@ export const Settings: React.FC = () => {
                       onKeyDown={(e) => {
                         if (e.key === 'ArrowDown') {
                           e.preventDefault();
-                          const target = document.getElementById('drawer-msm32-sub-url');
+                          const target = document.getElementById('drawer-msm-sub-url');
                           target?.focus();
                           target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
                         }
                       }}
                       onClick={() => {
                         const updated = isMsmEnabled
-                          ? enabledTg.filter(id => id !== 'telegram-msm32')
-                          : [...enabledTg, 'telegram-msm32'];
+                          ? enabledTg.filter(id => id !== 'telegram-msm' && id !== 'telegram-msm32')
+                          : [...enabledTg.filter(id => id !== 'telegram-msm32'), 'telegram-msm'];
                         handleUpdate({ enabledTelegramProviders: updated });
                       }}
                       className={`w-full p-4 rounded-xl border text-left transition-all tv-focus-target flex items-center justify-between ${
@@ -4403,7 +4404,7 @@ export const Settings: React.FC = () => {
                       <div className="min-w-0 pr-3">
                         <div className="font-bold text-sm text-white mb-0.5 flex items-center gap-2">
                           <Send className="w-4 h-4 text-sky-400" />
-                          <span>Enable @msm32bot</span>
+                          <span>Enable @msmbot</span>
                         </div>
                         <p className="text-[11px] text-gray-400">Probe and stream releases from MovieSubMalay bot.</p>
                       </div>
@@ -4425,7 +4426,7 @@ export const Settings: React.FC = () => {
                         <p className="text-[10px] text-gray-400">Backend server running Telegram MTProto client.</p>
                       </div>
                       <button
-                        id="drawer-msm32-sub-url"
+                        id="drawer-msm-sub-url"
                         data-telegram-msm-drawer-item="true"
                         type="button"
                         onKeyDown={(e) => {
@@ -4436,7 +4437,7 @@ export const Settings: React.FC = () => {
                             target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
                           } else if (e.key === 'ArrowDown') {
                             e.preventDefault();
-                            const target = document.getElementById('drawer-btn-msm32-test');
+                            const target = document.getElementById('drawer-btn-msm-test');
                             target?.focus();
                             target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
                           }
@@ -4462,62 +4463,62 @@ export const Settings: React.FC = () => {
                       </div>
 
                       <button
-                        id="drawer-btn-msm32-test"
+                        id="drawer-btn-msm-test"
                         data-telegram-msm-drawer-item="true"
                         type="button"
-                        aria-busy={testingMsm32}
+                        aria-busy={testingMsm}
                         onKeyDown={(e) => {
                           if (e.key === 'ArrowUp') {
                             e.preventDefault();
-                            const target = document.getElementById('drawer-msm32-sub-url');
+                            const target = document.getElementById('drawer-msm-sub-url');
                             target?.focus();
                             target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
                           } else if (e.key === 'ArrowDown') {
                             e.preventDefault();
-                            const target = document.getElementById('drawer-msm32-sub-quality');
+                            const target = document.getElementById('drawer-msm-sub-quality');
                             target?.focus();
                             target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
                           }
                         }}
                         onClick={async () => {
-                          if (testingMsm32) return;
-                          setTestingMsm32(true);
-                          setMsm32TestResult(null);
+                          if (testingMsm) return;
+                          setTestingMsm(true);
+                          setMsmTestResult(null);
                           try {
-                            const res = await msm32Service.testConnection(settings.msm32GetterUrl);
-                            setMsm32TestResult(res);
+                            const res = await msmService.testConnection(settings.msmGetterUrl || settings.msm32GetterUrl);
+                            setMsmTestResult(res);
                           } catch (err: any) {
-                            setMsm32TestResult({ ok: false, error: err?.message || 'Connection failed' });
+                            setMsmTestResult({ ok: false, error: err?.message || 'Connection failed' });
                           } finally {
-                            setTestingMsm32(false);
+                            setTestingMsm(false);
                           }
                         }}
                         className={`w-full py-2.5 rounded-xl text-black font-bold text-xs flex items-center justify-center gap-2 transition-all tv-focus-target ${
-                          testingMsm32 ? 'bg-sky-400/80 cursor-wait' : 'bg-sky-500 hover:bg-sky-400'
+                          testingMsm ? 'bg-sky-400/80 cursor-wait' : 'bg-sky-500 hover:bg-sky-400'
                         }`}
                       >
-                        <RefreshCw className={`w-3.5 h-3.5 ${testingMsm32 ? 'animate-spin' : ''}`} />
-                        <span>{testingMsm32 ? 'Pinging Server (Waking Up)...' : 'Re-ping Microservice Server'}</span>
+                        <RefreshCw className={`w-3.5 h-3.5 ${testingMsm ? 'animate-spin' : ''}`} />
+                        <span>{testingMsm ? 'Pinging Server (Waking Up)...' : 'Re-ping Microservice Server'}</span>
                       </button>
 
-                      {msm32TestResult ? (
+                      {msmTestResult ? (
                         <div className={`p-2.5 rounded-lg text-xs flex items-center gap-2 border ${
-                          msm32TestResult.ok
+                          msmTestResult.ok
                             ? 'bg-emerald-950/40 text-emerald-300 border-emerald-500/40'
                             : 'bg-rose-950/40 text-rose-300 border-rose-500/40'
                         }`}>
-                          {msm32TestResult.ok ? (
+                          {msmTestResult.ok ? (
                             <Check className="w-4 h-4 text-emerald-400 flex-shrink-0" />
                           ) : (
                             <AlertCircle className="w-4 h-4 text-rose-400 flex-shrink-0" />
                           )}
                           <span className="truncate">
-                            {msm32TestResult.ok
-                              ? `Online! Status: ${msm32TestResult.status || 'running'} • MTProto: ${msm32TestResult.isConnected ? 'Connected' : 'Standby'}`
-                              : `Failed / Waking Up: ${msm32TestResult.error}`}
+                            {msmTestResult.ok
+                              ? `Online! Status: ${msmTestResult.status || 'running'} • MTProto: ${msmTestResult.isConnected ? 'Connected' : 'Standby'}`
+                              : `Failed / Waking Up: ${msmTestResult.error}`}
                           </span>
                         </div>
-                      ) : testingMsm32 && (
+                      ) : testingMsm && (
                         <div className="p-2.5 rounded-lg text-xs flex items-center gap-2 border bg-sky-950/40 text-sky-300 border-sky-500/40">
                           <RefreshCw className="w-4 h-4 text-sky-400 flex-shrink-0 animate-spin" />
                           <span className="truncate">Pinging server... Please wait if waking up from sleep.</span>
@@ -4527,11 +4528,11 @@ export const Settings: React.FC = () => {
 
                     {/* View Server Logs in Browser Button */}
                     <button
-                      id="drawer-btn-msm32-logs"
+                      id="drawer-btn-msm-logs"
                       data-telegram-msm-drawer-item="true"
                       type="button"
                       onClick={() => {
-                        const target = `${(settings.msm32GetterUrl || 'https://www.julietmike.net:3033').replace(/\/+$/, '')}/logs`;
+                        const target = `${(settings.msmGetterUrl || settings.msm32GetterUrl || 'https://www.julietmike.net:3033').replace(/\/+$/, '')}/logs`;
                         openExternalUrl(target);
                       }}
                       className="w-full py-2.5 px-3 rounded-xl border text-xs font-bold transition-all tv-focus-target flex items-center justify-between border-sky-500/30 bg-sky-500/10 hover:bg-sky-500/20 text-sky-300"
@@ -4545,11 +4546,11 @@ export const Settings: React.FC = () => {
 
                     {/* Manage Persistent Cache in Browser Button */}
                     <button
-                      id="drawer-btn-msm32-cache"
+                      id="drawer-btn-msm-cache"
                       data-telegram-msm-drawer-item="true"
                       type="button"
                       onClick={() => {
-                        const target = `${(settings.msm32GetterUrl || 'https://www.julietmike.net:3033').replace(/\/+$/, '')}/logs#cachePanel`;
+                        const target = `${(settings.msmGetterUrl || settings.msm32GetterUrl || 'https://www.julietmike.net:3033').replace(/\/+$/, '')}/logs#cachePanel`;
                         openExternalUrl(target);
                       }}
                       className="w-full py-2.5 px-3 rounded-xl border text-xs font-bold transition-all tv-focus-target flex items-center justify-between border-sky-500/30 bg-sky-500/10 hover:bg-sky-500/20 text-sky-300"
@@ -4571,30 +4572,30 @@ export const Settings: React.FC = () => {
                         <p className="text-[10px] text-gray-400">Target video resolution for Telegram streams.</p>
                       </div>
                       <button
-                        id="drawer-msm32-sub-quality"
+                        id="drawer-msm-sub-quality"
                         data-telegram-msm-drawer-item="true"
                         type="button"
                         onKeyDown={(e) => {
                           if (e.key === 'ArrowUp') {
                             e.preventDefault();
-                            const target = document.getElementById('drawer-btn-msm32-test');
+                            const target = document.getElementById('drawer-btn-msm-test');
                             target?.focus();
                             target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
                           } else if (e.key === 'ArrowDown') {
                             e.preventDefault();
-                            const target = document.getElementById('drawer-msm32-sub-chunk');
+                            const target = document.getElementById('drawer-msm-sub-chunk');
                             target?.focus();
                             target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
                           }
                         }}
                         onClick={() => {
-                          const currentQuality = settings.msm32MaxQuality || '1080';
-                          handleUpdate({ msm32MaxQuality: currentQuality === '1080' ? '720' : '1080' });
+                          const currentQuality = settings.msmMaxQuality || settings.msm32MaxQuality || '1080';
+                          handleUpdate({ msmMaxQuality: currentQuality === '1080' ? '720' : '1080' });
                         }}
                         className="px-3 py-1.5 rounded-lg border text-xs font-bold transition-all tv-focus-target flex items-center gap-1.5 border-hbo-border bg-hbo-dark/80 hover:bg-hbo-hover text-white flex-shrink-0"
                       >
                         <span className="text-sky-400 font-mono">
-                          {(settings.msm32MaxQuality || '1080') === '1080' ? '1080p (Full HD)' : '720p (HD)'}
+                          {(settings.msmMaxQuality || settings.msm32MaxQuality || '1080') === '1080' ? '1080p (Full HD)' : '720p (HD)'}
                         </span>
                       </button>
                     </div>
@@ -4609,18 +4610,18 @@ export const Settings: React.FC = () => {
                         <p className="text-[10px] text-gray-400">Configure prefetch concurrency and pipeline depth.</p>
                       </div>
                       <button
-                        id="drawer-msm32-sub-chunk"
+                        id="drawer-msm-sub-chunk"
                         data-telegram-msm-drawer-item="true"
                         type="button"
                         onKeyDown={(e) => {
                           if (e.key === 'ArrowUp') {
                             e.preventDefault();
-                            const target = document.getElementById('drawer-msm32-sub-quality');
+                            const target = document.getElementById('drawer-msm-sub-quality');
                             target?.focus();
                             target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
                           } else if (e.key === 'ArrowDown') {
                             e.preventDefault();
-                            const target = document.getElementById('drawer-msm32-sub-country');
+                            const target = document.getElementById('drawer-msm-sub-country');
                             target?.focus();
                             target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
                           }
@@ -4632,7 +4633,7 @@ export const Settings: React.FC = () => {
                         className="px-3 py-1.5 rounded-lg border text-xs font-bold transition-all tv-focus-target flex items-center gap-1.5 border-hbo-border bg-hbo-dark/80 hover:bg-hbo-hover text-white flex-shrink-0"
                       >
                         <span className="text-sky-400 font-mono">
-                          {((settings.msm32ChunkSize || 524288) / 1024).toFixed(0)} KB
+                          {((settings.msmChunkSize || settings.msm32ChunkSize || 524288) / 1024).toFixed(0)} KB
                         </span>
                         <ChevronRight className="w-3.5 h-3.5 text-gray-400" />
                       </button>
@@ -4648,18 +4649,18 @@ export const Settings: React.FC = () => {
                         <p className="text-[10px] text-gray-400">Trigger provider based on title origin countries.</p>
                       </div>
                       <button
-                        id="drawer-msm32-sub-country"
+                        id="drawer-msm-sub-country"
                         data-telegram-msm-drawer-item="true"
                         type="button"
                         onKeyDown={(e) => {
                           if (e.key === 'ArrowUp') {
                             e.preventDefault();
-                            const target = document.getElementById('drawer-msm32-sub-chunk');
+                            const target = document.getElementById('drawer-msm-sub-chunk');
                             target?.focus();
                             target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
                           } else if (e.key === 'ArrowDown') {
                             e.preventDefault();
-                            const target = document.getElementById('drawer-msm32-sub-timeout');
+                            const target = document.getElementById('drawer-msm-sub-timeout');
                             target?.focus();
                             target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
                           }
@@ -4671,7 +4672,7 @@ export const Settings: React.FC = () => {
                         className="px-3 py-1.5 rounded-lg border text-xs font-bold transition-all tv-focus-target flex items-center gap-1.5 border-hbo-border bg-hbo-dark/80 hover:bg-hbo-hover text-white flex-shrink-0"
                       >
                         <span className="text-sky-400 font-mono">
-                          {((settings.telegramProviderCountries && settings.telegramProviderCountries['telegram-msm32']) || ['MY', 'ID', 'SG']).length} active
+                          {((settings.telegramProviderCountries && (settings.telegramProviderCountries['telegram-msm'] || settings.telegramProviderCountries['telegram-msm32'])) || ['MY', 'ID', 'SG']).length} active
                         </span>
                         <ChevronRight className="w-3.5 h-3.5 text-gray-400" />
                       </button>
@@ -4687,18 +4688,18 @@ export const Settings: React.FC = () => {
                         <p className="text-[10px] text-gray-400">Maximum search & resolution wait time before failover.</p>
                       </div>
                       <button
-                        id="drawer-msm32-sub-timeout"
+                        id="drawer-msm-sub-timeout"
                         data-telegram-msm-drawer-item="true"
                         type="button"
                         onKeyDown={(e) => {
                           if (e.key === 'ArrowUp') {
                             e.preventDefault();
-                            const target = document.getElementById('drawer-msm32-sub-country');
+                            const target = document.getElementById('drawer-msm-sub-country');
                             target?.focus();
                             target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
                           } else if (e.key === 'ArrowDown') {
                             e.preventDefault();
-                            const target = document.getElementById('drawer-msm32-sub-buffer-timeout');
+                            const target = document.getElementById('drawer-msm-sub-buffer-timeout');
                             target?.focus();
                             target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
                           }
@@ -4710,7 +4711,7 @@ export const Settings: React.FC = () => {
                         className="px-3 py-1.5 rounded-lg border text-xs font-bold transition-all tv-focus-target flex items-center gap-1.5 border-hbo-border bg-hbo-dark/80 hover:bg-hbo-hover text-white flex-shrink-0"
                       >
                         <span className="text-sky-400 font-mono">
-                          {`${settings.msm32Timeout || 90}s`}
+                          {`${settings.msmTimeout || settings.msm32Timeout || 90}s`}
                         </span>
                         <ChevronRight className="w-3.5 h-3.5 text-gray-400" />
                       </button>
@@ -4726,13 +4727,13 @@ export const Settings: React.FC = () => {
                         <p className="text-[11px] text-gray-400">Stream buffer wait time before warning/retry</p>
                       </div>
                       <button
-                        id="drawer-msm32-sub-buffer-timeout"
+                        id="drawer-msm-sub-buffer-timeout"
                         data-telegram-msm-drawer-item="true"
                         type="button"
                         onKeyDown={(e) => {
                           if (e.key === 'ArrowUp') {
                             e.preventDefault();
-                            const target = document.getElementById('drawer-msm32-sub-timeout');
+                            const target = document.getElementById('drawer-msm-sub-timeout');
                             target?.focus();
                             target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
                           }
@@ -4744,7 +4745,7 @@ export const Settings: React.FC = () => {
                         className="px-3 py-1.5 rounded-lg border text-xs font-bold transition-all tv-focus-target flex items-center gap-1.5 border-hbo-border bg-hbo-dark/80 hover:bg-hbo-hover text-white flex-shrink-0"
                       >
                         <span className="text-sky-400 font-mono">
-                          {`${settings.msm32BufferTimeout || 60}s`}
+                          {`${settings.msmBufferTimeout || settings.msm32BufferTimeout || 60}s`}
                         </span>
                         <ChevronRight className="w-3.5 h-3.5 text-gray-400" />
                       </button>

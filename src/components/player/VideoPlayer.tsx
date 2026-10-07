@@ -12,7 +12,7 @@ import { resolveLari21Stream } from '../../services/lariMappingService';
 import { resolvePencuriStream, clearPencuriCache } from '../../services/pencuriMappingService';
 import { resolveKisskhStream } from '../../services/kisskhMappingService';
 import { resolveDramacoolStream, type DramacoolServer } from '../../services/dramacoolMappingService';
-import { msm32Service, type Msm32ResolveResult } from '../../services/msm32MappingService';
+import { msmService, type MsmResolveResult } from '../../services/msmMappingService';
 import { SubtitleOverlay } from './SubtitleOverlay';
 import type { SubtitleCue } from '../../services/subtitleService';
 import { CustomDirectPlayer } from './CustomDirectPlayer';
@@ -106,7 +106,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const [topAseanProviders, setTopAseanProviders] = useState<string[]>(['pencurimovie-my', 'vidlink', '111movies']);
   const [topKoreanProviders, setTopKoreanProviders] = useState<string[]>(['kisskh-kdrama', 'cinesrc', 'moviesapi']);
   const [enabledResolvers, setEnabledResolvers] = useState<StreamResolverType[]>(['embed']);
-  const [enabledTelegramProviders, setEnabledTelegramProviders] = useState<string[]>(['telegram-msm32']);
+  const [enabledTelegramProviders, setEnabledTelegramProviders] = useState<string[]>(['telegram-msm']);
   const [telegramProviderCountries, setTelegramProviderCountries] = useState<Record<string, OriginCountryCode[]> | undefined>(initialTelegramCountries);
 
   useEffect(() => {
@@ -124,7 +124,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
   const isTelegramOriginMatching = useMemo(() => {
     return isProviderMatchingMedia(
-      getProviderById('telegram-msm32'),
+      getProviderById('telegram-msm'),
       effectiveOriginCountries,
       telegramProviderCountries,
       enabledTelegramProviders
@@ -162,9 +162,9 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const [tickerIntervalSec, setTickerIntervalSec] = useState(5);
   const [streamResolverTimeout, setStreamResolverTimeout] = useState(60);
   const streamResolverTimeoutRef = useRef(60);
-  const [msm32Timeout, setMsm32Timeout] = useState(90);
-  const msm32TimeoutRef = useRef(90);
-  const [msm32BufferTimeout, setMsm32BufferTimeout] = useState(60);
+  const [msmTimeout, setMsmTimeout] = useState(90);
+  const msmTimeoutRef = useRef(90);
+  const [msmBufferTimeout, setMsmBufferTimeout] = useState(60);
   const [streamResolverRetries, setStreamResolverRetries] = useState(1);
   const streamResolverRetriesRef = useRef(1);
 
@@ -255,8 +255,8 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     }
 
     const currentProvider = getProviderById(providerId);
-    const effectiveTimeoutSec = (providerId === 'telegram-msm32' || currentProvider.engine === 'telegram')
-      ? (msm32Timeout || msm32TimeoutRef.current || 90)
+    const effectiveTimeoutSec = (providerId === 'telegram-msm' || providerId === 'telegram-msm32' || currentProvider.engine === 'telegram')
+      ? (msmTimeout || msmTimeoutRef.current || 90)
       : (streamResolverTimeout || streamResolverTimeoutRef.current || 60);
 
     setResolverRequestCountdown(effectiveTimeoutSec);
@@ -274,7 +274,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     return () => {
       clearInterval(interval);
     };
-  }, [playerMode, providerId, msm32Timeout, streamResolverTimeout]);
+  }, [playerMode, providerId, msmTimeout, streamResolverTimeout]);
 
   const [watchdogCountdown, setWatchdogCountdown] = useState<number | null>(null);
 
@@ -480,12 +480,14 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           setStreamResolverTimeout(s.streamResolverTimeout);
           streamResolverTimeoutRef.current = s.streamResolverTimeout;
         }
-        if (typeof s.msm32Timeout === 'number') {
-          setMsm32Timeout(s.msm32Timeout);
-          msm32TimeoutRef.current = s.msm32Timeout;
+        const loadedMsmTimeout = typeof s.msmTimeout === 'number' ? s.msmTimeout : (typeof s.msm32Timeout === 'number' ? s.msm32Timeout : undefined);
+        if (typeof loadedMsmTimeout === 'number') {
+          setMsmTimeout(loadedMsmTimeout);
+          msmTimeoutRef.current = loadedMsmTimeout;
         }
-        if (typeof s.msm32BufferTimeout === 'number') {
-          setMsm32BufferTimeout(s.msm32BufferTimeout);
+        const loadedMsmBufferTimeout = typeof s.msmBufferTimeout === 'number' ? s.msmBufferTimeout : (typeof s.msm32BufferTimeout === 'number' ? s.msm32BufferTimeout : undefined);
+        if (typeof loadedMsmBufferTimeout === 'number') {
+          setMsmBufferTimeout(loadedMsmBufferTimeout);
         }
         if (typeof s.streamResolverRetries === 'number' && s.streamResolverRetries >= 0 && s.streamResolverRetries <= 3) {
           setStreamResolverRetries(s.streamResolverRetries);
@@ -521,8 +523,8 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       const isUnlimited = rawTimeout === 0;
       const activeTimeoutMs = isUnlimited ? 0 : rawTimeout * 1000;
 
-      // 0. TELEGRAM PROVIDER (MovieSubMalay MSM32)
-      if (providerId === 'telegram-msm32' || provider.engine === 'telegram') {
+      // 0. TELEGRAM PROVIDER (MovieSubMalay MSM)
+      if (providerId === 'telegram-msm' || providerId === 'telegram-msm32' || provider.engine === 'telegram') {
         if (!isTelegramOriginMatching && !isUserSelected) {
           console.log(`[Resolver] Title origin (${effectiveOriginCountries.join(',') || 'unknown'}) is not within telegram-msm filter, auto-cycling to next provider...`);
           if (autoCycle && !allFailed) {
@@ -610,15 +612,15 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           const querySeason = mediaType === 'tv' ? (season || 1) : undefined;
           const queryEpisode = mediaType === 'tv' ? (episode || 1) : undefined;
 
-          let msmRes: Msm32ResolveResult | null = null;
+          let msmRes: MsmResolveResult | null = null;
           for (const searchTitle of telegramSearchTitles) {
             if (!isMounted || abortController.signal.aborted) {
               clearTgCountdown();
               return;
             }
             console.log(`[Resolver] Telegram Provider (${provider.name}) searching for "${searchTitle}" (year: ${queryYear || 'none'}, s: ${querySeason}, e: ${queryEpisode}, forceFresh: ${isForceFresh})...`);
-            setResolvingStatus(`Searching @msm32bot for "${searchTitle}"...`);
-            const res = await msm32Service.resolveStream(
+            setResolvingStatus(`Searching @msmbot for "${searchTitle}"...`);
+            const res = await msmService.resolveStream(
               searchTitle,
               queryYear,
               querySeason,
@@ -697,9 +699,9 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             }
 
             setResolvingStatus('Connected to Telegram Stream');
-            setResolvedMsm32Url(finalUrl);
+            setResolvedMsmUrl(finalUrl);
             setDirectStreamUrl(finalUrl);
-            setDirectStreamLabel('Telegram (MSM32)');
+            setDirectStreamLabel('Telegram (MSM)');
             setPlayerMode('direct');
             setHasError(false);
             setProviderErrorDetail(null);
@@ -708,7 +710,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             setIsLoading(false);
             setIsProbing(false);
             isPlayingRef.current = true;
-            onActiveServerChange?.('Telegram (MSM32)', 'telegram-msm32');
+            onActiveServerChange?.('Telegram (MSM)', 'telegram-msm');
             if (autoCycleTimeoutRef.current) {
               clearTimeout(autoCycleTimeoutRef.current);
               autoCycleTimeoutRef.current = null;
@@ -1076,16 +1078,16 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const [resolvedPencuriUrl, setResolvedPencuriUrl] = useState<string | null>(null);
   const [resolvedKisskhUrl, setResolvedKisskhUrl] = useState<string | null>(null);
   const [resolvedDramacoolUrl, setResolvedDramacoolUrl] = useState<string | null>(null);
-  const [resolvedMsm32Url, setResolvedMsm32Url] = useState<string | null>(null);
+  const [resolvedMsmUrl, setResolvedMsmUrl] = useState<string | null>(null);
   const [dramacoolServers, setDramacoolServers] = useState<DramacoolServer[]>([]);
   const [activeDramacoolServerIndex, setActiveDramacoolServerIndex] = useState<number>(0);
 
   const provider = getProviderById(providerId);
   const baseStreamUrl = useMemo(() => {
     // For MovieSubMalay Telegram provider
-    if (provider.id === 'telegram-msm32' || provider.engine === 'telegram') {
-      if (resolvedMsm32Url) {
-        return resolvedMsm32Url;
+    if (provider.id === 'telegram-msm' || provider.id === 'telegram-msm32' || provider.engine === 'telegram') {
+      if (resolvedMsmUrl) {
+        return resolvedMsmUrl;
       }
       return '';
     }
@@ -1130,7 +1132,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     return mediaType === 'movie'
       ? provider.getMovieUrl(tmdbId)
       : provider.getTVUrl(tmdbId, season, episode);
-  }, [provider, resolvedDramacoolUrl, resolvedKisskhUrl, resolvedLari21Url, resolvedPencuriUrl, resolvedMsm32Url, resolvedAnimeMapping, mediaType, tmdbId, season, episode]);
+  }, [provider, resolvedDramacoolUrl, resolvedKisskhUrl, resolvedLari21Url, resolvedPencuriUrl, resolvedMsmUrl, resolvedAnimeMapping, mediaType, tmdbId, season, episode]);
 
   const streamUrl = useMemo(() => {
     if (!baseStreamUrl) return '';
@@ -2575,7 +2577,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
               </p>
             ) : (
               <p className="text-xs text-gray-400 mt-1">
-                Checking: {enabledResolvers.map(r => r === 'telegram' ? 'Telegram (MSM32)' : 'Embed Resolver').join(' → ')}
+                Checking: {enabledResolvers.map(r => r === 'telegram' ? 'Telegram (MSM)' : 'Embed Resolver').join(' → ')}
               </p>
             )}
           </div>
@@ -2626,7 +2628,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           totalDurationSec={((episodeRuntimeMinutes || details?.runtime || 0) * 60)}
           isFullscreen={isFullscreen}
           onToggleFullscreen={handleToggleFullscreen}
-          timeoutSeconds={msm32BufferTimeout || 60}
+          timeoutSeconds={msmBufferTimeout || 60}
           onProgress={(current, dur, isPaused) => {
             if (dur > 0) durationRef.current = dur;
             currentTimeRef.current = current;
@@ -2649,12 +2651,12 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           }}
           onError={() => {
             // 1. If playing Telegram direct stream and it errors out, auto-retry once with fresh resolution (bypasses stale DB cache or expired fileReference)
-            if (directStreamLabel === 'Telegram (MSM32)' && !hasRetriedTelegramForceRef.current) {
+            if (directStreamLabel === 'Telegram (MSM)' && !hasRetriedTelegramForceRef.current) {
               hasRetriedTelegramForceRef.current = true;
               forceFreshTelegramRef.current = true;
               console.log('[DirectStream] Telegram playback error. Auto-re-resolving with bypassCache=true...');
               setDirectStreamUrl(null);
-              setResolvedMsm32Url(null);
+              setResolvedMsmUrl(null);
               setResolvingStatus('Refreshing Telegram stream...');
               setResolveTrigger(prev => prev + 1);
               return;
@@ -2665,7 +2667,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
               const transcodedUrl = `${directStreamUrl}${sep}transcode=audio`;
               console.log('[DirectStream] Direct playback failed. Retrying with AAC audio transcode pipe:', transcodedUrl);
               setDirectStreamUrl(transcodedUrl);
-              setResolvedMsm32Url(transcodedUrl);
+              setResolvedMsmUrl(transcodedUrl);
               return;
             }
             if (autoCycle && !isUserSelected && !allFailed) {
@@ -2734,7 +2736,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             Could Not Resolve Direct Stream
           </h3>
           <p className="text-xs sm:text-sm text-gray-400 max-w-md mb-6 leading-relaxed">
-            The active direct stream engines (<span className="text-white font-semibold">{enabledResolvers.map(r => r === 'telegram' ? 'Telegram (MSM32)' : 'Embed Resolver').join(', ')}</span>) did not return a working direct video stream for "<span className="text-white">{originalTitle && originalTitle !== title ? `${title} (${originalTitle})` : title}</span>".
+            The active direct stream engines (<span className="text-white font-semibold">{enabledResolvers.map(r => r === 'telegram' ? 'Telegram (MSM)' : 'Embed Resolver').join(', ')}</span>) did not return a working direct video stream for "<span className="text-white">{originalTitle && originalTitle !== title ? `${title} (${originalTitle})` : title}</span>".
             <br /><br />
             <span className="text-gray-300">Embed Resolver is currently disabled in your Settings.</span>
           </p>
@@ -2768,18 +2770,18 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
               : `The selected server (${provider.name}) could not stream "${title}". Please try switching to another server.`)}
           </p>
           <div className="flex flex-wrap items-center justify-center gap-3">
-            {resolvedMsm32Url && (
+            {resolvedMsmUrl && (
               <button
                 onClick={() => {
                   setPlayerMode('direct');
-                  setDirectStreamUrl(resolvedMsm32Url);
-                  setDirectStreamLabel('Telegram (MSM32)');
+                  setDirectStreamUrl(resolvedMsmUrl);
+                  setDirectStreamLabel('Telegram (MSM)');
                   setHasError(false);
                   setProviderErrorDetail(null);
                 }}
                 className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 text-white font-bold text-xs sm:text-sm shadow-[0_0_20px_rgba(6,182,212,0.4)] hover:scale-105 transition tv-focus-target"
               >
-                Play via Telegram (MSM32)
+                Play via Telegram (MSM)
               </button>
             )}
             {provider.id === 'dramacool-kdrama' && dramacoolServers.length > 1 && (
