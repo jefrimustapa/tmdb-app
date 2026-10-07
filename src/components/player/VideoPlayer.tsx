@@ -160,10 +160,10 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const [upNextTriggerPercent, setUpNextTriggerPercent] = useState(90);
   const [upNextTimeout, setUpNextTimeout] = useState(10);
   const [tickerIntervalSec, setTickerIntervalSec] = useState(5);
-  const [streamResolverTimeout, setStreamResolverTimeout] = useState(30);
-  const streamResolverTimeoutRef = useRef(30);
-  const [msm32Timeout, setMsm32Timeout] = useState(60);
-  const msm32TimeoutRef = useRef(60);
+  const [streamResolverTimeout, setStreamResolverTimeout] = useState(60);
+  const streamResolverTimeoutRef = useRef(60);
+  const [msm32Timeout, setMsm32Timeout] = useState(90);
+  const msm32TimeoutRef = useRef(90);
   const [streamResolverRetries, setStreamResolverRetries] = useState(1);
   const streamResolverRetriesRef = useRef(1);
 
@@ -255,8 +255,8 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
     const currentProvider = getProviderById(providerId);
     const effectiveTimeoutSec = (providerId === 'telegram-msm32' || currentProvider.engine === 'telegram')
-      ? (msm32Timeout || msm32TimeoutRef.current || 60)
-      : (streamResolverTimeout || streamResolverTimeoutRef.current || 30);
+      ? (msm32Timeout || msm32TimeoutRef.current || 90)
+      : (streamResolverTimeout || streamResolverTimeoutRef.current || 60);
 
     setResolverRequestCountdown(effectiveTimeoutSec);
 
@@ -513,7 +513,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
       const rawTimeout = typeof streamResolverTimeoutRef.current === 'number'
         ? streamResolverTimeoutRef.current
-        : (typeof streamResolverTimeout === 'number' ? streamResolverTimeout : 0);
+        : (typeof streamResolverTimeout === 'number' ? streamResolverTimeout : 60);
       const isUnlimited = rawTimeout === 0;
       const activeTimeoutMs = isUnlimited ? 0 : rawTimeout * 1000;
 
@@ -2008,9 +2008,9 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
     const rawTimeout = typeof streamResolverTimeoutRef.current === 'number'
       ? streamResolverTimeoutRef.current
-      : (typeof streamResolverTimeout === 'number' ? streamResolverTimeout : 30);
+      : (typeof streamResolverTimeout === 'number' ? streamResolverTimeout : 60);
 
-    const timeoutSec = rawTimeout > 0 ? rawTimeout : 30;
+    const timeoutSec = rawTimeout > 0 ? rawTimeout : 60;
 
     // If explicitly configured as 0 (Unlimited), disable watchdog
     if (rawTimeout === 0) {

@@ -82,9 +82,9 @@ export const DEFAULT_SETTINGS: UserSettings = {
   msm32GetterUrl: 'https://www.julietmike.net:3033',
   msm32ChunkSize: 524288,
   msm32MaxQuality: '1080',
-  msm32Timeout: 60,
+  msm32Timeout: 90,
   streamHeaderTimeout: 5,
-  streamResolverTimeout: 30,
+  streamResolverTimeout: 60,
   streamResolverRetries: 1,
   includeNightlyUpdates: false,
   autoUpdateCheck: true,
@@ -345,7 +345,7 @@ export const dbService = {
     }
     const validResolverTimeouts = [30, 60, 90, 180, 240];
     if (settings.streamResolverTimeout === undefined || !validResolverTimeouts.includes(settings.streamResolverTimeout)) {
-      settings.streamResolverTimeout = 30;
+      settings.streamResolverTimeout = 60;
       await db.settings.put(settings);
     }
     if (settings.streamResolverRetries === undefined || settings.streamResolverRetries < 0 || settings.streamResolverRetries > 3) {
