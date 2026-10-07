@@ -64,7 +64,7 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
   onError,
   isFullscreen,
   onToggleFullscreen,
-  timeoutSeconds = 90,
+  timeoutSeconds = 60,
 }) => {
   const { isTV, isDesktop } = useDevice();
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -178,24 +178,24 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
     }
   }, [isPlaying, resetControlsTimer]);
 
-  const BUFFERING_TIMEOUT_SEC = 30;
+  const bufferingTimeoutSec = timeoutSeconds && timeoutSeconds > 0 ? timeoutSeconds : 60;
   const [loadTimedOut, setLoadTimedOut] = useState(false);
-  const [bufferingCountdown, setBufferingCountdown] = useState<number>(BUFFERING_TIMEOUT_SEC);
+  const [bufferingCountdown, setBufferingCountdown] = useState<number>(bufferingTimeoutSec);
   const [retryBufferTrigger, setRetryBufferTrigger] = useState(0);
 
-  // 30s hardcoded buffering watchdog timeout with live countdown
+  // Buffering watchdog timeout with live countdown (follows setting, default 60s)
   useEffect(() => {
     if (!isInitialLoading) {
       setLoadTimedOut(false);
       return;
     }
     setLoadTimedOut(false);
-    setBufferingCountdown(BUFFERING_TIMEOUT_SEC);
+    setBufferingCountdown(bufferingTimeoutSec);
     const interval = setInterval(() => {
       setBufferingCountdown((prev) => {
         if (prev <= 1) {
           clearInterval(interval);
-          console.warn(`[CustomDirectPlayer] Load took > ${BUFFERING_TIMEOUT_SEC}s, enabling manual controls`);
+          console.warn(`[CustomDirectPlayer] Load took > ${bufferingTimeoutSec}s, enabling manual controls`);
           setLoadTimedOut(true);
           return 0;
         }
@@ -206,7 +206,7 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
     return () => {
       clearInterval(interval);
     };
-  }, [isInitialLoading, retryBufferTrigger]);
+  }, [isInitialLoading, retryBufferTrigger, bufferingTimeoutSec]);
 
   const attachedSrcRef = useRef<string | null>(null);
   const onErrorRef = useRef(onError);

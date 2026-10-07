@@ -164,6 +164,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const streamResolverTimeoutRef = useRef(60);
   const [msm32Timeout, setMsm32Timeout] = useState(90);
   const msm32TimeoutRef = useRef(90);
+  const [msm32BufferTimeout, setMsm32BufferTimeout] = useState(60);
   const [streamResolverRetries, setStreamResolverRetries] = useState(1);
   const streamResolverRetriesRef = useRef(1);
 
@@ -482,6 +483,9 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         if (typeof s.msm32Timeout === 'number') {
           setMsm32Timeout(s.msm32Timeout);
           msm32TimeoutRef.current = s.msm32Timeout;
+        }
+        if (typeof s.msm32BufferTimeout === 'number') {
+          setMsm32BufferTimeout(s.msm32BufferTimeout);
         }
         if (typeof s.streamResolverRetries === 'number' && s.streamResolverRetries >= 0 && s.streamResolverRetries <= 3) {
           setStreamResolverRetries(s.streamResolverRetries);
@@ -2006,9 +2010,9 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       return;
     }
 
-    const rawTimeout = typeof streamResolverTimeoutRef.current === 'number'
-      ? streamResolverTimeoutRef.current
-      : (typeof streamResolverTimeout === 'number' ? streamResolverTimeout : 60);
+    const rawTimeout = typeof streamResolverTimeout === 'number'
+      ? streamResolverTimeout
+      : (typeof streamResolverTimeoutRef.current === 'number' ? streamResolverTimeoutRef.current : 60);
 
     const timeoutSec = rawTimeout > 0 ? rawTimeout : 60;
 
@@ -2105,7 +2109,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       }
       clearInterval(audioPoll);
     };
-  }, [providerId, autoCycle, isUserSelected, allFailed, playerMode, hasError, provider.name, clearWatchdog]);
+  }, [providerId, autoCycle, isUserSelected, allFailed, playerMode, hasError, provider.name, clearWatchdog, streamResolverTimeout]);
 
   // Clean up watchdog timer only when providerId changes or player unmounts
   useEffect(() => {
@@ -2622,6 +2626,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           totalDurationSec={((episodeRuntimeMinutes || details?.runtime || 0) * 60)}
           isFullscreen={isFullscreen}
           onToggleFullscreen={handleToggleFullscreen}
+          timeoutSeconds={msm32BufferTimeout || 60}
           onProgress={(current, dur, isPaused) => {
             if (dur > 0) durationRef.current = dur;
             currentTimeRef.current = current;

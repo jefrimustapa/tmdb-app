@@ -2,12 +2,14 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20261007-1302';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.fix-restore-resolver.20261007-1302';
+export const APP_BUILD_NUMBER = '20261007-1332';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.fix-hardcode-bufferi.20261007-1332';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
-export const APP_BRANCH = 'fix-restore-resolver';
-export const APP_CHANGELOG = `* Merge pull request #192 from jefrimustapa/refactor/msm-series-search-queries
+export const APP_BRANCH = 'fix-hardcode-bufferi';
+export const APP_CHANGELOG = `* Merge pull request #193 from jefrimustapa/fix/restore-resolver-timeout-adjust-watchdog
+* fix: restore msm32 resolver timeout default to 90s and set watchdog buffering timeout to 60s
+* Merge pull request #192 from jefrimustapa/refactor/msm-series-search-queries
 * refactor: optimize msm series queries and fix resolver/watchdog countdown
 * fix(msm-getter): add libuv fs compatibility shim to prevent Linux kernel segfault (#191)
 * fix(msm): auto-detect HEVC and transcode to H.264 fMP4 to eliminate black screen (#190)
@@ -19,6 +21,4 @@ export const APP_CHANGELOG = `* Merge pull request #192 from jefrimustapa/refact
 * Merge pull request #185 from jefrimustapa/feat/adaptive-bg-color-home-details
 * style(details): unify all metadata and original title badges with uniform bg-black/60 grey boxes
 * fix(details): remove duplicate country of origin row below storyline
-* feat(details): style all metadata items with translucent grey boxes
-* fix(ui): extend dark tint to 105vh to eliminate Continue Watching seam
-* fix(home): extract dominant color from poster in portrait and restore ambient visibility`;
+* feat(details): style all metadata items with translucent grey boxes`;
