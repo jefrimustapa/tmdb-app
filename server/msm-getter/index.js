@@ -51,6 +51,7 @@ const apiId = parseInt(process.env.TG_API_ID, 10);
 const apiHash = process.env.TG_API_HASH;
 let session = process.env.TG_SESSION || '';
 const LOG_PATH = process.env.LOG_FILE || (process.platform === 'win32' ? path.join(__dirname, 'msm-getter.log') : '/tmp/msm-getter.log');
+export const BOT_USERNAME = (process.env.TG_BOT_USERNAME || 'msm34bot').replace(/^@/, '');
 
 function getLogFilePath() {
   if (fs.existsSync('/tmp/msm-getter.log')) return '/tmp/msm-getter.log';
@@ -61,6 +62,7 @@ function getLogFilePath() {
 if (!apiId || !apiHash) {
   console.error('[ERROR] TG_API_ID or TG_API_HASH missing from .env!');
 }
+console.log(`[INIT] Target Telegram Bot configured as: @${BOT_USERNAME}`);
 
 let client = new TelegramClient(new StringSession(session), apiId, apiHash, {
   connection: ConnectionTCPObfuscated,
@@ -707,13 +709,13 @@ function scoreCandidateButton(btn, msg, context = {}) {
       if (prefixMatch) {
         const prefixWord = prefixMatch[1].toLowerCase();
         const targetHasArticle = /^(the|a|an)\b/i.test(title.trim());
-        const ignorePrefixes = new Set(['movie', 'film', 'msm', 'msm32']);
+        const ignorePrefixes = new Set(['movie', 'film', 'msm', 'msm32', BOT_USERNAME.toLowerCase()]);
         if (targetHasArticle) {
           ignorePrefixes.add('the');
           ignorePrefixes.add('a');
           ignorePrefixes.add('an');
         }
-        if (!ignorePrefixes.has(prefixWord)) {
+        if (!ignorePrefixes.has(prefixWord) && !/^msm\d*$/i.test(prefixWord)) {
           return -999;
         }
       }
@@ -2247,14 +2249,14 @@ app.get('/health', (req, res) => {
   });
 });
 
-// Diagnostic endpoint to inspect raw buttons returned by @msm32bot
+// Diagnostic endpoint to inspect raw buttons returned by @${BOT_USERNAME}
 app.get('/api/debug-search', async (req, res) => {
   try {
     const query = req.query.q || 'Kelas Cikgu Hiragi';
     await initTelegram();
-    const sentMsg = await client.sendMessage('msm32bot', { message: query });
+    const sentMsg = await client.sendMessage(BOT_USERNAME, { message: query });
     await new Promise(r => setTimeout(r, 2000));
-    const msgs = await client.getMessages('msm32bot', { limit: 5 });
+    const msgs = await client.getMessages(BOT_USERNAME, { limit: 5 });
     const buttons = [];
     for (const m of msgs) {
       if (m.id > sentMsg.id && m.replyMarkup?.rows) {
@@ -2462,13 +2464,13 @@ app.get('/api/resolve', async (req, res) => {
     }
 
     // Check if matching document was delivered in chat (combining recent messages + Telegram server-side document search)
-    const recentMsgs = await client.getMessages('msm32bot', { limit: 30 });
+    const recentMsgs = await client.getMessages(BOT_USERNAME, { limit: 30 });
     const cleanTitle = cleanSearchTitle(title);
     const candidateMsgs = [...recentMsgs];
 
     // Search historical chat messages on Telegram servers for matching documents
     try {
-      const serverDocs = await client.getMessages('msm32bot', {
+      const serverDocs = await client.getMessages(BOT_USERNAME, {
         search: isTv ? `${cleanTitle} ${epPadded}` : cleanTitle,
         limit: 20,
         filter: new Api.InputMessagesFilterDocument(),
@@ -2483,7 +2485,7 @@ app.get('/api/resolve', async (req, res) => {
         }
       }
       if (isTv) {
-        const epWordDocs = await client.getMessages('msm32bot', {
+        const epWordDocs = await client.getMessages(BOT_USERNAME, {
           search: `${cleanTitle} Episod ${eNum}`,
           limit: 15,
           filter: new Api.InputMessagesFilterDocument(),
@@ -2577,13 +2579,13 @@ app.get('/api/resolve', async (req, res) => {
             if (prefixMatch) {
               const prefixWord = prefixMatch[1].toLowerCase();
               const targetHasArticle = /^(the|a|an)\b/i.test(title.trim());
-              const ignorePrefixes = new Set(['movie', 'film', 'msm', 'msm32']);
+              const ignorePrefixes = new Set(['movie', 'film', 'msm', 'msm32', BOT_USERNAME.toLowerCase()]);
               if (targetHasArticle) {
                 ignorePrefixes.add('the');
                 ignorePrefixes.add('a');
                 ignorePrefixes.add('an');
               }
-              if (!ignorePrefixes.has(prefixWord)) {
+              if (!ignorePrefixes.has(prefixWord) && !/^msm\d*$/i.test(prefixWord)) {
                 matchesCandidate = false;
               }
             }
@@ -2793,12 +2795,12 @@ app.get('/api/resolve', async (req, res) => {
         console.log(`[RESOLVE] Navigating message ${msgId} from page ${activePage} towards page ${targetPage} via callback ("${navBtn.text}")...`);
         try {
           await client.invoke(new Api.messages.GetBotCallbackAnswer({
-            peer: 'msm32bot',
+            peer: BOT_USERNAME,
             msgId: msgId,
             data: navBtn.data,
           }));
           await new Promise(r => setTimeout(r, 1200));
-          const refreshed = await client.getMessages('msm32bot', { ids: [msgId] });
+          const refreshed = await client.getMessages(BOT_USERNAME, { ids: [msgId] });
           if (refreshed && refreshed[0]) {
             activeMsg = refreshed[0];
             const btnText = (navBtn.text || '').trim();
@@ -2852,8 +2854,8 @@ app.get('/api/resolve', async (req, res) => {
         console.log(`[RESOLVE] Aborting search query loop for "${queryTitle}" (client aborted)`);
         break;
       }
-      console.log(`[RESOLVE] Querying @msm32bot with: "${sq}"...`);
-      const sentMsg = await client.sendMessage('msm32bot', { message: sq });
+      console.log(`[RESOLVE] Querying @${BOT_USERNAME} with: "${sq}"...`);
+      const sentMsg = await client.sendMessage(BOT_USERNAME, { message: sq });
       sentMsgId = sentMsg.id;
 
       let noResults = false;
@@ -2861,7 +2863,7 @@ app.get('/api/resolve', async (req, res) => {
       for (let poll = 0; poll < 8; poll++) {
         if (isAborted || req.destroyed) break;
         await new Promise(r => setTimeout(r, 400));
-        const msgs = await client.getMessages('msm32bot', { limit: 5 });
+        const msgs = await client.getMessages(BOT_USERNAME, { limit: 5 });
         const candidates = [];
 
         let activeBotMsg = null;
@@ -2916,12 +2918,12 @@ app.get('/api/resolve', async (req, res) => {
                   console.log(`[RESOLVE] Navigating to page ${pageCount + 1} for "${sq}" via callback...`);
                   try {
                     await client.invoke(new Api.messages.GetBotCallbackAnswer({
-                      peer: 'msm32bot',
+                      peer: BOT_USERNAME,
                       msgId: currentMsg.id,
                       data: nextBtn.data,
                     }));
                     await new Promise(r => setTimeout(r, 1200));
-                    const refreshed = await client.getMessages('msm32bot', { ids: [currentMsg.id] });
+                    const refreshed = await client.getMessages(BOT_USERNAME, { ids: [currentMsg.id] });
                     if (refreshed && refreshed[0]) {
                       currentMsg = refreshed[0];
                       activeBotMsg = currentMsg;
@@ -2999,7 +3001,7 @@ app.get('/api/resolve', async (req, res) => {
             try {
               console.log(`[RESOLVE] Authorizing button (msgId: ${targetMsgId}, buttonId: ${targetButtonId}, page: ${activeBotPage})...`);
               authRes = await client.invoke(new Api.messages.RequestUrlAuth({
-                peer: 'msm32bot',
+                peer: BOT_USERNAME,
                 msgId: targetMsgId,
                 buttonId: targetButtonId,
               }));
@@ -3099,7 +3101,7 @@ app.get('/api/resolve', async (req, res) => {
                 );
                 console.log(`[RESOLVE] msmbot_getfile response: ${JSON.stringify(ajaxRes.data || 'ok')}`);
                 if (ajaxRes.data?.data?.description === 'forward_failed' || (ajaxRes.data?.data && ajaxRes.data.data.ok === false)) {
-                  console.warn(`[RESOLVE WARN] Media forward failed on @msm32bot for candidate "${cand.text}" (${ajaxRes.data?.data?.description || 'failed'}). Trying next candidate...`);
+                  console.warn(`[RESOLVE WARN] Media forward failed on @${BOT_USERNAME} for candidate "${cand.text}" (${ajaxRes.data?.data?.description || 'failed'}). Trying next candidate...`);
                   forwardFailed = true;
                   if (shortcode) deadShortcodes.add(shortcode);
                   if (candShortcode) deadShortcodes.add(candShortcode);
@@ -3114,7 +3116,7 @@ app.get('/api/resolve', async (req, res) => {
               }
             }
 
-            console.log(`[RESOLVE] Waiting for media delivery from @msm32bot (newer than msgId: ${sentMsgId})...`);
+            console.log(`[RESOLVE] Waiting for media delivery from @${BOT_USERNAME} (newer than msgId: ${sentMsgId})...`);
             let candDeliveredDoc = null;
             let candDeliveredMsgId = null;
             let finalFilename = candidateFilename || queryTitle;
@@ -3123,7 +3125,7 @@ app.get('/api/resolve', async (req, res) => {
               if (isAborted || req.destroyed) break;
               await new Promise(r => setTimeout(r, 1500));
               if (isAborted || req.destroyed) break;
-              const incoming = await client.getMessages('msm32bot', { limit: 10 });
+              const incoming = await client.getMessages(BOT_USERNAME, { limit: 10 });
               for (const im of incoming) {
                 if (im.id > sentMsgId && im.media?.document) {
                   candDeliveredDoc = im.media.document;
@@ -3166,7 +3168,7 @@ app.get('/api/resolve', async (req, res) => {
         console.log(`[RESOLVE] 720p not found from bot, falling back to cached 1080p stream for "${baseCacheKey}"`);
         return fallbackCached;
       }
-      const err = new Error(`No downloadable media found for "${queryTitle}" on @msm32bot`);
+      const err = new Error(`No downloadable media found for "${queryTitle}" on @${BOT_USERNAME}`);
       err.status = 404;
       throw err;
     }
@@ -3268,7 +3270,7 @@ async function refreshDocumentFileReference(client, targetDoc) {
     // 1. Direct message ID lookup (official MTProto fast path: re-fetching the message provides fresh HMAC file_reference)
     if (dbRecord && dbRecord.msgId) {
       try {
-        const msgs = await client.getMessages('msm32bot', { ids: [Number(dbRecord.msgId)] });
+        const msgs = await client.getMessages(BOT_USERNAME, { ids: [Number(dbRecord.msgId)] });
         const m = msgs?.[0];
         if (m && m.media?.document?.id?.toString() === docIdStr) {
           const freshRef = m.media.document.fileReference;
@@ -3289,9 +3291,9 @@ async function refreshDocumentFileReference(client, targetDoc) {
       }
     }
 
-    // 2. Scan recent chat messages from @msm32bot for the exact document ID
+    // 2. Scan recent chat messages from @${BOT_USERNAME} for the exact document ID
     try {
-      const recentMsgs = await client.getMessages('msm32bot', { limit: 100 });
+      const recentMsgs = await client.getMessages(BOT_USERNAME, { limit: 100 });
       for (const m of recentMsgs) {
         if (m.media?.document?.id?.toString() === docIdStr) {
           const freshRef = m.media.document.fileReference;
@@ -3325,7 +3327,7 @@ async function refreshDocumentFileReference(client, targetDoc) {
       if (searchTerm) {
         console.log(`[FILE_REF RECOVERY] Searching server messages for "${searchTerm}" (Doc ID: ${docIdStr})...`);
         try {
-          const serverDocs = await client.getMessages('msm32bot', {
+          const serverDocs = await client.getMessages(BOT_USERNAME, {
             search: searchTerm,
             limit: 30,
             filter: new Api.InputMessagesFilterDocument(),
@@ -4008,7 +4010,7 @@ app.get('/stream/:docId', async (req, res) => {
       mimeType = dbRecord.mimeType || 'video/mp4';
     } else {
       // 2. Fallback: Search recent bot messages
-      const msgs = await client.getMessages('msm32bot', { limit: 20 });
+      const msgs = await client.getMessages(BOT_USERNAME, { limit: 20 });
       for (const m of msgs) {
         if (m.media?.document && m.media.document.id.toString() === docId) {
           targetDoc = m.media.document;

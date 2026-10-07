@@ -171,6 +171,16 @@ it('disqualifies un-versioned candidates with no matching year when Season > 1 i
   assert.ok(scoreCandidateButton(btnMatchedYear, msg, contextS2) >= 150, 'Matching release year button should match Season 2');
 });
 
+it('ignores bot prefixes such as msm34, msm32, or film for single-word titles', () => {
+  const contextMovieSingleWord = { isTv: false, title: 'Inception', year: '2010', targetQuality: 1080 };
+  const btnMsm34 = { className: 'KeyboardButtonUrlAuth', url: 'https://t.me/msm34bot/link/1', text: 'MSM34 Inception 1080p' };
+  const btnUnrelated = { className: 'KeyboardButtonUrlAuth', url: 'https://t.me/msm34bot/link/2', text: 'Fake Inception 1080p' };
+  const msg = { message: '' };
+
+  assert.ok(scoreCandidateButton(btnMsm34, msg, contextMovieSingleWord) >= 150, 'MSM34 prefix must not disqualify single-word title');
+  assert.strictEqual(scoreCandidateButton(btnUnrelated, msg, contextMovieSingleWord), -999, 'Unrelated prefix must disqualify single-word title');
+});
+
 console.log('\n7. Search Query Generation (generateSeriesSearchQueries)');
 it('generates the adaptive 12 query patterns without episode/episod for Season 1', () => {
   const queries = generateSeriesSearchQueries('Kelas Cikgu Hiragi', 1, 3, 1, '2024');
