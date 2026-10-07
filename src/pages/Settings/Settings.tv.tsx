@@ -4140,13 +4140,13 @@ export const Settings: React.FC = () => {
             <div className="flex-1 overflow-y-auto px-6 py-6 space-y-3 font-sans">
               {(() => {
                 const timeoutOptions = [
-                  { val: 60 as const, label: '60 Seconds (Default)', desc: '1.0 Minute • Quickly failover to embed providers if Telegram is unresponsive.' },
-                  { val: 90 as const, label: '90 Seconds (Balanced)', desc: '1.5 Minutes • Recommended for multi-page Telegram queries and bot ad-gate.' },
+                  { val: 60 as const, label: '60 Seconds (Fast)', desc: '1.0 Minute • Quickly failover to embed providers if Telegram is unresponsive.' },
+                  { val: 90 as const, label: '90 Seconds (Default)', desc: '1.5 Minutes • Recommended for multi-page Telegram queries and bot ad-gate.' },
                   { val: 120 as const, label: '120 Seconds (Extended)', desc: '2.0 Minutes • Extended patience for complex series episode searching.' },
                   { val: 150 as const, label: '150 Seconds (Deep)', desc: '2.5 Minutes • Deep search across multiple result pages on high-load bots.' },
                   { val: 180 as const, label: '180 Seconds (Maximum)', desc: '3.0 Minutes • Maximum patience for congested networks and slow downloads.' },
                 ];
-                const currentVal = settings.msm32Timeout || 60;
+                const currentVal = settings.msm32Timeout || 90;
 
                 return timeoutOptions.map((opt, idx) => {
                   const isSelected = currentVal === opt.val;
@@ -4585,7 +4585,7 @@ export const Settings: React.FC = () => {
                         className="px-3 py-1.5 rounded-lg border text-xs font-bold transition-all tv-focus-target flex items-center gap-1.5 border-hbo-border bg-hbo-dark/80 hover:bg-hbo-hover text-white flex-shrink-0"
                       >
                         <span className="text-sky-400 font-mono">
-                          {`${settings.msm32Timeout || 60}s`}
+                          {`${settings.msm32Timeout || 90}s`}
                         </span>
                         <ChevronRight className="w-3.5 h-3.5 text-gray-400" />
                       </button>
@@ -4718,7 +4718,7 @@ export const Settings: React.FC = () => {
                         }}
                         className="px-3 py-1.5 rounded-lg border text-xs font-bold transition-all tv-focus-target flex items-center gap-1.5 border-hbo-border bg-hbo-dark/80 hover:bg-hbo-hover text-white flex-shrink-0"
                       >
-                        <span className="text-hbo-cyan">{`${settings.streamResolverTimeout ?? 30} Seconds`}</span>
+                        <span className="text-hbo-cyan">{`${settings.streamResolverTimeout ?? 60} Seconds`}</span>
                         <ChevronRight className="w-3.5 h-3.5 text-gray-400" />
                       </button>
                     </div>
@@ -5008,13 +5008,13 @@ export const Settings: React.FC = () => {
             <div className="flex-1 overflow-y-auto px-6 py-6 space-y-2.5 font-sans">
               {(() => {
                 const options = [
-                  { seconds: 30, label: '30 Seconds (Default)', desc: 'Standard failover threshold for embed providers and stream handshakes.' },
-                  { seconds: 60, label: '60 Seconds', desc: 'Extended patience for slower servers and high-traffic periods.' },
+                  { seconds: 30, label: '30 Seconds (Fast)', desc: 'Quick failover threshold for embed providers and stream handshakes.' },
+                  { seconds: 60, label: '60 Seconds (Default)', desc: 'Standard balanced patience for slower servers and high-traffic periods.' },
                   { seconds: 90, label: '90 Seconds', desc: 'Generous wait time for complex embed stream loading.' },
                   { seconds: 180, label: '180 Seconds', desc: 'Maximum patience for high-latency mobile or congested networks.' },
                   { seconds: 240, label: '240 Seconds', desc: 'Ultra-patient timeout for extremely slow or throttled connections.' },
                 ];
-                const currentVal = settings.streamResolverTimeout ?? 30;
+                const currentVal = settings.streamResolverTimeout ?? 60;
 
                 return options.map((opt, idx) => {
                   const isSelected = currentVal === opt.seconds;
