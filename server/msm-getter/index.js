@@ -4665,7 +4665,7 @@ async function refreshDocumentFileReference(client, targetDoc) {
  * Concurrently prefetches upcoming 512KB chunks across parallel MTProto pipelines (sliding window)
  * ensuring continuous high-throughput delivery with zero buffer underruns for 1080p/4K playback.
  */
-async function streamTelegramPipelined(client, targetDoc, startByte, endByte, res, req, customChunkSize, customConcurrency, passedStreamKey) {
+async function streamTelegramPipelined(client, targetDoc, startByte, endByte, res, req, customChunkSize, customConcurrency, passedStreamKey, passedQualityTier) {
   // Map requested chunkSize / mode to MTProto block size and concurrency
   let CHUNK_SIZE = 512 * 1024; // 512KB: Native Telegram MTProto block limit
   let CONCURRENCY = (typeof customConcurrency === 'number' && customConcurrency >= 1) ? customConcurrency : 4;
@@ -4718,7 +4718,7 @@ async function streamTelegramPipelined(client, targetDoc, startByte, endByte, re
     cancelIdleMemoryPurge();
     const fnAttr = targetDoc.attributes?.find(a => a.className === 'DocumentAttributeFilename');
     const mediaName = fnAttr ? fnAttr.fileName : `video_${targetDoc.id}.mp4`;
-    const qualityTier = detectVideoQualityTier(mediaName, '', targetDoc);
+    const qualityTier = passedQualityTier || detectVideoQualityTier(mediaName, '', targetDoc);
     const isPrefetchOverlapped = savedSettings.overlapPrefetch !== false;
     activeStreams.set(streamKey, {
       sessionKey: streamKey,
@@ -5615,7 +5615,7 @@ app.get('/stream/:docId', async (req, res) => {
         'Content-Disposition': `inline; filename="${encodeURIComponent(filename)}"`,
       });
       console.log(`[STREAM REQ] [${clientIdentity.name} (${clientIdentity.ip})] ${req.method} Full Stream -> 0 to ${fileSize - 1} (${fileSize} bytes, Tier: ${detectedTier.toUpperCase()} [${tierConcurrency}x512KB])`);
-      await streamTelegramPipelined(client, targetDoc, 0, fileSize - 1, res, req, downloadChunkSize, tierConcurrency, streamSessionKey);
+      await streamTelegramPipelined(client, targetDoc, 0, fileSize - 1, res, req, downloadChunkSize, tierConcurrency, streamSessionKey, detectedTier);
     } else {
       const rangeMatch = rangeHeader.match(/bytes=(\d*)-(\d*)/);
       let start;
@@ -5659,7 +5659,7 @@ app.get('/stream/:docId', async (req, res) => {
         'Content-Disposition': `inline; filename="${encodeURIComponent(filename)}"`,
       });
 
-      await streamTelegramPipelined(client, targetDoc, start, end, res, req, downloadChunkSize, tierConcurrency, streamSessionKey);
+      await streamTelegramPipelined(client, targetDoc, start, end, res, req, downloadChunkSize, tierConcurrency, streamSessionKey, detectedTier);
     }
   } catch (err) {
     if (err.code !== 'ERR_STREAM_WRITE_AFTER_END' && err.code !== 'ECONNRESET' && err.code !== 'EPIPE') {
