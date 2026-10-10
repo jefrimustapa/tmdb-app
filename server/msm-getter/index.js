@@ -81,8 +81,7 @@ if (savedSettings.routerRamCacheMb === undefined) savedSettings.routerRamCacheMb
 export let BOT_USERNAME = (savedSettings.targetBotUsername || process.env.TG_BOT_USERNAME || 'msm34bot').replace(/^@/, '');
 
 export function detectVideoQualityTier(filename = '', queryKey = '', targetDoc = null) {
-  const str = ` ${filename} ${queryKey} `.toLowerCase().replace(/[_\.\-\+\[\]\(\)]/g, ' ');
-
+  // 1. Direct Telegram Video Dimensions (Highest authority: real pixel height of the stream)
   if (targetDoc && Array.isArray(targetDoc.attributes)) {
     const videoAttr = targetDoc.attributes.find(a => a.className === 'DocumentAttributeVideo' || (a.w && a.h));
     if (videoAttr && videoAttr.h) {
@@ -94,11 +93,21 @@ export function detectVideoQualityTier(filename = '', queryKey = '', targetDoc =
     }
   }
 
-  if (/\b(4k|2160p|uhd)\b/i.test(str)) return '4k';
-  if (/\b(1080p|1080|fhd)\b/i.test(str)) return '1080p';
-  if (/\b(720p|720|hd)\b/i.test(str)) return '720p';
-  if (/\b(480p|360p|540p|sd)\b/i.test(str)) return 'sd';
+  // 2. Check the ACTUAL video filename itself
+  const fn = String(filename || '').toLowerCase().replace(/[_\.\-\+\[\]\(\)]/g, ' ');
+  if (/\b(4k|2160p|uhd)\b/i.test(fn)) return '4k';
+  if (/\b(1080p|1080|fhd)\b/i.test(fn)) return '1080p';
+  if (/\b(720p|720|hd)\b/i.test(fn)) return '720p';
+  if (/\b(480p|360p|540p|sd)\b/i.test(fn)) return 'sd';
 
+  // 3. Fallback: Secondary check on queryKey only if neither attributes nor filename has quality tags
+  const qk = String(queryKey || '').toLowerCase().replace(/[_\.\-\+\[\]\(\)]/g, ' ');
+  if (/\b(4k|2160p|uhd)\b/i.test(qk)) return '4k';
+  if (/\b(1080p|1080|fhd)\b/i.test(qk)) return '1080p';
+  if (/\b(720p|720|hd)\b/i.test(qk)) return '720p';
+  if (/\b(480p|360p|540p|sd)\b/i.test(qk)) return 'sd';
+
+  // 4. Default to standard 720p HD pipeline
   return '720p';
 }
 
@@ -3921,6 +3930,7 @@ app.get(['/api/resolve', '/msm/api/resolve'], async (req, res) => {
       if (chosen.qualityScore >= 30 || targetQuality > 720) {
         const docIdStr = chosen.doc.id.toString();
         console.log(`[RESOLVE] Found matching recent document in chat: ${chosen.filename} (ID: ${docIdStr}, score: ${chosen.qualityScore})`);
+        const vAttr = chosen.doc.attributes?.find(a => a.className === 'DocumentAttributeVideo' || (a.w && a.h));
         const streamItem = db.set(cacheKey, {
           docId: docIdStr,
           msgId: chosen.msgId,
@@ -3931,6 +3941,8 @@ app.get(['/api/resolve', '/msm/api/resolve'], async (req, res) => {
           mimeType: chosen.doc.mimeType || 'video/mp4',
           dcId: chosen.doc.dcId || 4,
           date: chosen.doc.date,
+          width: vAttr?.w ? Number(vAttr.w) : null,
+          height: vAttr?.h ? Number(vAttr.h) : null,
         });
         return streamItem;
       }
@@ -4469,6 +4481,7 @@ app.get(['/api/resolve', '/msm/api/resolve'], async (req, res) => {
 
     const docIdStr = deliveredDoc.id.toString();
     const filename = resolvedFilename || chosenFilename || queryTitle;
+    const vAttr = deliveredDoc.attributes?.find(a => a.className === 'DocumentAttributeVideo' || (a.w && a.h));
     const resolvedItem = db.set(cacheKey, {
       docId: docIdStr,
       msgId: deliveredMsgId,
@@ -4479,6 +4492,8 @@ app.get(['/api/resolve', '/msm/api/resolve'], async (req, res) => {
       mimeType: deliveredDoc.mimeType || 'video/mp4',
       dcId: deliveredDoc.dcId || 4,
       date: deliveredDoc.date,
+      width: vAttr?.w ? Number(vAttr.w) : null,
+      height: vAttr?.h ? Number(vAttr.h) : null,
     });
     console.log(`[RESOLVE] Successfully resolved "${queryTitle}" -> Doc ID: ${docIdStr} (${filename})`);
     return resolvedItem;
@@ -5159,6 +5174,8 @@ async function resolveMediaDetails(docId, parentSessionKey) {
           const videoStream = data.streams?.find(s => s.codec_type === 'video');
           const videoCodec = (videoStream?.codec_name || '').toLowerCase();
           const videoTag = (videoStream?.codec_tag_string || '').toLowerCase();
+          const width = videoStream?.width ? Number(videoStream.width) : 0;
+          const height = videoStream?.height ? Number(videoStream.height) : 0;
           const isHevc = videoCodec === 'hevc' || videoCodec === 'h265' || videoTag === 'hvc1';
           const isLegacyVideo = /^(mpeg4|msmpeg4v3|wmv3|flv1|vp6f)$/i.test(videoCodec);
 
@@ -5187,13 +5204,18 @@ async function resolveMediaDetails(docId, parentSessionKey) {
           if (videoCodec) {
             db.updateVideoCodec(docId, videoCodec);
           }
+          if (height) {
+            db.updateVideoDimensions(docId, width, height);
+          }
 
-          console.log(`[MEDIA PROBE] Doc ${docId} probed: videoCodec=${videoCodec || 'none'} (isHevc: ${isHevc}), audioTrack=${audioSpec}`);
+          console.log(`[MEDIA PROBE] Doc ${docId} probed: videoCodec=${videoCodec || 'none'} (isHevc: ${isHevc}), dimensions=${width}x${height}, audioTrack=${audioSpec}`);
           return resolve({
             audioMapSpecifier: audioSpec,
             videoCodec,
             isHevc,
             isLegacyVideo,
+            width,
+            height,
           });
         } catch (err) {
           reject(err);
@@ -5302,6 +5324,12 @@ app.get('/stream/:docId', async (req, res) => {
     const dbRecord = db.getByDocId(docId);
     if (dbRecord && dbRecord.accessHash) {
       console.log(`[STREAM] Serving from Central DB: ${dbRecord.filename} (Doc ID: ${docId})`);
+      const docHeight = dbRecord.height || docMediaDetailsCache.get(docId)?.height || null;
+      const docWidth = dbRecord.width || docMediaDetailsCache.get(docId)?.width || null;
+      const docAttrs = [new Api.DocumentAttributeFilename({ fileName: dbRecord.filename || filename })];
+      if (docHeight) {
+        docAttrs.push(new Api.DocumentAttributeVideo({ w: docWidth || 1280, h: docHeight, duration: 0 }));
+      }
       targetDoc = new Api.Document({
         id: bigInt(dbRecord.docId || docId),
         accessHash: bigInt(dbRecord.accessHash || '0'),
@@ -5310,7 +5338,7 @@ app.get('/stream/:docId', async (req, res) => {
         mimeType: dbRecord.mimeType || 'video/mp4',
         size: bigInt(dbRecord.size || '0'),
         dcId: dbRecord.dcId || 2,
-        attributes: [new Api.DocumentAttributeFilename({ fileName: dbRecord.filename || filename })],
+        attributes: docAttrs,
       });
       targetMedia = new Api.MessageMediaDocument({ document: targetDoc });
       filename = dbRecord.filename || filename;
@@ -5590,8 +5618,8 @@ app.get('/stream/:docId', async (req, res) => {
       return res.end();
     }
 
-    // Detect video resolution quality tier (sd, 720p, 1080p, 4k) and apply configured pipeline concurrency
-    const detectedTier = detectVideoQualityTier(filename, dbRecord?.queryKey || '', targetDoc);
+    // Detect video resolution quality tier (sd, 720p, 1080p, 4k) based on ACTUAL media (never downgraded by requested queryKey)
+    const detectedTier = detectVideoQualityTier(filename, '', targetDoc);
     const tierConcurrency = (savedSettings.pipelineBuffers && savedSettings.pipelineBuffers[detectedTier]) || DEFAULT_PIPELINE_BUFFERS[detectedTier] || 4;
 
     // Parse user-specified chunk size / pipeline mode from query parameter (for debug or backward compatibility)
