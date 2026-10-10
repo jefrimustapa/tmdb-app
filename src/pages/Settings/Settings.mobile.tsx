@@ -1778,7 +1778,8 @@ export const Settings: React.FC = () => {
             type="button"
             onClick={() => {
               const currentQuality = settings.msmMaxQuality || settings.msm32MaxQuality || '1080';
-              handleUpdate({ msmMaxQuality: currentQuality === '1080' ? '720' : '1080' });
+              const nextQuality = currentQuality === '480' ? '720' : currentQuality === '720' ? '1080' : currentQuality === '1080' ? '4k' : '480';
+              handleUpdate({ msmMaxQuality: nextQuality });
             }}
             className="w-full flex items-center justify-between p-3.5 rounded-xl bg-white/5 border border-white/10 hover:border-sky-400/50 hover:bg-white/10 transition-all text-left"
           >
@@ -1788,7 +1789,13 @@ export const Settings: React.FC = () => {
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">
               <span className="text-[10px] text-sky-400 font-mono font-bold bg-sky-500/10 px-2 py-0.5 rounded border border-sky-400/20">
-                {(settings.msmMaxQuality || settings.msm32MaxQuality || '1080') === '1080' ? '1080p (Full HD)' : '720p (HD)'}
+                {(() => {
+                  const q = settings.msmMaxQuality || settings.msm32MaxQuality || '1080';
+                  if (q === '4k') return '4K (Ultra HD)';
+                  if (q === '1080') return '1080p (Full HD)';
+                  if (q === '720') return '720p (HD)';
+                  return '480p (SD)';
+                })()}
               </span>
             </div>
           </button>

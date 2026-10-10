@@ -2,12 +2,14 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20261010-1706';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.perf-improve-msm-str.20261010-1706';
+export const APP_BUILD_NUMBER = '20261010-1755';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.perf-improve-msm-str.20261010-1755';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
 export const APP_BRANCH = 'perf-improve-msm-str';
-export const APP_CHANGELOG = `* perf(stream): harmonize 4-tier pipeline buffer (Eco, Standard, Turbo, Ultra) with 512KB blocks and overlapped prefetching
+export const APP_CHANGELOG = `* fix(msm-getter): handle malformed JSON bodies gracefully without logging stack trace
+* feat(stream): configure quality-based pipeline buffer concurrency on server and clean up client UI
+* perf(stream): harmonize 4-tier pipeline buffer (Eco, Standard, Turbo, Ultra) with 512KB blocks and overlapped prefetching
 * Merge pull request #196 from jefrimustapa/feat/msm-getter-revise
 * feat(msm-getter): consolidate all web pages under /msm and redirect legacy top-level routes
 * refactor(client): align web console log buttons to /msm/logs across mobile and tv settings
@@ -19,6 +21,4 @@ export const APP_CHANGELOG = `* perf(stream): harmonize 4-tier pipeline buffer (
 * refactor(msm): rename msm32 to msm across server and client with backward compatibility
 * feat(msm-getter): decouple bot handle and switch target to msm34bot
 * Merge pull request #194 from jefrimustapa/fix/hardcode-buffering-timeouts-60s
-* feat(settings): add direct stream msm32 buffering timeout setting (30/60/90/120s, default 60s)
-* Merge pull request #193 from jefrimustapa/fix/restore-resolver-timeout-adjust-watchdog
-* fix: restore msm32 resolver timeout default to 90s and set watchdog buffering timeout to 60s`;
+* feat(settings): add direct stream msm32 buffering timeout setting (30/60/90/120s, default 60s)`;

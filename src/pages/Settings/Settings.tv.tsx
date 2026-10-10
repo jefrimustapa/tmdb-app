@@ -4464,12 +4464,19 @@ export const Settings: React.FC = () => {
                         }}
                         onClick={() => {
                           const currentQuality = settings.msmMaxQuality || settings.msm32MaxQuality || '1080';
-                          handleUpdate({ msmMaxQuality: currentQuality === '1080' ? '720' : '1080' });
+                          const nextQuality = currentQuality === '480' ? '720' : currentQuality === '720' ? '1080' : currentQuality === '1080' ? '4k' : '480';
+                          handleUpdate({ msmMaxQuality: nextQuality });
                         }}
                         className="px-3 py-1.5 rounded-lg border text-xs font-bold transition-all tv-focus-target flex items-center gap-1.5 border-hbo-border bg-hbo-dark/80 hover:bg-hbo-hover text-white flex-shrink-0"
                       >
                         <span className="text-sky-400 font-mono">
-                          {(settings.msmMaxQuality || settings.msm32MaxQuality || '1080') === '1080' ? '1080p (Full HD)' : '720p (HD)'}
+                          {(() => {
+                            const q = settings.msmMaxQuality || settings.msm32MaxQuality || '1080';
+                            if (q === '4k') return '4K (Ultra HD)';
+                            if (q === '1080') return '1080p (Full HD)';
+                            if (q === '720') return '720p (HD)';
+                            return '480p (SD)';
+                          })()}
                         </span>
                       </button>
                     </div>

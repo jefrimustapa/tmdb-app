@@ -75,6 +75,8 @@ try {
 } catch (e) {}
 
 savedSettings.pipelineBuffers = Object.assign({}, DEFAULT_PIPELINE_BUFFERS, savedSettings.pipelineBuffers || {});
+if (savedSettings.overlapPrefetch === undefined) savedSettings.overlapPrefetch = true;
+if (savedSettings.routerRamCacheMb === undefined) savedSettings.routerRamCacheMb = 16;
 
 export let BOT_USERNAME = (savedSettings.targetBotUsername || process.env.TG_BOT_USERNAME || 'msm34bot').replace(/^@/, '');
 
@@ -804,14 +806,25 @@ function scoreCandidateButton(btn, msg, context = {}) {
   }
 
   // Quality preference
-  if (targetQuality <= 720) {
+  if (targetQuality <= 480) {
+    if (btnText.includes('480p') || btnText.includes('480') || btnText.includes('360p') || btnText.includes('540p')) score += 80;
+    else if (btnText.includes('720p') || btnText.includes('720')) score += 20;
+    else if (btnText.includes('1080p') || btnText.includes('1080')) score -= 40;
+    else if (btnText.includes('2160p') || btnText.includes('4k')) score -= 100;
+  } else if (targetQuality <= 720) {
     if (btnText.includes('720p') || btnText.includes('720')) score += 50;
     else if (btnText.includes('540p') || btnText.includes('480p') || btnText.includes('360p')) score += 30;
     else if (btnText.includes('1080p') || btnText.includes('1080')) score += 5;
     else if (btnText.includes('2160p') || btnText.includes('4k')) score -= 50;
+  } else if (targetQuality >= 2160) {
+    if (btnText.includes('2160p') || btnText.includes('4k') || btnText.includes('uhd')) score += 100;
+    else if (btnText.includes('1080p') || btnText.includes('1080')) score += 60;
+    else if (btnText.includes('720p') || btnText.includes('720')) score += 20;
   } else {
+    // 1080p target
     if (btnText.includes('1080p') || btnText.includes('1080')) score += 80;
     else if (btnText.includes('720p') || btnText.includes('720')) score += 30;
+    else if (btnText.includes('2160p') || btnText.includes('4k')) score -= 30;
   }
   if (btnText.toLowerCase().includes('.mp4') || btnText.toLowerCase().includes('mp4')) score += 15;
   if (btnText.includes('malaysub') || btnText.includes('msm')) score += 5;
@@ -998,36 +1011,51 @@ app.get('/msm/auth', (req, res) => {
     .glow-box { box-shadow: 0 0 25px rgba(56, 189, 248, 0.15); }
   </style>
 </head>
-<body class="min-h-screen flex items-center justify-center p-4">
-  <div class="max-w-md w-full bg-slate-900 border border-slate-800 rounded-2xl p-6 sm:p-8 glow-box shadow-2xl space-y-6">
-    
-    <!-- Header -->
-    <div class="text-center space-y-2">
-      <div class="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-sky-500/10 text-sky-400 border border-sky-500/20 mb-2">
-        <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69.01-.03.01-.14-.07-.19-.08-.05-.19-.02-.27 0-.12.03-1.99 1.27-5.62 3.72-.53.36-1.01.54-1.44.53-.47-.01-1.38-.27-2.05-.48-.83-.27-1.48-.42-1.42-.88.03-.24.37-.49 1.02-.75 3.98-1.73 6.64-2.88 7.98-3.44 3.81-1.59 4.6-1.87 5.12-1.88.11 0 .37.03.54.17.14.12.18.28.2.45-.02.07-.02.21-.04.38z"/></svg>
+<body class="min-h-screen p-4 sm:p-8 flex flex-col items-center bg-[#0B0F17] text-[#E2E8F0]">
+  <div class="max-w-6xl w-full space-y-6 flex flex-col items-center">
+    <!-- Top Navigation & Header -->
+    <header class="flex flex-col sm:flex-row items-center justify-between bg-slate-900 border border-slate-800 rounded-2xl px-6 py-4 glow-box gap-4 w-full">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20 flex items-center justify-center font-bold text-lg">
+          🔑
+        </div>
+        <div>
+          <h1 class="text-lg font-bold text-white flex items-center gap-2">
+            MSM Auth Portal
+            <span class="text-xs px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-300 border border-sky-500/30 font-mono">@${BOT_USERNAME}</span>
+          </h1>
+          <p class="text-xs text-slate-400">Telegram MTProto Session & Authentication Gateway</p>
+        </div>
       </div>
-      <h1 class="text-2xl font-black tracking-tight text-white">MSM Getter Portal</h1>
-      <p class="text-xs text-slate-400">Telegram MTProto Cloud Streaming Gateway</p>
-    </div>
+      <nav class="flex items-center gap-2 flex-wrap">
+        <a href="/msm" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800 transition flex items-center gap-1">
+          🏠 Dashboard
+        </a>
+        <a href="/msm/streams" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800 transition flex items-center gap-1">
+          💾 Streams
+        </a>
+        <a href="/msm/settings" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800 transition flex items-center gap-1">
+          ⚙️ Settings
+        </a>
+        <a href="/msm/logs" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800 transition flex items-center gap-1">
+          📜 Logs
+        </a>
+        <a href="/msm/auth" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-sky-400 bg-sky-500/10 border border-sky-500/30 flex items-center gap-1">
+          🔑 Auth
+        </a>
+      </nav>
+    </header>
 
-    <!-- Navigation Tabs -->
-    <div class="flex items-center justify-center gap-1.5 pb-1 flex-wrap">
-      <a href="/msm" class="px-2.5 py-1 rounded-lg text-xs font-semibold text-slate-400 hover:text-white bg-slate-800/60 border border-slate-700/60 transition flex items-center gap-1">
-        🏠 Dashboard
-      </a>
-      <a href="/msm/streams" class="px-2.5 py-1 rounded-lg text-xs font-semibold text-slate-400 hover:text-white bg-slate-800/60 border border-slate-700/60 transition flex items-center gap-1">
-        💾 Streams
-      </a>
-      <a href="/msm/settings" class="px-2.5 py-1 rounded-lg text-xs font-semibold text-slate-400 hover:text-white bg-slate-800/60 border border-slate-700/60 transition flex items-center gap-1">
-        ⚙️ Settings
-      </a>
-      <a href="/msm/logs" class="px-2.5 py-1 rounded-lg text-xs font-semibold text-slate-400 hover:text-white bg-slate-800/60 border border-slate-700/60 transition flex items-center gap-1">
-        📜 Logs
-      </a>
-      <a href="/msm/auth" class="px-2.5 py-1 rounded-lg text-xs font-semibold text-sky-400 bg-sky-500/10 border border-sky-500/20 flex items-center gap-1">
-        🔑 Auth
-      </a>
-    </div>
+    <div class="max-w-md w-full bg-slate-900 border border-slate-800 rounded-2xl p-6 sm:p-8 glow-box shadow-2xl space-y-6">
+      
+      <!-- Header -->
+      <div class="text-center space-y-2">
+        <div class="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-sky-500/10 text-sky-400 border border-sky-500/20 mb-2">
+          <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69.01-.03.01-.14-.07-.19-.08-.05-.19-.02-.27 0-.12.03-1.99 1.27-5.62 3.72-.53.36-1.01.54-1.44.53-.47-.01-1.38-.27-2.05-.48-.83-.27-1.48-.42-1.42-.88.03-.24.37-.49 1.02-.75 3.98-1.73 6.64-2.88 7.98-3.44 3.81-1.59 4.6-1.87 5.12-1.88.11 0 .37.03.54.17.14.12.18.28.2.45-.02.07-.02.21-.04.38z"/></svg>
+        </div>
+        <h2 class="text-xl font-black tracking-tight text-white">Telegram MTProto Login</h2>
+        <p class="text-xs text-slate-400">Generate and verify session string with OTP code</p>
+      </div>
 
     <!-- Live Status Pill -->
     <div id="statusContainer" class="p-3.5 rounded-xl bg-slate-800/60 border border-slate-700/60 flex items-center justify-between">
@@ -1222,6 +1250,7 @@ app.get('/msm/auth', (req, res) => {
 
     checkStatus();
   </script>
+  </div>
 </body>
 </html>`);
 });
@@ -1247,8 +1276,20 @@ const activeStreams = new Map();
 const internalWorkers = new Map(); // key: workerKey -> { abort: Function, parentKey: string, createdAt: number }
 
 // In-Memory LRU Block Cache for Telegram MTProto Stream Chunks
-// Caches up to 32 blocks (16 MB RAM) to eliminate seek latency while protecting router RAM from exhaustion.
-const BLOCK_CACHE_MAX_ENTRIES = 32; // 32 x 512KB = 16 MB
+// Configurable cache (8, 16, 32, 64 MB RAM) to eliminate seek latency while protecting router RAM from exhaustion.
+export function getBlockCacheMaxEntries() {
+  const mb = parseInt(savedSettings.routerRamCacheMb, 10) || 16;
+  return mb * 2; // 2 x 512KB blocks per MB
+}
+
+export function pruneGlobalBlockCache() {
+  const maxEntries = getBlockCacheMaxEntries();
+  while (globalBlockCache.size > maxEntries) {
+    const oldestKey = globalBlockCache.keys().next().value;
+    globalBlockCache.delete(oldestKey);
+  }
+}
+
 const globalBlockCache = new Map();
 
 // Pinned cache for container headers (first 4 blocks: 0..3) and tail cues (last 4 blocks)
@@ -1283,9 +1324,10 @@ function setCachedBlock(docId, blockIdx, data, isPinned = false) {
     pinnedHeaderCache.set(key, data);
     return;
   }
+  const maxEntries = getBlockCacheMaxEntries();
   if (globalBlockCache.has(key)) {
     globalBlockCache.delete(key);
-  } else if (globalBlockCache.size >= BLOCK_CACHE_MAX_ENTRIES) {
+  } else if (globalBlockCache.size >= maxEntries) {
     const oldestKey = globalBlockCache.keys().next().value;
     globalBlockCache.delete(oldestKey);
   }
@@ -1623,6 +1665,10 @@ app.get(['/api/system/stats', '/msm/api/system/stats'], (req, res) => {
       ip: stream.ip || 'unknown',
       clientName: stream.clientName || stream.ip || 'Client',
       filename: stream.filename || 'media',
+      qualityTier: stream.qualityTier || detectVideoQualityTier(stream.filename || ''),
+      concurrency: stream.concurrency || 4,
+      pipelineMB: stream.concurrency ? (stream.concurrency * 0.5).toFixed(1) : '2.0',
+      isPrefetchOverlapped: stream.isPrefetchOverlapped !== false,
       mode: stream.mode || 'Direct Native',
       status: isStreaming ? 'STREAMING' : 'IDLE',
       idleSec: Math.max(0, Math.round(idleMs / 1000)),
@@ -1654,6 +1700,11 @@ app.get(['/api/system/stats', '/msm/api/system/stats'], (req, res) => {
       arrayBuffersMB: Math.round((mem.arrayBuffers || 0) / (1024 * 1024)),
       chunkCacheMB: Number((calculateChunkCacheBytes() / (1024 * 1024)).toFixed(1)),
     },
+    pipelineBuffers: savedSettings.pipelineBuffers || DEFAULT_PIPELINE_BUFFERS,
+    overlapPrefetch: savedSettings.overlapPrefetch !== false,
+    routerRamCacheMb: savedSettings.routerRamCacheMb || 16,
+    blockCacheEntries: globalBlockCache.size,
+    blockCacheMaxEntries: getBlockCacheMaxEntries(),
     logSizeKB,
   });
 });
@@ -1835,152 +1886,99 @@ app.get('/msm/logs', (req, res) => {
     body { background-color: #0B0F17; color: #E2E8F0; font-family: ui-sans-serif, system-ui, sans-serif; }
     .glow-box { box-shadow: 0 0 25px rgba(56, 189, 248, 0.08); }
     ::-webkit-scrollbar { width: 8px; height: 8px; }
-    ::-webkit-scrollbar-track { background: #0F172A; }
-    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
-    ::-webkit-scrollbar-thumb:hover { background: #475569; }
+    ::-webkit-scrollbar-track { background: #0B0F17; }
+    ::-webkit-scrollbar-thumb { background: #1E293B; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #334155; }
   </style>
 </head>
-<body class="min-h-screen flex flex-col p-3 sm:p-6 max-w-7xl mx-auto w-full space-y-4">
-  <!-- Top Navigation & Header -->
-  <header class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-3 border-b border-slate-800">
-    <div class="flex items-center gap-3">
-      <div class="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-sky-500/10 text-sky-400 border border-sky-500/20">
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7"></path></svg>
-      </div>
-      <div>
-        <h1 class="text-lg font-black tracking-tight text-white flex items-center gap-2">
-          MSM Getter <span class="text-xs font-mono font-normal px-2 py-0.5 rounded bg-sky-500/10 text-sky-400 border border-sky-500/20">v1.2.1 • Live Console</span>
-        </h1>
-        <p class="text-xs text-slate-400">Telegram MTProto Cloud Streaming Server Logs</p>
-      </div>
-    </div>
-    
-    <!-- Navigation Tabs -->
-    <nav class="flex items-center gap-2 flex-wrap">
-      <a href="/msm" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800/80 transition flex items-center gap-1">
-        🏠 Dashboard
-      </a>
-      <a href="/msm/streams" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800/80 transition flex items-center gap-1">
-        💾 Streams
-      </a>
-      <a href="/msm/settings" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800/80 transition flex items-center gap-1">
-        ⚙️ Settings
-      </a>
-      <a href="/msm/logs" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-sky-400 bg-sky-500/10 border border-sky-500/20 transition flex items-center gap-1">
-        📜 Logs
-      </a>
-      <a href="/msm/auth" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800/80 transition flex items-center gap-1">
-        🔑 Auth
-      </a>
-      <a href="/msm/api/logs/download" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 bg-slate-800 hover:bg-slate-700 border border-slate-700 transition flex items-center gap-1.5">
-        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
-        Download .log
-      </a>
-    </nav>
-  </header>
-
-  <!-- Live System Metrics Bar -->
-  <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5">
-    <div class="p-3 rounded-xl bg-slate-900 border border-slate-800/80">
-      <span class="text-[10px] text-slate-400 font-semibold block uppercase tracking-wider">Status</span>
-      <div class="flex items-center gap-2 mt-1">
-        <span id="metricDot" class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
-        <span id="metricStatus" class="text-xs font-bold text-emerald-400">Online</span>
-      </div>
-      <span class="text-[10px] text-slate-500 font-mono block mt-0.5">Telegram MTProto</span>
-    </div>
-    <div class="p-3 rounded-xl bg-slate-900 border border-slate-800/80">
-      <span class="text-[10px] text-slate-400 font-semibold block uppercase tracking-wider">CPU Usage</span>
-      <div class="flex items-baseline gap-1 mt-1 truncate">
-        <span id="metricNodeCpu" class="text-xs font-bold font-mono text-emerald-400">--%</span>
-        <span id="metricRouterCpuBadge" class="text-[11px] font-mono text-slate-400">[<span id="metricRouterCpu">--%</span> router]</span>
-      </div>
-      <span id="metricCpuDetail" class="text-[10px] text-slate-500 font-mono block mt-0.5">-- cores · load --</span>
-    </div>
-    <div class="p-3 rounded-xl bg-slate-900 border border-slate-800/80">
-      <span class="text-[10px] text-slate-400 font-semibold block uppercase tracking-wider">Node RAM / Cap</span>
-      <div class="flex items-baseline gap-1 mt-1 truncate">
-        <span id="metricRam" class="text-xs font-bold font-mono text-sky-400">-- / 256 MB</span>
-        <span id="metricRamPct" class="text-[10px] font-mono text-slate-400">(--%)</span>
-      </div>
-      <span id="metricHeapDetail" class="text-[10px] text-slate-500 font-mono block mt-0.5">Heap: -- MB</span>
-    </div>
-    <div class="p-3 rounded-xl bg-slate-900 border border-slate-800/80">
-      <span class="text-[10px] text-slate-400 font-semibold block uppercase tracking-wider">Uptime</span>
-      <span id="metricUptime" class="text-xs font-bold font-mono text-white mt-1 block">--</span>
-      <span class="text-[10px] text-slate-500 font-mono block mt-0.5">microservice</span>
-    </div>
-    <div class="p-3 rounded-xl bg-slate-900 border border-slate-800/80 col-span-2 sm:col-span-1">
-      <span class="text-[10px] text-slate-400 font-semibold block uppercase tracking-wider">Log File Size</span>
-      <span id="metricLogSize" class="text-xs font-bold font-mono text-slate-300 mt-1 block">-- KB</span>
-      <span class="text-[10px] text-slate-500 font-mono block mt-0.5">RAM disk (cap 5 MB)</span>
-    </div>
-  </div>
-
-  <!-- Active Stream Clients Panel -->
-  <div id="activeStreamsPanel" class="p-4 rounded-xl bg-slate-900 border border-slate-800/80 space-y-2.5">
-    <div class="flex items-center justify-between">
-      <div class="flex items-center gap-2">
-        <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
-        <span class="text-xs font-bold text-white uppercase tracking-wider">Active Stream Clients</span>
-      </div>
-      <span id="activeClientsCount" class="text-xs font-mono font-semibold text-slate-400">0 connected</span>
-    </div>
-    <div id="activeClientsList" class="text-xs text-slate-400">
-      <p class="text-slate-500 italic text-[11px] py-1">No active playback sessions.</p>
-    </div>
-  </div>
-
-  <!-- Terminal Controls & Filters -->
-  <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 pt-1">
-    <div class="flex flex-wrap items-center gap-1.5 text-xs font-medium">
-      <button onclick="setFilter('')" id="btnFilterAll" class="px-2.5 py-1 rounded-lg bg-sky-500/20 text-sky-300 border border-sky-400/30 font-bold transition">All</button>
-      <button onclick="setFilter('[STREAM')" id="btnFilterStream" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition">Streams</button>
-      <button onclick="setFilter('[TG]')" id="btnFilterTg" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition">Telegram</button>
-      <button onclick="setFilter('ERROR')" id="btnFilterError" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition">Errors</button>
-      <button onclick="setFilter('[SUPERVISOR]')" id="btnFilterSup" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition">Supervisor</button>
-    </div>
-
-    <div class="flex items-center gap-2.5 flex-1 sm:max-w-md justify-end">
-      <div class="relative flex-1">
-        <input id="searchInput" type="text" placeholder="Search logs (e.g. 1080p, Polis, docId)..." 
-          class="w-full bg-slate-900 border border-slate-800 focus:border-sky-400 rounded-lg px-3 py-1.5 text-xs text-white placeholder:text-slate-500 outline-none font-mono transition" />
-      </div>
-      <label class="flex items-center gap-1.5 text-xs text-slate-400 cursor-pointer select-none">
-        <input id="autoScroll" type="checkbox" checked class="rounded bg-slate-900 border-slate-700 text-sky-500 focus:ring-0" />
-        <span>Auto-scroll</span>
-      </label>
-      <button onclick="clearServerLog()" class="px-2.5 py-1 text-xs font-semibold text-rose-300 hover:text-white bg-rose-500/10 hover:bg-rose-500/20 rounded-lg border border-rose-500/30 transition flex items-center gap-1.5" title="Physically truncate and clear log file on router">
-        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-        Clear Log
-      </button>
-    </div>
-  </div>
-
-
-
-  <!-- Terminal Window -->
-  <div class="relative flex-1 bg-slate-950 border border-slate-800/80 rounded-2xl overflow-hidden shadow-2xl glow-box flex flex-col min-h-[500px]">
-    <div class="bg-slate-900/90 border-b border-slate-800/80 px-4 py-2 flex items-center justify-between">
-      <div class="flex items-center gap-2">
-        <div class="flex gap-1.5">
-          <span class="w-3 h-3 rounded-full bg-rose-500/70 inline-block"></span>
-          <span class="w-3 h-3 rounded-full bg-amber-500/70 inline-block"></span>
-          <span class="w-3 h-3 rounded-full bg-emerald-500/70 inline-block"></span>
+<body class="min-h-screen p-4 sm:p-8 flex flex-col items-center bg-[#0B0F17] text-[#E2E8F0]">
+  <div class="max-w-6xl w-full space-y-4 flex flex-col flex-1">
+    <!-- Top Navigation & Header -->
+    <header class="flex flex-col sm:flex-row items-center justify-between bg-slate-900 border border-slate-800 rounded-2xl px-6 py-4 glow-box gap-4 w-full">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-sky-500/10 text-sky-400 border border-sky-500/20 flex items-center justify-center font-bold text-lg">
+          📜
         </div>
-        <span class="text-[11px] font-mono text-slate-400 ml-2">/tmp/msm-getter.log</span>
+        <div>
+          <h1 class="text-lg font-bold text-white flex items-center gap-2">
+            MSM Logs
+            <span class="text-xs px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-300 border border-sky-500/30 font-mono">@${BOT_USERNAME}</span>
+          </h1>
+          <p class="text-xs text-slate-400">Real-time MTProto microservice streaming & diagnostic console</p>
+        </div>
       </div>
-      <div class="flex items-center gap-2 text-[11px] text-slate-400 font-mono">
-        <span id="lineCount">0 lines</span>
-        <span id="streamStatusBadge" class="inline-flex items-center gap-1 text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
-          <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span> Live Stream
-        </span>
+      <nav class="flex items-center gap-2 flex-wrap">
+        <a href="/msm" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800 transition flex items-center gap-1">
+          🏠 Dashboard
+        </a>
+        <a href="/msm/streams" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800 transition flex items-center gap-1">
+          💾 Streams
+        </a>
+        <a href="/msm/settings" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800 transition flex items-center gap-1">
+          ⚙️ Settings
+        </a>
+        <a href="/msm/logs" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-sky-400 bg-sky-500/10 border border-sky-500/30 flex items-center gap-1">
+          📜 Logs
+        </a>
+        <a href="/msm/auth" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800 transition flex items-center gap-1">
+          🔑 Auth
+        </a>
+        <a href="/msm/api/logs/download" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 bg-slate-800 hover:bg-slate-700 border border-slate-700 transition flex items-center gap-1.5 ml-1">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+          Download .log
+        </a>
+      </nav>
+    </header>
+
+    <!-- Terminal Controls & Filters -->
+    <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 pt-1">
+      <div class="flex flex-wrap items-center gap-1.5 text-xs font-medium">
+        <button onclick="setFilter('')" id="btnFilterAll" class="px-2.5 py-1 rounded-lg bg-sky-500/20 text-sky-300 border border-sky-400/30 font-bold transition">All</button>
+        <button onclick="setFilter('[STREAM')" id="btnFilterStream" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition">Streams</button>
+        <button onclick="setFilter('[TG]')" id="btnFilterTg" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition">Telegram</button>
+        <button onclick="setFilter('ERROR')" id="btnFilterError" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition">Errors</button>
+        <button onclick="setFilter('[SUPERVISOR]')" id="btnFilterSup" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition">Supervisor</button>
+      </div>
+
+      <div class="flex items-center gap-2.5 flex-1 sm:max-w-md justify-end">
+        <div class="relative flex-1">
+          <input id="searchInput" type="text" placeholder="Search logs (e.g. 1080p, docId, buffer)..." 
+            class="w-full bg-slate-900 border border-slate-800 focus:border-sky-400 rounded-lg px-3 py-1.5 text-xs text-white placeholder:text-slate-500 outline-none font-mono transition" />
+        </div>
+        <label class="flex items-center gap-1.5 text-xs text-slate-400 cursor-pointer select-none">
+          <input id="autoScroll" type="checkbox" checked class="rounded bg-slate-900 border-slate-700 text-sky-500 focus:ring-0" />
+          <span>Auto-scroll</span>
+        </label>
+        <button onclick="clearServerLog()" class="px-2.5 py-1 text-xs font-semibold text-rose-300 hover:text-white bg-rose-500/10 hover:bg-rose-500/20 rounded-lg border border-rose-500/30 transition flex items-center gap-1.5" title="Physically truncate and clear log file on router">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+          Clear Log
+        </button>
       </div>
     </div>
 
-    <!-- Output Body -->
-    <div id="terminalBody" class="p-4 overflow-y-auto flex-1 font-mono text-[11px] leading-relaxed space-y-0.5 select-text whitespace-pre-wrap break-all">
-      <div class="text-slate-500 italic">Connecting to live log stream...</div>
+    <!-- Terminal Window (Full Height) -->
+    <div class="relative flex-1 bg-slate-950 border border-slate-800/80 rounded-2xl overflow-hidden shadow-2xl glow-box flex flex-col min-h-[650px]">
+      <div class="bg-slate-900/90 border-b border-slate-800/80 px-4 py-2 flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <div class="flex gap-1.5">
+            <span class="w-3 h-3 rounded-full bg-rose-500/70 inline-block"></span>
+            <span class="w-3 h-3 rounded-full bg-amber-500/70 inline-block"></span>
+            <span class="w-3 h-3 rounded-full bg-emerald-500/70 inline-block"></span>
+          </div>
+          <span class="text-[11px] font-mono text-slate-400 ml-2">/tmp/msm-getter.log</span>
+        </div>
+        <div class="flex items-center gap-2 text-[11px] text-slate-400 font-mono">
+          <span id="lineCount">0 lines</span>
+          <span id="streamStatusBadge" class="inline-flex items-center gap-1 text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span> Live Stream
+          </span>
+        </div>
+      </div>
+
+      <!-- Output Body -->
+      <div id="terminalBody" class="p-4 overflow-y-auto flex-1 font-mono text-[11px] leading-relaxed space-y-0.5 select-text whitespace-pre-wrap break-all">
+        <div class="text-slate-500 italic">Connecting to live log stream...</div>
+      </div>
     </div>
   </div>
 
@@ -2060,8 +2058,6 @@ app.get('/msm/logs', (req, res) => {
         if (data.success) {
           rawLines = [];
           renderLines();
-          const metricLogSize = document.getElementById('metricLogSize');
-          if (metricLogSize) metricLogSize.textContent = '0 KB';
         } else {
           alert('Failed to clear log: ' + (data.error || 'Unknown error'));
         }
@@ -2069,7 +2065,6 @@ app.get('/msm/logs', (req, res) => {
         alert('Network error while clearing log: ' + err.message);
       }
     }
-    const clearDisplay = clearServerLog;
 
     searchInput.addEventListener('input', renderLines);
 
@@ -2109,105 +2104,6 @@ app.get('/msm/logs', (req, res) => {
       };
     }
 
-    // System Metrics Polling
-    async function pollMetrics() {
-      try {
-        const res = await fetch('/msm/api/system/stats');
-        const d = await res.json();
-        document.getElementById('metricUptime').textContent = Math.floor(d.uptime / 3600) + 'h ' + Math.floor((d.uptime % 3600) / 60) + 'm ' + (d.uptime % 60) + 's';
-
-        // 1. CPU Usage: msm-getter (Node + FFmpeg) [router]
-        const cpu = d.cpu || {};
-        const nodeCpuEl = document.getElementById('metricNodeCpu');
-        const routerCpuEl = document.getElementById('metricRouterCpu');
-        const cpuDetailEl = document.getElementById('metricCpuDetail');
-        if (nodeCpuEl && routerCpuEl) {
-          const nodeCpu = cpu.nodeCpuPct !== undefined ? cpu.nodeCpuPct : 0;
-          const routerCpu = cpu.routerCpuPct !== undefined ? cpu.routerCpuPct : 0;
-          const ffmpegCpu = cpu.ffmpegCpuPct !== undefined ? cpu.ffmpegCpuPct : 0;
-          const serviceCpu = cpu.serviceCpuPct !== undefined ? cpu.serviceCpuPct : nodeCpu;
-          
-          nodeCpuEl.textContent = (ffmpegCpu > 0 ? serviceCpu : nodeCpu) + '%';
-          routerCpuEl.textContent = routerCpu + '%';
-          if (serviceCpu > 50 || routerCpu > 70) nodeCpuEl.className = 'text-xs font-bold font-mono text-rose-400';
-          else if (serviceCpu > 20 || routerCpu > 40) nodeCpuEl.className = 'text-xs font-bold font-mono text-amber-400';
-          else nodeCpuEl.className = 'text-xs font-bold font-mono text-emerald-400';
-
-          if (cpuDetailEl) {
-            if (ffmpegCpu > 0) {
-              cpuDetailEl.textContent = 'FFmpeg: ' + ffmpegCpu + '% · Node: ' + nodeCpu + '% · load ' + (cpu.loadAvg1m || 0);
-            } else {
-              cpuDetailEl.textContent = (cpu.cores || 4) + ' cores · load ' + (cpu.loadAvg1m || 0);
-            }
-          }
-        }
-
-        // 2. Node RAM / Cap
-        const mem = d.memory || {};
-        const ramEl = document.getElementById('metricRam');
-        const ramPctEl = document.getElementById('metricRamPct');
-        const heapDetailEl = document.getElementById('metricHeapDetail');
-        if (ramEl) {
-          const rss = mem.rssMB || 0;
-          const cap = mem.capMB || 256;
-          const pct = mem.ramPct !== undefined ? mem.ramPct : Math.round((rss / cap) * 100);
-          ramEl.textContent = rss + ' / ' + cap + ' MB';
-          if (ramPctEl) ramPctEl.textContent = '(' + pct + '%)';
-          if (heapDetailEl) heapDetailEl.textContent = 'Heap: ' + (mem.heapUsedMB || 0) + ' MB · Cache: ' + (mem.chunkCacheMB !== undefined ? mem.chunkCacheMB : 0) + ' MB';
-          if (pct > 80) ramEl.className = 'text-xs font-bold font-mono text-rose-400';
-          else if (pct > 50) ramEl.className = 'text-xs font-bold font-mono text-amber-400';
-          else ramEl.className = 'text-xs font-bold font-mono text-sky-400';
-        }
-
-        document.getElementById('metricLogSize').textContent = (d.logSizeKB || 0) + ' KB';
-        if (d.isConnected) {
-          document.getElementById('metricDot').className = 'w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse';
-          document.getElementById('metricStatus').textContent = 'Online';
-        } else {
-          document.getElementById('metricDot').className = 'w-2.5 h-2.5 rounded-full bg-rose-400';
-          document.getElementById('metricStatus').textContent = 'Offline';
-        }
-
-        const countEl = document.getElementById('activeClientsCount');
-        const listEl = document.getElementById('activeClientsList');
-        if (countEl && listEl) {
-          const clients = d.activeClients || [];
-          countEl.textContent = clients.length === 1 ? '1 client connected' : clients.length + ' clients connected';
-          if (clients.length === 0) {
-            listEl.innerHTML = '<p class="text-slate-500 italic text-[11px] py-1">No active playback sessions.</p>';
-          } else {
-            let rowsHtml = '';
-            for (let i = 0; i < clients.length; i++) {
-              const c = clients[i];
-              const isStreaming = c.status === 'STREAMING';
-              const statusBadge = isStreaming
-                ? '<span class="inline-flex items-center gap-1 text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20 font-bold text-[10px]"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> Streaming</span>'
-                : '<span class="inline-flex items-center gap-1 text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20 font-medium text-[10px]">⏸ Idle (' + (c.idleSec || 0) + 's)</span>';
-
-              rowsHtml += '<tr class="text-slate-300 hover:bg-slate-800/40 transition">' +
-                '<td class="py-1.5 px-2 font-bold text-sky-400 font-sans flex items-center gap-1.5">📺 ' + escapeHtml(c.clientName || 'Client') + '</td>' +
-                '<td class="py-1.5 px-2 text-slate-400 font-mono">' + escapeHtml(c.ip || '') + '</td>' +
-                '<td class="py-1.5 px-2 text-slate-200 truncate max-w-xs font-sans" title="' + escapeHtml(c.filename || '') + '">' + escapeHtml(c.filename || '') + '</td>' +
-                '<td class="py-1.5 px-2 text-sky-300 font-sans text-[11px]">' + escapeHtml(c.mode || '') + '</td>' +
-                '<td class="py-1.5 px-2 font-sans">' + statusBadge + '</td>' +
-                '<td class="py-1.5 px-2 text-slate-400 text-right font-mono">' + (c.connectedSec || 0) + 's</td>' +
-              '</tr>';
-            }
-            listEl.innerHTML = '<div class="overflow-x-auto"><table class="w-full text-left text-xs">' +
-              '<thead><tr class="text-slate-500 border-b border-slate-800 pb-1.5 text-[11px]">' +
-              '<th class="py-1 px-2 font-semibold">Client / Device</th>' +
-              '<th class="py-1 px-2 font-semibold">IP Address</th>' +
-              '<th class="py-1 px-2 font-semibold">Media Filename</th>' +
-              '<th class="py-1 px-2 font-semibold">Playback Mode</th>' +
-              '<th class="py-1 px-2 font-semibold">Status</th>' +
-              '<th class="py-1 px-2 font-semibold text-right">Connected</th>' +
-              '</tr></thead><tbody class="divide-y divide-slate-800/60 font-mono text-[11px]">' +
-              rowsHtml + '</tbody></table></div>';
-          }
-        }
-      } catch {}
-    }
-
     // Backward compatibility: redirect anchor /msm/logs#cachePanel to dedicated streams page
     if (window.location.hash === '#cachePanel') {
       window.location.replace('/msm/streams');
@@ -2215,8 +2111,6 @@ app.get('/msm/logs', (req, res) => {
 
     fetchInitialLogs();
     connectSSE();
-    pollMetrics();
-    setInterval(pollMetrics, 3000);
   </script>
 </body>
 </html>`);
@@ -2247,6 +2141,10 @@ app.get(['/api/settings', '/msm/api/settings'], (req, res) => {
     uptime: process.uptime(),
     cachedStreams: db.size(),
     pipelineBuffers: savedSettings.pipelineBuffers || DEFAULT_PIPELINE_BUFFERS,
+    overlapPrefetch: savedSettings.overlapPrefetch !== false,
+    routerRamCacheMb: savedSettings.routerRamCacheMb || 16,
+    blockCacheEntries: globalBlockCache.size,
+    blockCacheMaxEntries: getBlockCacheMaxEntries(),
     port,
     internalPort: INTERNAL_HTTP_PORT,
   });
@@ -2254,7 +2152,7 @@ app.get(['/api/settings', '/msm/api/settings'], (req, res) => {
 
 app.post(['/api/settings', '/msm/api/settings'], (req, res) => {
   try {
-    const { targetBotUsername, pipelineBuffers } = req.body || {};
+    const { targetBotUsername, pipelineBuffers, overlapPrefetch, routerRamCacheMb } = req.body || {};
     let changed = false;
 
     if (targetBotUsername && typeof targetBotUsername === 'string') {
@@ -2281,6 +2179,22 @@ app.post(['/api/settings', '/msm/api/settings'], (req, res) => {
       console.log(`[SETTINGS] Stream Pipeline Buffers updated:`, JSON.stringify(savedSettings.pipelineBuffers));
     }
 
+    if (overlapPrefetch !== undefined) {
+      savedSettings.overlapPrefetch = Boolean(overlapPrefetch);
+      changed = true;
+      console.log(`[SETTINGS] Overlap Prefetch updated to:`, savedSettings.overlapPrefetch);
+    }
+
+    if (routerRamCacheMb !== undefined) {
+      const mb = parseInt(routerRamCacheMb, 10);
+      if ([8, 16, 32, 64].includes(mb)) {
+        savedSettings.routerRamCacheMb = mb;
+        changed = true;
+        pruneGlobalBlockCache();
+        console.log(`[SETTINGS] Router RAM Block Cache updated to: ${mb} MB (${mb * 2} blocks)`);
+      }
+    }
+
     if (changed) {
       const dataDir = path.join(__dirname, 'data');
       if (!fs.existsSync(dataDir)) {
@@ -2293,10 +2207,23 @@ app.post(['/api/settings', '/msm/api/settings'], (req, res) => {
       success: true,
       targetBotUsername: BOT_USERNAME,
       pipelineBuffers: savedSettings.pipelineBuffers || DEFAULT_PIPELINE_BUFFERS,
+      overlapPrefetch: savedSettings.overlapPrefetch !== false,
+      routerRamCacheMb: savedSettings.routerRamCacheMb || 16,
+      blockCacheEntries: globalBlockCache.size,
+      blockCacheMaxEntries: getBlockCacheMaxEntries(),
     });
   } catch (err) {
     return res.status(500).json({ success: false, error: err.message });
   }
+});
+
+// System Service Restart Endpoint (Exits process; router supervisor auto-respawns in ~3s)
+app.post(['/api/system/restart', '/msm/api/system/restart'], (req, res) => {
+  console.log('[SYSTEM] Service restart requested via web settings.');
+  res.json({ success: true, message: 'Restarting MSM Getter service...' });
+  setTimeout(() => {
+    process.exit(0);
+  }, 1000);
 });
 
 // Redirect legacy root / and /dashboard to /msm
@@ -2324,10 +2251,10 @@ app.get(['/msm', '/msm/dashboard'], (req, res) => {
     ::-webkit-scrollbar-thumb { background: #1E293B; border-radius: 4px; }
   </style>
 </head>
-<body class="min-h-screen p-4 sm:p-8 flex flex-col items-center">
-  <div class="max-w-5xl w-full space-y-6">
-    <!-- Navigation Bar -->
-    <header class="flex flex-col sm:flex-row items-center justify-between bg-slate-900 border border-slate-800 rounded-2xl px-6 py-4 glow-box gap-4">
+<body class="min-h-screen p-4 sm:p-8 flex flex-col items-center bg-[#0B0F17] text-[#E2E8F0]">
+  <div class="max-w-6xl w-full space-y-6">
+    <!-- Top Navigation & Header -->
+    <header class="flex flex-col sm:flex-row items-center justify-between bg-slate-900 border border-slate-800 rounded-2xl px-6 py-4 glow-box gap-4 w-full">
       <div class="flex items-center gap-3">
         <div class="w-10 h-10 rounded-xl bg-sky-500/10 text-sky-400 border border-sky-500/20 flex items-center justify-center font-bold text-lg">
           🎬
@@ -2359,35 +2286,106 @@ app.get(['/msm', '/msm/dashboard'], (req, res) => {
       </nav>
     </header>
 
-    <!-- Key Metrics Grid -->
-    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
-      <div class="bg-slate-900 border border-slate-800/80 rounded-2xl p-4 glow-box">
-        <span class="text-xs text-slate-400 font-medium">Telegram Status</span>
-        <div class="flex items-center gap-2 mt-1.5">
-          <span id="statusDot" class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
-          <p id="statConn" class="text-sm font-semibold text-white">Connected</p>
+    <!-- Live System Metrics Bar -->
+    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+      <div class="p-3.5 rounded-2xl bg-slate-900 border border-slate-800/80 glow-box">
+        <span class="text-[10px] text-slate-400 font-semibold block uppercase tracking-wider">Status</span>
+        <div class="flex items-center gap-2 mt-1">
+          <span id="metricDot" class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+          <span id="metricStatus" class="text-xs font-bold text-emerald-400">Online</span>
+        </div>
+        <span class="text-[10px] text-slate-500 font-mono block mt-0.5">Telegram MTProto</span>
+      </div>
+      <div class="p-3.5 rounded-2xl bg-slate-900 border border-slate-800/80 glow-box">
+        <span class="text-[10px] text-slate-400 font-semibold block uppercase tracking-wider">CPU Usage</span>
+        <div class="flex items-baseline gap-1 mt-1 truncate">
+          <span id="metricNodeCpu" class="text-xs font-bold font-mono text-emerald-400">--%</span>
+          <span id="metricRouterCpuBadge" class="text-[11px] font-mono text-slate-400">[<span id="metricRouterCpu">--%</span> router]</span>
+        </div>
+        <span id="metricCpuDetail" class="text-[10px] text-slate-500 font-mono block mt-0.5">-- cores · load --</span>
+      </div>
+      <div class="p-3.5 rounded-2xl bg-slate-900 border border-slate-800/80 glow-box">
+        <span class="text-[10px] text-slate-400 font-semibold block uppercase tracking-wider">Node RAM / Cap</span>
+        <div class="flex items-baseline gap-1 mt-1 truncate">
+          <span id="metricRam" class="text-xs font-bold font-mono text-sky-400">-- / 256 MB</span>
+          <span id="metricRamPct" class="text-[10px] font-mono text-slate-400">(--%)</span>
+        </div>
+        <span id="metricHeapDetail" class="text-[10px] text-slate-500 font-mono block mt-0.5">Heap: -- MB</span>
+      </div>
+      <div class="p-3.5 rounded-2xl bg-slate-900 border border-slate-800/80 glow-box">
+        <span class="text-[10px] text-slate-400 font-semibold block uppercase tracking-wider">Uptime</span>
+        <span id="metricUptime" class="text-xs font-bold font-mono text-white mt-1 block">--</span>
+        <span class="text-[10px] text-slate-500 font-mono block mt-0.5">microservice</span>
+      </div>
+      <div class="p-3.5 rounded-2xl bg-slate-900 border border-slate-800/80 glow-box col-span-2 sm:col-span-1">
+        <span class="text-[10px] text-slate-400 font-semibold block uppercase tracking-wider">Log File Size</span>
+        <span id="metricLogSize" class="text-xs font-bold font-mono text-slate-300 mt-1 block">-- KB</span>
+        <span class="text-[10px] text-slate-500 font-mono block mt-0.5">RAM disk (cap 5 MB)</span>
+      </div>
+    </div>
+
+    <!-- ⚡ Stream Buffering & Engine Performance Strip -->
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 glow-box space-y-3">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800/80 pb-3">
+        <div class="flex items-center gap-2">
+          <span class="text-base">⚡</span>
+          <h2 class="text-xs font-bold text-white uppercase tracking-wider">Stream Buffering & Engine Performance</h2>
+        </div>
+        <a href="/msm/settings" class="text-xs text-sky-400 hover:text-sky-300 font-semibold flex items-center gap-1 transition">
+          ⚙️ Configure in Settings →
+        </a>
+      </div>
+      <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
+        <div class="bg-slate-950/70 border border-slate-800/80 rounded-xl p-2.5">
+          <span class="text-[10px] text-slate-400 font-semibold block uppercase">SD Pipeline</span>
+          <span id="stripBufSd" class="text-xs font-bold font-mono text-emerald-400 block mt-0.5">2 × 512KB</span>
+          <span class="text-[10px] text-slate-500 font-mono block">1.0 MB in-flight</span>
+        </div>
+        <div class="bg-slate-950/70 border border-slate-800/80 rounded-xl p-2.5">
+          <span class="text-[10px] text-slate-400 font-semibold block uppercase">720p Pipeline</span>
+          <span id="stripBuf720" class="text-xs font-bold font-mono text-emerald-400 block mt-0.5">4 × 512KB</span>
+          <span class="text-[10px] text-slate-500 font-mono block">2.0 MB in-flight</span>
+        </div>
+        <div class="bg-slate-950/70 border border-slate-800/80 rounded-xl p-2.5">
+          <span class="text-[10px] text-slate-400 font-semibold block uppercase">1080p Pipeline</span>
+          <span id="stripBuf1080" class="text-xs font-bold font-mono text-sky-400 block mt-0.5">6 × 512KB</span>
+          <span class="text-[10px] text-slate-500 font-mono block">3.0 MB in-flight</span>
+        </div>
+        <div class="bg-slate-950/70 border border-slate-800/80 rounded-xl p-2.5">
+          <span class="text-[10px] text-slate-400 font-semibold block uppercase">4K Pipeline</span>
+          <span id="stripBuf4k" class="text-xs font-bold font-mono text-purple-400 block mt-0.5">8 × 512KB</span>
+          <span class="text-[10px] text-slate-500 font-mono block">4.0 MB in-flight</span>
+        </div>
+        <div class="bg-slate-950/70 border border-slate-800/80 rounded-xl p-2.5">
+          <span class="text-[10px] text-slate-400 font-semibold block uppercase">Overlap Prefetch</span>
+          <span id="stripPrefetch" class="text-xs font-bold font-mono text-emerald-400 block mt-0.5">Active</span>
+          <span class="text-[10px] text-slate-500 font-mono block">Fast seek & start</span>
+        </div>
+        <div class="bg-slate-950/70 border border-slate-800/80 rounded-xl p-2.5">
+          <span class="text-[10px] text-slate-400 font-semibold block uppercase">Router RAM Cache</span>
+          <span id="stripRamCache" class="text-xs font-bold font-mono text-white block mt-0.5">16 MB</span>
+          <span id="stripRamBlocks" class="text-[10px] text-slate-500 font-mono block">32 blocks cap</span>
         </div>
       </div>
-      <div class="bg-slate-900 border border-slate-800/80 rounded-2xl p-4 glow-box">
-        <span class="text-xs text-slate-400 font-medium">Server Uptime</span>
-        <p id="statUptime" class="text-lg font-bold text-white mt-1">--</p>
-      </div>
-      <div class="bg-slate-900 border border-slate-800/80 rounded-2xl p-4 glow-box">
-        <span class="text-xs text-slate-400 font-medium">Memory Usage (RSS)</span>
-        <p id="statMem" class="text-lg font-bold text-white mt-1">--</p>
-      </div>
-      <a href="/msm/streams" class="bg-slate-900 hover:bg-slate-800/90 border border-slate-800/80 rounded-2xl p-4 glow-box block transition group" title="Click to view all cached video streams">
-        <div class="flex items-center justify-between">
-          <span class="text-xs text-slate-400 font-medium group-hover:text-sky-300 transition">Streams in Central Cache</span>
-          <span class="text-xs text-sky-400 group-hover:translate-x-0.5 transition">→</span>
+    </div>
+
+    <!-- Active Stream Clients Panel -->
+    <div id="activeStreamsPanel" class="p-5 rounded-2xl bg-slate-900 border border-slate-800 glow-box space-y-3">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+          <span class="text-xs font-bold text-white uppercase tracking-wider">Active Stream Clients</span>
         </div>
-        <p id="statCache" class="text-lg font-bold text-sky-400 mt-1">--</p>
-      </a>
+        <span id="activeClientsCount" class="text-xs font-mono font-semibold text-slate-400">0 connected</span>
+      </div>
+      <div id="activeClientsList" class="text-xs text-slate-400">
+        <p class="text-slate-500 italic text-[11px] py-2">No active playback sessions.</p>
+      </div>
     </div>
 
     <!-- Quick Navigation Hub -->
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-      <a href="/msm/streams" class="bg-slate-900 hover:bg-slate-800/90 border border-slate-800 rounded-2xl p-5 space-y-2 transition group block">
+      <a href="/msm/streams" class="bg-slate-900 hover:bg-slate-800/90 border border-slate-800 rounded-2xl p-5 space-y-2 transition group block glow-box">
         <div class="w-9 h-9 rounded-xl bg-sky-500/10 text-sky-400 border border-sky-500/20 flex items-center justify-center text-lg">
           💾
         </div>
@@ -2396,16 +2394,16 @@ app.get(['/msm', '/msm/dashboard'], (req, res) => {
         <span class="text-xs text-sky-400 font-semibold inline-block pt-1">Open Streams →</span>
       </a>
 
-      <a href="/msm/settings" class="bg-slate-900 hover:bg-slate-800/90 border border-slate-800 rounded-2xl p-5 space-y-2 transition group block">
+      <a href="/msm/settings" class="bg-slate-900 hover:bg-slate-800/90 border border-slate-800 rounded-2xl p-5 space-y-2 transition group block glow-box">
         <div class="w-9 h-9 rounded-xl bg-purple-500/10 text-purple-400 border border-purple-500/20 flex items-center justify-center text-lg">
           ⚙️
         </div>
         <h3 class="text-sm font-bold text-white group-hover:text-sky-400 transition">Server Settings</h3>
-        <p class="text-xs text-slate-400">Configure target bot handle (@msm34bot), adjust timeouts, and server controls.</p>
+        <p class="text-xs text-slate-400">Configure target bot handle (@msm34bot), adjust buffer pipelines, RAM cache, and reboot service.</p>
         <span class="text-xs text-sky-400 font-semibold inline-block pt-1">Open Settings →</span>
       </a>
 
-      <a href="/msm/logs" class="bg-slate-900 hover:bg-slate-800/90 border border-slate-800 rounded-2xl p-5 space-y-2 transition group block">
+      <a href="/msm/logs" class="bg-slate-900 hover:bg-slate-800/90 border border-slate-800 rounded-2xl p-5 space-y-2 transition group block glow-box">
         <div class="w-9 h-9 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center justify-center text-lg">
           📜
         </div>
@@ -2414,7 +2412,7 @@ app.get(['/msm', '/msm/dashboard'], (req, res) => {
         <span class="text-xs text-sky-400 font-semibold inline-block pt-1">View Logs →</span>
       </a>
 
-      <a href="/msm/auth" class="bg-slate-900 hover:bg-slate-800/90 border border-slate-800 rounded-2xl p-5 space-y-2 transition group block">
+      <a href="/msm/auth" class="bg-slate-900 hover:bg-slate-800/90 border border-slate-800 rounded-2xl p-5 space-y-2 transition group block glow-box">
         <div class="w-9 h-9 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20 flex items-center justify-center text-lg">
           🔑
         </div>
@@ -2425,7 +2423,7 @@ app.get(['/msm', '/msm/dashboard'], (req, res) => {
     </div>
 
     <!-- Live Query Diagnostic Sandbox -->
-    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 glow-box space-y-4">
       <div class="flex items-center justify-between">
         <h2 class="text-sm font-bold text-white flex items-center gap-2">
           🔍 Live Bot Query Diagnostic Sandbox
@@ -2445,36 +2443,141 @@ app.get(['/msm', '/msm/dashboard'], (req, res) => {
   </div>
 
   <script>
+    function escapeHtml(str) {
+      return String(str || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
     async function loadStats() {
       try {
-        const [sysRes, healthRes] = await Promise.all([
-          fetch('/msm/api/system/stats').then(r => r.json()),
-          fetch('/msm/health').then(r => r.json())
-        ]);
-        
-        if (healthRes.uptime) {
-          const u = Math.floor(healthRes.uptime);
-          const d = Math.floor(u / 86400);
-          const h = Math.floor((u % 86400) / 3600);
-          const m = Math.floor((u % 3600) / 60);
-          document.getElementById('statUptime').textContent = d > 0 ? \`\${d}d \${h}h \${m}m\` : \`\${h}h \${m}m\`;
-        }
-        
-        if (sysRes.stats) {
-          document.getElementById('statMem').textContent = (sysRes.stats.memoryRSS || 0) + ' MB';
-        }
-        document.getElementById('statCache').textContent = healthRes.cachedStreams || 0;
+        const res = await fetch('/msm/api/system/stats');
+        const d = await res.json();
 
-        const statConn = document.getElementById('statConn');
-        const dot = document.getElementById('statusDot');
-        if (healthRes.isConnected) {
-          statConn.textContent = 'Connected (MTProto)';
-          statConn.className = 'text-sm font-semibold text-emerald-400';
-          dot.className = 'w-2.5 h-2.5 rounded-full bg-emerald-400';
+        // 1. Status
+        if (d.isConnected) {
+          document.getElementById('metricDot').className = 'w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse';
+          document.getElementById('metricStatus').textContent = 'Online';
+          document.getElementById('metricStatus').className = 'text-xs font-bold text-emerald-400';
         } else {
-          statConn.textContent = 'Disconnected';
-          statConn.className = 'text-sm font-semibold text-rose-400';
-          dot.className = 'w-2.5 h-2.5 rounded-full bg-rose-400';
+          document.getElementById('metricDot').className = 'w-2.5 h-2.5 rounded-full bg-rose-400';
+          document.getElementById('metricStatus').textContent = 'Offline';
+          document.getElementById('metricStatus').className = 'text-xs font-bold text-rose-400';
+        }
+
+        // 2. CPU
+        const cpu = d.cpu || {};
+        const nodeCpuEl = document.getElementById('metricNodeCpu');
+        const routerCpuEl = document.getElementById('metricRouterCpu');
+        const cpuDetailEl = document.getElementById('metricCpuDetail');
+        if (nodeCpuEl && routerCpuEl) {
+          const nodeCpu = cpu.nodeCpuPct !== undefined ? cpu.nodeCpuPct : 0;
+          const routerCpu = cpu.routerCpuPct !== undefined ? cpu.routerCpuPct : 0;
+          const ffmpegCpu = cpu.ffmpegCpuPct !== undefined ? cpu.ffmpegCpuPct : 0;
+          const serviceCpu = cpu.serviceCpuPct !== undefined ? cpu.serviceCpuPct : nodeCpu;
+
+          nodeCpuEl.textContent = (ffmpegCpu > 0 ? serviceCpu : nodeCpu) + '%';
+          routerCpuEl.textContent = routerCpu + '%';
+          if (serviceCpu > 50 || routerCpu > 70) nodeCpuEl.className = 'text-xs font-bold font-mono text-rose-400';
+          else if (serviceCpu > 20 || routerCpu > 40) nodeCpuEl.className = 'text-xs font-bold font-mono text-amber-400';
+          else nodeCpuEl.className = 'text-xs font-bold font-mono text-emerald-400';
+
+          if (cpuDetailEl) {
+            if (ffmpegCpu > 0) {
+              cpuDetailEl.textContent = 'FFmpeg: ' + ffmpegCpu + '% · Node: ' + nodeCpu + '% · load ' + (cpu.loadAvg1m || 0);
+            } else {
+              cpuDetailEl.textContent = (cpu.cores || 4) + ' cores · load ' + (cpu.loadAvg1m || 0);
+            }
+          }
+        }
+
+        // 3. RAM
+        const mem = d.memory || {};
+        const ramEl = document.getElementById('metricRam');
+        const ramPctEl = document.getElementById('metricRamPct');
+        const heapDetailEl = document.getElementById('metricHeapDetail');
+        if (ramEl) {
+          const rss = mem.rssMB || 0;
+          const cap = mem.capMB || 256;
+          const pct = mem.ramPct !== undefined ? mem.ramPct : Math.round((rss / cap) * 100);
+          ramEl.textContent = rss + ' / ' + cap + ' MB';
+          if (ramPctEl) ramPctEl.textContent = '(' + pct + '%)';
+          if (heapDetailEl) heapDetailEl.textContent = 'Heap: ' + (mem.heapUsedMB || 0) + ' MB · Cache: ' + (mem.chunkCacheMB !== undefined ? mem.chunkCacheMB : 0) + ' MB';
+          if (pct > 80) ramEl.className = 'text-xs font-bold font-mono text-rose-400';
+          else if (pct > 50) ramEl.className = 'text-xs font-bold font-mono text-amber-400';
+          else ramEl.className = 'text-xs font-bold font-mono text-sky-400';
+        }
+
+        // 4. Uptime
+        const u = d.uptime || 0;
+        document.getElementById('metricUptime').textContent = Math.floor(u / 3600) + 'h ' + Math.floor((u % 3600) / 60) + 'm ' + (u % 60) + 's';
+
+        // 5. Log Size
+        document.getElementById('metricLogSize').textContent = (d.logSizeKB || 0) + ' KB';
+
+        // 6. Buffering Performance Strip
+        if (d.pipelineBuffers) {
+          const p = d.pipelineBuffers;
+          if (p.sd) document.getElementById('stripBufSd').textContent = p.sd + ' × 512KB';
+          if (p['720p']) document.getElementById('stripBuf720').textContent = p['720p'] + ' × 512KB';
+          if (p['1080p']) document.getElementById('stripBuf1080').textContent = p['1080p'] + ' × 512KB';
+          if (p['4k']) document.getElementById('stripBuf4k').textContent = p['4k'] + ' × 512KB';
+        }
+        if (d.overlapPrefetch !== undefined) {
+          const el = document.getElementById('stripPrefetch');
+          el.textContent = d.overlapPrefetch ? 'Active' : 'Disabled';
+          el.className = d.overlapPrefetch ? 'text-xs font-bold font-mono text-emerald-400 block mt-0.5' : 'text-xs font-bold font-mono text-slate-400 block mt-0.5';
+        }
+        if (d.routerRamCacheMb !== undefined) {
+          document.getElementById('stripRamCache').textContent = d.routerRamCacheMb + ' MB';
+          document.getElementById('stripRamBlocks').textContent = (d.routerRamCacheMb * 2) + ' blocks cap';
+        }
+
+        // 7. Active Clients Table
+        const countEl = document.getElementById('activeClientsCount');
+        const listEl = document.getElementById('activeClientsList');
+        if (countEl && listEl) {
+          const clients = d.activeClients || [];
+          countEl.textContent = clients.length === 1 ? '1 client connected' : clients.length + ' clients connected';
+          if (clients.length === 0) {
+            listEl.innerHTML = '<p class="text-slate-500 italic text-[11px] py-2">No active playback sessions.</p>';
+          } else {
+            let rowsHtml = '';
+            for (let i = 0; i < clients.length; i++) {
+              const c = clients[i];
+              const isStreaming = c.status === 'STREAMING';
+              const statusBadge = isStreaming
+                ? '<span class="inline-flex items-center gap-1 text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20 font-bold text-[10px]"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> Streaming</span>'
+                : '<span class="inline-flex items-center gap-1 text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20 font-medium text-[10px]">⏸ Idle (' + (c.idleSec || 0) + 's)</span>';
+
+              const tierBadge = '<span class="text-sky-300 font-mono font-bold uppercase">' + escapeHtml(c.qualityTier || '720p') + '</span> · ' +
+                (c.concurrency || 4) + '×512KB (' + (c.pipelineMB || '2.0') + ' MB)';
+
+              rowsHtml += '<tr class="text-slate-300 hover:bg-slate-800/40 transition">' +
+                '<td class="py-2 px-2.5 font-bold text-sky-400 font-sans flex items-center gap-1.5">📺 ' + escapeHtml(c.clientName || 'Client') + '</td>' +
+                '<td class="py-2 px-2.5 text-slate-400 font-mono text-[11px]">' + escapeHtml(c.ip || '') + '</td>' +
+                '<td class="py-2 px-2.5 text-slate-200 truncate max-w-xs font-sans text-xs" title="' + escapeHtml(c.filename || '') + '">' + escapeHtml(c.filename || '') + '</td>' +
+                '<td class="py-2 px-2.5 text-slate-300 font-sans text-[11px]">' + tierBadge + '</td>' +
+                '<td class="py-2 px-2.5 text-sky-300 font-sans text-[11px]">' + escapeHtml(c.mode || '') + '</td>' +
+                '<td class="py-2 px-2.5 font-sans">' + statusBadge + '</td>' +
+                '<td class="py-2 px-2.5 text-slate-400 text-right font-mono text-[11px]">' + (c.connectedSec || 0) + 's</td>' +
+              '</tr>';
+            }
+            listEl.innerHTML = '<div class="overflow-x-auto"><table class="w-full text-left text-xs">' +
+              '<thead><tr class="text-slate-500 border-b border-slate-800 pb-2 text-[11px]">' +
+              '<th class="py-1.5 px-2.5 font-semibold">Client / Device</th>' +
+              '<th class="py-1.5 px-2.5 font-semibold">IP Address</th>' +
+              '<th class="py-1.5 px-2.5 font-semibold">Media Filename</th>' +
+              '<th class="py-1.5 px-2.5 font-semibold">Quality & Buffer Pipeline</th>' +
+              '<th class="py-1.5 px-2.5 font-semibold">Playback Mode</th>' +
+              '<th class="py-1.5 px-2.5 font-semibold">Status</th>' +
+              '<th class="py-1.5 px-2.5 font-semibold text-right">Connected</th>' +
+              '</tr></thead><tbody class="divide-y divide-slate-800/60">' +
+              rowsHtml + '</tbody></table></div>';
+          }
         }
       } catch (err) {
         console.warn('Failed to load stats:', err);
@@ -2517,7 +2620,7 @@ app.get(['/msm', '/msm/dashboard'], (req, res) => {
     }
 
     loadStats();
-    setInterval(loadStats, 5000);
+    setInterval(loadStats, 3000);
   </script>
 </body>
 </html>`);
@@ -2548,14 +2651,14 @@ app.get(['/msm/streams', '/msm/cache'], (req, res) => {
     ::-webkit-scrollbar-thumb { background: #1E293B; border-radius: 4px; }
   </style>
 </head>
-<body class="min-h-screen p-4 sm:p-8 flex flex-col items-center">
-  <div class="max-w-5xl w-full space-y-6">
-    <!-- Header with Back to Dashboard Link -->
-    <header class="flex flex-col sm:flex-row items-center justify-between bg-slate-900 border border-slate-800 rounded-2xl px-6 py-4 glow-box gap-4">
+<body class="min-h-screen p-4 sm:p-8 flex flex-col items-center bg-[#0B0F17] text-[#E2E8F0]">
+  <div class="max-w-6xl w-full space-y-6">
+    <!-- Top Navigation & Header -->
+    <header class="flex flex-col sm:flex-row items-center justify-between bg-slate-900 border border-slate-800 rounded-2xl px-6 py-4 glow-box gap-4 w-full">
       <div class="flex items-center gap-3">
-        <a href="/msm" class="w-10 h-10 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 flex items-center justify-center font-bold transition" title="Back to Dashboard">
-          ←
-        </a>
+        <div class="w-10 h-10 rounded-xl bg-sky-500/10 text-sky-400 border border-sky-500/20 flex items-center justify-center font-bold text-lg">
+          💾
+        </div>
         <div>
           <h1 class="text-lg font-bold text-white flex items-center gap-2">
             Persistent Stream Cache
@@ -2875,19 +2978,20 @@ app.get(['/msm/setting', '/msm/settings'], (req, res) => {
     ::-webkit-scrollbar-thumb { background: #1E293B; border-radius: 4px; }
   </style>
 </head>
-<body class="min-h-screen p-4 sm:p-8 flex flex-col items-center">
-  <div class="max-w-4xl w-full space-y-6">
-    <!-- Header with Back to Dashboard Link -->
-    <header class="flex flex-col sm:flex-row items-center justify-between bg-slate-900 border border-slate-800 rounded-2xl px-6 py-4 glow-box gap-4">
+<body class="min-h-screen p-4 sm:p-8 flex flex-col items-center bg-[#0B0F17] text-[#E2E8F0]">
+  <div class="max-w-6xl w-full space-y-6">
+    <!-- Top Navigation & Header -->
+    <header class="flex flex-col sm:flex-row items-center justify-between bg-slate-900 border border-slate-800 rounded-2xl px-6 py-4 glow-box gap-4 w-full">
       <div class="flex items-center gap-3">
-        <a href="/msm" class="w-10 h-10 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 flex items-center justify-center font-bold transition" title="Back to Dashboard">
-          ←
-        </a>
+        <div class="w-10 h-10 rounded-xl bg-purple-500/10 text-purple-400 border border-purple-500/20 flex items-center justify-center font-bold text-lg">
+          ⚙️
+        </div>
         <div>
           <h1 class="text-lg font-bold text-white flex items-center gap-2">
-            MSM Settings & Configuration
+            MSM Settings
+            <span class="text-xs px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-300 border border-sky-500/30 font-mono">@${BOT_USERNAME}</span>
           </h1>
-          <p class="text-xs text-slate-400">Manage Telegram bot target, caching, and server controls</p>
+          <p class="text-xs text-slate-400">Configure bot handle, buffer pipelines, RAM block cache, and system services</p>
         </div>
       </div>
       <nav class="flex items-center gap-2 flex-wrap">
@@ -2913,7 +3017,7 @@ app.get(['/msm/setting', '/msm/settings'], (req, res) => {
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
       
       <!-- Card 1: Target Bot Configuration -->
-      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 glow-box space-y-4">
         <div class="flex items-center justify-between">
           <h2 class="text-sm font-semibold text-white flex items-center gap-2">
             🤖 Target Telegram Bot
@@ -2947,7 +3051,7 @@ app.get(['/msm/setting', '/msm/settings'], (req, res) => {
       </div>
 
       <!-- Card 2: Stream Buffer Pipelines (Per-Quality Concurrency) -->
-      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 glow-box space-y-4">
         <div class="flex items-center justify-between">
           <h2 class="text-sm font-semibold text-white flex items-center gap-2">
             ⚡ Stream Buffer Pipelines
@@ -3028,8 +3132,78 @@ app.get(['/msm/setting', '/msm/settings'], (req, res) => {
         </div>
       </div>
 
-      <!-- Card 3: Stream Cache Management -->
-      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
+      <!-- Card 3: Stream Engine Prefetch & RAM Cache -->
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 glow-box space-y-4">
+        <div class="flex items-center justify-between">
+          <h2 class="text-sm font-semibold text-white flex items-center gap-2">
+            🚀 Engine Prefetch & RAM Cache
+          </h2>
+          <span class="text-xs px-2.5 py-0.5 rounded-full bg-sky-500/20 text-sky-300 border border-sky-500/30 font-mono">Router Tuned</span>
+        </div>
+        <p class="text-xs text-slate-400">Optimize seek latency and in-memory LRU caching on the router's RAM disk.</p>
+
+        <div class="space-y-3 pt-1">
+          <!-- Overlap Prefetch Toggle -->
+          <div class="flex items-center justify-between gap-3 bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/80">
+            <div>
+              <div class="text-xs font-semibold text-white">Overlap Prefetch</div>
+              <div class="text-[11px] text-slate-400">Proactively queues upcoming chunks during initial seek/play</div>
+            </div>
+            <select id="prefetchSelect" class="bg-slate-900 border border-slate-700 text-xs text-white rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-sky-500">
+              <option value="true" selected>Enabled (Fast Playback)</option>
+              <option value="false">Disabled (Strict Sequential)</option>
+            </select>
+          </div>
+
+          <!-- Router RAM Block Cache -->
+          <div class="flex items-center justify-between gap-3 bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/80">
+            <div>
+              <div class="text-xs font-semibold text-white">Router RAM Block Cache</div>
+              <div id="ramCacheHint" class="text-[11px] text-slate-400">32 blocks (16 MB cap in Node memory)</div>
+            </div>
+            <select id="ramCacheSelect" onchange="updateRamCacheLabel()" class="bg-slate-900 border border-slate-700 text-xs text-white rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-sky-500">
+              <option value="8">8 MB (16 blocks)</option>
+              <option value="16" selected>16 MB (32 blocks - Recommended)</option>
+              <option value="32">32 MB (64 blocks)</option>
+              <option value="64">64 MB (128 blocks - High RAM)</option>
+            </select>
+          </div>
+
+          <div class="flex items-center justify-between pt-2">
+            <span id="saveEngineMsg" class="text-xs text-emerald-400 hidden">✓ Engine settings saved & applied!</span>
+            <div class="flex-1"></div>
+            <button id="saveEngineBtn" onclick="saveEngineSettings()" class="px-4 py-1.5 bg-sky-500 hover:bg-sky-400 text-slate-950 font-semibold text-xs rounded-xl transition">
+              Save Engine Settings
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 4: Service Management (Reboot / Restart MSM Server) -->
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 glow-box space-y-4">
+        <div class="flex items-center justify-between">
+          <h2 class="text-sm font-semibold text-white flex items-center gap-2">
+            🔄 Service Management
+          </h2>
+          <span class="text-xs px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 font-mono">Supervisor</span>
+        </div>
+        <p class="text-xs text-slate-400">Reboot the MSM Getter microservice. The router supervisor loop will automatically respawn the process with clean memory in ~3 seconds.</p>
+
+        <div class="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl space-y-1">
+          <span class="text-xs font-semibold text-amber-300 block">⚠️ Note on Active Streams</span>
+          <p class="text-[11px] text-slate-400">Rebooting will briefly interrupt in-flight downloads. Active video players will automatically retry and reconnect.</p>
+        </div>
+
+        <div class="pt-2 flex items-center justify-end">
+          <button onclick="confirmRestartService()" class="px-4 py-2 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 hover:text-amber-300 border border-amber-500/30 rounded-xl text-xs font-semibold transition flex items-center gap-1.5">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+            Restart MSM Service
+          </button>
+        </div>
+      </div>
+
+      <!-- Card 5: Stream Cache Management -->
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 glow-box space-y-4">
         <h2 class="text-sm font-semibold text-white flex items-center gap-2">
           💾 Stream Cache Storage
         </h2>
@@ -3050,33 +3224,59 @@ app.get(['/msm/setting', '/msm/settings'], (req, res) => {
         </div>
       </div>
 
-      <!-- Card 4: Log File Maintenance -->
-      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
+      <!-- Card 6: Log File Maintenance & Telegram Session -->
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 glow-box space-y-4">
         <h2 class="text-sm font-semibold text-white flex items-center gap-2">
-          📜 Server Log Controls
+          📜 Maintenance & Telegram Auth
         </h2>
-        <p class="text-xs text-slate-400">Manage server stdout/stderr diagnostic log files on RAM disk.</p>
-        <div class="flex gap-3">
-          <a href="/api/logs/download" class="flex-1 text-center py-2 bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-white rounded-xl transition">
-            Download Log File
+        <p class="text-xs text-slate-400">Manage server stdout/stderr diagnostic log files or update your active Telegram phone session.</p>
+        <div class="flex flex-col gap-2.5">
+          <div class="flex gap-3">
+            <a href="/api/logs/download" class="flex-1 text-center py-2 bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-white rounded-xl transition">
+              Download Log File
+            </a>
+            <button onclick="clearLogs()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-rose-400 text-xs font-semibold rounded-xl transition">
+              Clear Log
+            </button>
+          </div>
+          <a href="/msm/auth" class="block text-center py-2 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 text-xs font-semibold rounded-xl transition">
+            Open Telegram Phone Auth Portal →
           </a>
-          <button onclick="clearLogs()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-rose-400 text-xs font-semibold rounded-xl transition">
-            Truncate / Clear Log
-          </button>
         </div>
       </div>
 
-      <!-- Card 5: Session & Telegram Gateway -->
-      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
-        <h2 class="text-sm font-semibold text-white flex items-center gap-2">
-          🔑 MTProto Telegram Session
-        </h2>
-        <p class="text-xs text-slate-400">Need to re-login with a new phone number or update credentials?</p>
-        <a href="/msm/auth" class="block text-center py-2 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 text-xs font-semibold rounded-xl transition">
-          Open Telegram Phone Auth Portal →
-        </a>
-      </div>
+    </div>
+  </div>
 
+  <!-- Restart Confirmation Modal -->
+  <div id="restartModal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="max-w-md w-full bg-slate-900 border border-slate-800 rounded-2xl p-6 glow-box shadow-2xl space-y-4">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20 flex items-center justify-center text-lg">
+          🔄
+        </div>
+        <div>
+          <h3 class="text-base font-bold text-white">Restart MSM Service</h3>
+          <p class="text-xs text-slate-400">Confirm microservice restart</p>
+        </div>
+      </div>
+      <p class="text-xs text-slate-300 leading-relaxed">
+        Are you sure you want to reboot the MSM Getter server process? The router supervisor loop will respawn the service automatically within ~3 seconds.
+      </p>
+      <div id="restartStatusBox" class="hidden p-3 rounded-xl bg-slate-950 border border-slate-800 text-xs font-mono text-center text-sky-400">
+        <div class="flex items-center justify-center gap-2">
+          <span class="w-2.5 h-2.5 rounded-full bg-sky-400 animate-ping"></span>
+          <span id="restartingCountdown">Restarting service in 3s...</span>
+        </div>
+      </div>
+      <div id="restartBtnGroup" class="flex items-center justify-end gap-2 pt-2">
+        <button onclick="closeRestartModal()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl transition">
+          Cancel
+        </button>
+        <button id="btnConfirmRestart" onclick="executeRestartService()" class="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold rounded-xl transition">
+          Yes, Restart Now
+        </button>
+      </div>
     </div>
   </div>
 
@@ -3097,6 +3297,13 @@ app.get(['/msm/setting', '/msm/settings'], (req, res) => {
           if (res.pipelineBuffers['4k']) document.getElementById('4kBufSelect').value = String(res.pipelineBuffers['4k']);
           updatePipelineLabels();
         }
+        if (res.overlapPrefetch !== undefined) {
+          document.getElementById('prefetchSelect').value = String(res.overlapPrefetch);
+        }
+        if (res.routerRamCacheMb !== undefined) {
+          document.getElementById('ramCacheSelect').value = String(res.routerRamCacheMb);
+          updateRamCacheLabel();
+        }
       } catch (e) {}
     }
 
@@ -3110,6 +3317,11 @@ app.get(['/msm/setting', '/msm/settings'], (req, res) => {
       document.getElementById('720pBufCalc').textContent = p720 + ' × 512 KB = ' + (p720 * 0.5).toFixed(1) + ' MB in-flight';
       document.getElementById('1080pBufCalc').textContent = p1080 + ' × 512 KB = ' + (p1080 * 0.5).toFixed(1) + ' MB in-flight';
       document.getElementById('4kBufCalc').textContent = p4k + ' × 512 KB = ' + (p4k * 0.5).toFixed(1) + ' MB in-flight';
+    }
+
+    function updateRamCacheLabel() {
+      const mb = parseInt(document.getElementById('ramCacheSelect').value, 10) || 16;
+      document.getElementById('ramCacheHint').textContent = (mb * 2) + ' blocks (' + mb + ' MB cap in Node memory)';
     }
 
     async function savePipelineBuffers() {
@@ -3127,12 +3339,7 @@ app.get(['/msm/setting', '/msm/settings'], (req, res) => {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            pipelineBuffers: {
-              sd,
-              '720p': p720,
-              '1080p': p1080,
-              '4k': p4k,
-            }
+            pipelineBuffers: { sd, '720p': p720, '1080p': p1080, '4k': p4k }
           })
         });
         const data = await res.json();
@@ -3146,6 +3353,37 @@ app.get(['/msm/setting', '/msm/settings'], (req, res) => {
       } finally {
         btn.disabled = false;
         btn.textContent = 'Save Pipeline Buffers';
+      }
+    }
+
+    async function saveEngineSettings() {
+      const prefetch = document.getElementById('prefetchSelect').value === 'true';
+      const ramMb = parseInt(document.getElementById('ramCacheSelect').value, 10) || 16;
+
+      const btn = document.getElementById('saveEngineBtn');
+      btn.disabled = true;
+      btn.textContent = 'Saving...';
+
+      try {
+        const res = await fetch('/msm/api/settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            overlapPrefetch: prefetch,
+            routerRamCacheMb: ramMb,
+          })
+        });
+        const data = await res.json();
+        if (data.success) {
+          const msg = document.getElementById('saveEngineMsg');
+          msg.classList.remove('hidden');
+          setTimeout(() => msg.classList.add('hidden'), 3000);
+        }
+      } catch (e) {
+        alert('Failed to save engine settings: ' + e.message);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Save Engine Settings';
       }
     }
 
@@ -3182,6 +3420,48 @@ app.get(['/msm/setting', '/msm/settings'], (req, res) => {
     function setBotPreset(name) {
       document.getElementById('botInput').value = name;
       saveBot();
+    }
+
+    function confirmRestartService() {
+      document.getElementById('restartModal').classList.remove('hidden');
+      document.getElementById('restartStatusBox').classList.add('hidden');
+      document.getElementById('restartBtnGroup').classList.remove('hidden');
+    }
+
+    function closeRestartModal() {
+      document.getElementById('restartModal').classList.add('hidden');
+    }
+
+    async function executeRestartService() {
+      const btnGroup = document.getElementById('restartBtnGroup');
+      const statusBox = document.getElementById('restartStatusBox');
+      const countdownEl = document.getElementById('restartingCountdown');
+
+      btnGroup.classList.add('hidden');
+      statusBox.classList.remove('hidden');
+      countdownEl.textContent = 'Initiating service reboot...';
+
+      try {
+        await fetch('/msm/api/system/restart', { method: 'POST' });
+      } catch (e) {}
+
+      let remaining = 4;
+      const interval = setInterval(async () => {
+        remaining--;
+        if (remaining > 0) {
+          countdownEl.textContent = 'Restarting microservice in ' + remaining + 's...';
+        } else {
+          countdownEl.textContent = 'Checking server connection...';
+          try {
+            const res = await fetch('/msm/api/settings', { cache: 'no-store' });
+            if (res.ok) {
+              clearInterval(interval);
+              countdownEl.textContent = '✓ Service back online! Reloading...';
+              setTimeout(() => window.location.reload(), 1000);
+            }
+          } catch (pingErr) {}
+        }
+      }, 1000);
     }
 
     async function clearCache() {
@@ -3303,7 +3583,18 @@ app.get(['/api/resolve', '/msm/api/resolve'], async (req, res) => {
   }
 
   const shouldBypassCache = force === 'true' || refresh === 'true';
-  const targetQuality = parseInt(maxQuality, 10) || 720;
+  let targetQuality = 720;
+  const rawQ = String(maxQuality || '').toLowerCase().trim();
+  if (rawQ === '4k' || parseInt(rawQ, 10) >= 2160) {
+    targetQuality = 2160;
+  } else if (parseInt(rawQ, 10) >= 1080) {
+    targetQuality = 1080;
+  } else if (parseInt(rawQ, 10) >= 720) {
+    targetQuality = 720;
+  } else {
+    targetQuality = 480;
+  }
+
   const sNum = season ? parseInt(season, 10) : NaN;
   const eNum = episode ? parseInt(episode, 10) : NaN;
   const totalSeasons = totalSeasonsQuery ? parseInt(totalSeasonsQuery, 10) : NaN;
@@ -3314,7 +3605,11 @@ app.get(['/api/resolve', '/msm/api/resolve'], async (req, res) => {
 
   const queryTitle = isTv ? `${title} ${tvTag}` : `${title} ${year || ''}`.trim();
   const baseCacheKey = normalizeTitle(isTv ? `${title} ${tvTag}` : `${title} ${year || ''}`);
-  const qualitySuffix = targetQuality <= 720 ? '_720p' : '_1080p';
+  let qualitySuffix = '_720p';
+  if (targetQuality >= 2160) qualitySuffix = '_4k';
+  else if (targetQuality >= 1080) qualitySuffix = '_1080p';
+  else if (targetQuality <= 480) qualitySuffix = '_480p';
+  else qualitySuffix = '_720p';
   const cacheKey = `${baseCacheKey}${qualitySuffix}`;
 
   console.log(`[RESOLVE] Request: "${queryTitle}" (isTv: ${isTv}, maxQuality: ${targetQuality}, bypassCache: ${shouldBypassCache}, cacheKey: "${cacheKey}")`);
@@ -3338,19 +3633,23 @@ app.get(['/api/resolve', '/msm/api/resolve'], async (req, res) => {
     const legacyCached = db.get(baseCacheKey);
     if (legacyCached && legacyCached.filename) {
       const fnLower = legacyCached.filename.toLowerCase();
+      const is4k = fnLower.includes('2160p') || fnLower.includes('4k') || fnLower.includes('uhd');
       const is1080 = fnLower.includes('1080p') || fnLower.includes('1080');
       const is720 = fnLower.includes('720p') || fnLower.includes('720');
       const isLowerRes = fnLower.includes('480p') || fnLower.includes('540p') || fnLower.includes('360p');
 
-      if (targetQuality <= 720) {
-        if (is720 || isLowerRes) {
-          cached = legacyCached;
-        } else if (is1080) {
-          // Keep as fallback in case 720p is not available from bot
-          fallbackCached = legacyCached;
-        }
+      if (targetQuality >= 2160) {
+        if (is4k) cached = legacyCached;
+        else if (is1080) fallbackCached = legacyCached;
+      } else if (targetQuality <= 480) {
+        if (isLowerRes) cached = legacyCached;
+        else if (is720) fallbackCached = legacyCached;
+      } else if (targetQuality <= 720) {
+        if (is720 || isLowerRes) cached = legacyCached;
+        else if (is1080) fallbackCached = legacyCached;
       } else {
-        cached = legacyCached;
+        if (is1080) cached = legacyCached;
+        else if (is720) fallbackCached = legacyCached;
       }
     }
   }
@@ -3586,15 +3885,24 @@ app.get(['/api/resolve', '/msm/api/resolve'], async (req, res) => {
 
         if (matchesCandidate) {
           const fnLower = (filename || '').toLowerCase();
-          const is720 = fnLower.includes('720p') || fnLower.includes('720');
+          const is4k = fnLower.includes('2160p') || fnLower.includes('4k') || fnLower.includes('uhd');
           const is1080 = fnLower.includes('1080p') || fnLower.includes('1080');
+          const is720 = fnLower.includes('720p') || fnLower.includes('720');
           const isLower = fnLower.includes('480p') || fnLower.includes('540p') || fnLower.includes('360p');
 
           let qualityScore = 10;
-          if (targetQuality <= 720) {
+          if (targetQuality <= 480) {
+            if (isLower) qualityScore = 60;
+            else if (is720) qualityScore = 30;
+            else if (is1080) qualityScore = 5;
+          } else if (targetQuality <= 720) {
             if (is720) qualityScore = 50;
             else if (isLower) qualityScore = 30;
             else if (is1080) qualityScore = 5;
+          } else if (targetQuality >= 2160) {
+            if (is4k) qualityScore = 70;
+            else if (is1080) qualityScore = 40;
+            else if (is720) qualityScore = 20;
           } else {
             if (is1080) qualityScore = 50;
             else if (is720) qualityScore = 30;
@@ -4410,12 +4718,17 @@ async function streamTelegramPipelined(client, targetDoc, startByte, endByte, re
     cancelIdleMemoryPurge();
     const fnAttr = targetDoc.attributes?.find(a => a.className === 'DocumentAttributeFilename');
     const mediaName = fnAttr ? fnAttr.fileName : `video_${targetDoc.id}.mp4`;
+    const qualityTier = detectVideoQualityTier(mediaName, '', targetDoc);
+    const isPrefetchOverlapped = savedSettings.overlapPrefetch !== false;
     activeStreams.set(streamKey, {
       sessionKey: streamKey,
       ip: clientIdentity.ip,
       clientName: clientIdentity.name,
       docId: targetDoc.id.toString(),
       filename: mediaName,
+      qualityTier,
+      concurrency: CONCURRENCY,
+      isPrefetchOverlapped,
       mode: 'Direct Native',
       createdAt: activeStreams.get(streamKey)?.createdAt || Date.now(),
       lastActive: Date.now(),
@@ -4652,11 +4965,12 @@ async function streamTelegramPipelined(client, targetDoc, startByte, endByte, re
   }
 
   // 1. Overlapped Prefetching Delivery:
-  // Concurrently fetch startBlock AND immediately trigger prefetching for subsequent blocks.
+  // Concurrently fetch startBlock AND immediately trigger prefetching for subsequent blocks when enabled.
   // When startBlock arrives and streams to the player, upcoming blocks (startBlock + 1..)
   // are already in-flight or completed, eliminating the ~200ms initial playback stall!
+  const isOverlapPrefetchEnabled = savedSettings.overlapPrefetch !== false;
   const firstBlockPromise = fetchBlockWithRetry(startBlock);
-  if (startBlock < endBlock) {
+  if (startBlock < endBlock && isOverlapPrefetchEnabled) {
     fillPipeline();
   }
 

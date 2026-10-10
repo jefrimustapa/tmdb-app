@@ -99,13 +99,13 @@ export interface UserSettings {
   telegramProviderCountries?: Record<string, OriginCountryCode[]>; // e.g. { 'telegram-msm': ['MY', 'ID', 'SG'] }
   msmGetterUrl?: string; // e.g. 'https://www.julietmike.net:3033'
   msmChunkSize?: number; // Stream Buffer Pipeline in bytes: 262144 (Eco 1.0MB), 524288 (Standard 2.0MB), 1048576 (Turbo 3.0MB), 2097152 (Ultra 4.0MB)
-  msmMaxQuality?: '720' | '1080'; // Resolution preference: '720' or '1080' (default: '1080')
+  msmMaxQuality?: '480' | '720' | '1080' | '4k'; // Resolution preference: '480', '720', '1080', or '4k' (default: '1080')
   msmTimeout?: 60 | 90 | 120 | 150 | 180; // MSM bot resolver request timeout in seconds (default: 90)
   msmBufferTimeout?: 30 | 60 | 90 | 120; // MSM direct stream buffering timeout in seconds (default: 60)
   // Backward compatibility aliases
   msm32GetterUrl?: string;
   msm32ChunkSize?: number;
-  msm32MaxQuality?: '720' | '1080';
+  msm32MaxQuality?: '480' | '720' | '1080' | '4k';
   msm32Timeout?: 60 | 90 | 120 | 150 | 180;
   msm32BufferTimeout?: 30 | 60 | 90 | 120;
   streamHeaderTimeout: number; // in seconds, e.g. 3, 5, 8, or 0 for always visible
