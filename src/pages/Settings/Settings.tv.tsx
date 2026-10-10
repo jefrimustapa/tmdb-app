@@ -170,7 +170,6 @@ export const Settings: React.FC = () => {
   const [showTelegramDrawer, setShowTelegramDrawer] = useState(false);
   const [showTelegramMsmDrawer, setShowTelegramMsmDrawer] = useState(false);
   const [showTelegramUrlDrawer, setShowTelegramUrlDrawer] = useState(false);
-  const [showTelegramChunkDrawer, setShowTelegramChunkDrawer] = useState(false);
   const [showTelegramCountryDrawer, setShowTelegramCountryDrawer] = useState(false);
   const [showTelegramTimeoutDrawer, setShowTelegramTimeoutDrawer] = useState(false);
   const [showTelegramBufferTimeoutDrawer, setShowTelegramBufferTimeoutDrawer] = useState(false);
@@ -190,7 +189,7 @@ export const Settings: React.FC = () => {
   const { detectedPlatform, activeLayout } = useDevice();
 
   const isPickerModalOpen = pickerModalSlot !== null;
-  const isAnyModalOpen = isPickerModalOpen || showMaturityDrawer || showTriggerDrawer || showAutoplayDrawer || showAutoplayTriggerDrawer || showAutoplayTimeoutDrawer || showEnginesDrawer || showEnginePriorityDrawer || showTelegramDrawer || showTelegramMsmDrawer || showTelegramUrlDrawer || showTelegramChunkDrawer || showTelegramCountryDrawer || showTelegramTimeoutDrawer || showTelegramBufferTimeoutDrawer || showEmbedResolverDrawer || showEmbedTimeoutDrawer || showEmbedRetryDrawer || activePriorityDrawer !== null || showTickerDrawer || showHeaderTimeoutDrawer || showPerfHudDrawer || showBackupDrawer;
+  const isAnyModalOpen = isPickerModalOpen || showMaturityDrawer || showTriggerDrawer || showAutoplayDrawer || showAutoplayTriggerDrawer || showAutoplayTimeoutDrawer || showEnginesDrawer || showEnginePriorityDrawer || showTelegramDrawer || showTelegramMsmDrawer || showTelegramUrlDrawer || showTelegramCountryDrawer || showTelegramTimeoutDrawer || showTelegramBufferTimeoutDrawer || showEmbedResolverDrawer || showEmbedTimeoutDrawer || showEmbedRetryDrawer || activePriorityDrawer !== null || showTickerDrawer || showHeaderTimeoutDrawer || showPerfHudDrawer || showBackupDrawer;
 
   // Viewport scroll helpers for TV remote navigation (snaps to absolute top / bottom)
   const scrollToPanelTop = () => {
@@ -347,15 +346,7 @@ export const Settings: React.FC = () => {
           defaultEl.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
         }
       }, 50);
-    } else if (showTelegramChunkDrawer) {
-      setTimeout(() => {
-        const selectedEl = document.querySelector<HTMLElement>('[data-telegram-chunk-drawer-item][data-telegram-chunk-selected="true"]') ||
-                           document.querySelector<HTMLElement>('[data-telegram-chunk-drawer-item]');
-        if (selectedEl) {
-          selectedEl.focus();
-          selectedEl.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-        }
-      }, 50);
+
     } else if (showTelegramCountryDrawer) {
       setTimeout(() => {
         const defaultEl = document.getElementById('drawer-telegram-country-MY') ||
@@ -454,7 +445,7 @@ export const Settings: React.FC = () => {
         (window as any).AndroidBridge?.setDropdownOpen?.(false);
       } catch {}
     };
-  }, [pickerModalSlot, isPickerModalOpen, showMaturityDrawer, showTriggerDrawer, showAutoplayDrawer, showAutoplayTriggerDrawer, showAutoplayTimeoutDrawer, showEnginesDrawer, showEnginePriorityDrawer, showTelegramDrawer, showTelegramMsmDrawer, showTelegramUrlDrawer, showTelegramChunkDrawer, showTelegramCountryDrawer, showTelegramTimeoutDrawer, showEmbedResolverDrawer, showEmbedTimeoutDrawer, showEmbedRetryDrawer, activePriorityDrawer, showTickerDrawer, showHeaderTimeoutDrawer, showPerfHudDrawer, showBackupDrawer, isAnyModalOpen]);
+  }, [pickerModalSlot, isPickerModalOpen, showMaturityDrawer, showTriggerDrawer, showAutoplayDrawer, showAutoplayTriggerDrawer, showAutoplayTimeoutDrawer, showEnginesDrawer, showEnginePriorityDrawer, showTelegramDrawer, showTelegramMsmDrawer, showTelegramUrlDrawer, showTelegramCountryDrawer, showTelegramTimeoutDrawer, showEmbedResolverDrawer, showEmbedTimeoutDrawer, showEmbedRetryDrawer, activePriorityDrawer, showTickerDrawer, showHeaderTimeoutDrawer, showPerfHudDrawer, showBackupDrawer, isAnyModalOpen]);
 
   // Handle remote Back button, tmdb_close_dropdowns, and Escape dismissal for modals / drawers
   useEffect(() => {
@@ -501,14 +492,6 @@ export const Settings: React.FC = () => {
         setShowTelegramMsmDrawer(true);
         setTimeout(() => {
           document.getElementById('drawer-msm-sub-url')?.focus();
-        }, 50);
-        return;
-      }
-      if (showTelegramChunkDrawer) {
-        setShowTelegramChunkDrawer(false);
-        setShowTelegramMsmDrawer(true);
-        setTimeout(() => {
-          document.getElementById('drawer-msm-sub-chunk')?.focus();
         }, 50);
         return;
       }
@@ -671,7 +654,6 @@ export const Settings: React.FC = () => {
     showTelegramDrawer,
     showTelegramMsmDrawer,
     showTelegramUrlDrawer,
-    showTelegramChunkDrawer,
     showTelegramCountryDrawer,
     showTelegramTimeoutDrawer,
     showEmbedResolverDrawer,
@@ -3735,115 +3717,7 @@ export const Settings: React.FC = () => {
         </div>
       )}
 
-      {/* ========================================================================= */}
-      {/* Android TV Telegram Stream Chunk Buffer Right Drawer (Level 3)            */}
-      {/* ========================================================================= */}
-      {showTelegramChunkDrawer && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          data-drawer-container="true"
-          className="fixed inset-0 z-[9999] flex justify-end bg-black/80 backdrop-blur-md animate-fade-in"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) {
-              setShowTelegramChunkDrawer(false);
-              setShowTelegramMsmDrawer(true);
-            }
-          }}
-        >
-          {/* Left Side Parent Path Context */}
-          <div className="flex-1 hidden md:flex flex-col justify-center pl-16 pr-8 pointer-events-none select-none">
-            <div className="flex items-center gap-2 text-xs font-bold text-gray-400 tracking-wider uppercase mb-2">
-              <span className="text-gray-400">Settings</span>
-              <ChevronRight className="w-3.5 h-3.5 text-gray-500" />
-              <span className="text-gray-400">Playback &amp; Streaming</span>
-              <ChevronRight className="w-3.5 h-3.5 text-gray-500" />
-              <span className="text-gray-400">Stream Engines</span>
-              <ChevronRight className="w-3.5 h-3.5 text-gray-500" />
-              <span className="text-gray-400">Telegram</span>
-              <ChevronRight className="w-3.5 h-3.5 text-gray-500" />
-              <span className="text-hbo-cyan font-semibold">MSMbot</span>
-            </div>
-            <h1 className="text-3xl font-extrabold text-white tracking-tight mb-2">Stream Chunk Buffer</h1>
-            <p className="text-sm text-gray-400 max-w-md leading-relaxed">
-              Configure in-memory chunk slice buffer size for Telegram MTProto video streaming.
-            </p>
-          </div>
 
-          <div className="w-full max-w-md h-full bg-hbo-card/95 border-l border-hbo-border/80 shadow-2xl flex flex-col justify-between animate-slide-in-right overflow-hidden">
-            {/* Drawer Body: Single Column Options */}
-            <div className="flex-1 overflow-y-auto px-6 py-6 space-y-3 font-sans">
-              {(() => {
-                const chunkOptions = [
-                  { val: 262144, label: '256 KB (Eco Pipeline)', desc: '2 parallel streams (512KB in-flight) • Fastest seek & low data usage for mobile hotspot.' },
-                  { val: 524288, label: '512 KB (Standard Pipeline)', desc: '4 parallel streams (2MB in-flight) • Optimum balance between seek response and stable throughput.' },
-                  { val: 1048576, label: '1 MB (Turbo Pipeline)', desc: '6 parallel streams (3MB in-flight) • Maximum prefetch throughput for smooth, zero-stutter 1080p.' },
-                ];
-                const currentVal = settings.msmChunkSize || settings.msm32ChunkSize || 524288;
-
-                return chunkOptions.map((opt, idx) => {
-                  const isSelected = currentVal === opt.val;
-                  return (
-                    <button
-                      key={opt.val}
-                      id={`drawer-telegram-chunk-${opt.val}`}
-                      data-telegram-chunk-drawer-item="true"
-                      data-telegram-chunk-selected={isSelected ? 'true' : 'false'}
-                      type="button"
-                      onKeyDown={(e) => {
-                        if (e.key === 'ArrowUp' && idx > 0) {
-                          e.preventDefault();
-                          const target = document.getElementById(`drawer-telegram-chunk-${chunkOptions[idx - 1].val}`);
-                          target?.focus();
-                          target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-                        } else if (e.key === 'ArrowDown' && idx < chunkOptions.length - 1) {
-                          e.preventDefault();
-                          const target = document.getElementById(`drawer-telegram-chunk-${chunkOptions[idx + 1].val}`);
-                          target?.focus();
-                          target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-                        }
-                      }}
-                      onClick={() => {
-                        handleUpdate({ msmChunkSize: opt.val });
-                        setShowTelegramChunkDrawer(false);
-                        setShowTelegramMsmDrawer(true);
-                        setTimeout(() => {
-                          document.getElementById('drawer-msm-sub-chunk')?.focus();
-                        }, 50);
-                      }}
-                      className={`w-full p-4 rounded-xl border text-left transition-all tv-focus-target flex items-center justify-between gap-3 ${
-                        isSelected
-                          ? 'bg-sky-950/40 border-sky-400 text-white shadow-hbo-glow ring-1 ring-sky-400/40'
-                          : 'bg-black/30 border-hbo-border hover:border-gray-600 text-gray-400'
-                      }`}
-                    >
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="font-bold text-sm text-white">{opt.label}</span>
-                          <span className="text-[10px] text-sky-400 font-mono font-bold bg-sky-500/10 px-1.5 py-0.5 rounded border border-sky-400/20">
-                            {(opt.val / 1024).toFixed(0)} KB
-                          </span>
-                        </div>
-                        <p className="text-[11px] text-gray-400 leading-snug">{opt.desc}</p>
-                      </div>
-                      <div className={`w-6 h-6 rounded-full border flex items-center justify-center flex-shrink-0 ${
-                        isSelected ? 'bg-sky-500 border-sky-400 text-black' : 'border-gray-600 bg-black/40 text-transparent'
-                      }`}>
-                        <Check className="w-3.5 h-3.5 stroke-[3]" />
-                      </div>
-                    </button>
-                  );
-                });
-              })()}
-            </div>
-
-            {/* Drawer Footer Hint */}
-            <div className="p-4 border-t border-hbo-border/50 bg-black/40 flex items-center justify-center text-xs text-gray-400 select-none">
-              <span>Press <strong className="text-white font-semibold">Back</strong> to return</span>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* ========================================================================= */}
       {/* Android TV Telegram Country Origin Filters Right Drawer (Level 3)          */}
@@ -4583,59 +4457,27 @@ export const Settings: React.FC = () => {
                             target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
                           } else if (e.key === 'ArrowDown') {
                             e.preventDefault();
-                            const target = document.getElementById('drawer-msm-sub-chunk');
-                            target?.focus();
-                            target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-                          }
-                        }}
-                        onClick={() => {
-                          const currentQuality = settings.msmMaxQuality || settings.msm32MaxQuality || '1080';
-                          handleUpdate({ msmMaxQuality: currentQuality === '1080' ? '720' : '1080' });
-                        }}
-                        className="px-3 py-1.5 rounded-lg border text-xs font-bold transition-all tv-focus-target flex items-center gap-1.5 border-hbo-border bg-hbo-dark/80 hover:bg-hbo-hover text-white flex-shrink-0"
-                      >
-                        <span className="text-sky-400 font-mono">
-                          {(settings.msmMaxQuality || settings.msm32MaxQuality || '1080') === '1080' ? '1080p (Full HD)' : '720p (HD)'}
-                        </span>
-                      </button>
-                    </div>
-
-                    {/* Sub-Drawer Item: Stream Chunk Slice Buffer */}
-                    <div className="bg-black/40 border border-hbo-border rounded-xl p-3.5 flex items-center justify-between">
-                      <div className="min-w-0 pr-2">
-                        <div className="font-bold text-xs text-white flex items-center gap-1.5 mb-0.5">
-                          <HardDrive className="w-3.5 h-3.5 text-sky-400" />
-                          <span>Stream Pipeline Buffer</span>
-                        </div>
-                        <p className="text-[10px] text-gray-400">Configure prefetch concurrency and pipeline depth.</p>
-                      </div>
-                      <button
-                        id="drawer-msm-sub-chunk"
-                        data-telegram-msm-drawer-item="true"
-                        type="button"
-                        onKeyDown={(e) => {
-                          if (e.key === 'ArrowUp') {
-                            e.preventDefault();
-                            const target = document.getElementById('drawer-msm-sub-quality');
-                            target?.focus();
-                            target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-                          } else if (e.key === 'ArrowDown') {
-                            e.preventDefault();
                             const target = document.getElementById('drawer-msm-sub-country');
                             target?.focus();
                             target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
                           }
                         }}
                         onClick={() => {
-                          setShowTelegramMsmDrawer(false);
-                          setShowTelegramChunkDrawer(true);
+                          const currentQuality = settings.msmMaxQuality || settings.msm32MaxQuality || '1080';
+                          const nextQuality = currentQuality === '480' ? '720' : currentQuality === '720' ? '1080' : currentQuality === '1080' ? '4k' : '480';
+                          handleUpdate({ msmMaxQuality: nextQuality });
                         }}
                         className="px-3 py-1.5 rounded-lg border text-xs font-bold transition-all tv-focus-target flex items-center gap-1.5 border-hbo-border bg-hbo-dark/80 hover:bg-hbo-hover text-white flex-shrink-0"
                       >
                         <span className="text-sky-400 font-mono">
-                          {((settings.msmChunkSize || settings.msm32ChunkSize || 524288) / 1024).toFixed(0)} KB
+                          {(() => {
+                            const q = settings.msmMaxQuality || settings.msm32MaxQuality || '1080';
+                            if (q === '4k') return '4K (Ultra HD)';
+                            if (q === '1080') return '1080p (Full HD)';
+                            if (q === '720') return '720p (HD)';
+                            return '480p (SD)';
+                          })()}
                         </span>
-                        <ChevronRight className="w-3.5 h-3.5 text-gray-400" />
                       </button>
                     </div>
 
@@ -4655,7 +4497,7 @@ export const Settings: React.FC = () => {
                         onKeyDown={(e) => {
                           if (e.key === 'ArrowUp') {
                             e.preventDefault();
-                            const target = document.getElementById('drawer-msm-sub-chunk');
+                            const target = document.getElementById('drawer-msm-sub-quality');
                             target?.focus();
                             target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
                           } else if (e.key === 'ArrowDown') {

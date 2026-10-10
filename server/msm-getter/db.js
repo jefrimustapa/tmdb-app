@@ -162,6 +162,19 @@ class CentralDatabase {
     return false;
   }
 
+  updateVideoDimensions(docId, width, height) {
+    const docIdStr = String(docId);
+    const existing = this.byDocId.get(docIdStr);
+    if (existing && (existing.width !== width || existing.height !== height)) {
+      existing.width = width;
+      existing.height = height;
+      this.save();
+      console.log(`[DB] Updated dimensions for doc ${docIdStr}: ${width}x${height}`);
+      return true;
+    }
+    return false;
+  }
+
   clear() {
     this.byQuery.clear();
     this.byDocId.clear();

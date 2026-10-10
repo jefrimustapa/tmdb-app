@@ -183,7 +183,6 @@ export const Settings: React.FC = () => {
     | 'telegram-msm32'
     | 'telegram-logs'
     | 'telegram-url'
-    | 'telegram-chunk'
     | 'telegram-country'
     | 'telegram-timeout'
     | 'telegram-buffer-timeout'
@@ -1779,7 +1778,8 @@ export const Settings: React.FC = () => {
             type="button"
             onClick={() => {
               const currentQuality = settings.msmMaxQuality || settings.msm32MaxQuality || '1080';
-              handleUpdate({ msmMaxQuality: currentQuality === '1080' ? '720' : '1080' });
+              const nextQuality = currentQuality === '480' ? '720' : currentQuality === '720' ? '1080' : currentQuality === '1080' ? '4k' : '480';
+              handleUpdate({ msmMaxQuality: nextQuality });
             }}
             className="w-full flex items-center justify-between p-3.5 rounded-xl bg-white/5 border border-white/10 hover:border-sky-400/50 hover:bg-white/10 transition-all text-left"
           >
@@ -1789,28 +1789,18 @@ export const Settings: React.FC = () => {
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">
               <span className="text-[10px] text-sky-400 font-mono font-bold bg-sky-500/10 px-2 py-0.5 rounded border border-sky-400/20">
-                {(settings.msmMaxQuality || settings.msm32MaxQuality || '1080') === '1080' ? '1080p (Full HD)' : '720p (HD)'}
+                {(() => {
+                  const q = settings.msmMaxQuality || settings.msm32MaxQuality || '1080';
+                  if (q === '4k') return '4K (Ultra HD)';
+                  if (q === '1080') return '1080p (Full HD)';
+                  if (q === '720') return '720p (HD)';
+                  return '480p (SD)';
+                })()}
               </span>
             </div>
           </button>
 
-          {/* Navigation to Stream Chunk Sub-Drawer */}
-          <button
-            type="button"
-            onClick={() => setActiveDrawer('telegram-chunk')}
-            className="w-full flex items-center justify-between p-3.5 rounded-xl bg-white/5 border border-white/10 hover:border-sky-400/50 hover:bg-white/10 transition-all text-left"
-          >
-            <div className="space-y-0.5">
-              <span className="text-xs font-semibold text-white block">Stream Pipeline Buffer</span>
-              <span className="text-[11px] text-gray-400">Configure prefetch concurrency and pipeline depth</span>
-            </div>
-            <div className="flex items-center gap-2 flex-shrink-0">
-              <span className="text-[10px] text-sky-400 font-mono font-bold bg-sky-500/10 px-2 py-0.5 rounded border border-sky-400/20">
-                {(settings.msmChunkSize ?? settings.msm32ChunkSize) === 1048576 ? '1 MB (Turbo)' : (settings.msmChunkSize ?? settings.msm32ChunkSize) === 262144 ? '256 KB (Eco)' : '512 KB (Standard)'}
-              </span>
-              <ChevronRight className="w-4 h-4 text-gray-400" />
-            </div>
-          </button>
+
 
           {/* Navigation to Origin Country Filter Sub-Drawer */}
           <button
@@ -2284,59 +2274,7 @@ export const Settings: React.FC = () => {
         </div>
       </SettingsDrawer>
 
-      {/* 3a-TG-CHUNK. Sub-Drawer: Stream Chunk Slice Buffer */}
-      <SettingsDrawer
-        isOpen={activeDrawer === 'telegram-chunk'}
-        onClose={() => setActiveDrawer(null)}
-        onBack={() => setActiveDrawer('telegram-msm')}
-        title="Stream Chunk Buffer"
-        subtitle="Configure buffer chunk slice size for Telegram streaming."
-        categoryLabel="Telegram > MSMbot > Buffer Size"
-      >
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-gray-300 block">Current Chunk Size:</span>
-            <span className="text-xs text-sky-400 font-mono font-bold">
-              {((settings.msmChunkSize || 524288) / 1024).toFixed(0)} KB
-            </span>
-          </div>
 
-          <div className="grid grid-cols-1 gap-2">
-            {[
-              { label: '256 KB (Eco Pipeline)', desc: '2 parallel streams (512KB in-flight) • Fastest seek & low cellular data usage', val: 262144 },
-              { label: '512 KB (Standard Pipeline)', desc: '4 parallel streams (2MB in-flight) • Balanced latency & steady throughput (Default)', val: 524288 },
-              { label: '1 MB (Turbo Pipeline)', desc: '6 parallel streams (3MB in-flight) • Maximum prefetch throughput for smooth 1080p', val: 1048576 }
-            ].map((c) => {
-              const isCurrent = (settings.msmChunkSize || 524288) === c.val;
-              return (
-                <button
-                  key={c.val}
-                  type="button"
-                  onClick={() => handleUpdate({ msmChunkSize: c.val })}
-                  className={`p-3.5 rounded-xl border text-left transition-all flex items-center justify-between ${
-                    isCurrent
-                      ? 'bg-sky-500/20 border-sky-400 text-white'
-                      : 'bg-white/5 border-white/10 text-gray-400 hover:text-white'
-                  }`}
-                >
-                  <div className="space-y-0.5 pr-2">
-                    <span className="text-xs font-bold block text-white">{c.label}</span>
-                    <span className="text-[11px] text-gray-400 block leading-snug">{c.desc}</span>
-                  </div>
-                  <div className={`w-5 h-5 rounded-full border flex items-center justify-center flex-shrink-0 ${
-                    isCurrent ? 'bg-sky-500 border-sky-400 text-black' : 'border-gray-600 bg-black/40 text-transparent'
-                  }`}>
-                    <Check className="w-3 h-3 stroke-[3]" />
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-          <p className="text-[11px] text-gray-500 leading-relaxed">
-            Smaller chunks start playback and seek faster by downloading smaller initial byte ranges; larger chunks yield higher sustained throughput.
-          </p>
-        </div>
-      </SettingsDrawer>
 
       {/* 3a-TG-COUNTRY. Sub-Drawer: MSM Country Origin Filters */}
       <SettingsDrawer
