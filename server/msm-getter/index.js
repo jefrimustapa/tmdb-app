@@ -3669,10 +3669,11 @@ app.get(['/api/resolve', '/msm/api/resolve'], async (req, res) => {
     const host = req.get('host');
     const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'https';
     const isDesktopWeb = isDesktopWebClient(req);
+    const isMp4 = /\.mp4$/i.test(cached.filename || '');
     const isAvi = /\.avi$/i.test(cached.filename || '');
     const isHevc = cached.videoCodec === 'hevc' || cached.videoCodec === 'h265' || /\b(x265|hevc|h265)\b/i.test(cached.filename || '');
-    // Only transcode for desktop web. Non-desktop web devices (S25, Smart TV) receive direct stream
-    const transcodeQuery = (isDesktopWeb && (isAvi || isHevc)) ? '?transcode=audio&vcodec=h264' : '';
+    // Only transcode legacy AVI files for desktop web. Native MP4 files and modern devices receive 100% direct native stream
+    const transcodeQuery = (isDesktopWeb && isAvi && !isMp4) ? '?transcode=audio&vcodec=h264' : '';
     return res.json({
       success: true,
       cached: true,
@@ -3693,9 +3694,11 @@ app.get(['/api/resolve', '/msm/api/resolve'], async (req, res) => {
       const host = req.get('host');
       const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'https';
       const isDesktopWeb = isDesktopWebClient(req);
+      const isMp4 = /\.mp4$/i.test(result.filename || '');
       const isAvi = /\.avi$/i.test(result.filename || '');
       const isHevc = result.videoCodec === 'hevc' || result.videoCodec === 'h265' || /\b(x265|hevc|h265)\b/i.test(result.filename || '');
-      const transcodeQuery = (isDesktopWeb && (isAvi || isHevc)) ? '?transcode=audio&vcodec=h264' : '';
+      // Only transcode legacy AVI files for desktop web. Native MP4 files and modern devices receive 100% direct native stream
+      const transcodeQuery = (isDesktopWeb && isAvi && !isMp4) ? '?transcode=audio&vcodec=h264' : '';
       return res.json({
         success: true,
         cached: true,
@@ -4511,9 +4514,11 @@ app.get(['/api/resolve', '/msm/api/resolve'], async (req, res) => {
     const host = req.get('host');
     const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'https';
     const isDesktopWeb = isDesktopWebClient(req);
+    const isMp4 = /\.mp4$/i.test(result.filename || '');
     const isAvi = /\.avi$/i.test(result.filename || '');
     const isHevc = result.videoCodec === 'hevc' || result.videoCodec === 'h265' || /\b(x265|hevc|h265)\b/i.test(result.filename || '');
-    const transcodeQuery = (isDesktopWeb && (isAvi || isHevc)) ? '?transcode=audio&vcodec=h264' : '';
+    // Only transcode legacy AVI files for desktop web. Native MP4 files and modern devices receive 100% direct native stream
+    const transcodeQuery = (isDesktopWeb && isAvi && !isMp4) ? '?transcode=audio&vcodec=h264' : '';
 
     return res.json({
       success: true,
@@ -5387,21 +5392,22 @@ app.get('/stream/:docId', async (req, res) => {
       }
     }
 
+    const isMp4 = /\.mp4$/i.test(filename);
     const isDesktopWeb = isDesktopWebClient(req);
 
-    // Only redirect to transcode pipe for desktop web browsers. Non-desktop devices (S25, Smart TV) stream direct.
-    if ((isAvi || isHevc) && !isInternalTranscoder && !req.query.transcode && isDesktopWeb) {
+    // Only redirect untagged legacy AVI requests to transcode pipe for desktop web. Native MP4 files stream direct.
+    if (isAvi && !isMp4 && !isInternalTranscoder && !req.query.transcode && isDesktopWeb) {
       const sep = req.url.includes('?') ? '&' : '?';
-      console.log(`[VIDEO TRANSCODE REDIRECT] Redirecting untagged ${isAvi ? 'AVI' : 'HEVC'} request to 2-core transcode pipe for desktop web [${clientIdentity.name} (${clientIdentity.ip})] doc ${docId}`);
+      console.log(`[VIDEO TRANSCODE REDIRECT] Redirecting untagged AVI request to transcode pipe for desktop web [${clientIdentity.name} (${clientIdentity.ip})] doc ${docId}`);
       return res.redirect(307, `${req.url}${sep}transcode=audio&vcodec=h264`);
     }
 
-    // STRICT: Non-desktop devices (phones, Android TV, tablets) ALWAYS receive 100% direct native stream without transcoding
-    const shouldTranscode = isDesktopWeb && !isInternalTranscoder && (
+    // STRICT: Native MP4 files and mobile/TV devices ALWAYS stream direct without transcoding.
+    // Transcode only if explicitly requested by client or for unplayable legacy AVI containers.
+    const shouldTranscode = isDesktopWeb && !isInternalTranscoder && !isMp4 && (
       req.query.transcode === 'audio' ||
       req.query.transcode === 'video' ||
-      isAvi ||
-      isHevc
+      isAvi
     );
 
     if (shouldTranscode) {
