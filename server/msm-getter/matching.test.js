@@ -114,11 +114,15 @@ it('disqualifies Episode 10 when Episode 1 is searched', () => {
   assert.strictEqual(score, -999, 'Ep 10 button must be hard disqualified (-999)');
 });
 
-it('awards high score for matching Episode 1 buttons', () => {
-  const btnEp1 = { className: 'KeyboardButtonUrlAuth', url: 'https://t.me/msmbot/link/ep1', text: 'Hantu Punya Boss Ep 1 720p' };
+it('awards high score for matching Episode 1 buttons (both KeyboardButtonUrlAuth and KeyboardButtonUrl)', () => {
+  const btnEp1Auth = { className: 'KeyboardButtonUrlAuth', url: 'https://t.me/msmbot/link/ep1', text: 'Hantu Punya Boss Ep 1 720p' };
+  const btnEp1Direct = { className: 'KeyboardButtonUrl', url: 'https://getlink.msmbot.club/ep1', text: 'Hantu Punya Boss Ep 1 720p' };
   const msg = { message: 'Hantu Punya Boss' };
-  const score = scoreCandidateButton(btnEp1, msg, contextTvEp1);
-  assert.ok(score >= 200, `Ep 1 button should score >= 200, got ${score}`);
+  const scoreAuth = scoreCandidateButton(btnEp1Auth, msg, contextTvEp1);
+  const scoreDirect = scoreCandidateButton(btnEp1Direct, msg, contextTvEp1);
+  assert.ok(scoreAuth >= 200, `Ep 1 auth button should score >= 200, got ${scoreAuth}`);
+  assert.ok(scoreDirect >= 200, `Ep 1 direct button should score >= 200, got ${scoreDirect}`);
+  assert.strictEqual(scoreAuth, scoreDirect, 'Auth and direct buttons should receive identical scores');
 });
 
 it('correctly handles bare buttons by checking parent message context', () => {
