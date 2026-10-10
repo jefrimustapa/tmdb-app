@@ -7,6 +7,9 @@ import {
   isBareButton,
   scoreCandidateButton,
   generateSeriesSearchQueries,
+  detectVideoQualityTier,
+  DEFAULT_PIPELINE_BUFFERS,
+  getBlockCacheMaxEntries,
 } from './index.js';
 
 let passed = 0;
@@ -238,6 +241,77 @@ it('generates the adaptive 12 query patterns without episode/episod for Multi-Se
   for (const q of queries) {
     assert.ok(!/\bepisod/i.test(q), `Query "${q}" should not contain episod or episode`);
   }
+});
+
+console.log('\n8. Video Quality Detection & Pipeline Buffers (detectVideoQualityTier)');
+it('correctly detects SD tier (≤480p, 360p, 540p)', () => {
+  assert.strictEqual(detectVideoQualityTier('Series.S01E01.480p.mp4'), 'sd');
+  assert.strictEqual(detectVideoQualityTier('Movie.360p.WEBRip.mp4'), 'sd');
+  assert.strictEqual(detectVideoQualityTier('Show.540p.mp4'), 'sd');
+  assert.strictEqual(detectVideoQualityTier('Video.mp4', '', { attributes: [{ className: 'DocumentAttributeVideo', h: 480, w: 854 }] }), 'sd');
+});
+
+it('correctly detects 720p HD tier', () => {
+  assert.strictEqual(detectVideoQualityTier('Movie.2024.720p.HDTV.mkv'), '720p');
+  assert.strictEqual(detectVideoQualityTier('Show.HD.mp4'), '720p');
+  assert.strictEqual(detectVideoQualityTier('Unknown.mp4', 'title_720p'), '720p');
+  assert.strictEqual(detectVideoQualityTier('Video.mp4', '', { attributes: [{ className: 'DocumentAttributeVideo', h: 720, w: 1280 }] }), '720p');
+  // Fallback default is 720p
+  assert.strictEqual(detectVideoQualityTier('Unknown.mp4'), '720p');
+});
+
+it('correctly detects 1080p FHD tier', () => {
+  assert.strictEqual(detectVideoQualityTier('Movie.2024.1080p.WEBRip.mp4'), '1080p');
+  assert.strictEqual(detectVideoQualityTier('Show.FHD.mkv'), '1080p');
+  assert.strictEqual(detectVideoQualityTier('Unknown.mp4', 'title_1080p'), '1080p');
+  assert.strictEqual(detectVideoQualityTier('Video.mp4', '', { attributes: [{ className: 'DocumentAttributeVideo', h: 1080, w: 1920 }] }), '1080p');
+});
+
+it('correctly detects 4K UHD tier', () => {
+  assert.strictEqual(detectVideoQualityTier('Movie.2024.2160p.UHD.Remux.mkv'), '4k');
+  assert.strictEqual(detectVideoQualityTier('Movie.4K.HDR.mkv'), '4k');
+  assert.strictEqual(detectVideoQualityTier('Video.mp4', '', { attributes: [{ className: 'DocumentAttributeVideo', h: 2160, w: 3840 }] }), '4k');
+});
+
+it('provides expected default pipeline buffer values per tier', () => {
+  assert.strictEqual(DEFAULT_PIPELINE_BUFFERS.sd, 2);      // 2 x 512KB = 1.0 MB
+  assert.strictEqual(DEFAULT_PIPELINE_BUFFERS['720p'], 4); // 4 x 512KB = 2.0 MB
+  assert.strictEqual(DEFAULT_PIPELINE_BUFFERS['1080p'], 6); // 6 x 512KB = 3.0 MB
+  assert.strictEqual(DEFAULT_PIPELINE_BUFFERS['4k'], 8);    // 8 x 512KB = 4.0 MB
+});
+
+console.log('\n9. 480p and 4K Candidate Scoring & Dynamic Block Cache');
+it('prioritizes 480p/360p and penalizes 1080p/4K when targetQuality is 480', () => {
+  const context480 = { isTv: true, title: 'Series Name', sNum: 1, eNum: 1, targetQuality: 480 };
+  const btn480 = { className: 'KeyboardButtonUrlAuth', url: 'https://t.me/b/1', text: 'Series Name S01E01 480p' };
+  const btn720 = { className: 'KeyboardButtonUrlAuth', url: 'https://t.me/b/2', text: 'Series Name S01E01 720p' };
+  const btn1080 = { className: 'KeyboardButtonUrlAuth', url: 'https://t.me/b/3', text: 'Series Name S01E01 1080p' };
+  const msg = { message: '' };
+
+  const score480 = scoreCandidateButton(btn480, msg, context480);
+  const score720 = scoreCandidateButton(btn720, msg, context480);
+  const score1080 = scoreCandidateButton(btn1080, msg, context480);
+
+  assert.ok(score480 > score720, `480p score (${score480}) should be higher than 720p score (${score720})`);
+  assert.ok(score720 > score1080, `720p score (${score720}) should be higher than 1080p score (${score1080})`);
+});
+
+it('prioritizes 4K/2160p when targetQuality is 2160', () => {
+  const context4k = { isTv: false, title: 'Action Movie', year: '2024', targetQuality: 2160 };
+  const btn4k = { className: 'KeyboardButtonUrlAuth', url: 'https://t.me/b/1', text: 'Action Movie 2024 4K UHD' };
+  const btn1080 = { className: 'KeyboardButtonUrlAuth', url: 'https://t.me/b/2', text: 'Action Movie 2024 1080p' };
+  const msg = { message: '' };
+
+  const score4k = scoreCandidateButton(btn4k, msg, context4k);
+  const score1080 = scoreCandidateButton(btn1080, msg, context4k);
+
+  assert.ok(score4k > score1080, `4K score (${score4k}) should be higher than 1080p score (${score1080})`);
+});
+
+it('calculates router RAM block cache max entries accurately', () => {
+  const entries = getBlockCacheMaxEntries();
+  assert.strictEqual(typeof entries, 'number');
+  assert.ok(entries >= 16 && entries <= 128, `Block cache entries (${entries}) should be within expected range`);
 });
 
 console.log(`\nResults: ${passed}/${total} tests passed!\n`);
