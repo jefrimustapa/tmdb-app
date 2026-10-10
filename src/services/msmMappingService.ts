@@ -176,10 +176,8 @@ class MsmMappingService {
 
       if (data.success && data.streamUrl) {
         let finalStreamUrl = data.streamUrl;
-        const chunkSize = settings?.msmChunkSize || settings?.msm32ChunkSize || 524288;
         try {
           const u = new URL(finalStreamUrl);
-          u.searchParams.set('chunkSize', String(chunkSize));
           if (typeof window !== 'undefined') {
             const bridge = (window as any).AndroidBridge;
             if (bridge?.getDeviceName) {

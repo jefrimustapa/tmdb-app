@@ -53,6 +53,13 @@ let session = process.env.TG_SESSION || '';
 const LOG_PATH = process.env.LOG_FILE || (process.platform === 'win32' ? path.join(__dirname, 'msm-getter.log') : '/tmp/msm-getter.log');
 
 const SETTINGS_FILE = path.join(__dirname, 'data', 'settings.json');
+export const DEFAULT_PIPELINE_BUFFERS = {
+  sd: 2,       // 2 x 512KB = 1.0 MB (<=480p / 360p)
+  '720p': 4,   // 4 x 512KB = 2.0 MB
+  '1080p': 6,  // 6 x 512KB = 3.0 MB
+  '4k': 8,     // 8 x 512KB = 4.0 MB
+};
+
 let savedSettings = {};
 try {
   if (fs.existsSync(SETTINGS_FILE)) {
@@ -60,7 +67,31 @@ try {
   }
 } catch (e) {}
 
+savedSettings.pipelineBuffers = Object.assign({}, DEFAULT_PIPELINE_BUFFERS, savedSettings.pipelineBuffers || {});
+
 export let BOT_USERNAME = (savedSettings.targetBotUsername || process.env.TG_BOT_USERNAME || 'msm34bot').replace(/^@/, '');
+
+export function detectVideoQualityTier(filename = '', queryKey = '', targetDoc = null) {
+  const str = ` ${filename} ${queryKey} `.toLowerCase().replace(/[_\.\-\+\[\]\(\)]/g, ' ');
+
+  if (targetDoc && Array.isArray(targetDoc.attributes)) {
+    const videoAttr = targetDoc.attributes.find(a => a.className === 'DocumentAttributeVideo' || (a.w && a.h));
+    if (videoAttr && videoAttr.h) {
+      const h = Number(videoAttr.h);
+      if (h >= 2160) return '4k';
+      if (h >= 1080) return '1080p';
+      if (h >= 720) return '720p';
+      return 'sd';
+    }
+  }
+
+  if (/\b(4k|2160p|uhd)\b/i.test(str)) return '4k';
+  if (/\b(1080p|1080|fhd)\b/i.test(str)) return '1080p';
+  if (/\b(720p|720|hd)\b/i.test(str)) return '720p';
+  if (/\b(480p|360p|540p|sd)\b/i.test(str)) return 'sd';
+
+  return '720p';
+}
 
 function getLogFilePath() {
   if (fs.existsSync('/tmp/msm-getter.log')) return '/tmp/msm-getter.log';
@@ -2208,6 +2239,7 @@ app.get(['/api/settings', '/msm/api/settings'], (req, res) => {
     isConnected,
     uptime: process.uptime(),
     cachedStreams: db.size(),
+    pipelineBuffers: savedSettings.pipelineBuffers || DEFAULT_PIPELINE_BUFFERS,
     port,
     internalPort: INTERNAL_HTTP_PORT,
   });
@@ -2215,21 +2247,46 @@ app.get(['/api/settings', '/msm/api/settings'], (req, res) => {
 
 app.post(['/api/settings', '/msm/api/settings'], (req, res) => {
   try {
-    const { targetBotUsername } = req.body || {};
+    const { targetBotUsername, pipelineBuffers } = req.body || {};
+    let changed = false;
+
     if (targetBotUsername && typeof targetBotUsername === 'string') {
       const sanitized = targetBotUsername.trim().replace(/^@/, '');
       if (sanitized.length > 0) {
         BOT_USERNAME = sanitized;
         savedSettings.targetBotUsername = sanitized;
-        const dataDir = path.join(__dirname, 'data');
-        if (!fs.existsSync(dataDir)) {
-          fs.mkdirSync(dataDir, { recursive: true });
-        }
-        fs.writeFileSync(SETTINGS_FILE, JSON.stringify(savedSettings, null, 2), 'utf-8');
+        changed = true;
         console.log(`[SETTINGS] Target Telegram Bot updated to: @${BOT_USERNAME}`);
       }
     }
-    return res.json({ success: true, targetBotUsername: BOT_USERNAME });
+
+    if (pipelineBuffers && typeof pipelineBuffers === 'object') {
+      savedSettings.pipelineBuffers = savedSettings.pipelineBuffers || { ...DEFAULT_PIPELINE_BUFFERS };
+      for (const tier of ['sd', '720p', '1080p', '4k']) {
+        if (pipelineBuffers[tier] !== undefined) {
+          const val = parseInt(pipelineBuffers[tier], 10);
+          if (!isNaN(val) && val >= 1 && val <= 16) {
+            savedSettings.pipelineBuffers[tier] = val;
+            changed = true;
+          }
+        }
+      }
+      console.log(`[SETTINGS] Stream Pipeline Buffers updated:`, JSON.stringify(savedSettings.pipelineBuffers));
+    }
+
+    if (changed) {
+      const dataDir = path.join(__dirname, 'data');
+      if (!fs.existsSync(dataDir)) {
+        fs.mkdirSync(dataDir, { recursive: true });
+      }
+      fs.writeFileSync(SETTINGS_FILE, JSON.stringify(savedSettings, null, 2), 'utf-8');
+    }
+
+    return res.json({
+      success: true,
+      targetBotUsername: BOT_USERNAME,
+      pipelineBuffers: savedSettings.pipelineBuffers || DEFAULT_PIPELINE_BUFFERS,
+    });
   } catch (err) {
     return res.status(500).json({ success: false, error: err.message });
   }
@@ -2882,7 +2939,89 @@ app.get(['/msm/setting', '/msm/settings'], (req, res) => {
         </div>
       </div>
 
-      <!-- Card 2: Stream Cache Management -->
+      <!-- Card 2: Stream Buffer Pipelines (Per-Quality Concurrency) -->
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
+        <div class="flex items-center justify-between">
+          <h2 class="text-sm font-semibold text-white flex items-center gap-2">
+            ⚡ Stream Buffer Pipelines
+          </h2>
+          <span class="text-xs px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-mono">Dynamic Prefetch</span>
+        </div>
+        <p class="text-xs text-slate-400">Configure parallel MTProto stream download pipelines (x 512 KB) per video quality tier. Applied dynamically to all mobile, TV, and web streams.</p>
+
+        <div class="space-y-3 pt-1">
+          <!-- SD <=480p -->
+          <div class="flex items-center justify-between gap-3 bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/80">
+            <div>
+              <div class="text-xs font-semibold text-white">SD (≤ 480p / 360p)</div>
+              <div id="sdBufCalc" class="text-[11px] text-slate-400 font-mono">2 × 512 KB = 1.0 MB in-flight</div>
+            </div>
+            <select id="sdBufSelect" onchange="updatePipelineLabels()" class="bg-slate-900 border border-slate-700 text-xs text-white rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-sky-500">
+              <option value="1">1 pipeline (512 KB)</option>
+              <option value="2" selected>2 pipelines (1.0 MB)</option>
+              <option value="3">3 pipelines (1.5 MB)</option>
+              <option value="4">4 pipelines (2.0 MB)</option>
+              <option value="6">6 pipelines (3.0 MB)</option>
+            </select>
+          </div>
+
+          <!-- HD 720p -->
+          <div class="flex items-center justify-between gap-3 bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/80">
+            <div>
+              <div class="text-xs font-semibold text-white">HD 720p</div>
+              <div id="720pBufCalc" class="text-[11px] text-slate-400 font-mono">4 × 512 KB = 2.0 MB in-flight</div>
+            </div>
+            <select id="720pBufSelect" onchange="updatePipelineLabels()" class="bg-slate-900 border border-slate-700 text-xs text-white rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-sky-500">
+              <option value="2">2 pipelines (1.0 MB)</option>
+              <option value="4" selected>4 pipelines (2.0 MB)</option>
+              <option value="6">6 pipelines (3.0 MB)</option>
+              <option value="8">8 pipelines (4.0 MB)</option>
+            </select>
+          </div>
+
+          <!-- FHD 1080p -->
+          <div class="flex items-center justify-between gap-3 bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/80">
+            <div>
+              <div class="text-xs font-semibold text-white">Full HD 1080p</div>
+              <div id="1080pBufCalc" class="text-[11px] text-slate-400 font-mono">6 × 512 KB = 3.0 MB in-flight</div>
+            </div>
+            <select id="1080pBufSelect" onchange="updatePipelineLabels()" class="bg-slate-900 border border-slate-700 text-xs text-white rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-sky-500">
+              <option value="2">2 pipelines (1.0 MB)</option>
+              <option value="4">4 pipelines (2.0 MB)</option>
+              <option value="6" selected>6 pipelines (3.0 MB)</option>
+              <option value="8">8 pipelines (4.0 MB)</option>
+              <option value="10">10 pipelines (5.0 MB)</option>
+              <option value="12">12 pipelines (6.0 MB)</option>
+            </select>
+          </div>
+
+          <!-- 4K UHD -->
+          <div class="flex items-center justify-between gap-3 bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/80">
+            <div>
+              <div class="text-xs font-semibold text-white">4K UHD (2160p)</div>
+              <div id="4kBufCalc" class="text-[11px] text-slate-400 font-mono">8 × 512 KB = 4.0 MB in-flight</div>
+            </div>
+            <select id="4kBufSelect" onchange="updatePipelineLabels()" class="bg-slate-900 border border-slate-700 text-xs text-white rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-sky-500">
+              <option value="4">4 pipelines (2.0 MB)</option>
+              <option value="6">6 pipelines (3.0 MB)</option>
+              <option value="8" selected>8 pipelines (4.0 MB)</option>
+              <option value="10">10 pipelines (5.0 MB)</option>
+              <option value="12">12 pipelines (6.0 MB)</option>
+              <option value="16">16 pipelines (8.0 MB)</option>
+            </select>
+          </div>
+
+          <div class="flex items-center justify-between pt-2">
+            <span id="savePipelineMsg" class="text-xs text-emerald-400 hidden">✓ Pipeline buffers saved & applied live!</span>
+            <div class="flex-1"></div>
+            <button id="savePipelineBtn" onclick="savePipelineBuffers()" class="px-4 py-1.5 bg-sky-500 hover:bg-sky-400 text-slate-950 font-semibold text-xs rounded-xl transition">
+              Save Pipeline Buffers
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 3: Stream Cache Management -->
       <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
         <h2 class="text-sm font-semibold text-white flex items-center gap-2">
           💾 Stream Cache Storage
@@ -2904,7 +3043,7 @@ app.get(['/msm/setting', '/msm/settings'], (req, res) => {
         </div>
       </div>
 
-      <!-- Card 3: Log File Maintenance -->
+      <!-- Card 4: Log File Maintenance -->
       <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
         <h2 class="text-sm font-semibold text-white flex items-center gap-2">
           📜 Server Log Controls
@@ -2920,7 +3059,7 @@ app.get(['/msm/setting', '/msm/settings'], (req, res) => {
         </div>
       </div>
 
-      <!-- Card 4: Session & Telegram Gateway -->
+      <!-- Card 5: Session & Telegram Gateway -->
       <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
         <h2 class="text-sm font-semibold text-white flex items-center gap-2">
           🔑 MTProto Telegram Session
@@ -2944,7 +3083,63 @@ app.get(['/msm/setting', '/msm/settings'], (req, res) => {
         if (res.targetBotUsername) {
           document.getElementById('botStatusPill').textContent = '@' + res.targetBotUsername;
         }
+        if (res.pipelineBuffers) {
+          if (res.pipelineBuffers.sd) document.getElementById('sdBufSelect').value = String(res.pipelineBuffers.sd);
+          if (res.pipelineBuffers['720p']) document.getElementById('720pBufSelect').value = String(res.pipelineBuffers['720p']);
+          if (res.pipelineBuffers['1080p']) document.getElementById('1080pBufSelect').value = String(res.pipelineBuffers['1080p']);
+          if (res.pipelineBuffers['4k']) document.getElementById('4kBufSelect').value = String(res.pipelineBuffers['4k']);
+          updatePipelineLabels();
+        }
       } catch (e) {}
+    }
+
+    function updatePipelineLabels() {
+      const sd = parseInt(document.getElementById('sdBufSelect').value, 10) || 2;
+      const p720 = parseInt(document.getElementById('720pBufSelect').value, 10) || 4;
+      const p1080 = parseInt(document.getElementById('1080pBufSelect').value, 10) || 6;
+      const p4k = parseInt(document.getElementById('4kBufSelect').value, 10) || 8;
+
+      document.getElementById('sdBufCalc').textContent = sd + ' × 512 KB = ' + (sd * 0.5).toFixed(1) + ' MB in-flight';
+      document.getElementById('720pBufCalc').textContent = p720 + ' × 512 KB = ' + (p720 * 0.5).toFixed(1) + ' MB in-flight';
+      document.getElementById('1080pBufCalc').textContent = p1080 + ' × 512 KB = ' + (p1080 * 0.5).toFixed(1) + ' MB in-flight';
+      document.getElementById('4kBufCalc').textContent = p4k + ' × 512 KB = ' + (p4k * 0.5).toFixed(1) + ' MB in-flight';
+    }
+
+    async function savePipelineBuffers() {
+      const sd = parseInt(document.getElementById('sdBufSelect').value, 10) || 2;
+      const p720 = parseInt(document.getElementById('720pBufSelect').value, 10) || 4;
+      const p1080 = parseInt(document.getElementById('1080pBufSelect').value, 10) || 6;
+      const p4k = parseInt(document.getElementById('4kBufSelect').value, 10) || 8;
+
+      const btn = document.getElementById('savePipelineBtn');
+      btn.disabled = true;
+      btn.textContent = 'Saving...';
+
+      try {
+        const res = await fetch('/msm/api/settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            pipelineBuffers: {
+              sd,
+              '720p': p720,
+              '1080p': p1080,
+              '4k': p4k,
+            }
+          })
+        });
+        const data = await res.json();
+        if (data.success) {
+          const msg = document.getElementById('savePipelineMsg');
+          msg.classList.remove('hidden');
+          setTimeout(() => msg.classList.add('hidden'), 3000);
+        }
+      } catch (e) {
+        alert('Failed to save pipeline buffers: ' + e.message);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Save Pipeline Buffers';
+      }
     }
 
     async function saveBot() {
@@ -4158,23 +4353,17 @@ async function refreshDocumentFileReference(client, targetDoc) {
 async function streamTelegramPipelined(client, targetDoc, startByte, endByte, res, req, customChunkSize, customConcurrency, passedStreamKey) {
   // Map requested chunkSize / mode to MTProto block size and concurrency
   let CHUNK_SIZE = 512 * 1024; // 512KB: Native Telegram MTProto block limit
-  let CONCURRENCY = 4;         // Default Standard: 4 parallel calls (2.0 MB in-flight)
+  let CONCURRENCY = (typeof customConcurrency === 'number' && customConcurrency >= 1) ? customConcurrency : 4;
 
-  if (customChunkSize === 262144 || req?.query?.mode === 'eco') {
-    CONCURRENCY = 2; // Eco: 2 parallel calls (1.0 MB in-flight)
-  } else if (customChunkSize === 524288 || req?.query?.mode === 'standard') {
-    CONCURRENCY = 4; // Standard: 4 parallel calls (2.0 MB in-flight)
-  } else if (customChunkSize === 1048576 || req?.query?.mode === 'turbo') {
-    CONCURRENCY = 6; // Turbo: 6 parallel calls (3.0 MB in-flight)
-  } else if (customChunkSize === 2097152 || req?.query?.mode === 'ultra') {
-    CONCURRENCY = 8; // Ultra: 8 parallel calls (4.0 MB in-flight)
-  }
-
-  if (customConcurrency && typeof customConcurrency === 'number') {
-    CONCURRENCY = customConcurrency;
-  } else if (req?.query?.concurrency) {
+  if (req?.query?.concurrency) {
     const c = parseInt(req.query.concurrency, 10);
-    if (!isNaN(c) && c >= 1 && c <= 8) CONCURRENCY = c;
+    if (!isNaN(c) && c >= 1 && c <= 16) CONCURRENCY = c;
+  } else if (req?.query?.mode === 'eco' || customChunkSize === 262144) {
+    CONCURRENCY = 2; // Eco: 2 parallel calls (1.0 MB in-flight)
+  } else if (req?.query?.mode === 'turbo' || customChunkSize === 1048576) {
+    CONCURRENCY = 6; // Turbo: 6 parallel calls (3.0 MB in-flight)
+  } else if (req?.query?.mode === 'ultra' || customChunkSize === 2097152) {
+    CONCURRENCY = 8; // Ultra: 8 parallel calls (4.0 MB in-flight)
   }
 
   const docTotalSize = Number(targetDoc.size || 0);
@@ -5080,7 +5269,11 @@ app.get('/stream/:docId', async (req, res) => {
       return res.end();
     }
 
-    // Parse user-specified chunk size / pipeline mode from query parameter (e.g. ?chunkSize=1048576 or 2097152)
+    // Detect video resolution quality tier (sd, 720p, 1080p, 4k) and apply configured pipeline concurrency
+    const detectedTier = detectVideoQualityTier(filename, dbRecord?.queryKey || '', targetDoc);
+    const tierConcurrency = (savedSettings.pipelineBuffers && savedSettings.pipelineBuffers[detectedTier]) || DEFAULT_PIPELINE_BUFFERS[detectedTier] || 4;
+
+    // Parse user-specified chunk size / pipeline mode from query parameter (for debug or backward compatibility)
     const parsedChunk = parseInt(req.query.chunkSize, 10);
     const downloadChunkSize = [262144, 524288, 1048576, 2097152].includes(parsedChunk) ? parsedChunk : 524288;
 
@@ -5100,7 +5293,8 @@ app.get('/stream/:docId', async (req, res) => {
         'X-Accel-Buffering': 'no',
         'Content-Disposition': `inline; filename="${encodeURIComponent(filename)}"`,
       });
-      await streamTelegramPipelined(client, targetDoc, 0, fileSize - 1, res, req, downloadChunkSize, undefined, streamSessionKey);
+      console.log(`[STREAM REQ] [${clientIdentity.name} (${clientIdentity.ip})] ${req.method} Full Stream -> 0 to ${fileSize - 1} (${fileSize} bytes, Tier: ${detectedTier.toUpperCase()} [${tierConcurrency}x512KB])`);
+      await streamTelegramPipelined(client, targetDoc, 0, fileSize - 1, res, req, downloadChunkSize, tierConcurrency, streamSessionKey);
     } else {
       const rangeMatch = rangeHeader.match(/bytes=(\d*)-(\d*)/);
       let start;
@@ -5133,7 +5327,7 @@ app.get('/stream/:docId', async (req, res) => {
       end = Math.min(end, fileSize - 1);
 
       const chunkSize = (end - start) + 1;
-      console.log(`[STREAM REQ] [${clientIdentity.name} (${clientIdentity.ip})] ${req.method} Range: "${rangeHeader}" -> start: ${start}, end: ${end} (${chunkSize} bytes, chunkParam: ${req.query.chunkSize || 'default'})`);
+      console.log(`[STREAM REQ] [${clientIdentity.name} (${clientIdentity.ip})] ${req.method} Range: "${rangeHeader}" -> start: ${start}, end: ${end} (${chunkSize} bytes, Tier: ${detectedTier.toUpperCase()} [${tierConcurrency}x512KB])`);
       res.writeHead(206, {
         'Content-Range': `bytes ${start}-${end}/${fileSize}`,
         'Accept-Ranges': 'bytes',
@@ -5144,7 +5338,7 @@ app.get('/stream/:docId', async (req, res) => {
         'Content-Disposition': `inline; filename="${encodeURIComponent(filename)}"`,
       });
 
-      await streamTelegramPipelined(client, targetDoc, start, end, res, req, downloadChunkSize, undefined, streamSessionKey);
+      await streamTelegramPipelined(client, targetDoc, start, end, res, req, downloadChunkSize, tierConcurrency, streamSessionKey);
     }
   } catch (err) {
     if (err.code !== 'ERR_STREAM_WRITE_AFTER_END' && err.code !== 'ECONNRESET' && err.code !== 'EPIPE') {

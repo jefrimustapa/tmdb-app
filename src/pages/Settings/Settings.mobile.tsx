@@ -183,7 +183,6 @@ export const Settings: React.FC = () => {
     | 'telegram-msm32'
     | 'telegram-logs'
     | 'telegram-url'
-    | 'telegram-chunk'
     | 'telegram-country'
     | 'telegram-timeout'
     | 'telegram-buffer-timeout'
@@ -1794,23 +1793,7 @@ export const Settings: React.FC = () => {
             </div>
           </button>
 
-          {/* Navigation to Stream Chunk Sub-Drawer */}
-          <button
-            type="button"
-            onClick={() => setActiveDrawer('telegram-chunk')}
-            className="w-full flex items-center justify-between p-3.5 rounded-xl bg-white/5 border border-white/10 hover:border-sky-400/50 hover:bg-white/10 transition-all text-left"
-          >
-            <div className="space-y-0.5">
-              <span className="text-xs font-semibold text-white block">Stream Pipeline Buffer</span>
-              <span className="text-[11px] text-gray-400">Configure prefetch concurrency and pipeline depth</span>
-            </div>
-            <div className="flex items-center gap-2 flex-shrink-0">
-              <span className="text-[10px] text-sky-400 font-mono font-bold bg-sky-500/10 px-2 py-0.5 rounded border border-sky-400/20">
-                {(settings.msmChunkSize ?? settings.msm32ChunkSize) === 2097152 ? 'Ultra (4.0 MB)' : (settings.msmChunkSize ?? settings.msm32ChunkSize) === 1048576 ? 'Turbo (3.0 MB)' : (settings.msmChunkSize ?? settings.msm32ChunkSize) === 262144 ? 'Eco (1.0 MB)' : 'Standard (2.0 MB)'}
-              </span>
-              <ChevronRight className="w-4 h-4 text-gray-400" />
-            </div>
-          </button>
+
 
           {/* Navigation to Origin Country Filter Sub-Drawer */}
           <button
@@ -2284,60 +2267,7 @@ export const Settings: React.FC = () => {
         </div>
       </SettingsDrawer>
 
-      {/* 3a-TG-CHUNK. Sub-Drawer: Stream Buffer Pipeline */}
-      <SettingsDrawer
-        isOpen={activeDrawer === 'telegram-chunk'}
-        onClose={() => setActiveDrawer(null)}
-        onBack={() => setActiveDrawer('telegram-msm')}
-        title="Stream Buffer Pipeline"
-        subtitle="Configure prefetch concurrency and in-flight buffer depth."
-        categoryLabel="Telegram > MSMbot > Buffer Pipeline"
-      >
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-gray-300 block">Current In-Flight Buffer:</span>
-            <span className="text-xs text-sky-400 font-mono font-bold">
-              {(settings.msmChunkSize || 524288) === 2097152 ? '4.0 MB (Ultra)' : (settings.msmChunkSize || 524288) === 1048576 ? '3.0 MB (Turbo)' : (settings.msmChunkSize || 524288) === 262144 ? '1.0 MB (Eco)' : '2.0 MB (Standard)'}
-            </span>
-          </div>
 
-          <div className="grid grid-cols-1 gap-2">
-            {[
-              { label: 'Eco Pipeline (1.0 MB)', desc: '2 parallel calls (512KB each) • Low cellular data & battery saving', val: 262144 },
-              { label: 'Standard Pipeline (2.0 MB)', desc: '4 parallel calls (512KB each) • Balanced latency & steady playback (Default)', val: 524288 },
-              { label: 'Turbo Pipeline (3.0 MB)', desc: '6 parallel calls (512KB each) • Maximum prefetch throughput for smooth 1080p', val: 1048576 },
-              { label: 'Ultra Pipeline (4.0 MB)', desc: '8 parallel calls (512KB each) • Maximum buffer for 4K UHD & High Bitrate', val: 2097152 }
-            ].map((c) => {
-              const isCurrent = (settings.msmChunkSize || 524288) === c.val;
-              return (
-                <button
-                  key={c.val}
-                  type="button"
-                  onClick={() => handleUpdate({ msmChunkSize: c.val })}
-                  className={`p-3.5 rounded-xl border text-left transition-all flex items-center justify-between ${
-                    isCurrent
-                      ? 'bg-sky-500/20 border-sky-400 text-white'
-                      : 'bg-white/5 border-white/10 text-gray-400 hover:text-white'
-                  }`}
-                >
-                  <div className="space-y-0.5 pr-2">
-                    <span className="text-xs font-bold block text-white">{c.label}</span>
-                    <span className="text-[11px] text-gray-400 block leading-snug">{c.desc}</span>
-                  </div>
-                  <div className={`w-5 h-5 rounded-full border flex items-center justify-center flex-shrink-0 ${
-                    isCurrent ? 'bg-sky-500 border-sky-400 text-black' : 'border-gray-600 bg-black/40 text-transparent'
-                  }`}>
-                    <Check className="w-3 h-3 stroke-[3]" />
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-          <p className="text-[11px] text-gray-500 leading-relaxed">
-            All modes use Telegram's native 512 KB block size. Higher pipelines prefetch more data concurrently over MTProto, eliminating buffer stalls on high-bitrate video.
-          </p>
-        </div>
-      </SettingsDrawer>
 
       {/* 3a-TG-COUNTRY. Sub-Drawer: MSM Country Origin Filters */}
       <SettingsDrawer
