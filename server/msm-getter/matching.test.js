@@ -9,6 +9,7 @@ import {
   generateSeriesSearchQueries,
   detectVideoQualityTier,
   DEFAULT_PIPELINE_BUFFERS,
+  getBlockCacheMaxEntries,
 } from './index.js';
 
 let passed = 0;
@@ -277,6 +278,40 @@ it('provides expected default pipeline buffer values per tier', () => {
   assert.strictEqual(DEFAULT_PIPELINE_BUFFERS['720p'], 4); // 4 x 512KB = 2.0 MB
   assert.strictEqual(DEFAULT_PIPELINE_BUFFERS['1080p'], 6); // 6 x 512KB = 3.0 MB
   assert.strictEqual(DEFAULT_PIPELINE_BUFFERS['4k'], 8);    // 8 x 512KB = 4.0 MB
+});
+
+console.log('\n9. 480p and 4K Candidate Scoring & Dynamic Block Cache');
+it('prioritizes 480p/360p and penalizes 1080p/4K when targetQuality is 480', () => {
+  const context480 = { isTv: true, title: 'Series Name', sNum: 1, eNum: 1, targetQuality: 480 };
+  const btn480 = { className: 'KeyboardButtonUrlAuth', url: 'https://t.me/b/1', text: 'Series Name S01E01 480p' };
+  const btn720 = { className: 'KeyboardButtonUrlAuth', url: 'https://t.me/b/2', text: 'Series Name S01E01 720p' };
+  const btn1080 = { className: 'KeyboardButtonUrlAuth', url: 'https://t.me/b/3', text: 'Series Name S01E01 1080p' };
+  const msg = { message: '' };
+
+  const score480 = scoreCandidateButton(btn480, msg, context480);
+  const score720 = scoreCandidateButton(btn720, msg, context480);
+  const score1080 = scoreCandidateButton(btn1080, msg, context480);
+
+  assert.ok(score480 > score720, `480p score (${score480}) should be higher than 720p score (${score720})`);
+  assert.ok(score720 > score1080, `720p score (${score720}) should be higher than 1080p score (${score1080})`);
+});
+
+it('prioritizes 4K/2160p when targetQuality is 2160', () => {
+  const context4k = { isTv: false, title: 'Action Movie', year: '2024', targetQuality: 2160 };
+  const btn4k = { className: 'KeyboardButtonUrlAuth', url: 'https://t.me/b/1', text: 'Action Movie 2024 4K UHD' };
+  const btn1080 = { className: 'KeyboardButtonUrlAuth', url: 'https://t.me/b/2', text: 'Action Movie 2024 1080p' };
+  const msg = { message: '' };
+
+  const score4k = scoreCandidateButton(btn4k, msg, context4k);
+  const score1080 = scoreCandidateButton(btn1080, msg, context4k);
+
+  assert.ok(score4k > score1080, `4K score (${score4k}) should be higher than 1080p score (${score1080})`);
+});
+
+it('calculates router RAM block cache max entries accurately', () => {
+  const entries = getBlockCacheMaxEntries();
+  assert.strictEqual(typeof entries, 'number');
+  assert.ok(entries >= 16 && entries <= 128, `Block cache entries (${entries}) should be within expected range`);
 });
 
 console.log(`\nResults: ${passed}/${total} tests passed!\n`);
