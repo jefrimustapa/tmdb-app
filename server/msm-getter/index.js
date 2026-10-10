@@ -3669,10 +3669,11 @@ app.get(['/api/resolve', '/msm/api/resolve'], async (req, res) => {
     const host = req.get('host');
     const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'https';
     const isDesktopWeb = isDesktopWebClient(req);
+    const isMp4 = /\.mp4$/i.test(cached.filename || '');
     const isAvi = /\.avi$/i.test(cached.filename || '');
     const isHevc = cached.videoCodec === 'hevc' || cached.videoCodec === 'h265' || /\b(x265|hevc|h265)\b/i.test(cached.filename || '');
-    // Only transcode for desktop web. Non-desktop web devices (S25, Smart TV) receive direct stream
-    const transcodeQuery = (isDesktopWeb && (isAvi || isHevc)) ? '?transcode=audio&vcodec=h264' : '';
+    // Only transcode legacy AVI files for desktop web. Native MP4 files and modern devices receive 100% direct native stream
+    const transcodeQuery = (isDesktopWeb && isAvi && !isMp4) ? '?transcode=audio&vcodec=h264' : '';
     return res.json({
       success: true,
       cached: true,
@@ -3693,9 +3694,11 @@ app.get(['/api/resolve', '/msm/api/resolve'], async (req, res) => {
       const host = req.get('host');
       const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'https';
       const isDesktopWeb = isDesktopWebClient(req);
+      const isMp4 = /\.mp4$/i.test(result.filename || '');
       const isAvi = /\.avi$/i.test(result.filename || '');
       const isHevc = result.videoCodec === 'hevc' || result.videoCodec === 'h265' || /\b(x265|hevc|h265)\b/i.test(result.filename || '');
-      const transcodeQuery = (isDesktopWeb && (isAvi || isHevc)) ? '?transcode=audio&vcodec=h264' : '';
+      // Only transcode legacy AVI files for desktop web. Native MP4 files and modern devices receive 100% direct native stream
+      const transcodeQuery = (isDesktopWeb && isAvi && !isMp4) ? '?transcode=audio&vcodec=h264' : '';
       return res.json({
         success: true,
         cached: true,
@@ -4511,9 +4514,11 @@ app.get(['/api/resolve', '/msm/api/resolve'], async (req, res) => {
     const host = req.get('host');
     const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'https';
     const isDesktopWeb = isDesktopWebClient(req);
+    const isMp4 = /\.mp4$/i.test(result.filename || '');
     const isAvi = /\.avi$/i.test(result.filename || '');
     const isHevc = result.videoCodec === 'hevc' || result.videoCodec === 'h265' || /\b(x265|hevc|h265)\b/i.test(result.filename || '');
-    const transcodeQuery = (isDesktopWeb && (isAvi || isHevc)) ? '?transcode=audio&vcodec=h264' : '';
+    // Only transcode legacy AVI files for desktop web. Native MP4 files and modern devices receive 100% direct native stream
+    const transcodeQuery = (isDesktopWeb && isAvi && !isMp4) ? '?transcode=audio&vcodec=h264' : '';
 
     return res.json({
       success: true,
@@ -5387,26 +5392,29 @@ app.get('/stream/:docId', async (req, res) => {
       }
     }
 
+    const isMp4 = /\.mp4$/i.test(filename);
     const isDesktopWeb = isDesktopWebClient(req);
 
-    // Only redirect to transcode pipe for desktop web browsers. Non-desktop devices (S25, Smart TV) stream direct.
-    if ((isAvi || isHevc) && !isInternalTranscoder && !req.query.transcode && isDesktopWeb) {
+    // Only redirect untagged legacy AVI requests to transcode pipe for desktop web. Native MP4 files stream direct.
+    if (isAvi && !isMp4 && !isInternalTranscoder && !req.query.transcode && isDesktopWeb) {
       const sep = req.url.includes('?') ? '&' : '?';
-      console.log(`[VIDEO TRANSCODE REDIRECT] Redirecting untagged ${isAvi ? 'AVI' : 'HEVC'} request to 2-core transcode pipe for desktop web [${clientIdentity.name} (${clientIdentity.ip})] doc ${docId}`);
+      console.log(`[VIDEO TRANSCODE REDIRECT] Redirecting untagged AVI request to transcode pipe for desktop web [${clientIdentity.name} (${clientIdentity.ip})] doc ${docId}`);
       return res.redirect(307, `${req.url}${sep}transcode=audio&vcodec=h264`);
     }
 
-    // STRICT: Non-desktop devices (phones, Android TV, tablets) ALWAYS receive 100% direct native stream without transcoding
-    const shouldTranscode = isDesktopWeb && !isInternalTranscoder && (
+    // STRICT: Native MP4 files and mobile/TV devices ALWAYS stream direct without transcoding.
+    // Transcode only if explicitly requested by client or for unplayable legacy AVI containers.
+    const shouldTranscode = isDesktopWeb && !isInternalTranscoder && !isMp4 && (
       req.query.transcode === 'audio' ||
       req.query.transcode === 'video' ||
-      isAvi ||
-      isHevc
+      isAvi
     );
 
     if (shouldTranscode) {
       const seekSec = Math.max(0, parseFloat(req.query.ss) || 0);
-      console.log(`[TRANSCODE ${isAvi ? 'AVI->H264' : (isHevc ? 'HEVC->H264 (2-core)' : 'AUDIO')}] Starting transcode for [${clientIdentity.name} (${clientIdentity.ip})] doc ${docId} (${filename}) at ${seekSec}s...`);
+      const detectedTier = detectVideoQualityTier(filename, '', targetDoc);
+      const tierConcurrency = (savedSettings.pipelineBuffers && savedSettings.pipelineBuffers[detectedTier]) || DEFAULT_PIPELINE_BUFFERS[detectedTier] || 4;
+      console.log(`[TRANSCODE ${isAvi ? 'AVI->H264' : (isHevc ? 'HEVC->H264 (2-core)' : 'AUDIO')}] Starting transcode for [${clientIdentity.name} (${clientIdentity.ip})] doc ${docId} (${filename}, Tier: ${detectedTier.toUpperCase()} [${tierConcurrency}x512KB]) at ${seekSec}s...`);
 
       let mediaDetails = { audioMapSpecifier: '0:a:0', videoCodec: '', isHevc: false, isLegacyVideo: false };
       try {
@@ -5477,7 +5485,7 @@ app.get('/stream/:docId', async (req, res) => {
         '-probesize', '1000000',
         '-analyzeduration', '1000000',
         '-fflags', '+nobuffer+flush_packets',
-        '-i', `http://127.0.0.1:${INTERNAL_HTTP_PORT}/stream/${docId}?direct=1`,
+        '-i', `http://127.0.0.1:${INTERNAL_HTTP_PORT}/stream/${docId}?direct=1&concurrency=${tierConcurrency}`,
         '-map', '0:v:0',
         '-map', audioMapSpecifier,
         ...videoArgs,
@@ -5516,7 +5524,10 @@ app.get('/stream/:docId', async (req, res) => {
         clientName: clientIdentity.name,
         docId,
         filename,
-        mode: '1080p Transcode (Stereo AAC)',
+        qualityTier: detectedTier,
+        concurrency: tierConcurrency,
+        isPrefetchOverlapped: savedSettings.overlapPrefetch !== false,
+        mode: `${detectedTier.toUpperCase()} Transcode (${mediaDetails.isHevc || isHevc ? 'HEVC->H264' : 'Stereo AAC'})`,
         createdAt: activeStreams.get(streamSessionKey)?.createdAt || Date.now(),
         lastActive: Date.now(),
         isSocketOpen: true,
