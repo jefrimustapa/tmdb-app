@@ -970,12 +970,18 @@ app.get(['/auth', '/msm/auth'], (req, res) => {
     </div>
 
     <!-- Navigation Tabs -->
-    <div class="flex items-center justify-center gap-2 pb-1">
-      <a href="/auth" class="px-3 py-1 rounded-lg text-xs font-semibold text-sky-400 bg-sky-500/10 border border-sky-500/20">
-        🔑 Auth Portal
+    <div class="flex items-center justify-center gap-1.5 pb-1 flex-wrap">
+      <a href="/msm" class="px-2.5 py-1 rounded-lg text-xs font-semibold text-slate-400 hover:text-white bg-slate-800/60 border border-slate-700/60 transition flex items-center gap-1">
+        🏠 Dashboard
       </a>
-      <a href="/logs" class="px-3 py-1 rounded-lg text-xs font-semibold text-slate-400 hover:text-white bg-slate-800/60 border border-slate-700/60 transition">
-        📄 Live Logs
+      <a href="/msm/settings" class="px-2.5 py-1 rounded-lg text-xs font-semibold text-slate-400 hover:text-white bg-slate-800/60 border border-slate-700/60 transition flex items-center gap-1">
+        ⚙️ Settings
+      </a>
+      <a href="/msm/logs" class="px-2.5 py-1 rounded-lg text-xs font-semibold text-slate-400 hover:text-white bg-slate-800/60 border border-slate-700/60 transition flex items-center gap-1">
+        📜 Logs
+      </a>
+      <a href="/msm/auth" class="px-2.5 py-1 rounded-lg text-xs font-semibold text-sky-400 bg-sky-500/10 border border-sky-500/20 flex items-center gap-1">
+        🔑 Auth
       </a>
     </div>
 
@@ -1803,12 +1809,18 @@ app.get(['/logs', '/msm/logs'], (req, res) => {
     </div>
     
     <!-- Navigation Tabs -->
-    <nav class="flex items-center gap-2">
-      <a href="/auth" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800/80 transition">
-        🔑 Auth Portal
+    <nav class="flex items-center gap-2 flex-wrap">
+      <a href="/msm" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800/80 transition flex items-center gap-1">
+        🏠 Dashboard
       </a>
-      <a href="/logs" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-sky-400 bg-sky-500/10 border border-sky-500/20 transition">
-        📄 Live Logs
+      <a href="/msm/settings" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800/80 transition flex items-center gap-1">
+        ⚙️ Settings
+      </a>
+      <a href="/msm/logs" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-sky-400 bg-sky-500/10 border border-sky-500/20 transition flex items-center gap-1">
+        📜 Logs
+      </a>
+      <a href="/msm/auth" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800/80 transition flex items-center gap-1">
+        🔑 Auth
       </a>
       <a href="/api/logs/download" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 bg-slate-800 hover:bg-slate-700 border border-slate-700 transition flex items-center gap-1.5">
         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
@@ -2294,8 +2306,10 @@ app.post(['/api/settings', '/msm/api/settings'], (req, res) => {
   }
 });
 
-// Web Settings Page GUI (Served at /, /msm, /setting, /settings, /msm/setting, /msm/settings)
-app.get(['/', '/msm', '/setting', '/settings', '/msm/setting', '/msm/settings'], (req, res) => {
+// -------------------------------------------------------------
+// Dedicated Web Dashboard (Served at /, /msm, /dashboard, /msm/dashboard)
+// -------------------------------------------------------------
+app.get(['/', '/msm', '/dashboard', '/msm/dashboard'], (req, res) => {
   res.set({
     'Cache-Control': 'no-cache, no-store, must-revalidate',
     'Pragma': 'no-cache',
@@ -2306,7 +2320,215 @@ app.get(['/', '/msm', '/setting', '/settings', '/msm/setting', '/msm/settings'],
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>MSM Getter — Settings & Control Center</title>
+  <title>MSM Getter — Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { background-color: #0B0F17; color: #E2E8F0; font-family: ui-sans-serif, system-ui, sans-serif; }
+    .glow-box { box-shadow: 0 0 25px rgba(56, 189, 248, 0.08); }
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: #0B0F17; }
+    ::-webkit-scrollbar-thumb { background: #1E293B; border-radius: 4px; }
+  </style>
+</head>
+<body class="min-h-screen p-4 sm:p-8 flex flex-col items-center">
+  <div class="max-w-5xl w-full space-y-6">
+    <!-- Navigation Bar -->
+    <header class="flex flex-col sm:flex-row items-center justify-between bg-slate-900 border border-slate-800 rounded-2xl px-6 py-4 glow-box gap-4">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-sky-500/10 text-sky-400 border border-sky-500/20 flex items-center justify-center font-bold text-lg">
+          🎬
+        </div>
+        <div>
+          <h1 class="text-lg font-bold text-white flex items-center gap-2">
+            MSM Dashboard
+            <span id="botBadge" class="text-xs px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-300 border border-sky-500/30 font-mono">@${BOT_USERNAME}</span>
+          </h1>
+          <p class="text-xs text-slate-400">Telegram MTProto Cloud Streaming Gateway</p>
+        </div>
+      </div>
+      <nav class="flex items-center gap-2 flex-wrap">
+        <a href="/msm" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-sky-400 bg-sky-500/10 border border-sky-500/30 flex items-center gap-1">
+          🏠 Dashboard
+        </a>
+        <a href="/msm/settings" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800 transition flex items-center gap-1">
+          ⚙️ Settings
+        </a>
+        <a href="/msm/logs" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800 transition flex items-center gap-1">
+          📜 Logs
+        </a>
+        <a href="/msm/auth" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800 transition flex items-center gap-1">
+          🔑 Auth
+        </a>
+      </nav>
+    </header>
+
+    <!-- Key Metrics Grid -->
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div class="bg-slate-900 border border-slate-800/80 rounded-2xl p-4 glow-box">
+        <span class="text-xs text-slate-400 font-medium">Telegram Status</span>
+        <div class="flex items-center gap-2 mt-1.5">
+          <span id="statusDot" class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+          <p id="statConn" class="text-sm font-semibold text-white">Connected</p>
+        </div>
+      </div>
+      <div class="bg-slate-900 border border-slate-800/80 rounded-2xl p-4 glow-box">
+        <span class="text-xs text-slate-400 font-medium">Server Uptime</span>
+        <p id="statUptime" class="text-lg font-bold text-white mt-1">--</p>
+      </div>
+      <div class="bg-slate-900 border border-slate-800/80 rounded-2xl p-4 glow-box">
+        <span class="text-xs text-slate-400 font-medium">Memory Usage (RSS)</span>
+        <p id="statMem" class="text-lg font-bold text-white mt-1">--</p>
+      </div>
+      <div class="bg-slate-900 border border-slate-800/80 rounded-2xl p-4 glow-box">
+        <span class="text-xs text-slate-400 font-medium">Streams in Central Cache</span>
+        <p id="statCache" class="text-lg font-bold text-sky-400 mt-1">--</p>
+      </div>
+    </div>
+
+    <!-- Quick Navigation Hub -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <a href="/msm/settings" class="bg-slate-900 hover:bg-slate-800/90 border border-slate-800 rounded-2xl p-5 space-y-2 transition group block">
+        <div class="w-9 h-9 rounded-xl bg-purple-500/10 text-purple-400 border border-purple-500/20 flex items-center justify-center text-lg">
+          ⚙️
+        </div>
+        <h3 class="text-sm font-bold text-white group-hover:text-sky-400 transition">Server Settings</h3>
+        <p class="text-xs text-slate-400">Configure target bot handle (@msm34bot), clear central cache, and manage server timeouts.</p>
+        <span class="text-xs text-sky-400 font-semibold inline-block pt-1">Open Settings →</span>
+      </a>
+
+      <a href="/msm/logs" class="bg-slate-900 hover:bg-slate-800/90 border border-slate-800 rounded-2xl p-5 space-y-2 transition group block">
+        <div class="w-9 h-9 rounded-xl bg-sky-500/10 text-sky-400 border border-sky-500/20 flex items-center justify-center text-lg">
+          📜
+        </div>
+        <h3 class="text-sm font-bold text-white group-hover:text-sky-400 transition">Live Logs & Cache Viewer</h3>
+        <p class="text-xs text-slate-400">Inspect real-time resolution logs, diagnose query matching, and explore all 200+ cached stream records.</p>
+        <span class="text-xs text-sky-400 font-semibold inline-block pt-1">View Logs →</span>
+      </a>
+
+      <a href="/msm/auth" class="bg-slate-900 hover:bg-slate-800/90 border border-slate-800 rounded-2xl p-5 space-y-2 transition group block">
+        <div class="w-9 h-9 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20 flex items-center justify-center text-lg">
+          🔑
+        </div>
+        <h3 class="text-sm font-bold text-white group-hover:text-sky-400 transition">Telegram Auth Portal</h3>
+        <p class="text-xs text-slate-400">Authenticate or update your Telegram phone number session string with 2FA OTP code.</p>
+        <span class="text-xs text-sky-400 font-semibold inline-block pt-1">Open Auth Portal →</span>
+      </a>
+    </div>
+
+    <!-- Live Query Diagnostic Sandbox -->
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
+      <div class="flex items-center justify-between">
+        <h2 class="text-sm font-bold text-white flex items-center gap-2">
+          🔍 Live Bot Query Diagnostic Sandbox
+        </h2>
+        <span class="text-xs text-slate-400">Targeting @${BOT_USERNAME}</span>
+      </div>
+      <p class="text-xs text-slate-400">Test live query extraction and view raw candidate buttons directly from the active Telegram bot.</p>
+      <div class="flex gap-2">
+        <input id="diagInput" type="text" value="Kudrat 1968" placeholder="Title (e.g. Spider-Man, Carrie)..." class="flex-1 px-3.5 py-2 bg-slate-950 border border-slate-800 rounded-xl text-sm text-white focus:outline-none focus:border-sky-500/50" />
+        <button id="diagBtn" onclick="runDiagnostic()" class="px-5 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs rounded-xl transition">
+          Test Query
+        </button>
+      </div>
+      <div id="diagResults" class="hidden space-y-2 max-h-56 overflow-y-auto text-xs bg-slate-950 p-3 rounded-xl border border-slate-800">
+      </div>
+    </div>
+  </div>
+
+  <script>
+    async function loadStats() {
+      try {
+        const [sysRes, healthRes] = await Promise.all([
+          fetch('/api/system/stats').then(r => r.json()),
+          fetch('/health').then(r => r.json())
+        ]);
+        
+        if (healthRes.uptime) {
+          const u = Math.floor(healthRes.uptime);
+          const d = Math.floor(u / 86400);
+          const h = Math.floor((u % 86400) / 3600);
+          const m = Math.floor((u % 3600) / 60);
+          document.getElementById('statUptime').textContent = d > 0 ? \`\${d}d \${h}h \${m}m\` : \`\${h}h \${m}m\`;
+        }
+        
+        if (sysRes.stats) {
+          document.getElementById('statMem').textContent = (sysRes.stats.memoryRSS || 0) + ' MB';
+        }
+        document.getElementById('statCache').textContent = healthRes.cachedStreams || 0;
+
+        const statConn = document.getElementById('statConn');
+        const dot = document.getElementById('statusDot');
+        if (healthRes.isConnected) {
+          statConn.textContent = 'Connected (MTProto)';
+          statConn.className = 'text-sm font-semibold text-emerald-400';
+          dot.className = 'w-2.5 h-2.5 rounded-full bg-emerald-400';
+        } else {
+          statConn.textContent = 'Disconnected';
+          statConn.className = 'text-sm font-semibold text-rose-400';
+          dot.className = 'w-2.5 h-2.5 rounded-full bg-rose-400';
+        }
+      } catch (err) {
+        console.warn('Failed to load stats:', err);
+      }
+    }
+
+    async function runDiagnostic() {
+      const query = document.getElementById('diagInput').value.trim();
+      if (!query) return;
+      const btn = document.getElementById('diagBtn');
+      const box = document.getElementById('diagResults');
+      btn.disabled = true;
+      btn.textContent = 'Querying...';
+      box.classList.remove('hidden');
+      box.innerHTML = '<span class="text-slate-400">Querying @' + '${BOT_USERNAME}' + '...</span>';
+
+      try {
+        const res = await fetch('/api/debug-search?q=' + encodeURIComponent(query));
+        const data = await res.json();
+        if (data.success && data.buttons) {
+          box.innerHTML = '<div class="text-slate-300 font-semibold mb-2">Found ' + data.buttons.length + ' buttons for "' + query + '":</div>' +
+            data.buttons.map(b => 
+              '<div class="p-2.5 rounded-xl bg-slate-900 border border-slate-800">' +
+                '<div class="text-white font-medium truncate">' + b.text + '</div>' +
+                '<div class="text-[10px] text-slate-500 flex gap-2 mt-1">' +
+                  '<span class="text-sky-400 font-mono">' + b.className + '</span>' +
+                  (b.url ? '<span class="truncate max-w-sm text-slate-400">' + b.url + '</span>' : '') +
+                '</div>' +
+              '</div>'
+            ).join('');
+        } else {
+          box.innerHTML = '<span class="text-rose-400">No buttons found or error: ' + (data.error || 'Empty') + '</span>';
+        }
+      } catch (e) {
+        box.innerHTML = '<span class="text-rose-400">Query failed: ' + e.message + '</span>';
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Test Query';
+      }
+    }
+
+    loadStats();
+    setInterval(loadStats, 5000);
+  </script>
+</body>
+</html>`);
+});
+
+// -------------------------------------------------------------
+// Dedicated Web Settings Page (Served at /setting, /settings, /msm/setting, /msm/settings)
+// -------------------------------------------------------------
+app.get(['/setting', '/settings', '/msm/setting', '/msm/settings'], (req, res) => {
+  res.set({
+    'Cache-Control': 'no-cache, no-store, must-revalidate',
+    'Pragma': 'no-cache',
+    'Expires': '0',
+  });
+  res.send(`<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MSM Getter — Settings</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     body { background-color: #0B0F17; color: #E2E8F0; font-family: ui-sans-serif, system-ui, sans-serif; }
@@ -2318,28 +2540,36 @@ app.get(['/', '/msm', '/setting', '/settings', '/msm/setting', '/msm/settings'],
 </head>
 <body class="min-h-screen p-4 sm:p-8 flex flex-col items-center">
   <div class="max-w-4xl w-full space-y-6">
-    <!-- Navigation Bar -->
+    <!-- Header with Back to Dashboard Link -->
     <header class="flex flex-col sm:flex-row items-center justify-between bg-slate-900 border border-slate-800 rounded-2xl px-6 py-4 glow-box gap-4">
       <div class="flex items-center gap-3">
-        <div class="w-10 h-10 rounded-xl bg-sky-500/10 text-sky-400 border border-sky-500/20 flex items-center justify-center font-bold text-lg">
-          🎬
-        </div>
+        <a href="/msm" class="w-10 h-10 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 flex items-center justify-center font-bold transition" title="Back to Dashboard">
+          ←
+        </a>
         <div>
           <h1 class="text-lg font-bold text-white flex items-center gap-2">
-            MSM Control Center
-            <span id="botBadge" class="text-xs px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-300 border border-sky-500/30 font-mono">@${BOT_USERNAME}</span>
+            MSM Settings & Configuration
           </h1>
-          <p class="text-xs text-slate-400">Telegram MTProto Streaming Microservice</p>
+          <p class="text-xs text-slate-400">Manage Telegram bot target, caching, and server controls</p>
         </div>
       </div>
-      <nav class="flex items-center gap-2">
-        <a href="/msm/auth" class="px-3.5 py-1.5 rounded-lg text-xs font-medium text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800 transition">🔐 Auth</a>
-        <a href="/msm/logs" class="px-3.5 py-1.5 rounded-lg text-xs font-medium text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800 transition">📜 Logs</a>
-        <a href="/msm/settings" class="px-3.5 py-1.5 rounded-lg text-xs font-medium text-sky-400 bg-sky-500/10 border border-sky-500/30 font-semibold">⚙️ Settings</a>
+      <nav class="flex items-center gap-2 flex-wrap">
+        <a href="/msm" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800 transition flex items-center gap-1">
+          🏠 Dashboard
+        </a>
+        <a href="/msm/settings" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-sky-400 bg-sky-500/10 border border-sky-500/30 flex items-center gap-1">
+          ⚙️ Settings
+        </a>
+        <a href="/msm/logs" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800 transition flex items-center gap-1">
+          📜 Logs
+        </a>
+        <a href="/msm/auth" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800 transition flex items-center gap-1">
+          🔑 Auth
+        </a>
       </nav>
     </header>
 
-    <!-- Main Settings Grid -->
+    <!-- Main Settings Form Grid -->
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
       
       <!-- Card 1: Target Bot Configuration -->
@@ -2348,7 +2578,7 @@ app.get(['/', '/msm', '/setting', '/settings', '/msm/setting', '/msm/settings'],
           <h2 class="text-sm font-semibold text-white flex items-center gap-2">
             🤖 Target Telegram Bot
           </h2>
-          <span id="connStatusPill" class="text-xs px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700">Checking...</span>
+          <span id="botStatusPill" class="text-xs px-2.5 py-0.5 rounded-full bg-sky-500/20 text-sky-300 border border-sky-500/30 font-mono">@${BOT_USERNAME}</span>
         </div>
         <p class="text-xs text-slate-400">Specify which MSM Telegram bot handle the resolver queries for streaming media.</p>
         
@@ -2376,103 +2606,69 @@ app.get(['/', '/msm', '/setting', '/settings', '/msm/setting', '/msm/settings'],
         </div>
       </div>
 
-      <!-- Card 2: Server Hardware & Health -->
-      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
-        <h2 class="text-sm font-semibold text-white flex items-center gap-2">
-          ⚡ System & Health Status
-        </h2>
-        <div class="grid grid-cols-2 gap-3 text-xs">
-          <div class="bg-slate-950/70 p-3 rounded-xl border border-slate-800/80">
-            <span class="text-slate-400">Uptime</span>
-            <p id="statUptime" class="text-sm font-semibold text-white mt-1">--</p>
-          </div>
-          <div class="bg-slate-950/70 p-3 rounded-xl border border-slate-800/80">
-            <span class="text-slate-400">Memory RSS</span>
-            <p id="statMem" class="text-sm font-semibold text-white mt-1">--</p>
-          </div>
-          <div class="bg-slate-950/70 p-3 rounded-xl border border-slate-800/80">
-            <span class="text-slate-400">Active Streams</span>
-            <p id="statActive" class="text-sm font-semibold text-white mt-1">--</p>
-          </div>
-          <div class="bg-slate-950/70 p-3 rounded-xl border border-slate-800/80">
-            <span class="text-slate-400">Cached Streams</span>
-            <p id="statCache" class="text-sm font-semibold text-white mt-1">--</p>
-          </div>
-        </div>
-        <div class="pt-2 flex items-center justify-between text-xs">
-          <a href="/msm/health" target="_blank" class="text-sky-400 hover:underline">View raw /msm/health JSON →</a>
-          <button onclick="loadStats()" class="text-slate-400 hover:text-white">Refresh ⟳</button>
-        </div>
-      </div>
-
-      <!-- Card 3: Stream Cache Management -->
+      <!-- Card 2: Stream Cache Management -->
       <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
         <h2 class="text-sm font-semibold text-white flex items-center gap-2">
           💾 Stream Cache Storage
         </h2>
-        <p class="text-xs text-slate-400">Streams resolved from Telegram are permanently mapped in <code class="text-slate-300">streams.json</code> for zero-delay instant playback.</p>
+        <p class="text-xs text-slate-400">Central database mapping cached video stream documents in <code class="text-slate-300">streams.json</code>.</p>
+        <div class="space-y-3">
+          <div class="flex gap-3">
+            <a href="/msm/logs#cachePanel" class="flex-1 text-center py-2 bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-white rounded-xl transition">
+              Browse Cached Videos
+            </a>
+            <button onclick="clearCache()" class="px-4 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 text-xs font-semibold rounded-xl transition">
+              Clear All Cache
+            </button>
+          </div>
+          <div class="pt-2 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-400">
+            <span>Total stored items:</span>
+            <span id="cacheCount" class="font-bold text-white">--</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 3: Log File Maintenance -->
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
+        <h2 class="text-sm font-semibold text-white flex items-center gap-2">
+          📜 Server Log Controls
+        </h2>
+        <p class="text-xs text-slate-400">Manage server stdout/stderr diagnostic log files on RAM disk.</p>
         <div class="flex gap-3">
-          <a href="/msm/logs#cachePanel" class="flex-1 text-center py-2 bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-white rounded-xl transition">
-            Browse Cached Videos
+          <a href="/api/logs/download" class="flex-1 text-center py-2 bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-white rounded-xl transition">
+            Download Log File
           </a>
-          <button onclick="clearCache()" class="px-4 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 text-xs font-semibold rounded-xl transition">
-            Clear Cache
+          <button onclick="clearLogs()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-rose-400 text-xs font-semibold rounded-xl transition">
+            Truncate / Clear Log
           </button>
         </div>
       </div>
 
-      <!-- Card 4: Live Query Diagnostic Sandbox -->
+      <!-- Card 4: Session & Telegram Gateway -->
       <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
         <h2 class="text-sm font-semibold text-white flex items-center gap-2">
-          🔍 Live Bot Query Sandbox
+          🔑 MTProto Telegram Session
         </h2>
-        <p class="text-xs text-slate-400">Test live button extraction from the active Telegram bot without playing.</p>
-        <div class="flex gap-2">
-          <input id="diagInput" type="text" value="Kudrat 1968" placeholder="Title (e.g. Spider-Man)..." class="flex-1 px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-sm text-white focus:outline-none focus:border-sky-500/50" />
-          <button id="diagBtn" onclick="runDiagnostic()" class="px-4 py-1.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold text-xs rounded-xl transition">
-            Test
-          </button>
-        </div>
-        <div id="diagResults" class="hidden space-y-2 max-h-48 overflow-y-auto text-xs bg-slate-950 p-3 rounded-xl border border-slate-800">
-        </div>
+        <p class="text-xs text-slate-400">Need to re-login with a new phone number or update credentials?</p>
+        <a href="/msm/auth" class="block text-center py-2 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 text-xs font-semibold rounded-xl transition">
+          Open Telegram Phone Auth Portal →
+        </a>
       </div>
 
     </div>
   </div>
 
   <script>
-    async function loadStats() {
+    async function loadSettingsData() {
       try {
-        const [sysRes, healthRes] = await Promise.all([
-          fetch('/api/system/stats').then(r => r.json()),
-          fetch('/health').then(r => r.json())
-        ]);
-        
-        if (healthRes.uptime) {
-          const u = Math.floor(healthRes.uptime);
-          const d = Math.floor(u / 86400);
-          const h = Math.floor((u % 86400) / 3600);
-          const m = Math.floor((u % 3600) / 60);
-          document.getElementById('statUptime').textContent = d > 0 ? \`\${d}d \${h}h \${m}m\` : \`\${h}h \${m}m\`;
+        const res = await fetch('/api/settings').then(r => r.json());
+        if (res.cachedStreams !== undefined) {
+          document.getElementById('cacheCount').textContent = res.cachedStreams + ' videos';
         }
-        
-        if (sysRes.stats) {
-          document.getElementById('statMem').textContent = (sysRes.stats.memoryRSS || 0) + ' MB';
-          document.getElementById('statActive').textContent = sysRes.stats.activeStreams || 0;
+        if (res.targetBotUsername) {
+          document.getElementById('botStatusPill').textContent = '@' + res.targetBotUsername;
         }
-        document.getElementById('statCache').textContent = healthRes.cachedStreams || 0;
-
-        const pill = document.getElementById('connStatusPill');
-        if (healthRes.isConnected) {
-          pill.className = 'text-xs px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30';
-          pill.textContent = '● Connected';
-        } else {
-          pill.className = 'text-xs px-2.5 py-0.5 rounded-full bg-rose-500/20 text-rose-400 border border-rose-500/30';
-          pill.textContent = '○ Disconnected';
-        }
-      } catch (err) {
-        console.warn('Failed to load stats:', err);
-      }
+      } catch (e) {}
     }
 
     async function saveBot() {
@@ -2492,7 +2688,7 @@ app.get(['/', '/msm', '/setting', '/settings', '/msm/setting', '/msm/settings'],
         });
         const data = await res.json();
         if (data.success) {
-          document.getElementById('botBadge').textContent = '@' + data.targetBotUsername;
+          document.getElementById('botStatusPill').textContent = '@' + data.targetBotUsername;
           const msg = document.getElementById('saveMsg');
           msg.classList.remove('hidden');
           setTimeout(() => msg.classList.add('hidden'), 3000);
@@ -2511,54 +2707,29 @@ app.get(['/', '/msm', '/setting', '/settings', '/msm/setting', '/msm/settings'],
     }
 
     async function clearCache() {
-      if (!confirm('Are you sure you want to clear the central streams cache?')) return;
+      if (!confirm('Are you sure you want to clear the entire stream cache?')) return;
       try {
         const res = await fetch('/api/cache/clear', { method: 'POST' });
         const d = await res.json();
         alert(d.message || 'Cache cleared');
-        loadStats();
+        loadSettingsData();
       } catch (e) {
         alert('Failed to clear cache: ' + e.message);
       }
     }
 
-    async function runDiagnostic() {
-      const query = document.getElementById('diagInput').value.trim();
-      if (!query) return;
-      const btn = document.getElementById('diagBtn');
-      const box = document.getElementById('diagResults');
-      btn.disabled = true;
-      btn.textContent = 'Querying...';
-      box.classList.remove('hidden');
-      box.innerHTML = '<span class="text-slate-400">Querying @' + document.getElementById('botInput').value.trim() + '...</span>';
-
+    async function clearLogs() {
+      if (!confirm('Are you sure you want to truncate the log file?')) return;
       try {
-        const res = await fetch('/api/debug-search?q=' + encodeURIComponent(query));
-        const data = await res.json();
-        if (data.success && data.buttons) {
-          box.innerHTML = '<div class="text-slate-300 font-semibold mb-2">Found ' + data.buttons.length + ' buttons for "' + query + '":</div>' +
-            data.buttons.map(b => 
-              '<div class="p-2 rounded bg-slate-900 border border-slate-800">' +
-                '<div class="text-white font-medium truncate">' + b.text + '</div>' +
-                '<div class="text-[10px] text-slate-500 flex gap-2 mt-1">' +
-                  '<span class="text-sky-400">' + b.className + '</span>' +
-                  (b.url ? '<span class="truncate max-w-xs text-slate-400">' + b.url + '</span>' : '') +
-                '</div>' +
-              '</div>'
-            ).join('');
-        } else {
-          box.innerHTML = '<span class="text-rose-400">No buttons found or error: ' + (data.error || 'Empty') + '</span>';
-        }
+        const res = await fetch('/api/logs/clear', { method: 'POST' });
+        const d = await res.json();
+        alert(d.message || 'Log cleared');
       } catch (e) {
-        box.innerHTML = '<span class="text-rose-400">Query failed: ' + e.message + '</span>';
-      } finally {
-        btn.disabled = false;
-        btn.textContent = 'Test';
+        alert('Failed to clear logs: ' + e.message);
       }
     }
 
-    loadStats();
-    setInterval(loadStats, 5000);
+    loadSettingsData();
   </script>
 </body>
 </html>`);
