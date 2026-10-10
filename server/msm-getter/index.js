@@ -5406,7 +5406,9 @@ app.get('/stream/:docId', async (req, res) => {
 
     if (shouldTranscode) {
       const seekSec = Math.max(0, parseFloat(req.query.ss) || 0);
-      console.log(`[TRANSCODE ${isAvi ? 'AVI->H264' : (isHevc ? 'HEVC->H264 (2-core)' : 'AUDIO')}] Starting transcode for [${clientIdentity.name} (${clientIdentity.ip})] doc ${docId} (${filename}) at ${seekSec}s...`);
+      const detectedTier = detectVideoQualityTier(filename, '', targetDoc);
+      const tierConcurrency = (savedSettings.pipelineBuffers && savedSettings.pipelineBuffers[detectedTier]) || DEFAULT_PIPELINE_BUFFERS[detectedTier] || 4;
+      console.log(`[TRANSCODE ${isAvi ? 'AVI->H264' : (isHevc ? 'HEVC->H264 (2-core)' : 'AUDIO')}] Starting transcode for [${clientIdentity.name} (${clientIdentity.ip})] doc ${docId} (${filename}, Tier: ${detectedTier.toUpperCase()} [${tierConcurrency}x512KB]) at ${seekSec}s...`);
 
       let mediaDetails = { audioMapSpecifier: '0:a:0', videoCodec: '', isHevc: false, isLegacyVideo: false };
       try {
@@ -5477,7 +5479,7 @@ app.get('/stream/:docId', async (req, res) => {
         '-probesize', '1000000',
         '-analyzeduration', '1000000',
         '-fflags', '+nobuffer+flush_packets',
-        '-i', `http://127.0.0.1:${INTERNAL_HTTP_PORT}/stream/${docId}?direct=1`,
+        '-i', `http://127.0.0.1:${INTERNAL_HTTP_PORT}/stream/${docId}?direct=1&concurrency=${tierConcurrency}`,
         '-map', '0:v:0',
         '-map', audioMapSpecifier,
         ...videoArgs,
@@ -5516,7 +5518,10 @@ app.get('/stream/:docId', async (req, res) => {
         clientName: clientIdentity.name,
         docId,
         filename,
-        mode: '1080p Transcode (Stereo AAC)',
+        qualityTier: detectedTier,
+        concurrency: tierConcurrency,
+        isPrefetchOverlapped: savedSettings.overlapPrefetch !== false,
+        mode: `${detectedTier.toUpperCase()} Transcode (${mediaDetails.isHevc || isHevc ? 'HEVC->H264' : 'Stereo AAC'})`,
         createdAt: activeStreams.get(streamSessionKey)?.createdAt || Date.now(),
         lastActive: Date.now(),
         isSocketOpen: true,
