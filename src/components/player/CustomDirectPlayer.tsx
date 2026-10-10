@@ -123,6 +123,7 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
   const suppressNextClickRef = useRef(false);
   const isSeekingRef = useRef(false);
   const seekSettleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const seekGenerationRef = useRef(0);
 
   const clearLongPress = useCallback(() => {
     if (longPressTimerRef.current) {
@@ -443,14 +444,17 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
       isSeekingRef.current = false;
       targetSeekTimeRef.current = null;
 
-      let isCurrentSeek = true;
+      seekGenerationRef.current += 1;
+      const currentSeekGen = seekGenerationRef.current;
+      const isCurrentSeek = () => currentSeekGen === seekGenerationRef.current;
+
       const triggerPlayAfterLoad = () => {
-        if (!isCurrentSeek || !video) return;
+        if (!isCurrentSeek() || !video) return;
         video.muted = false;
         video.volume = 1;
         setIsMuted(false);
         video.play().then(() => {
-          if (!isCurrentSeek) return;
+          if (!isCurrentSeek()) return;
           setIsPlaying(true);
           isPlayingRef.current = true;
           setIsBuffering(false);
@@ -461,7 +465,7 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
             seekWatchdogTimerRef.current = null;
           }
         }).catch((err) => {
-          if (!isCurrentSeek) return;
+          if (!isCurrentSeek()) return;
           console.warn('[CustomDirectPlayer] Play after seek error:', err);
           setIsBuffering(false);
           isSeekingRef.current = false;
@@ -492,7 +496,7 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
         const onLoaded = () => {
           video.removeEventListener('loadeddata', onLoaded);
           video.removeEventListener('canplay', onLoaded);
-          if (!isCurrentSeek) return;
+          if (!isCurrentSeek()) return;
           setIsBuffering(false);
           isSeekingRef.current = false;
           targetSeekTimeRef.current = null;
@@ -503,7 +507,7 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
 
       // 25s seek watchdog for remote Telegram transcode negotiation
       seekWatchdogTimerRef.current = setTimeout(() => {
-        if (isCurrentSeek) {
+        if (isCurrentSeek()) {
           console.warn('[CustomDirectPlayer] Seek response took > 25s, clearing buffering state');
           setIsBuffering(false);
           isSeekingRef.current = false;

@@ -5402,19 +5402,22 @@ app.get('/stream/:docId', async (req, res) => {
       return res.redirect(307, `${req.url}${sep}transcode=audio&vcodec=h264`);
     }
 
-    // STRICT: Native MP4 files and mobile/TV devices ALWAYS stream direct without transcoding.
-    // Transcode only if explicitly requested by client or for unplayable legacy AVI containers.
-    const shouldTranscode = isDesktopWeb && !isInternalTranscoder && !isMp4 && (
-      req.query.transcode === 'audio' ||
-      req.query.transcode === 'video' ||
-      isAvi
+    // Audio transcode is lightweight (-c:v copy -c:a aac, 0% video CPU) and required for WebView/mobile clients to hear EAC3/AC3 5.1 surround sound.
+    // Video transcode (libx264) is only enabled for legacy AVI containers on desktop web or when explicitly requested (?transcode=video or ?vcodec=h264).
+    const isAudioTranscodeRequested = req.query.transcode === 'audio';
+    const isVideoTranscodeRequested = req.query.transcode === 'video';
+    const isLegacyAviTranscode = isAvi && !isMp4 && isDesktopWeb;
+
+    const shouldTranscode = !isInternalTranscoder && (
+      isAudioTranscodeRequested ||
+      isVideoTranscodeRequested ||
+      isLegacyAviTranscode
     );
 
     if (shouldTranscode) {
       const seekSec = Math.max(0, parseFloat(req.query.ss) || 0);
       const detectedTier = detectVideoQualityTier(filename, '', targetDoc);
       const tierConcurrency = (savedSettings.pipelineBuffers && savedSettings.pipelineBuffers[detectedTier]) || DEFAULT_PIPELINE_BUFFERS[detectedTier] || 4;
-      console.log(`[TRANSCODE ${isAvi ? 'AVI->H264' : (isHevc ? 'HEVC->H264 (2-core)' : 'AUDIO')}] Starting transcode for [${clientIdentity.name} (${clientIdentity.ip})] doc ${docId} (${filename}, Tier: ${detectedTier.toUpperCase()} [${tierConcurrency}x512KB]) at ${seekSec}s...`);
 
       let mediaDetails = { audioMapSpecifier: '0:a:0', videoCodec: '', isHevc: false, isLegacyVideo: false };
       try {
@@ -5423,12 +5426,17 @@ app.get('/stream/:docId', async (req, res) => {
         mediaDetails = { audioMapSpecifier: '0:a:0', videoCodec: '', isHevc: false, isLegacyVideo: false };
       }
 
-      const isAviOrLegacyVideo = isAvi || req.query.vcodec === 'h264' || mediaDetails.isHevc || mediaDetails.isLegacyVideo || isHevc;
+      // Video transcoding (libx264) is ONLY performed when desktop web cannot decode HEVC/legacy video or explicitly asked via vcodec=h264.
+      // Mobile devices and modern clients have native hardware decoders, so video is ALWAYS stream-copied (-c:v copy, 0% CPU).
+      const needsVideoTranscode = isAvi || req.query.vcodec === 'h264' || (isDesktopWeb && (mediaDetails.isHevc || isHevc)) || mediaDetails.isLegacyVideo;
       const isMp4Source = /\.mp4$/i.test(filename);
-      // For any video needing H.264 conversion OR any MP4 source: output fragmented MP4 for 100% universal browser compatibility.
-      const useMp4Muxer = isAviOrLegacyVideo || isMp4Source;
+      // Fragmented MP4 is universally supported across Android WebView, iOS Safari, and Desktop browsers.
+      // Use fMP4 muxer whenever video is transcoded to H.264, source is MP4, or video codec is H.264.
+      const useMp4Muxer = needsVideoTranscode || isMp4Source || mediaDetails.videoCodec === 'h264';
       const outputMime = useMp4Muxer ? 'video/mp4' : 'video/x-matroska';
       const outputExt = useMp4Muxer ? 'mp4' : 'mkv';
+
+      console.log(`[TRANSCODE ${needsVideoTranscode ? (isAvi ? 'AVI->H264' : 'HEVC->H264 (2-core)') : 'AUDIO (Direct Video Copy)'}] Starting transcode for [${clientIdentity.name} (${clientIdentity.ip})] doc ${docId} (${filename}, Tier: ${detectedTier.toUpperCase()} [${tierConcurrency}x512KB]) at ${seekSec}s...`);
 
       if (req.method === 'HEAD') {
         res.writeHead(200, {
@@ -5448,11 +5456,10 @@ app.get('/stream/:docId', async (req, res) => {
       }
 
       // Video encoding strategy:
-      // For AVI / legacy video: use single-thread baseline libx264 (pinned to 1 core, 57 fps).
-      // For HEVC: use 2-core baseline libx264 (pinned to 2 cores, leaving 2 cores free for router/WiFi).
-      // For standard H.264 MKV/MP4: stream-copy 1:1 (-c:v copy, 0% CPU).
+      // For AVI / legacy video or HEVC on desktop web: use baseline libx264.
+      // For standard H.264 streams and mobile clients: stream-copy 1:1 (-c:v copy, 0% CPU).
       const videoThreadCount = (mediaDetails.isHevc || isHevc) ? '2' : '1';
-      const videoArgs = isAviOrLegacyVideo
+      const videoArgs = needsVideoTranscode
         ? [
             '-threads', videoThreadCount,
             '-c:v', 'libx264',
@@ -5473,7 +5480,7 @@ app.get('/stream/:docId', async (req, res) => {
 
       const ffmpegBin = process.env.FFMPEG_PATH || (fs.existsSync('/opt/bin/ffmpeg') ? '/opt/bin/ffmpeg' : 'ffmpeg');
       const inputSeekFlags = seekSec > 0 ? ['-ss', seekSec.toString(), '-seekable', '1'] : ['-seekable', '1'];
-      const inputDecoderThreads = (mediaDetails.isHevc || isHevc) ? ['-threads', '2'] : [];
+      const inputDecoderThreads = (needsVideoTranscode && (mediaDetails.isHevc || isHevc)) ? ['-threads', '2'] : [];
       const ffmpegArgs = [
         '-loglevel', 'error',
         ...inputDecoderThreads,
@@ -5492,7 +5499,7 @@ app.get('/stream/:docId', async (req, res) => {
         '-c:a', 'aac',
         '-ac', '2',
         '-b:a', '128k',
-        ...(isAviOrLegacyVideo ? ['-af', 'aresample=async=1:first_pts=0'] : []),
+        ...(needsVideoTranscode ? ['-af', 'aresample=async=1:first_pts=0'] : []),
         '-avoid_negative_ts', 'make_zero',
         ...muxerArgs,
         'pipe:1',
@@ -5527,7 +5534,7 @@ app.get('/stream/:docId', async (req, res) => {
         qualityTier: detectedTier,
         concurrency: tierConcurrency,
         isPrefetchOverlapped: savedSettings.overlapPrefetch !== false,
-        mode: `${detectedTier.toUpperCase()} Transcode (${mediaDetails.isHevc || isHevc ? 'HEVC->H264' : 'Stereo AAC'})`,
+        mode: `${detectedTier.toUpperCase()} Transcode (${needsVideoTranscode ? (mediaDetails.isHevc || isHevc ? 'HEVC->H264' : 'Video H264') : 'Direct Video Copy + Stereo AAC'})`,
         createdAt: activeStreams.get(streamSessionKey)?.createdAt || Date.now(),
         lastActive: Date.now(),
         isSocketOpen: true,
