@@ -2,14 +2,16 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20261010-1158';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-msm-getter-revi.20261010-1158';
+export const APP_BUILD_NUMBER = '20261010-1348';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-msm-getter-revi.20261010-1348';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
 export const APP_BRANCH = 'feat-msm-getter-revi';
-export const APP_CHANGELOG = `* refactor(client): align web logs buttons to /msm/logs across mobile and tv settings
-* feat(msm-getter): separate persistent stream cache to dedicated /msm/streams explorer page with universal navigation
+export const APP_CHANGELOG = `* refactor(client): align web console log buttons to /msm/logs across mobile and tv settings
+* feat(msm-getter): separate persistent stream cache to dedicated /msm/streams explorer page
 * feat(msm-getter): separate dashboard and settings pages with universal navigation linking
+* fix(msm-getter): route /msm to control center settings and keep /msm/auth for authentication
+* feat(msm-getter): group routes under /msm, add persistent settings API and web control center
 * fix(msm-getter): handle UrlAuthResultRequest via AcceptUrlAuth and support direct KeyboardButtonUrl
 * refactor(msm): rename msm32 to msm across server and client with backward compatibility
 * feat(msm-getter): decouple bot handle and switch target to msm34bot
@@ -19,9 +21,4 @@ export const APP_CHANGELOG = `* refactor(client): align web logs buttons to /msm
 * fix: restore msm32 resolver timeout default to 90s and set watchdog buffering timeout to 60s
 * Merge pull request #192 from jefrimustapa/refactor/msm-series-search-queries
 * refactor: optimize msm series queries and fix resolver/watchdog countdown
-* fix(msm-getter): add libuv fs compatibility shim to prevent Linux kernel segfault (#191)
-* fix(msm): auto-detect HEVC and transcode to H.264 fMP4 to eliminate black screen (#190)
-* fix: 5-minute stream idle grace period with auto-resume and status indicator (#189)
-* feat(player): separate resolver timeout (follows settings) and hardcoded 20s buffering timeout with retry/switch options (#188)
-* fix(msm-getter): prevent GramJS infinite reconnect recursion and socket exhaustion (EMFILE) (#187)
-* Merge pull request #186 from jefrimustapa/feat/msm-getter-search-improvement`;
+* fix(msm-getter): add libuv fs compatibility shim to prevent Linux kernel segfault (#191)`;

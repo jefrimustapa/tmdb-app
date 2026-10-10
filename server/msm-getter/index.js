@@ -170,7 +170,7 @@ async function initTelegram() {
 
   initPromise = (async () => {
     if (!session && !client?.session?.authKey) {
-      authError = 'No active session. Please authenticate via Web Portal at /auth.';
+      authError = 'No active session. Please authenticate via Web Portal at /msm/auth.';
       throw new Error(authError);
     }
     console.log('[TG] Connecting MTProto...');
@@ -187,7 +187,7 @@ async function initTelegram() {
       isConnected = false;
       authError = err.message;
       if (err.message && err.message.includes('AUTH_KEY_DUPLICATED')) {
-        console.error('[TG ERROR] Auth key duplicated. Re-authentication required at /auth.');
+        console.error('[TG ERROR] Auth key duplicated. Re-authentication required at /msm/auth.');
       }
       throw err;
     }
@@ -794,7 +794,7 @@ let pendingAuth = {
 // ==========================================
 
 // Auth Status Endpoint
-app.get('/api/auth/status', async (req, res) => {
+app.get(['/api/auth/status', '/msm/api/auth/status'], async (req, res) => {
   try {
     if (!isConnected || !client) {
       return res.json({
@@ -824,7 +824,7 @@ app.get('/api/auth/status', async (req, res) => {
 });
 
 // Step 1: Send Login Code to Telegram App
-app.post('/api/auth/send-code', async (req, res) => {
+app.post(['/api/auth/send-code', '/msm/api/auth/send-code'], async (req, res) => {
   const { phoneNumber } = req.body;
   if (!phoneNumber || !phoneNumber.trim()) {
     return res.status(400).json({ success: false, error: 'Phone number is required (e.g. +60123456789)' });
@@ -877,7 +877,7 @@ app.post('/api/auth/send-code', async (req, res) => {
 });
 
 // Step 2: Verify Code and Activate Session in Memory
-app.post('/api/auth/verify-code', async (req, res) => {
+app.post(['/api/auth/verify-code', '/msm/api/auth/verify-code'], async (req, res) => {
   const { phoneCode, password } = req.body;
   if (!phoneCode || !phoneCode.trim()) {
     return res.status(400).json({ success: false, error: 'Telegram login code is required' });
@@ -943,8 +943,11 @@ app.post('/api/auth/verify-code', async (req, res) => {
   }
 });
 
-// Web Authentication Portal UI (Served at /auth and /msm/auth)
-app.get(['/auth', '/msm/auth'], (req, res) => {
+// Redirect legacy /auth to /msm/auth
+app.get('/auth', (req, res) => res.redirect(301, '/msm/auth'));
+
+// Web Authentication Portal UI (Served exclusively at /msm/auth)
+app.get('/msm/auth', (req, res) => {
   res.send(`<!DOCTYPE html>
 <html lang="en" class="dark">
 <head>
@@ -1058,7 +1061,7 @@ app.get(['/auth', '/msm/auth'], (req, res) => {
   <script>
     async function checkStatus() {
       try {
-        const res = await fetch('/api/auth/status');
+        const res = await fetch('/msm/api/auth/status');
         const data = await res.json();
         const dot = document.getElementById('statusDot');
         const text = document.getElementById('statusText');
@@ -1110,7 +1113,7 @@ app.get(['/auth', '/msm/auth'], (req, res) => {
       btn.textContent = 'Sending code...';
 
       try {
-        const res = await fetch('/api/auth/send-code', {
+        const res = await fetch('/msm/api/auth/send-code', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ phoneNumber: phone })
@@ -1142,7 +1145,7 @@ app.get(['/auth', '/msm/auth'], (req, res) => {
       btn.textContent = 'Verifying with Telegram...';
 
       try {
-        const res = await fetch('/api/auth/verify-code', {
+        const res = await fetch('/msm/api/auth/verify-code', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ phoneCode: code, password })
@@ -1618,7 +1621,7 @@ app.get(['/api/system/stats', '/msm/api/system/stats'], (req, res) => {
 });
 
 // Manual Memory Purge API (Evicts chunk caches, clears client cache & runs GC)
-app.post('/api/system/purge-memory', (req, res) => {
+app.post(['/api/system/purge-memory', '/msm/api/system/purge-memory'], (req, res) => {
   purgeIdleMemory();
   const mem = process.memoryUsage();
   res.json({
@@ -1770,8 +1773,11 @@ app.post(['/api/logs/clear', '/msm/api/logs/clear'], (req, res) => {
   }
 });
 
-// Dedicated Web Log Viewer GUI
-app.get(['/logs', '/msm/logs'], (req, res) => {
+// Redirect legacy /logs to /msm/logs
+app.get('/logs', (req, res) => res.redirect(301, '/msm/logs'));
+
+// Dedicated Web Log Viewer GUI (Served exclusively at /msm/logs)
+app.get('/msm/logs', (req, res) => {
   res.set({
     'Cache-Control': 'no-cache, no-store, must-revalidate',
     'Pragma': 'no-cache',
@@ -1828,7 +1834,7 @@ app.get(['/logs', '/msm/logs'], (req, res) => {
       <a href="/msm/auth" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800/80 transition flex items-center gap-1">
         🔑 Auth
       </a>
-      <a href="/api/logs/download" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 bg-slate-800 hover:bg-slate-700 border border-slate-700 transition flex items-center gap-1.5">
+      <a href="/msm/api/logs/download" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 bg-slate-800 hover:bg-slate-700 border border-slate-700 transition flex items-center gap-1.5">
         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
         Download .log
       </a>
@@ -2011,7 +2017,7 @@ app.get(['/logs', '/msm/logs'], (req, res) => {
     async function clearServerLog() {
       if (!confirm('Are you sure you want to physically clear and truncate the log file on the router?')) return;
       try {
-        const res = await fetch('/api/logs/clear', { method: 'POST' });
+        const res = await fetch('/msm/api/logs/clear', { method: 'POST' });
         const data = await res.json();
         if (data.success) {
           rawLines = [];
@@ -2032,7 +2038,7 @@ app.get(['/logs', '/msm/logs'], (req, res) => {
     // Initial log fetch
     async function fetchInitialLogs() {
       try {
-        const res = await fetch('/api/logs?lines=300');
+        const res = await fetch('/msm/api/logs?lines=300');
         const data = await res.json();
         if (data.success && data.logs) {
           rawLines = data.logs;
@@ -2046,7 +2052,7 @@ app.get(['/logs', '/msm/logs'], (req, res) => {
     // Connect Server-Sent Events (SSE)
     function connectSSE() {
       const badge = document.getElementById('streamStatusBadge');
-      const es = new EventSource('/api/logs/stream');
+      const es = new EventSource('/msm/api/logs/stream');
       es.onopen = () => {
         badge.className = 'inline-flex items-center gap-1 text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20';
         badge.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span> Live Stream';
@@ -2068,7 +2074,7 @@ app.get(['/logs', '/msm/logs'], (req, res) => {
     // System Metrics Polling
     async function pollMetrics() {
       try {
-        const res = await fetch('/api/system/stats');
+        const res = await fetch('/msm/api/system/stats');
         const d = await res.json();
         document.getElementById('metricUptime').textContent = Math.floor(d.uptime / 3600) + 'h ' + Math.floor((d.uptime % 3600) / 60) + 'm ' + (d.uptime % 60) + 's';
 
@@ -2229,10 +2235,11 @@ app.post(['/api/settings', '/msm/api/settings'], (req, res) => {
   }
 });
 
-// -------------------------------------------------------------
-// Dedicated Web Dashboard (Served at /, /msm, /dashboard, /msm/dashboard)
-// -------------------------------------------------------------
-app.get(['/', '/msm', '/dashboard', '/msm/dashboard'], (req, res) => {
+// Redirect legacy root / and /dashboard to /msm
+app.get(['/', '/dashboard'], (req, res) => res.redirect(301, '/msm'));
+
+// Dedicated Web Dashboard (Served exclusively at /msm, /msm/dashboard)
+app.get(['/msm', '/msm/dashboard'], (req, res) => {
   res.set({
     'Cache-Control': 'no-cache, no-store, must-revalidate',
     'Pragma': 'no-cache',
@@ -2377,8 +2384,8 @@ app.get(['/', '/msm', '/dashboard', '/msm/dashboard'], (req, res) => {
     async function loadStats() {
       try {
         const [sysRes, healthRes] = await Promise.all([
-          fetch('/api/system/stats').then(r => r.json()),
-          fetch('/health').then(r => r.json())
+          fetch('/msm/api/system/stats').then(r => r.json()),
+          fetch('/msm/health').then(r => r.json())
         ]);
         
         if (healthRes.uptime) {
@@ -2421,7 +2428,7 @@ app.get(['/', '/msm', '/dashboard', '/msm/dashboard'], (req, res) => {
       box.innerHTML = '<span class="text-slate-400">Querying @' + '${BOT_USERNAME}' + '...</span>';
 
       try {
-        const res = await fetch('/api/debug-search?q=' + encodeURIComponent(query));
+        const res = await fetch('/msm/api/debug-search?q=' + encodeURIComponent(query));
         const data = await res.json();
         if (data.success && data.buttons) {
           box.innerHTML = '<div class="text-slate-300 font-semibold mb-2">Found ' + data.buttons.length + ' buttons for "' + query + '":</div>' +
@@ -2452,10 +2459,11 @@ app.get(['/', '/msm', '/dashboard', '/msm/dashboard'], (req, res) => {
 </html>`);
 });
 
-// -------------------------------------------------------------
-// Dedicated Persistent Stream Cache Page (Served at /streams, /cache, /msm/streams, /msm/cache)
-// -------------------------------------------------------------
-app.get(['/streams', '/cache', '/msm/streams', '/msm/cache'], (req, res) => {
+// Redirect legacy /streams and /cache to /msm/streams
+app.get(['/streams', '/cache'], (req, res) => res.redirect(301, '/msm/streams'));
+
+// Dedicated Persistent Stream Cache Page (Served exclusively at /msm/streams, /msm/cache)
+app.get(['/msm/streams', '/msm/cache'], (req, res) => {
   res.set({
     'Cache-Control': 'no-cache, no-store, must-revalidate',
     'Pragma': 'no-cache',
@@ -2632,7 +2640,7 @@ app.get(['/streams', '/cache', '/msm/streams', '/msm/cache'], (req, res) => {
 
     async function loadStreams() {
       try {
-        const res = await fetch('/api/cache');
+        const res = await fetch('/msm/api/cache');
         const data = await res.json();
         allStreams = data.items || [];
 
@@ -2747,7 +2755,7 @@ app.get(['/streams', '/cache', '/msm/streams', '/msm/cache'], (req, res) => {
       const docId = decodeURIComponent(docIdEnc || '');
       if (!confirm('Evict from persistent cache?\\n\\n' + (title || key))) return;
       try {
-        const res = await fetch('/api/cache?key=' + encodeURIComponent(key) + '&docId=' + encodeURIComponent(docId), { method: 'DELETE' });
+        const res = await fetch('/msm/api/cache?key=' + encodeURIComponent(key) + '&docId=' + encodeURIComponent(docId), { method: 'DELETE' });
         const d = await res.json();
         if (d.success) {
           showToast('Evicted: ' + (title || key));
@@ -2763,7 +2771,7 @@ app.get(['/streams', '/cache', '/msm/streams', '/msm/cache'], (req, res) => {
     async function clearAllCache() {
       if (!confirm('DANGER: Clear ALL cached stream records from central database?\\n\\nThis will remove all ' + allStreams.length + ' video records.')) return;
       try {
-        const res = await fetch('/api/cache/clear', { method: 'POST' });
+        const res = await fetch('/msm/api/cache/clear', { method: 'POST' });
         const d = await res.json();
         showToast(d.message || 'Cache cleared');
         loadStreams();
@@ -2778,10 +2786,11 @@ app.get(['/streams', '/cache', '/msm/streams', '/msm/cache'], (req, res) => {
 </html>`);
 });
 
-// -------------------------------------------------------------
-// Dedicated Web Settings Page (Served at /setting, /settings, /msm/setting, /msm/settings)
-// -------------------------------------------------------------
-app.get(['/setting', '/settings', '/msm/setting', '/msm/settings'], (req, res) => {
+// Redirect legacy /setting and /settings to /msm/settings
+app.get(['/setting', '/settings'], (req, res) => res.redirect(301, '/msm/settings'));
+
+// Dedicated Web Settings Page (Served exclusively at /msm/setting, /msm/settings)
+app.get(['/msm/setting', '/msm/settings'], (req, res) => {
   res.set({
     'Cache-Control': 'no-cache, no-store, must-revalidate',
     'Pragma': 'no-cache',
@@ -2928,7 +2937,7 @@ app.get(['/setting', '/settings', '/msm/setting', '/msm/settings'], (req, res) =
   <script>
     async function loadSettingsData() {
       try {
-        const res = await fetch('/api/settings').then(r => r.json());
+        const res = await fetch('/msm/api/settings').then(r => r.json());
         if (res.cachedStreams !== undefined) {
           document.getElementById('cacheCount').textContent = res.cachedStreams + ' videos';
         }
@@ -2948,7 +2957,7 @@ app.get(['/setting', '/settings', '/msm/setting', '/msm/settings'], (req, res) =
       btn.textContent = 'Saving...';
       
       try {
-        const res = await fetch('/api/settings', {
+        const res = await fetch('/msm/api/settings', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ targetBotUsername: val })
@@ -2976,7 +2985,7 @@ app.get(['/setting', '/settings', '/msm/setting', '/msm/settings'], (req, res) =
     async function clearCache() {
       if (!confirm('Are you sure you want to clear the entire stream cache?')) return;
       try {
-        const res = await fetch('/api/cache/clear', { method: 'POST' });
+        const res = await fetch('/msm/api/cache/clear', { method: 'POST' });
         const d = await res.json();
         alert(d.message || 'Cache cleared');
         loadSettingsData();
@@ -2988,7 +2997,7 @@ app.get(['/setting', '/settings', '/msm/setting', '/msm/settings'], (req, res) =
     async function clearLogs() {
       if (!confirm('Are you sure you want to truncate the log file?')) return;
       try {
-        const res = await fetch('/api/logs/clear', { method: 'POST' });
+        const res = await fetch('/msm/api/logs/clear', { method: 'POST' });
         const d = await res.json();
         alert(d.message || 'Log cleared');
       } catch (e) {
@@ -5217,7 +5226,7 @@ if (isMain) {
         try {
           await initTelegram();
         } catch (err) {
-          console.warn(`[SERVER] Telegram not connected on startup (${err.message}). Web auth portal ready at /auth.`);
+          console.warn(`[SERVER] Telegram not connected on startup (${err.message}). Web auth portal ready at /msm/auth.`);
         }
       });
     } catch (sslErr) {
@@ -5230,7 +5239,7 @@ if (isMain) {
         try {
           await initTelegram();
         } catch (err) {
-          console.warn(`[SERVER] Telegram not connected on startup (${err.message}). Web auth portal ready at /auth.`);
+          console.warn(`[SERVER] Telegram not connected on startup (${err.message}). Web auth portal ready at /msm/auth.`);
         }
       });
     }
@@ -5243,7 +5252,7 @@ if (isMain) {
       try {
         await initTelegram();
       } catch (err) {
-        console.warn(`[SERVER] Telegram not connected on startup (${err.message}). Web auth portal ready at /auth.`);
+        console.warn(`[SERVER] Telegram not connected on startup (${err.message}). Web auth portal ready at /msm/auth.`);
       }
     });
   }
