@@ -3671,9 +3671,8 @@ app.get(['/api/resolve', '/msm/api/resolve'], async (req, res) => {
     const isDesktopWeb = isDesktopWebClient(req);
     const isMp4 = /\.mp4$/i.test(cached.filename || '');
     const isAvi = /\.avi$/i.test(cached.filename || '');
-    const isHevc = cached.videoCodec === 'hevc' || cached.videoCodec === 'h265' || /\b(x265|hevc|h265)\b/i.test(cached.filename || '');
-    // Only transcode legacy AVI files for desktop web. Native MP4 files and modern devices receive 100% direct native stream
-    const transcodeQuery = (isDesktopWeb && isAvi && !isMp4) ? '?transcode=audio&vcodec=h264' : '';
+    // Video transcode is disabled. All clients receive direct stream or audio-only transcode when requested.
+    const transcodeQuery = '';
     return res.json({
       success: true,
       cached: true,
@@ -3696,9 +3695,8 @@ app.get(['/api/resolve', '/msm/api/resolve'], async (req, res) => {
       const isDesktopWeb = isDesktopWebClient(req);
       const isMp4 = /\.mp4$/i.test(result.filename || '');
       const isAvi = /\.avi$/i.test(result.filename || '');
-      const isHevc = result.videoCodec === 'hevc' || result.videoCodec === 'h265' || /\b(x265|hevc|h265)\b/i.test(result.filename || '');
-      // Only transcode legacy AVI files for desktop web. Native MP4 files and modern devices receive 100% direct native stream
-      const transcodeQuery = (isDesktopWeb && isAvi && !isMp4) ? '?transcode=audio&vcodec=h264' : '';
+      // Video transcode is disabled. All clients receive direct stream or audio-only transcode when requested.
+      const transcodeQuery = '';
       return res.json({
         success: true,
         cached: true,
@@ -4516,9 +4514,8 @@ app.get(['/api/resolve', '/msm/api/resolve'], async (req, res) => {
     const isDesktopWeb = isDesktopWebClient(req);
     const isMp4 = /\.mp4$/i.test(result.filename || '');
     const isAvi = /\.avi$/i.test(result.filename || '');
-    const isHevc = result.videoCodec === 'hevc' || result.videoCodec === 'h265' || /\b(x265|hevc|h265)\b/i.test(result.filename || '');
-    // Only transcode legacy AVI files for desktop web. Native MP4 files and modern devices receive 100% direct native stream
-    const transcodeQuery = (isDesktopWeb && isAvi && !isMp4) ? '?transcode=audio&vcodec=h264' : '';
+    // Video transcode is disabled. All clients receive direct stream or audio-only transcode when requested.
+    const transcodeQuery = '';
 
     return res.json({
       success: true,
@@ -5395,23 +5392,14 @@ app.get('/stream/:docId', async (req, res) => {
     const isMp4 = /\.mp4$/i.test(filename);
     const isDesktopWeb = isDesktopWebClient(req);
 
-    // Only redirect untagged legacy AVI requests to transcode pipe for desktop web. Native MP4 files stream direct.
-    if (isAvi && !isMp4 && !isInternalTranscoder && !req.query.transcode && isDesktopWeb) {
-      const sep = req.url.includes('?') ? '&' : '?';
-      console.log(`[VIDEO TRANSCODE REDIRECT] Redirecting untagged AVI request to transcode pipe for desktop web [${clientIdentity.name} (${clientIdentity.ip})] doc ${docId}`);
-      return res.redirect(307, `${req.url}${sep}transcode=audio&vcodec=h264`);
-    }
-
     // Audio transcode is lightweight (-c:v copy -c:a aac, 0% video CPU) and required for WebView/mobile clients to hear EAC3/AC3 5.1 surround sound.
-    // Video transcode (libx264) is only enabled for legacy AVI containers on desktop web or when explicitly requested (?transcode=video or ?vcodec=h264).
+    // Video transcode (libx264) is disabled. Video is ALWAYS stream-copied (-c:v copy, 0% CPU).
     const isAudioTranscodeRequested = req.query.transcode === 'audio';
     const isVideoTranscodeRequested = req.query.transcode === 'video';
-    const isLegacyAviTranscode = isAvi && !isMp4 && isDesktopWeb;
 
     const shouldTranscode = !isInternalTranscoder && (
       isAudioTranscodeRequested ||
-      isVideoTranscodeRequested ||
-      isLegacyAviTranscode
+      isVideoTranscodeRequested
     );
 
     if (shouldTranscode) {
@@ -5426,18 +5414,16 @@ app.get('/stream/:docId', async (req, res) => {
         mediaDetails = { audioMapSpecifier: '0:a:0', videoCodec: '', isHevc: false, isLegacyVideo: false };
       }
 
-      // Video transcoding (libx264) is STRICTLY limited to desktop web PC browsers that lack HEVC hardware support or legacy AVI.
-      // Mobile devices (S25, phones, tablets, smart TVs) have native hardware decoders: video is ALWAYS stream-copied (-c:v copy, 0% CPU).
-      const isMobileDevice = !isDesktopWeb || /S25|Galaxy|Phone|Android|iOS|iPad|iPhone|SmartTV|GoogleTV|AppleTV|Roku|Tizen|Web0S/i.test(clientIdentity?.name || '');
-      const needsVideoTranscode = !isMobileDevice && (isAvi || req.query.vcodec === 'h264' || (mediaDetails.isHevc || isHevc) || mediaDetails.isLegacyVideo);
+      // Video transcoding (libx264) is 100% DISABLED across all clients. Video is ALWAYS stream-copied (-c:v copy, 0% CPU).
+      const needsVideoTranscode = false;
       const isMp4Source = /\.mp4$/i.test(filename);
       // Fragmented MP4 is universally supported across Android WebView, iOS Safari, and Desktop browsers.
       // Use fMP4 muxer whenever video is transcoded to H.264, source is MP4, or video codec is H.264.
-      const useMp4Muxer = needsVideoTranscode || isMp4Source || mediaDetails.videoCodec === 'h264';
+      const useMp4Muxer = isMp4Source || mediaDetails.videoCodec === 'h264';
       const outputMime = useMp4Muxer ? 'video/mp4' : 'video/x-matroska';
       const outputExt = useMp4Muxer ? 'mp4' : 'mkv';
 
-      console.log(`[TRANSCODE ${needsVideoTranscode ? (isAvi ? 'AVI->H264' : 'HEVC->H264 (2-core)') : 'AUDIO (Direct Video Copy)'}] Starting transcode for [${clientIdentity.name} (${clientIdentity.ip})] doc ${docId} (${filename}, Tier: ${detectedTier.toUpperCase()} [${tierConcurrency}x512KB]) at ${seekSec}s...`);
+      console.log(`[TRANSCODE AUDIO (Direct Video Copy)] Starting transcode for [${clientIdentity.name} (${clientIdentity.ip})] doc ${docId} (${filename}, Tier: ${detectedTier.toUpperCase()} [${tierConcurrency}x512KB]) at ${seekSec}s...`);
 
       if (req.method === 'HEAD') {
         res.writeHead(200, {
