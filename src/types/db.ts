@@ -95,13 +95,19 @@ export interface UserSettings {
   streamResolver: StreamResolverType; // Legacy single selection
   enabledResolvers: StreamResolverType[]; // Multi or single enabled engines (e.g. ['telegram', 'embed'])
   enginePriority?: StreamResolverType[]; // Priority order of engines (e.g. ['telegram', 'embed'])
-  enabledTelegramProviders?: string[]; // e.g. ['telegram-msm32']
-  telegramProviderCountries?: Record<string, OriginCountryCode[]>; // e.g. { 'telegram-msm32': ['MY', 'ID', 'SG'] }
-  msm32GetterUrl?: string; // e.g. 'https://www.julietmike.net:3033'
-  msm32ChunkSize?: number; // Chunk buffer slice in bytes: 262144 (256KB Eco), 524288 (512KB Standard), 1048576 (1MB Turbo)
-  msm32MaxQuality?: '720' | '1080'; // Resolution preference: '720' or '1080' (default: '1080')
-  msm32Timeout?: 60 | 90 | 120 | 150 | 180; // MSM32bot resolver request timeout in seconds (default: 90)
-  msm32BufferTimeout?: 30 | 60 | 90 | 120; // MSM32 direct stream buffering timeout in seconds (default: 60)
+  enabledTelegramProviders?: string[]; // e.g. ['telegram-msm']
+  telegramProviderCountries?: Record<string, OriginCountryCode[]>; // e.g. { 'telegram-msm': ['MY', 'ID', 'SG'] }
+  msmGetterUrl?: string; // e.g. 'https://www.julietmike.net:3033'
+  msmChunkSize?: number; // Chunk buffer slice in bytes: 262144 (256KB Eco), 524288 (512KB Standard), 1048576 (1MB Turbo)
+  msmMaxQuality?: '720' | '1080'; // Resolution preference: '720' or '1080' (default: '1080')
+  msmTimeout?: 60 | 90 | 120 | 150 | 180; // MSM bot resolver request timeout in seconds (default: 90)
+  msmBufferTimeout?: 30 | 60 | 90 | 120; // MSM direct stream buffering timeout in seconds (default: 60)
+  // Backward compatibility aliases
+  msm32GetterUrl?: string;
+  msm32ChunkSize?: number;
+  msm32MaxQuality?: '720' | '1080';
+  msm32Timeout?: 60 | 90 | 120 | 150 | 180;
+  msm32BufferTimeout?: 30 | 60 | 90 | 120;
   streamHeaderTimeout: number; // in seconds, e.g. 3, 5, 8, or 0 for always visible
   streamResolverTimeout?: number; // Provider stream resolution timeout in seconds (30, 60, 90, 180, 240, default 60s)
   streamResolverRetries?: number; // Number of retry attempts on provider failure (0-3, default 1)
