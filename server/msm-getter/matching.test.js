@@ -7,6 +7,8 @@ import {
   isBareButton,
   scoreCandidateButton,
   generateSeriesSearchQueries,
+  detectVideoQualityTier,
+  DEFAULT_PIPELINE_BUFFERS,
 } from './index.js';
 
 let passed = 0;
@@ -238,6 +240,43 @@ it('generates the adaptive 12 query patterns without episode/episod for Multi-Se
   for (const q of queries) {
     assert.ok(!/\bepisod/i.test(q), `Query "${q}" should not contain episod or episode`);
   }
+});
+
+console.log('\n8. Video Quality Detection & Pipeline Buffers (detectVideoQualityTier)');
+it('correctly detects SD tier (≤480p, 360p, 540p)', () => {
+  assert.strictEqual(detectVideoQualityTier('Series.S01E01.480p.mp4'), 'sd');
+  assert.strictEqual(detectVideoQualityTier('Movie.360p.WEBRip.mp4'), 'sd');
+  assert.strictEqual(detectVideoQualityTier('Show.540p.mp4'), 'sd');
+  assert.strictEqual(detectVideoQualityTier('Video.mp4', '', { attributes: [{ className: 'DocumentAttributeVideo', h: 480, w: 854 }] }), 'sd');
+});
+
+it('correctly detects 720p HD tier', () => {
+  assert.strictEqual(detectVideoQualityTier('Movie.2024.720p.HDTV.mkv'), '720p');
+  assert.strictEqual(detectVideoQualityTier('Show.HD.mp4'), '720p');
+  assert.strictEqual(detectVideoQualityTier('Unknown.mp4', 'title_720p'), '720p');
+  assert.strictEqual(detectVideoQualityTier('Video.mp4', '', { attributes: [{ className: 'DocumentAttributeVideo', h: 720, w: 1280 }] }), '720p');
+  // Fallback default is 720p
+  assert.strictEqual(detectVideoQualityTier('Unknown.mp4'), '720p');
+});
+
+it('correctly detects 1080p FHD tier', () => {
+  assert.strictEqual(detectVideoQualityTier('Movie.2024.1080p.WEBRip.mp4'), '1080p');
+  assert.strictEqual(detectVideoQualityTier('Show.FHD.mkv'), '1080p');
+  assert.strictEqual(detectVideoQualityTier('Unknown.mp4', 'title_1080p'), '1080p');
+  assert.strictEqual(detectVideoQualityTier('Video.mp4', '', { attributes: [{ className: 'DocumentAttributeVideo', h: 1080, w: 1920 }] }), '1080p');
+});
+
+it('correctly detects 4K UHD tier', () => {
+  assert.strictEqual(detectVideoQualityTier('Movie.2024.2160p.UHD.Remux.mkv'), '4k');
+  assert.strictEqual(detectVideoQualityTier('Movie.4K.HDR.mkv'), '4k');
+  assert.strictEqual(detectVideoQualityTier('Video.mp4', '', { attributes: [{ className: 'DocumentAttributeVideo', h: 2160, w: 3840 }] }), '4k');
+});
+
+it('provides expected default pipeline buffer values per tier', () => {
+  assert.strictEqual(DEFAULT_PIPELINE_BUFFERS.sd, 2);      // 2 x 512KB = 1.0 MB
+  assert.strictEqual(DEFAULT_PIPELINE_BUFFERS['720p'], 4); // 4 x 512KB = 2.0 MB
+  assert.strictEqual(DEFAULT_PIPELINE_BUFFERS['1080p'], 6); // 6 x 512KB = 3.0 MB
+  assert.strictEqual(DEFAULT_PIPELINE_BUFFERS['4k'], 8);    // 8 x 512KB = 4.0 MB
 });
 
 console.log(`\nResults: ${passed}/${total} tests passed!\n`);
