@@ -44,6 +44,13 @@ const app = express();
 app.set('trust proxy', true);
 app.use(cors());
 app.use(express.json());
+// Catch malformed JSON payloads gracefully without logging uncaught SyntaxError stack traces
+app.use((err, req, res, next) => {
+  if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
+    return res.status(400).json({ success: false, error: 'Malformed JSON payload' });
+  }
+  next(err);
+});
 
 const port = process.env.PORT || 3033;
 const INTERNAL_HTTP_PORT = parseInt(process.env.INTERNAL_PORT || '3034', 10);
