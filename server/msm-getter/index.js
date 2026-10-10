@@ -974,6 +974,9 @@ app.get(['/auth', '/msm/auth'], (req, res) => {
       <a href="/msm" class="px-2.5 py-1 rounded-lg text-xs font-semibold text-slate-400 hover:text-white bg-slate-800/60 border border-slate-700/60 transition flex items-center gap-1">
         🏠 Dashboard
       </a>
+      <a href="/msm/streams" class="px-2.5 py-1 rounded-lg text-xs font-semibold text-slate-400 hover:text-white bg-slate-800/60 border border-slate-700/60 transition flex items-center gap-1">
+        💾 Streams
+      </a>
       <a href="/msm/settings" class="px-2.5 py-1 rounded-lg text-xs font-semibold text-slate-400 hover:text-white bg-slate-800/60 border border-slate-700/60 transition flex items-center gap-1">
         ⚙️ Settings
       </a>
@@ -1813,6 +1816,9 @@ app.get(['/logs', '/msm/logs'], (req, res) => {
       <a href="/msm" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800/80 transition flex items-center gap-1">
         🏠 Dashboard
       </a>
+      <a href="/msm/streams" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800/80 transition flex items-center gap-1">
+        💾 Streams
+      </a>
       <a href="/msm/settings" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800/80 transition flex items-center gap-1">
         ⚙️ Settings
       </a>
@@ -1907,24 +1913,7 @@ app.get(['/logs', '/msm/logs'], (req, res) => {
     </div>
   </div>
 
-  <!-- Persistent Stream Cache Panel -->
-  <div id="cachePanel" class="p-4 rounded-xl bg-slate-900 border border-slate-800/80 space-y-3">
-    <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 pb-2 border-b border-slate-800/60">
-      <div class="flex items-center gap-2">
-        <span class="text-sm">💾</span>
-        <span class="text-xs font-bold text-white uppercase tracking-wider">Persistent Stream Cache (Central DB)</span>
-        <span id="cacheCountBadge" class="text-[10px] font-mono font-bold bg-sky-500/10 text-sky-400 px-2 py-0.5 rounded border border-sky-500/20">-- items</span>
-      </div>
-      <div class="flex items-center gap-2 w-full sm:w-auto">
-        <input id="cacheSearch" type="text" placeholder="Search cached video / key..." class="bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-sky-500/50 w-full sm:w-64" oninput="loadCacheList()" />
-        <button onclick="loadCacheList()" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-medium text-slate-300 border border-slate-700 shrink-0">Refresh</button>
-        <button onclick="clearAllCache()" class="px-2.5 py-1 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 text-xs font-medium shrink-0">Clear All</button>
-      </div>
-    </div>
-    <div id="cacheListContainer" class="max-h-60 overflow-y-auto space-y-1.5 font-mono text-xs">
-      <div class="text-slate-500 italic py-2">Loading persistent cache...</div>
-    </div>
-  </div>
+
 
   <!-- Terminal Window -->
   <div class="relative flex-1 bg-slate-950 border border-slate-800/80 rounded-2xl overflow-hidden shadow-2xl glow-box flex flex-col min-h-[500px]">
@@ -2175,80 +2164,14 @@ app.get(['/logs', '/msm/logs'], (req, res) => {
       } catch {}
     }
 
-    async function loadCacheList() {
-      const searchEl = document.getElementById('cacheSearch');
-      const q = searchEl ? searchEl.value : '';
-      try {
-        const res = await fetch('/api/cache?search=' + encodeURIComponent(q));
-        const data = await res.json();
-        const container = document.getElementById('cacheListContainer');
-        const badge = document.getElementById('cacheCountBadge');
-        if (badge) {
-          const totalSizeMB = data.totalSizeBytes ? (data.totalSizeBytes / (1024 * 1024)).toFixed(1) + ' MB' : '0 MB';
-          badge.textContent = (data.total || 0) + ' videos (' + totalSizeMB + ')';
-        }
-        if (!container) return;
-        if (!data.items || data.items.length === 0) {
-          container.innerHTML = '<div class="text-slate-500 italic py-2">No cached records found.</div>';
-          return;
-        }
-        container.innerHTML = data.items.map(function(item) {
-          return '<div class="flex items-center justify-between p-2 rounded-lg bg-slate-950/60 border border-slate-800/40 hover:border-slate-700/60 transition gap-2">' +
-            '<div class="min-w-0 flex-1">' +
-              '<div class="flex items-center gap-1.5 truncate">' +
-                '<span class="text-slate-400 text-[10px]">🎬</span>' +
-                '<span class="text-white font-semibold truncate text-[11px]">' + escapeHtml(item.filename || item.queryKey) + '</span>' +
-              '</div>' +
-              '<div class="text-[10px] text-slate-400 truncate flex items-center gap-2 mt-0.5">' +
-                '<span class="text-sky-400 font-bold">' + escapeHtml(item.sizeFormatted) + '</span>' +
-                '<span>Key: ' + escapeHtml(item.queryKey) + '</span>' +
-                '<span>Doc: ' + escapeHtml(item.docId) + '</span>' +
-              '</div>' +
-            '</div>' +
-            '<button data-key="' + encodeURIComponent(item.queryKey || '') + '" data-doc="' + encodeURIComponent(item.docId || '') + '" class="evict-cache-btn px-2 py-1 rounded bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 text-[10px] shrink-0 font-sans font-semibold transition">Evict</button>' +
-          '</div>';
-        }).join('');
-      } catch (err) {
-        console.error('Failed to load cache:', err);
-      }
-    }
-
-    const cacheContainerEl = document.getElementById('cacheListContainer');
-    if (cacheContainerEl) {
-      cacheContainerEl.addEventListener('click', function(e) {
-        const btn = e.target.closest('.evict-cache-btn');
-        if (btn) {
-          const k = decodeURIComponent(btn.getAttribute('data-key') || '');
-          const d = decodeURIComponent(btn.getAttribute('data-doc') || '');
-          evictCacheRecord(k, d);
-        }
-      });
-    }
-
-    async function evictCacheRecord(key, docId) {
-      if (!confirm('Evict this video stream from persistent cache?')) return;
-      try {
-        await fetch('/api/cache?key=' + encodeURIComponent(key) + '&docId=' + encodeURIComponent(docId), { method: 'DELETE' });
-        loadCacheList();
-      } catch (err) {
-        alert('Evict failed: ' + err.message);
-      }
-    }
-
-    async function clearAllCache() {
-      if (!confirm('DANGER: Clear ALL stream cache records from server?')) return;
-      try {
-        await fetch('/api/cache/clear', { method: 'POST' });
-        loadCacheList();
-      } catch (err) {
-        alert('Clear failed: ' + err.message);
-      }
+    // Backward compatibility: redirect anchor /msm/logs#cachePanel to dedicated streams page
+    if (window.location.hash === '#cachePanel') {
+      window.location.replace('/msm/streams');
     }
 
     fetchInitialLogs();
     connectSSE();
     pollMetrics();
-    loadCacheList();
     setInterval(pollMetrics, 3000);
   </script>
 </body>
@@ -2350,6 +2273,9 @@ app.get(['/', '/msm', '/dashboard', '/msm/dashboard'], (req, res) => {
         <a href="/msm" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-sky-400 bg-sky-500/10 border border-sky-500/30 flex items-center gap-1">
           🏠 Dashboard
         </a>
+        <a href="/msm/streams" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800 transition flex items-center gap-1">
+          💾 Streams
+        </a>
         <a href="/msm/settings" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800 transition flex items-center gap-1">
           ⚙️ Settings
         </a>
@@ -2379,29 +2305,41 @@ app.get(['/', '/msm', '/dashboard', '/msm/dashboard'], (req, res) => {
         <span class="text-xs text-slate-400 font-medium">Memory Usage (RSS)</span>
         <p id="statMem" class="text-lg font-bold text-white mt-1">--</p>
       </div>
-      <div class="bg-slate-900 border border-slate-800/80 rounded-2xl p-4 glow-box">
-        <span class="text-xs text-slate-400 font-medium">Streams in Central Cache</span>
+      <a href="/msm/streams" class="bg-slate-900 hover:bg-slate-800/90 border border-slate-800/80 rounded-2xl p-4 glow-box block transition group" title="Click to view all cached video streams">
+        <div class="flex items-center justify-between">
+          <span class="text-xs text-slate-400 font-medium group-hover:text-sky-300 transition">Streams in Central Cache</span>
+          <span class="text-xs text-sky-400 group-hover:translate-x-0.5 transition">→</span>
+        </div>
         <p id="statCache" class="text-lg font-bold text-sky-400 mt-1">--</p>
-      </div>
+      </a>
     </div>
 
     <!-- Quick Navigation Hub -->
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <a href="/msm/streams" class="bg-slate-900 hover:bg-slate-800/90 border border-slate-800 rounded-2xl p-5 space-y-2 transition group block">
+        <div class="w-9 h-9 rounded-xl bg-sky-500/10 text-sky-400 border border-sky-500/20 flex items-center justify-center text-lg">
+          💾
+        </div>
+        <h3 class="text-sm font-bold text-white group-hover:text-sky-400 transition">Persistent Stream Cache</h3>
+        <p class="text-xs text-slate-400">Explore, search, and manage cached video streams stored in central database streams.json.</p>
+        <span class="text-xs text-sky-400 font-semibold inline-block pt-1">Open Streams →</span>
+      </a>
+
       <a href="/msm/settings" class="bg-slate-900 hover:bg-slate-800/90 border border-slate-800 rounded-2xl p-5 space-y-2 transition group block">
         <div class="w-9 h-9 rounded-xl bg-purple-500/10 text-purple-400 border border-purple-500/20 flex items-center justify-center text-lg">
           ⚙️
         </div>
         <h3 class="text-sm font-bold text-white group-hover:text-sky-400 transition">Server Settings</h3>
-        <p class="text-xs text-slate-400">Configure target bot handle (@msm34bot), clear central cache, and manage server timeouts.</p>
+        <p class="text-xs text-slate-400">Configure target bot handle (@msm34bot), adjust timeouts, and server controls.</p>
         <span class="text-xs text-sky-400 font-semibold inline-block pt-1">Open Settings →</span>
       </a>
 
       <a href="/msm/logs" class="bg-slate-900 hover:bg-slate-800/90 border border-slate-800 rounded-2xl p-5 space-y-2 transition group block">
-        <div class="w-9 h-9 rounded-xl bg-sky-500/10 text-sky-400 border border-sky-500/20 flex items-center justify-center text-lg">
+        <div class="w-9 h-9 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center justify-center text-lg">
           📜
         </div>
-        <h3 class="text-sm font-bold text-white group-hover:text-sky-400 transition">Live Logs & Cache Viewer</h3>
-        <p class="text-xs text-slate-400">Inspect real-time resolution logs, diagnose query matching, and explore all 200+ cached stream records.</p>
+        <h3 class="text-sm font-bold text-white group-hover:text-sky-400 transition">Live Console Logs</h3>
+        <p class="text-xs text-slate-400">Inspect real-time resolution logs, client playback metrics, and diagnose stream requests.</p>
         <span class="text-xs text-sky-400 font-semibold inline-block pt-1">View Logs →</span>
       </a>
 
@@ -2515,6 +2453,332 @@ app.get(['/', '/msm', '/dashboard', '/msm/dashboard'], (req, res) => {
 });
 
 // -------------------------------------------------------------
+// Dedicated Persistent Stream Cache Page (Served at /streams, /cache, /msm/streams, /msm/cache)
+// -------------------------------------------------------------
+app.get(['/streams', '/cache', '/msm/streams', '/msm/cache'], (req, res) => {
+  res.set({
+    'Cache-Control': 'no-cache, no-store, must-revalidate',
+    'Pragma': 'no-cache',
+    'Expires': '0',
+  });
+  res.send(`<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MSM Getter — Persistent Stream Cache</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { background-color: #0B0F17; color: #E2E8F0; font-family: ui-sans-serif, system-ui, sans-serif; }
+    .glow-box { box-shadow: 0 0 25px rgba(56, 189, 248, 0.08); }
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: #0B0F17; }
+    ::-webkit-scrollbar-thumb { background: #1E293B; border-radius: 4px; }
+  </style>
+</head>
+<body class="min-h-screen p-4 sm:p-8 flex flex-col items-center">
+  <div class="max-w-5xl w-full space-y-6">
+    <!-- Header with Back to Dashboard Link -->
+    <header class="flex flex-col sm:flex-row items-center justify-between bg-slate-900 border border-slate-800 rounded-2xl px-6 py-4 glow-box gap-4">
+      <div class="flex items-center gap-3">
+        <a href="/msm" class="w-10 h-10 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 flex items-center justify-center font-bold transition" title="Back to Dashboard">
+          ←
+        </a>
+        <div>
+          <h1 class="text-lg font-bold text-white flex items-center gap-2">
+            Persistent Stream Cache
+            <span id="headerCountBadge" class="text-xs px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-300 border border-sky-500/30 font-mono">-- items</span>
+          </h1>
+          <p class="text-xs text-slate-400">Central database explorer for cached Telegram video streams (streams.json)</p>
+        </div>
+      </div>
+      <nav class="flex items-center gap-2 flex-wrap">
+        <a href="/msm" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800 transition flex items-center gap-1">
+          🏠 Dashboard
+        </a>
+        <a href="/msm/streams" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-sky-400 bg-sky-500/10 border border-sky-500/30 flex items-center gap-1">
+          💾 Streams
+        </a>
+        <a href="/msm/settings" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800 transition flex items-center gap-1">
+          ⚙️ Settings
+        </a>
+        <a href="/msm/logs" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800 transition flex items-center gap-1">
+          📜 Logs
+        </a>
+        <a href="/msm/auth" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800 transition flex items-center gap-1">
+          🔑 Auth
+        </a>
+      </nav>
+    </header>
+
+    <!-- Key Metrics Grid -->
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div class="bg-slate-900 border border-slate-800/80 rounded-2xl p-4 glow-box">
+        <span class="text-xs text-slate-400 font-medium">Total Cached Videos</span>
+        <div class="flex items-baseline gap-1 mt-1">
+          <p id="statTotalCount" class="text-xl font-bold font-mono text-white">--</p>
+          <span class="text-xs text-slate-400 font-mono">items</span>
+        </div>
+      </div>
+      <div class="bg-slate-900 border border-slate-800/80 rounded-2xl p-4 glow-box">
+        <span class="text-xs text-slate-400 font-medium">Total Storage Footprint</span>
+        <div class="flex items-baseline gap-1 mt-1">
+          <p id="statTotalSize" class="text-xl font-bold font-mono text-sky-400">--</p>
+        </div>
+      </div>
+      <div class="bg-slate-900 border border-slate-800/80 rounded-2xl p-4 glow-box">
+        <span class="text-xs text-slate-400 font-medium">Database File</span>
+        <p class="text-sm font-bold font-mono text-white mt-1 truncate">data/streams.json</p>
+        <span class="text-[10px] text-slate-500 font-mono block mt-0.5">Persistent disk storage</span>
+      </div>
+      <div class="bg-slate-900 border border-slate-800/80 rounded-2xl p-4 glow-box">
+        <span class="text-xs text-slate-400 font-medium">Eviction Policy</span>
+        <p class="text-sm font-bold font-mono text-emerald-400 mt-1">LRU Cap: 2,000</p>
+        <span class="text-[10px] text-slate-500 font-mono block mt-0.5">Auto-prunes oldest items</span>
+      </div>
+    </div>
+
+    <!-- Explorer Toolbar & Filters -->
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 glow-box space-y-3">
+      <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+        <div class="relative flex-1">
+          <span class="absolute left-3 top-2.5 text-slate-500 text-xs">🔍</span>
+          <input id="streamSearch" type="text" placeholder="Search by title, query key, or document ID..." 
+            class="w-full pl-8 pr-8 py-2 bg-slate-950 border border-slate-800 focus:border-sky-500/50 rounded-xl text-xs text-white placeholder:text-slate-500 outline-none font-mono transition" 
+            oninput="handleSearchInput()" />
+          <button id="clearSearchBtn" onclick="clearSearch()" class="hidden absolute right-3 top-2.5 text-slate-500 hover:text-slate-300 text-xs font-bold">✕</button>
+        </div>
+
+        <div class="flex items-center gap-2 flex-wrap">
+          <select id="sortSelect" onchange="applyFilterAndSort()" class="bg-slate-950 border border-slate-800 text-slate-300 text-xs rounded-xl px-3 py-2 outline-none focus:border-sky-500/50 cursor-pointer">
+            <option value="newest">Sort: Newest First</option>
+            <option value="oldest">Sort: Oldest First</option>
+            <option value="sizeDesc">Sort: Largest Size</option>
+            <option value="sizeAsc">Sort: Smallest Size</option>
+            <option value="titleAsc">Sort: Title (A-Z)</option>
+          </select>
+
+          <button onclick="loadStreams()" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-semibold rounded-xl transition flex items-center gap-1.5" title="Reload streams from server">
+            <span>🔄</span> Refresh
+          </button>
+
+          <a href="/api/cache" target="_blank" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-semibold rounded-xl transition flex items-center gap-1.5" title="Export raw JSON records">
+            <span>📥</span> Export JSON
+          </a>
+
+          <button onclick="clearAllCache()" class="px-3 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 text-xs font-semibold rounded-xl transition flex items-center gap-1.5" title="Clear all stream records">
+            <span>🗑️</span> Clear All
+          </button>
+        </div>
+      </div>
+
+      <div class="flex items-center justify-between text-xs text-slate-400 pt-1 border-t border-slate-800/80">
+        <span id="resultsCount">Showing 0 of 0 cached streams</span>
+        <span class="text-[11px] text-slate-500 font-mono">Live Central DB Viewer</span>
+      </div>
+    </div>
+
+    <!-- Feedback Toast -->
+    <div id="toast" class="hidden fixed bottom-6 right-6 z-50 p-3.5 rounded-xl text-xs font-semibold shadow-2xl transition-all duration-200 bg-sky-500/90 text-white border border-sky-400"></div>
+
+    <!-- Streams Card List -->
+    <div id="streamListContainer" class="space-y-2.5">
+      <div class="p-8 text-center bg-slate-900 border border-slate-800 rounded-2xl">
+        <p class="text-slate-500 italic text-sm">Loading stream records...</p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let allStreams = [];
+    let searchTimer = null;
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function showToast(msg, isError = false) {
+      const toast = document.getElementById('toast');
+      toast.textContent = msg;
+      toast.className = 'fixed bottom-6 right-6 z-50 p-3.5 rounded-xl text-xs font-semibold shadow-2xl transition-all duration-200 ' + 
+        (isError ? 'bg-rose-600 text-white border border-rose-500' : 'bg-sky-500 text-white border border-sky-400');
+      toast.classList.remove('hidden');
+      setTimeout(() => toast.classList.add('hidden'), 2500);
+    }
+
+    function handleSearchInput() {
+      const searchEl = document.getElementById('streamSearch');
+      const clearBtn = document.getElementById('clearSearchBtn');
+      if (clearBtn) {
+        clearBtn.classList.toggle('hidden', !searchEl.value);
+      }
+      clearTimeout(searchTimer);
+      searchTimer = setTimeout(applyFilterAndSort, 150);
+    }
+
+    function clearSearch() {
+      const searchEl = document.getElementById('streamSearch');
+      searchEl.value = '';
+      const clearBtn = document.getElementById('clearSearchBtn');
+      if (clearBtn) clearBtn.classList.add('hidden');
+      applyFilterAndSort();
+    }
+
+    async function loadStreams() {
+      try {
+        const res = await fetch('/api/cache');
+        const data = await res.json();
+        allStreams = data.items || [];
+
+        const totalCount = allStreams.length;
+        const totalBytes = data.totalSizeBytes || 0;
+        let formattedSize = '0 MB';
+        if (totalBytes >= 1024 * 1024 * 1024) {
+          formattedSize = (totalBytes / (1024 * 1024 * 1024)).toFixed(2) + ' GB';
+        } else {
+          formattedSize = (totalBytes / (1024 * 1024)).toFixed(1) + ' MB';
+        }
+
+        document.getElementById('headerCountBadge').textContent = totalCount + ' items';
+        document.getElementById('statTotalCount').textContent = totalCount;
+        document.getElementById('statTotalSize').textContent = formattedSize;
+
+        applyFilterAndSort();
+      } catch (err) {
+        console.error('Failed to load streams:', err);
+        showToast('Failed to load stream cache: ' + err.message, true);
+      }
+    }
+
+    function applyFilterAndSort() {
+      const searchEl = document.getElementById('streamSearch');
+      const sortEl = document.getElementById('sortSelect');
+      const q = (searchEl ? searchEl.value : '').trim().toLowerCase();
+      const sortMode = sortEl ? sortEl.value : 'newest';
+
+      let filtered = allStreams.filter(item => {
+        if (!q) return true;
+        const fn = (item.filename || '').toLowerCase();
+        const key = (item.queryKey || '').toLowerCase();
+        const doc = String(item.docId || '').toLowerCase();
+        return fn.includes(q) || key.includes(q) || doc.includes(q);
+      });
+
+      filtered.sort((a, b) => {
+        if (sortMode === 'newest') return (b.createdAt || 0) - (a.createdAt || 0);
+        if (sortMode === 'oldest') return (a.createdAt || 0) - (b.createdAt || 0);
+        if (sortMode === 'sizeDesc') return (b.size || 0) - (a.size || 0);
+        if (sortMode === 'sizeAsc') return (a.size || 0) - (b.size || 0);
+        if (sortMode === 'titleAsc') return (a.filename || a.queryKey || '').localeCompare(b.filename || b.queryKey || '');
+        return 0;
+      });
+
+      renderList(filtered);
+    }
+
+    function renderList(items) {
+      const container = document.getElementById('streamListContainer');
+      const countEl = document.getElementById('resultsCount');
+      if (countEl) {
+        countEl.textContent = 'Showing ' + items.length + ' of ' + allStreams.length + ' cached streams';
+      }
+
+      if (items.length === 0) {
+        container.innerHTML = '<div class="p-12 text-center bg-slate-900 border border-slate-800 rounded-2xl space-y-2">' +
+          '<div class="text-3xl">📭</div>' +
+          '<p class="text-sm font-semibold text-slate-300">No stream records found</p>' +
+          '<p class="text-xs text-slate-500">Try adjusting your search query or resolve a title from TMDB Stream.</p>' +
+          '</div>';
+        return;
+      }
+
+      container.innerHTML = items.map(item => {
+        const title = item.filename || item.queryKey || 'Untitled Stream';
+        const dateStr = item.createdAt ? new Date(item.createdAt).toLocaleString() : '--';
+        return '<div class="bg-slate-900 hover:bg-slate-900/90 border border-slate-800/90 hover:border-slate-700/80 rounded-2xl p-4 transition glow-box flex flex-col md:flex-row md:items-center justify-between gap-3.5">' +
+          '<div class="min-w-0 flex-1 space-y-1.5">' +
+            '<div class="flex items-center gap-2">' +
+              '<span class="text-base shrink-0">🎬</span>' +
+              '<h3 class="text-sm font-bold text-white truncate" title="' + escapeHtml(title) + '">' + escapeHtml(title) + '</h3>' +
+            '</div>' +
+            '<div class="flex items-center gap-2 flex-wrap text-[11px] font-mono">' +
+              '<span class="px-2 py-0.5 rounded bg-sky-500/10 text-sky-400 border border-sky-500/20 font-bold">' + escapeHtml(item.sizeFormatted) + '</span>' +
+              '<span class="px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700/70">Key: ' + escapeHtml(item.queryKey || '--') + '</span>' +
+              '<span class="px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700/70">DC ' + escapeHtml(item.dcId || 4) + '</span>' +
+              '<span class="text-slate-500 text-[10px]">' + escapeHtml(dateStr) + '</span>' +
+            '</div>' +
+          '</div>' +
+          '<div class="flex items-center gap-2 shrink-0 self-end md:self-center">' +
+            '<button onclick="copyDocId(\\'' + escapeHtml(item.docId || '') + '\\', this)" class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 text-xs font-mono font-medium transition flex items-center gap-1.5" title="Copy Telegram Document ID">' +
+              '<span>📋</span> <span class="doc-label">Doc: ' + escapeHtml(item.docId || '--') + '</span>' +
+            '</button>' +
+            '<button onclick="evictItem(\\'' + encodeURIComponent(item.queryKey || '') + '\\', \\'' + encodeURIComponent(item.docId || '') + '\\', \\'' + escapeHtml(title).replace(/'/g, "\\\\'") + '\\')" class="px-3 py-1.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 text-xs font-semibold transition flex items-center gap-1">' +
+              '<span>🗑️</span> Evict' +
+            '</button>' +
+          '</div>' +
+        '</div>';
+      }).join('');
+    }
+
+    async function copyDocId(docId, btn) {
+      if (!docId) return;
+      try {
+        await navigator.clipboard.writeText(docId);
+        showToast('Copied Doc ID: ' + docId);
+        const label = btn.querySelector('.doc-label');
+        if (label) {
+          const old = label.textContent;
+          label.textContent = '✓ Copied!';
+          setTimeout(() => { label.textContent = old; }, 1500);
+        }
+      } catch (err) {
+        showToast('Doc ID: ' + docId);
+      }
+    }
+
+    async function evictItem(keyEnc, docIdEnc, title) {
+      const key = decodeURIComponent(keyEnc || '');
+      const docId = decodeURIComponent(docIdEnc || '');
+      if (!confirm('Evict from persistent cache?\\n\\n' + (title || key))) return;
+      try {
+        const res = await fetch('/api/cache?key=' + encodeURIComponent(key) + '&docId=' + encodeURIComponent(docId), { method: 'DELETE' });
+        const d = await res.json();
+        if (d.success) {
+          showToast('Evicted: ' + (title || key));
+          loadStreams();
+        } else {
+          showToast('Evict failed', true);
+        }
+      } catch (err) {
+        showToast('Evict failed: ' + err.message, true);
+      }
+    }
+
+    async function clearAllCache() {
+      if (!confirm('DANGER: Clear ALL cached stream records from central database?\\n\\nThis will remove all ' + allStreams.length + ' video records.')) return;
+      try {
+        const res = await fetch('/api/cache/clear', { method: 'POST' });
+        const d = await res.json();
+        showToast(d.message || 'Cache cleared');
+        loadStreams();
+      } catch (err) {
+        showToast('Clear failed: ' + err.message, true);
+      }
+    }
+
+    loadStreams();
+  </script>
+</body>
+</html>`);
+});
+
+// -------------------------------------------------------------
 // Dedicated Web Settings Page (Served at /setting, /settings, /msm/setting, /msm/settings)
 // -------------------------------------------------------------
 app.get(['/setting', '/settings', '/msm/setting', '/msm/settings'], (req, res) => {
@@ -2556,6 +2820,9 @@ app.get(['/setting', '/settings', '/msm/setting', '/msm/settings'], (req, res) =
       <nav class="flex items-center gap-2 flex-wrap">
         <a href="/msm" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800 transition flex items-center gap-1">
           🏠 Dashboard
+        </a>
+        <a href="/msm/streams" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800 transition flex items-center gap-1">
+          💾 Streams
         </a>
         <a href="/msm/settings" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-sky-400 bg-sky-500/10 border border-sky-500/30 flex items-center gap-1">
           ⚙️ Settings
@@ -2614,7 +2881,7 @@ app.get(['/setting', '/settings', '/msm/setting', '/msm/settings'], (req, res) =
         <p class="text-xs text-slate-400">Central database mapping cached video stream documents in <code class="text-slate-300">streams.json</code>.</p>
         <div class="space-y-3">
           <div class="flex gap-3">
-            <a href="/msm/logs#cachePanel" class="flex-1 text-center py-2 bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-white rounded-xl transition">
+            <a href="/msm/streams" class="flex-1 text-center py-2 bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-white rounded-xl transition">
               Browse Cached Videos
             </a>
             <button onclick="clearCache()" class="px-4 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 text-xs font-semibold rounded-xl transition">

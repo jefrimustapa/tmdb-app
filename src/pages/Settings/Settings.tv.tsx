@@ -4550,7 +4550,7 @@ export const Settings: React.FC = () => {
                       data-telegram-msm-drawer-item="true"
                       type="button"
                       onClick={() => {
-                        const target = `${(settings.msmGetterUrl || settings.msm32GetterUrl || 'https://www.julietmike.net:3033').replace(/\/+$/, '')}/logs#cachePanel`;
+                        const target = `${(settings.msmGetterUrl || settings.msm32GetterUrl || 'https://www.julietmike.net:3033').replace(/\/+$/, '')}/msm/streams`;
                         openExternalUrl(target);
                       }}
                       className="w-full py-2.5 px-3 rounded-xl border text-xs font-bold transition-all tv-focus-target flex items-center justify-between border-sky-500/30 bg-sky-500/10 hover:bg-sky-500/20 text-sky-300"
