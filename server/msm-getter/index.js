@@ -591,7 +591,7 @@ function scoreCandidateButton(btn, msg, context = {}) {
     significantTokens = extractSignificantTokens(title)
   } = context;
 
-  if (btn.className !== 'KeyboardButtonUrlAuth' || !btn.url) return -999;
+  if ((btn.className !== 'KeyboardButtonUrlAuth' && btn.className !== 'KeyboardButtonUrl') || !btn.url) return -999;
   const btnText = (btn.text || '').toLowerCase();
   const normBtnText = normalizeTitle(btnText);
   const msgText = (msg.message || '').toLowerCase();
@@ -2901,6 +2901,7 @@ app.get('/api/resolve', async (req, res) => {
                           buttonId: btn.buttonId,
                           url: btn.url,
                           text: btn.text,
+                          className: btn.className,
                           score,
                           page: pageCount,
                         });
@@ -2997,21 +2998,42 @@ app.get('/api/resolve', async (req, res) => {
               }
             }
 
-            let authRes;
-            try {
-              console.log(`[RESOLVE] Authorizing button (msgId: ${targetMsgId}, buttonId: ${targetButtonId}, page: ${activeBotPage})...`);
-              authRes = await client.invoke(new Api.messages.RequestUrlAuth({
-                peer: BOT_USERNAME,
-                msgId: targetMsgId,
-                buttonId: targetButtonId,
-              }));
-            } catch (authErr) {
-              console.warn(`[RESOLVE WARN] RequestUrlAuth failed for "${cand.text}": ${authErr.message}. Trying next candidate...`);
-              continue;
-            }
+            let authUrl = null;
+            if (cand.className === 'KeyboardButtonUrl') {
+              authUrl = cand.url;
+              console.log(`[RESOLVE] Candidate "${cand.text}" is a direct KeyboardButtonUrl. Using direct URL: ${authUrl}`);
+            } else {
+              let authRes;
+              try {
+                console.log(`[RESOLVE] Authorizing button (msgId: ${targetMsgId}, buttonId: ${targetButtonId}, page: ${activeBotPage})...`);
+                authRes = await client.invoke(new Api.messages.RequestUrlAuth({
+                  peer: BOT_USERNAME,
+                  msgId: targetMsgId,
+                  buttonId: targetButtonId,
+                }));
 
-            const authUrl = authRes.url;
-            console.log('[RESOLVE] Authorized URL generated successfully.');
+                // If Telegram requests user confirmation (UrlAuthResultRequest), accept authorization
+                if (authRes?.className === 'UrlAuthResultRequest' || !authRes?.url) {
+                  console.log(`[RESOLVE] Telegram returned ${authRes?.className || 'UrlAuthResultRequest'}. Invoking AcceptUrlAuth...`);
+                  authRes = await client.invoke(new Api.messages.AcceptUrlAuth({
+                    peer: BOT_USERNAME,
+                    msgId: targetMsgId,
+                    buttonId: targetButtonId,
+                    writeAllowed: true,
+                  }));
+                }
+              } catch (authErr) {
+                console.warn(`[RESOLVE WARN] URL authorization failed for "${cand.text}": ${authErr.message}. Trying next candidate...`);
+                continue;
+              }
+
+              authUrl = authRes?.url || cand.url;
+              if (!authUrl) {
+                console.warn(`[RESOLVE WARN] No valid authorized URL obtained for "${cand.text}". Trying next candidate...`);
+                continue;
+              }
+              console.log('[RESOLVE] Authorized URL generated successfully:', authUrl);
+            }
 
             const cookieMap = new Map();
             function processSetCookies(header) {
@@ -3086,7 +3108,7 @@ app.get('/api/resolve', async (req, res) => {
               let forwardFailed = false;
               try {
                 const ajaxRes = await axiosWithRetry(
-                  () => axios.post('https://go.msmbot.club/wp-admin/admin-ajax.php', postData.toString(), {
+                  () => axios.post(new URL('/wp-admin/admin-ajax.php', targetUrl).toString(), postData.toString(), {
                     timeout: 25000,
                     headers: {
                       'Content-Type': 'application/x-www-form-urlencoded',

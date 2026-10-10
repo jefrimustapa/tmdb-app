@@ -2,12 +2,16 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20261007-1332';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.fix-hardcode-bufferi.20261007-1332';
+export const APP_BUILD_NUMBER = '20261010-1034';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-msm-getter-revi.20261010-1034';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
-export const APP_BRANCH = 'fix-hardcode-bufferi';
-export const APP_CHANGELOG = `* Merge pull request #193 from jefrimustapa/fix/restore-resolver-timeout-adjust-watchdog
+export const APP_BRANCH = 'feat-msm-getter-revi';
+export const APP_CHANGELOG = `* refactor(msm): rename msm32 to msm across server and client with backward compatibility
+* feat(msm-getter): decouple bot handle and switch target to msm34bot
+* Merge pull request #194 from jefrimustapa/fix/hardcode-buffering-timeouts-60s
+* feat(settings): add direct stream msm32 buffering timeout setting (30/60/90/120s, default 60s)
+* Merge pull request #193 from jefrimustapa/fix/restore-resolver-timeout-adjust-watchdog
 * fix: restore msm32 resolver timeout default to 90s and set watchdog buffering timeout to 60s
 * Merge pull request #192 from jefrimustapa/refactor/msm-series-search-queries
 * refactor: optimize msm series queries and fix resolver/watchdog countdown
@@ -17,8 +21,4 @@ export const APP_CHANGELOG = `* Merge pull request #193 from jefrimustapa/fix/re
 * feat(player): separate resolver timeout (follows settings) and hardcoded 20s buffering timeout with retry/switch options (#188)
 * fix(msm-getter): prevent GramJS infinite reconnect recursion and socket exhaustion (EMFILE) (#187)
 * Merge pull request #186 from jefrimustapa/feat/msm-getter-search-improvement
-* feat(msm-getter): add bidirectional pagination navigation and configurable request timeout
-* Merge pull request #185 from jefrimustapa/feat/adaptive-bg-color-home-details
-* style(details): unify all metadata and original title badges with uniform bg-black/60 grey boxes
-* fix(details): remove duplicate country of origin row below storyline
-* feat(details): style all metadata items with translucent grey boxes`;
+* feat(msm-getter): add bidirectional pagination navigation and configurable request timeout`;
