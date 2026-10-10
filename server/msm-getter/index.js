@@ -5426,9 +5426,10 @@ app.get('/stream/:docId', async (req, res) => {
         mediaDetails = { audioMapSpecifier: '0:a:0', videoCodec: '', isHevc: false, isLegacyVideo: false };
       }
 
-      // Video transcoding (libx264) is ONLY performed when desktop web cannot decode HEVC/legacy video or explicitly asked via vcodec=h264.
-      // Mobile devices and modern clients have native hardware decoders, so video is ALWAYS stream-copied (-c:v copy, 0% CPU).
-      const needsVideoTranscode = isAvi || req.query.vcodec === 'h264' || (isDesktopWeb && (mediaDetails.isHevc || isHevc)) || mediaDetails.isLegacyVideo;
+      // Video transcoding (libx264) is STRICTLY limited to desktop web PC browsers that lack HEVC hardware support or legacy AVI.
+      // Mobile devices (S25, phones, tablets, smart TVs) have native hardware decoders: video is ALWAYS stream-copied (-c:v copy, 0% CPU).
+      const isMobileDevice = !isDesktopWeb || /S25|Galaxy|Phone|Android|iOS|iPad|iPhone|SmartTV|GoogleTV|AppleTV|Roku|Tizen|Web0S/i.test(clientIdentity?.name || '');
+      const needsVideoTranscode = !isMobileDevice && (isAvi || req.query.vcodec === 'h264' || (mediaDetails.isHevc || isHevc) || mediaDetails.isLegacyVideo);
       const isMp4Source = /\.mp4$/i.test(filename);
       // Fragmented MP4 is universally supported across Android WebView, iOS Safari, and Desktop browsers.
       // Use fMP4 muxer whenever video is transcoded to H.264, source is MP4, or video codec is H.264.
