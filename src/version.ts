@@ -2,12 +2,16 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20261010-1755';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.perf-improve-msm-str.20261010-1755';
+export const APP_BUILD_NUMBER = '20261010-1909';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.main.20261010-1909';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
-export const APP_BRANCH = 'perf-improve-msm-str';
-export const APP_CHANGELOG = `* fix(msm-getter): handle malformed JSON bodies gracefully without logging stack trace
+export const APP_BRANCH = 'main';
+export const APP_CHANGELOG = `* Merge branch 'perf/improve-msm-stream-speed' into main
+* fix(msm): bind pipeline buffer tier strictly to actual media quality instead of client requested quality
+* fix(msm): pass detectedTier to stream pipeline so active clients display matching quality tier
+* feat(msm): add 480p and 4k quality tiers, service restart, unified styling and dashboard metrics
+* fix(msm-getter): handle malformed JSON bodies gracefully without logging stack trace
 * feat(stream): configure quality-based pipeline buffer concurrency on server and clean up client UI
 * perf(stream): harmonize 4-tier pipeline buffer (Eco, Standard, Turbo, Ultra) with 512KB blocks and overlapped prefetching
 * Merge pull request #196 from jefrimustapa/feat/msm-getter-revise
@@ -17,8 +21,4 @@ export const APP_CHANGELOG = `* fix(msm-getter): handle malformed JSON bodies gr
 * feat(msm-getter): separate dashboard and settings pages with universal navigation linking
 * fix(msm-getter): route /msm to control center settings and keep /msm/auth for authentication
 * feat(msm-getter): group routes under /msm, add persistent settings API and web control center
-* fix(msm-getter): handle UrlAuthResultRequest via AcceptUrlAuth and support direct KeyboardButtonUrl
-* refactor(msm): rename msm32 to msm across server and client with backward compatibility
-* feat(msm-getter): decouple bot handle and switch target to msm34bot
-* Merge pull request #194 from jefrimustapa/fix/hardcode-buffering-timeouts-60s
-* feat(settings): add direct stream msm32 buffering timeout setting (30/60/90/120s, default 60s)`;
+* fix(msm-getter): handle UrlAuthResultRequest via AcceptUrlAuth and support direct KeyboardButtonUrl`;
