@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { App as CapApp } from '@capacitor/app';
-import { msm32Service } from '../services/msm32MappingService';
+import { msmService } from '../services/msmMappingService';
 
 export const useAndroidBackButton = () => {
   const navigate = useNavigate();
@@ -48,7 +48,7 @@ export const useAndroidBackButton = () => {
       // 3. If not on home page, navigate back to Home directly
       if (location.pathname !== '/') {
         if (location.pathname.startsWith('/watch')) {
-          msm32Service.closeActiveStream();
+          msmService.closeActiveStream();
         }
         (window as any).__tmdbFocusSidebarOnHome = true;
         navigate('/');

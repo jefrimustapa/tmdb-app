@@ -14,7 +14,7 @@ High-performance direct stream resolver and Telegram MTProto video proxy for TMD
 
 ## Features
 - Web Authentication Portal at `/auth`.
-- Automated Telegram Bot (`@msm32bot`) query and link authorization via MTProto.
+- Automated Telegram Bot (`@msmbot` / configurable via `TG_BOT_USERNAME`) query and link authorization via MTProto.
 - Multi-tier search fallback for Movies and TV Series (`S01E01`, `E01`, `Episod 1`).
 - HTTP 206 Partial Content Range streaming proxy for instant video playback and seeking.
 - Memory caching and request deduplication.
