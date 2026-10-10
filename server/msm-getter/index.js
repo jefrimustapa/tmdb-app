@@ -943,8 +943,8 @@ app.post('/api/auth/verify-code', async (req, res) => {
   }
 });
 
-// Web Authentication Portal UI (Served at / and /auth)
-app.get(['/', '/auth', '/msm', '/msm/auth'], (req, res) => {
+// Web Authentication Portal UI (Served at /auth and /msm/auth)
+app.get(['/auth', '/msm/auth'], (req, res) => {
   res.send(`<!DOCTYPE html>
 <html lang="en" class="dark">
 <head>
@@ -2294,8 +2294,8 @@ app.post(['/api/settings', '/msm/api/settings'], (req, res) => {
   }
 });
 
-// Web Settings Page GUI (Served at /setting, /settings, /msm/setting, /msm/settings)
-app.get(['/setting', '/settings', '/msm/setting', '/msm/settings'], (req, res) => {
+// Web Settings Page GUI (Served at /, /msm, /setting, /settings, /msm/setting, /msm/settings)
+app.get(['/', '/msm', '/setting', '/settings', '/msm/setting', '/msm/settings'], (req, res) => {
   res.set({
     'Cache-Control': 'no-cache, no-store, must-revalidate',
     'Pragma': 'no-cache',
