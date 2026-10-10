@@ -2,12 +2,14 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20261010-1111';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-msm-getter-revi.20261010-1111';
+export const APP_BUILD_NUMBER = '20261010-1127';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-msm-getter-revi.20261010-1127';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
 export const APP_BRANCH = 'feat-msm-getter-revi';
-export const APP_CHANGELOG = `* fix(msm-getter): handle UrlAuthResultRequest via AcceptUrlAuth and support direct KeyboardButtonUrl
+export const APP_CHANGELOG = `* feat(msm-getter): separate persistent stream cache to dedicated /msm/streams explorer page with universal navigation
+* feat(msm-getter): separate dashboard and settings pages with universal navigation linking
+* fix(msm-getter): handle UrlAuthResultRequest via AcceptUrlAuth and support direct KeyboardButtonUrl
 * refactor(msm): rename msm32 to msm across server and client with backward compatibility
 * feat(msm-getter): decouple bot handle and switch target to msm34bot
 * Merge pull request #194 from jefrimustapa/fix/hardcode-buffering-timeouts-60s
