@@ -684,16 +684,12 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
               ? /(\.mkv$|mkv\b|ddp|dd\+|ac3|ac-3|eac3|e-ac-3|atmos|dts|truehd|thd|5[._-]1|7[._-]1|[345678]ch|surround)/i.test(msmRes.filename)
               : false;
             let finalUrl = msmRes.streamUrl;
-            if (isAviOrLegacy || isHevc) {
+            if (isSurroundOrDolbyAudio || isAviOrLegacy) {
               const sep = finalUrl.includes('?') ? '&' : '?';
               if (!finalUrl.includes('transcode=')) {
-                finalUrl = `${finalUrl}${sep}transcode=audio&vcodec=h264`;
+                finalUrl = `${finalUrl}${sep}transcode=audio`;
               }
-              console.log('[Resolver] 🎬 Detected AVI/HEVC video in Telegram stream. Enabling H.264 video + AAC transcode pipe:', finalUrl);
-            } else if (isSurroundOrDolbyAudio) {
-              const sep = finalUrl.includes('?') ? '&' : '?';
-              finalUrl = `${finalUrl}${sep}transcode=audio`;
-              console.log('[Resolver] 🔊 Detected multi-channel surround/Dolby audio in Telegram stream. Enabling stereo AAC downmix pipe:', finalUrl);
+              console.log('[Resolver] 🔊 Detected surround/Dolby audio in Telegram stream. Enabling stereo AAC downmix pipe:', finalUrl);
             } else {
               console.log('[Resolver] ✅ Playing via Telegram Direct Stream (native stream):', finalUrl);
             }

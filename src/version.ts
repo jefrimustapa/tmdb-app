@@ -2,12 +2,14 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20261010-2321';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.fix-phone-mkv-audio-.20261010-2321';
+export const APP_BUILD_NUMBER = '20261010-2347';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.fix-phone-mkv-audio-.20261010-2347';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
 export const APP_BRANCH = 'fix-phone-mkv-audio-';
-export const APP_CHANGELOG = `* chore(version): update build metadata for main branch
+export const APP_CHANGELOG = `* fix(stream): strictly enforce direct video copy for mobile clients on HEVC
+* fix(stream): enable mobile audio transcode with direct video copy and accurate seek
+* chore(version): update build metadata for main branch
 * Merge branch 'refactor/msm-mp4-stream-revise' into main
 * feat(msm): stream native MP4 files direct without CPU transcode on desktop web
 * fix(msm): dynamically apply server configured pipeline concurrency to transcode streams
@@ -19,6 +21,4 @@ export const APP_CHANGELOG = `* chore(version): update build metadata for main b
 * fix(msm-getter): handle malformed JSON bodies gracefully without logging stack trace
 * feat(stream): configure quality-based pipeline buffer concurrency on server and clean up client UI
 * perf(stream): harmonize 4-tier pipeline buffer (Eco, Standard, Turbo, Ultra) with 512KB blocks and overlapped prefetching
-* Merge pull request #196 from jefrimustapa/feat/msm-getter-revise
-* feat(msm-getter): consolidate all web pages under /msm and redirect legacy top-level routes
-* refactor(client): align web console log buttons to /msm/logs across mobile and tv settings`;
+* Merge pull request #196 from jefrimustapa/feat/msm-getter-revise`;
