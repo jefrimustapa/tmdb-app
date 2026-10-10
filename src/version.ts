@@ -2,12 +2,16 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20261010-1909';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.main.20261010-1909';
+export const APP_BUILD_NUMBER = '20261010-2254';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.main.20261010-2254';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
 export const APP_BRANCH = 'main';
-export const APP_CHANGELOG = `* Merge branch 'perf/improve-msm-stream-speed' into main
+export const APP_CHANGELOG = `* Merge branch 'refactor/msm-mp4-stream-revise' into main
+* feat(msm): stream native MP4 files direct without CPU transcode on desktop web
+* fix(msm): dynamically apply server configured pipeline concurrency to transcode streams
+* chore(version): update build metadata for main branch
+* Merge branch 'perf/improve-msm-stream-speed' into main
 * fix(msm): bind pipeline buffer tier strictly to actual media quality instead of client requested quality
 * fix(msm): pass detectedTier to stream pipeline so active clients display matching quality tier
 * feat(msm): add 480p and 4k quality tiers, service restart, unified styling and dashboard metrics
@@ -17,8 +21,4 @@ export const APP_CHANGELOG = `* Merge branch 'perf/improve-msm-stream-speed' int
 * Merge pull request #196 from jefrimustapa/feat/msm-getter-revise
 * feat(msm-getter): consolidate all web pages under /msm and redirect legacy top-level routes
 * refactor(client): align web console log buttons to /msm/logs across mobile and tv settings
-* feat(msm-getter): separate persistent stream cache to dedicated /msm/streams explorer page
-* feat(msm-getter): separate dashboard and settings pages with universal navigation linking
-* fix(msm-getter): route /msm to control center settings and keep /msm/auth for authentication
-* feat(msm-getter): group routes under /msm, add persistent settings API and web control center
-* fix(msm-getter): handle UrlAuthResultRequest via AcceptUrlAuth and support direct KeyboardButtonUrl`;
+* feat(msm-getter): separate persistent stream cache to dedicated /msm/streams explorer page`;
