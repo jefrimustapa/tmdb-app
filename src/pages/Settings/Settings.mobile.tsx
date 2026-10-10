@@ -1806,7 +1806,7 @@ export const Settings: React.FC = () => {
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">
               <span className="text-[10px] text-sky-400 font-mono font-bold bg-sky-500/10 px-2 py-0.5 rounded border border-sky-400/20">
-                {(settings.msmChunkSize ?? settings.msm32ChunkSize) === 1048576 ? '1 MB (Turbo)' : (settings.msmChunkSize ?? settings.msm32ChunkSize) === 262144 ? '256 KB (Eco)' : '512 KB (Standard)'}
+                {(settings.msmChunkSize ?? settings.msm32ChunkSize) === 2097152 ? 'Ultra (4.0 MB)' : (settings.msmChunkSize ?? settings.msm32ChunkSize) === 1048576 ? 'Turbo (3.0 MB)' : (settings.msmChunkSize ?? settings.msm32ChunkSize) === 262144 ? 'Eco (1.0 MB)' : 'Standard (2.0 MB)'}
               </span>
               <ChevronRight className="w-4 h-4 text-gray-400" />
             </div>
@@ -2284,28 +2284,29 @@ export const Settings: React.FC = () => {
         </div>
       </SettingsDrawer>
 
-      {/* 3a-TG-CHUNK. Sub-Drawer: Stream Chunk Slice Buffer */}
+      {/* 3a-TG-CHUNK. Sub-Drawer: Stream Buffer Pipeline */}
       <SettingsDrawer
         isOpen={activeDrawer === 'telegram-chunk'}
         onClose={() => setActiveDrawer(null)}
         onBack={() => setActiveDrawer('telegram-msm')}
-        title="Stream Chunk Buffer"
-        subtitle="Configure buffer chunk slice size for Telegram streaming."
-        categoryLabel="Telegram > MSMbot > Buffer Size"
+        title="Stream Buffer Pipeline"
+        subtitle="Configure prefetch concurrency and in-flight buffer depth."
+        categoryLabel="Telegram > MSMbot > Buffer Pipeline"
       >
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-gray-300 block">Current Chunk Size:</span>
+            <span className="text-xs font-semibold text-gray-300 block">Current In-Flight Buffer:</span>
             <span className="text-xs text-sky-400 font-mono font-bold">
-              {((settings.msmChunkSize || 524288) / 1024).toFixed(0)} KB
+              {(settings.msmChunkSize || 524288) === 2097152 ? '4.0 MB (Ultra)' : (settings.msmChunkSize || 524288) === 1048576 ? '3.0 MB (Turbo)' : (settings.msmChunkSize || 524288) === 262144 ? '1.0 MB (Eco)' : '2.0 MB (Standard)'}
             </span>
           </div>
 
           <div className="grid grid-cols-1 gap-2">
             {[
-              { label: '256 KB (Eco Pipeline)', desc: '2 parallel streams (512KB in-flight) • Fastest seek & low cellular data usage', val: 262144 },
-              { label: '512 KB (Standard Pipeline)', desc: '4 parallel streams (2MB in-flight) • Balanced latency & steady throughput (Default)', val: 524288 },
-              { label: '1 MB (Turbo Pipeline)', desc: '6 parallel streams (3MB in-flight) • Maximum prefetch throughput for smooth 1080p', val: 1048576 }
+              { label: 'Eco Pipeline (1.0 MB)', desc: '2 parallel calls (512KB each) • Low cellular data & battery saving', val: 262144 },
+              { label: 'Standard Pipeline (2.0 MB)', desc: '4 parallel calls (512KB each) • Balanced latency & steady playback (Default)', val: 524288 },
+              { label: 'Turbo Pipeline (3.0 MB)', desc: '6 parallel calls (512KB each) • Maximum prefetch throughput for smooth 1080p', val: 1048576 },
+              { label: 'Ultra Pipeline (4.0 MB)', desc: '8 parallel calls (512KB each) • Maximum buffer for 4K UHD & High Bitrate', val: 2097152 }
             ].map((c) => {
               const isCurrent = (settings.msmChunkSize || 524288) === c.val;
               return (
@@ -2333,7 +2334,7 @@ export const Settings: React.FC = () => {
             })}
           </div>
           <p className="text-[11px] text-gray-500 leading-relaxed">
-            Smaller chunks start playback and seek faster by downloading smaller initial byte ranges; larger chunks yield higher sustained throughput.
+            All modes use Telegram's native 512 KB block size. Higher pipelines prefetch more data concurrently over MTProto, eliminating buffer stalls on high-bitrate video.
           </p>
         </div>
       </SettingsDrawer>
