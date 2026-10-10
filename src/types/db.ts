@@ -98,7 +98,7 @@ export interface UserSettings {
   enabledTelegramProviders?: string[]; // e.g. ['telegram-msm']
   telegramProviderCountries?: Record<string, OriginCountryCode[]>; // e.g. { 'telegram-msm': ['MY', 'ID', 'SG'] }
   msmGetterUrl?: string; // e.g. 'https://www.julietmike.net:3033'
-  msmChunkSize?: number; // Chunk buffer slice in bytes: 262144 (256KB Eco), 524288 (512KB Standard), 1048576 (1MB Turbo)
+  msmChunkSize?: number; // Stream Buffer Pipeline in bytes: 262144 (Eco 1.0MB), 524288 (Standard 2.0MB), 1048576 (Turbo 3.0MB), 2097152 (Ultra 4.0MB)
   msmMaxQuality?: '720' | '1080'; // Resolution preference: '720' or '1080' (default: '1080')
   msmTimeout?: 60 | 90 | 120 | 150 | 180; // MSM bot resolver request timeout in seconds (default: 90)
   msmBufferTimeout?: 30 | 60 | 90 | 120; // MSM direct stream buffering timeout in seconds (default: 60)

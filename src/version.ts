@@ -2,12 +2,14 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20261010-1348';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-msm-getter-revi.20261010-1348';
+export const APP_BUILD_NUMBER = '20261010-1610';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.perf-improve-msm-str.20261010-1610';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
-export const APP_BRANCH = 'feat-msm-getter-revi';
-export const APP_CHANGELOG = `* refactor(client): align web console log buttons to /msm/logs across mobile and tv settings
+export const APP_BRANCH = 'perf-improve-msm-str';
+export const APP_CHANGELOG = `* Merge pull request #196 from jefrimustapa/feat/msm-getter-revise
+* feat(msm-getter): consolidate all web pages under /msm and redirect legacy top-level routes
+* refactor(client): align web console log buttons to /msm/logs across mobile and tv settings
 * feat(msm-getter): separate persistent stream cache to dedicated /msm/streams explorer page
 * feat(msm-getter): separate dashboard and settings pages with universal navigation linking
 * fix(msm-getter): route /msm to control center settings and keep /msm/auth for authentication
@@ -19,6 +21,4 @@ export const APP_CHANGELOG = `* refactor(client): align web console log buttons 
 * feat(settings): add direct stream msm32 buffering timeout setting (30/60/90/120s, default 60s)
 * Merge pull request #193 from jefrimustapa/fix/restore-resolver-timeout-adjust-watchdog
 * fix: restore msm32 resolver timeout default to 90s and set watchdog buffering timeout to 60s
-* Merge pull request #192 from jefrimustapa/refactor/msm-series-search-queries
-* refactor: optimize msm series queries and fix resolver/watchdog countdown
-* fix(msm-getter): add libuv fs compatibility shim to prevent Linux kernel segfault (#191)`;
+* Merge pull request #192 from jefrimustapa/refactor/msm-series-search-queries`;

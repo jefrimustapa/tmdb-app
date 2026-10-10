@@ -1209,13 +1209,13 @@ const activeStreams = new Map();
 const internalWorkers = new Map(); // key: workerKey -> { abort: Function, parentKey: string, createdAt: number }
 
 // In-Memory LRU Block Cache for Telegram MTProto Stream Chunks
-// Caches up to 16 blocks (8 MB RAM) to eliminate seek latency while protecting router RAM from exhaustion.
-const BLOCK_CACHE_MAX_ENTRIES = 16; // 16 x 512KB = 8 MB
+// Caches up to 32 blocks (16 MB RAM) to eliminate seek latency while protecting router RAM from exhaustion.
+const BLOCK_CACHE_MAX_ENTRIES = 32; // 32 x 512KB = 16 MB
 const globalBlockCache = new Map();
 
-// Pinned cache for container headers (first 2 blocks: 0, 1) and tail cues (last 2 blocks)
-// These blocks (<= 2 MB total per doc) are NEVER evicted by sequential playback pipelines,
-// eliminating 5 out of 6 remote Telegram round-trips on every seek!
+// Pinned cache for container headers (first 4 blocks: 0..3) and tail cues (last 4 blocks)
+// These blocks (<= 4 MB total per doc) are NEVER evicted by sequential playback pipelines,
+// eliminating remote Telegram round-trips on every seek & probe!
 const pinnedHeaderCache = new Map(); // key: `${docId}:${blockIdx}` -> Buffer
 
 function getCachedBlock(docId, blockIdx) {
@@ -1238,7 +1238,7 @@ function setCachedBlock(docId, blockIdx, data, isPinned = false) {
   if (isPinned) {
     if (pinnedHeaderCache.has(key)) {
       pinnedHeaderCache.delete(key);
-    } else if (pinnedHeaderCache.size >= 24) {
+    } else if (pinnedHeaderCache.size >= 48) {
       const oldestKey = pinnedHeaderCache.keys().next().value;
       pinnedHeaderCache.delete(oldestKey);
     }
@@ -4156,26 +4156,35 @@ async function refreshDocumentFileReference(client, targetDoc) {
  * ensuring continuous high-throughput delivery with zero buffer underruns for 1080p/4K playback.
  */
 async function streamTelegramPipelined(client, targetDoc, startByte, endByte, res, req, customChunkSize, customConcurrency, passedStreamKey) {
-  // Map requested chunkSize to MTProto block size and concurrency
+  // Map requested chunkSize / mode to MTProto block size and concurrency
   let CHUNK_SIZE = 512 * 1024; // 512KB: Native Telegram MTProto block limit
-  let CONCURRENCY = 3;         // Balanced: 1.5MB sliding window
+  let CONCURRENCY = 4;         // Default Standard: 4 parallel calls (2.0 MB in-flight)
 
-  if (customChunkSize === 262144) {
-    CHUNK_SIZE = 256 * 1024;
-    CONCURRENCY = 2; // Eco mode: 512KB sliding window (low bandwidth / mobile)
-  } else if (customChunkSize === 1048576) {
-    CHUNK_SIZE = 512 * 1024;
-    CONCURRENCY = 4; // High-throughput: 2MB sliding window (avoids saturating high-latency TCP link)
-  } else if (customConcurrency && typeof customConcurrency === 'number') {
-    CONCURRENCY = customConcurrency;
+  if (customChunkSize === 262144 || req?.query?.mode === 'eco') {
+    CONCURRENCY = 2; // Eco: 2 parallel calls (1.0 MB in-flight)
+  } else if (customChunkSize === 524288 || req?.query?.mode === 'standard') {
+    CONCURRENCY = 4; // Standard: 4 parallel calls (2.0 MB in-flight)
+  } else if (customChunkSize === 1048576 || req?.query?.mode === 'turbo') {
+    CONCURRENCY = 6; // Turbo: 6 parallel calls (3.0 MB in-flight)
+  } else if (customChunkSize === 2097152 || req?.query?.mode === 'ultra') {
+    CONCURRENCY = 8; // Ultra: 8 parallel calls (4.0 MB in-flight)
   }
 
-  const isProbe = req?.headers?.['x-internal-probe'] === '1' || req?.query?.probe === '1' || (endByte - startByte <= 1048576);
+  if (customConcurrency && typeof customConcurrency === 'number') {
+    CONCURRENCY = customConcurrency;
+  } else if (req?.query?.concurrency) {
+    const c = parseInt(req.query.concurrency, 10);
+    if (!isNaN(c) && c >= 1 && c <= 8) CONCURRENCY = c;
+  }
+
+  const docTotalSize = Number(targetDoc.size || 0);
+  const isTailMetadata = docTotalSize > 0 && startByte >= docTotalSize - 10 * 1024 * 1024;
+  const isProbe = req?.headers?.['x-internal-probe'] === '1' || req?.query?.probe === '1' || (endByte - startByte <= 1048576) || isTailMetadata;
   const isInternal = req?.headers?.['x-internal-transcoder'] === '1' || req?.query?.direct === '1';
   const parentSessionKey = req?.headers?.['x-parent-session'] || req?.query?.parentSession;
   const clientIdentity = resolveClientIdentity(req?.headers?.['x-forwarded-for'] || req?.ip || req?.socket?.remoteAddress, req);
   if (isProbe) {
-    CONCURRENCY = 3; // Fast metadata & cues retrieval without timeout
+    CONCURRENCY = Math.min(CONCURRENCY, 3); // Fast metadata & cues retrieval without timeout
   }
 
   const streamKey = passedStreamKey || `${isInternal ? (parentSessionKey ? `worker-${parentSessionKey}` : `internal-${Date.now()}`) : clientIdentity.ip}:${targetDoc.id}`;
@@ -4317,7 +4326,7 @@ async function streamTelegramPipelined(client, targetDoc, startByte, endByte, re
     });
 
     const totalDocBlocks = Math.ceil(Number(targetDoc.size) / CHUNK_SIZE);
-    const isPinnedBlock = blockIdx <= 2 || blockIdx >= totalDocBlocks - 3;
+    const isPinnedBlock = blockIdx <= 3 || blockIdx >= totalDocBlocks - 4;
 
     try {
       if (aborted) return null;
@@ -4429,16 +4438,33 @@ async function streamTelegramPipelined(client, targetDoc, startByte, endByte, re
     return null;
   }
 
-  let nextBlockToFetch = startBlock;
+  let nextBlockToFetch = startBlock + 1;
   const touchActive = () => {
     const s = activeStreams.get(streamKey);
     if (s) s.lastActive = Date.now();
   };
 
-  // 1. First-Chunk Express Delivery:
-  // Immediately fetch & send the first block alone with 100% bandwidth.
-  // This allows the video decoder to display frames instantly (< 300ms) after seek without waiting for parallel chunks.
-  let firstBlockData = await fetchBlockWithRetry(startBlock);
+  function fillPipeline() {
+    while (!aborted && inFlight.size < CONCURRENCY && nextBlockToFetch <= endBlock) {
+      const idx = nextBlockToFetch++;
+      const p = fetchBlockWithRetry(idx).catch(err => {
+        if (!aborted) console.warn(`[STREAM PIPE WARN] Block ${idx} fetch error: ${err.message}`);
+        return null;
+      });
+      inFlight.set(idx, p);
+    }
+  }
+
+  // 1. Overlapped Prefetching Delivery:
+  // Concurrently fetch startBlock AND immediately trigger prefetching for subsequent blocks.
+  // When startBlock arrives and streams to the player, upcoming blocks (startBlock + 1..)
+  // are already in-flight or completed, eliminating the ~200ms initial playback stall!
+  const firstBlockPromise = fetchBlockWithRetry(startBlock);
+  if (startBlock < endBlock) {
+    fillPipeline();
+  }
+
+  let firstBlockData = await firstBlockPromise;
   if (aborted || res.destroyed || res.writableEnded) {
     firstBlockData = null;
     return;
@@ -4461,18 +4487,6 @@ async function streamTelegramPipelined(client, targetDoc, startByte, endByte, re
   }
 
   // 2. Sliding-Window Pipeline for subsequent blocks
-  nextBlockToFetch = startBlock + 1;
-
-  function fillPipeline() {
-    while (!aborted && inFlight.size < CONCURRENCY && nextBlockToFetch <= endBlock) {
-      const idx = nextBlockToFetch++;
-      const p = fetchBlockWithRetry(idx).catch(err => {
-        if (!aborted) console.warn(`[STREAM PIPE WARN] Block ${idx} fetch error: ${err.message}`);
-        return null;
-      });
-      inFlight.set(idx, p);
-    }
-  }
 
   for (let currentBlock = startBlock + 1; currentBlock <= endBlock; currentBlock++) {
     activeBlock = currentBlock;
@@ -5066,15 +5080,24 @@ app.get('/stream/:docId', async (req, res) => {
       return res.end();
     }
 
-    // Parse user-specified chunk size / pipeline mode from query parameter (e.g. ?chunkSize=1048576)
+    // Parse user-specified chunk size / pipeline mode from query parameter (e.g. ?chunkSize=1048576 or 2097152)
     const parsedChunk = parseInt(req.query.chunkSize, 10);
-    const downloadChunkSize = [131072, 262144, 524288, 1048576].includes(parsedChunk) ? parsedChunk : 512 * 1024;
+    const downloadChunkSize = [262144, 524288, 1048576, 2097152].includes(parsedChunk) ? parsedChunk : 524288;
+
+    if (res.socket) {
+      try {
+        res.socket.setNoDelay(true);
+        res.socket.setKeepAlive(true, 15000);
+      } catch {}
+    }
 
     if (!rangeHeader) {
       res.writeHead(200, {
         'Content-Length': fileSize,
         'Content-Type': mimeType,
         'Accept-Ranges': 'bytes',
+        'Cache-Control': 'no-cache, no-store, no-transform',
+        'X-Accel-Buffering': 'no',
         'Content-Disposition': `inline; filename="${encodeURIComponent(filename)}"`,
       });
       await streamTelegramPipelined(client, targetDoc, 0, fileSize - 1, res, req, downloadChunkSize, undefined, streamSessionKey);
@@ -5116,6 +5139,8 @@ app.get('/stream/:docId', async (req, res) => {
         'Accept-Ranges': 'bytes',
         'Content-Length': chunkSize,
         'Content-Type': mimeType,
+        'Cache-Control': 'no-cache, no-store, no-transform',
+        'X-Accel-Buffering': 'no',
         'Content-Disposition': `inline; filename="${encodeURIComponent(filename)}"`,
       });
 

@@ -3764,9 +3764,9 @@ export const Settings: React.FC = () => {
               <ChevronRight className="w-3.5 h-3.5 text-gray-500" />
               <span className="text-hbo-cyan font-semibold">MSMbot</span>
             </div>
-            <h1 className="text-3xl font-extrabold text-white tracking-tight mb-2">Stream Chunk Buffer</h1>
+            <h1 className="text-3xl font-extrabold text-white tracking-tight mb-2">Stream Buffer Pipeline</h1>
             <p className="text-sm text-gray-400 max-w-md leading-relaxed">
-              Configure in-memory chunk slice buffer size for Telegram MTProto video streaming.
+              Configure in-memory prefetch concurrency and in-flight buffer depth for Telegram MTProto streaming.
             </p>
           </div>
 
@@ -3775,9 +3775,10 @@ export const Settings: React.FC = () => {
             <div className="flex-1 overflow-y-auto px-6 py-6 space-y-3 font-sans">
               {(() => {
                 const chunkOptions = [
-                  { val: 262144, label: '256 KB (Eco Pipeline)', desc: '2 parallel streams (512KB in-flight) • Fastest seek & low data usage for mobile hotspot.' },
-                  { val: 524288, label: '512 KB (Standard Pipeline)', desc: '4 parallel streams (2MB in-flight) • Optimum balance between seek response and stable throughput.' },
-                  { val: 1048576, label: '1 MB (Turbo Pipeline)', desc: '6 parallel streams (3MB in-flight) • Maximum prefetch throughput for smooth, zero-stutter 1080p.' },
+                  { val: 262144, label: 'Eco Pipeline (1.0 MB)', desc: '2 parallel calls (512KB each) • Low cellular data & battery saving.' },
+                  { val: 524288, label: 'Standard Pipeline (2.0 MB)', desc: '4 parallel calls (512KB each) • Balanced latency & steady playback (Default).' },
+                  { val: 1048576, label: 'Turbo Pipeline (3.0 MB)', desc: '6 parallel calls (512KB each) • Maximum prefetch throughput for smooth 1080p.' },
+                  { val: 2097152, label: 'Ultra Pipeline (4.0 MB)', desc: '8 parallel calls (512KB each) • Maximum buffer for 4K UHD & High Bitrate.' },
                 ];
                 const currentVal = settings.msmChunkSize || settings.msm32ChunkSize || 524288;
 
@@ -4633,7 +4634,7 @@ export const Settings: React.FC = () => {
                         className="px-3 py-1.5 rounded-lg border text-xs font-bold transition-all tv-focus-target flex items-center gap-1.5 border-hbo-border bg-hbo-dark/80 hover:bg-hbo-hover text-white flex-shrink-0"
                       >
                         <span className="text-sky-400 font-mono">
-                          {((settings.msmChunkSize || settings.msm32ChunkSize || 524288) / 1024).toFixed(0)} KB
+                          {(settings.msmChunkSize || settings.msm32ChunkSize || 524288) === 2097152 ? 'Ultra (4MB)' : (settings.msmChunkSize || settings.msm32ChunkSize || 524288) === 1048576 ? 'Turbo (3MB)' : (settings.msmChunkSize || settings.msm32ChunkSize || 524288) === 262144 ? 'Eco (1MB)' : 'Standard (2MB)'}
                         </span>
                         <ChevronRight className="w-3.5 h-3.5 text-gray-400" />
                       </button>
