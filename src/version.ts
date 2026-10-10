@@ -2,12 +2,13 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20261010-1034';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-msm-getter-revi.20261010-1034';
+export const APP_BUILD_NUMBER = '20261010-1111';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-msm-getter-revi.20261010-1111';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
 export const APP_BRANCH = 'feat-msm-getter-revi';
-export const APP_CHANGELOG = `* refactor(msm): rename msm32 to msm across server and client with backward compatibility
+export const APP_CHANGELOG = `* fix(msm-getter): handle UrlAuthResultRequest via AcceptUrlAuth and support direct KeyboardButtonUrl
+* refactor(msm): rename msm32 to msm across server and client with backward compatibility
 * feat(msm-getter): decouple bot handle and switch target to msm34bot
 * Merge pull request #194 from jefrimustapa/fix/hardcode-buffering-timeouts-60s
 * feat(settings): add direct stream msm32 buffering timeout setting (30/60/90/120s, default 60s)
@@ -20,5 +21,4 @@ export const APP_CHANGELOG = `* refactor(msm): rename msm32 to msm across server
 * fix: 5-minute stream idle grace period with auto-resume and status indicator (#189)
 * feat(player): separate resolver timeout (follows settings) and hardcoded 20s buffering timeout with retry/switch options (#188)
 * fix(msm-getter): prevent GramJS infinite reconnect recursion and socket exhaustion (EMFILE) (#187)
-* Merge pull request #186 from jefrimustapa/feat/msm-getter-search-improvement
-* feat(msm-getter): add bidirectional pagination navigation and configurable request timeout`;
+* Merge pull request #186 from jefrimustapa/feat/msm-getter-search-improvement`;

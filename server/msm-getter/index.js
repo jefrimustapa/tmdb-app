@@ -51,7 +51,16 @@ const apiId = parseInt(process.env.TG_API_ID, 10);
 const apiHash = process.env.TG_API_HASH;
 let session = process.env.TG_SESSION || '';
 const LOG_PATH = process.env.LOG_FILE || (process.platform === 'win32' ? path.join(__dirname, 'msm-getter.log') : '/tmp/msm-getter.log');
-export const BOT_USERNAME = (process.env.TG_BOT_USERNAME || 'msm34bot').replace(/^@/, '');
+
+const SETTINGS_FILE = path.join(__dirname, 'data', 'settings.json');
+let savedSettings = {};
+try {
+  if (fs.existsSync(SETTINGS_FILE)) {
+    savedSettings = JSON.parse(fs.readFileSync(SETTINGS_FILE, 'utf-8'));
+  }
+} catch (e) {}
+
+export let BOT_USERNAME = (savedSettings.targetBotUsername || process.env.TG_BOT_USERNAME || 'msm34bot').replace(/^@/, '');
 
 function getLogFilePath() {
   if (fs.existsSync('/tmp/msm-getter.log')) return '/tmp/msm-getter.log';
@@ -935,7 +944,7 @@ app.post('/api/auth/verify-code', async (req, res) => {
 });
 
 // Web Authentication Portal UI (Served at / and /auth)
-app.get(['/', '/auth'], (req, res) => {
+app.get(['/', '/auth', '/msm', '/msm/auth'], (req, res) => {
   res.send(`<!DOCTYPE html>
 <html lang="en" class="dark">
 <head>
@@ -1541,7 +1550,7 @@ function getCpuMetrics() {
 }
 
 // System Stats Endpoint (Uptime, Memory RSS, Active Streams, Active Clients, Log Size)
-app.get('/api/system/stats', (req, res) => {
+app.get(['/api/system/stats', '/msm/api/system/stats'], (req, res) => {
   let mem = { rss: 0, heapUsed: 0, heapTotal: 0, external: 0 };
   try {
     mem = process.memoryUsage();
@@ -1614,7 +1623,7 @@ app.post('/api/system/purge-memory', (req, res) => {
 });
 
 // Log Snapshot API (Last N lines from RAM disk)
-app.get('/api/logs', (req, res) => {
+app.get(['/api/logs', '/msm/api/logs'], (req, res) => {
   try {
     const linesCount = parseInt(req.query.lines, 10) || 200;
     const logPath = getLogFilePath();
@@ -1655,7 +1664,7 @@ app.get('/api/logs', (req, res) => {
 });
 
 // Server-Sent Events (SSE) Live Log Streaming
-app.get('/api/logs/stream', (req, res) => {
+app.get(['/api/logs/stream', '/msm/api/logs/stream'], (req, res) => {
   res.writeHead(200, {
     'Content-Type': 'text/event-stream',
     'Cache-Control': 'no-cache',
@@ -1724,7 +1733,7 @@ app.get('/api/logs/stream', (req, res) => {
 });
 
 // Download Raw Log File
-app.get('/api/logs/download', (req, res) => {
+app.get(['/api/logs/download', '/msm/api/logs/download'], (req, res) => {
   try {
     const logPath = getLogFilePath();
     if (!fs.existsSync(logPath)) {
@@ -1738,7 +1747,7 @@ app.get('/api/logs/download', (req, res) => {
 });
 
 // Clear / Truncate Physical Log File on Disk
-app.post('/api/logs/clear', (req, res) => {
+app.post(['/api/logs/clear', '/msm/api/logs/clear'], (req, res) => {
   try {
     const logPath = getLogFilePath();
     if (fs.existsSync(logPath)) {
@@ -1753,7 +1762,7 @@ app.post('/api/logs/clear', (req, res) => {
 });
 
 // Dedicated Web Log Viewer GUI
-app.get('/logs', (req, res) => {
+app.get(['/logs', '/msm/logs'], (req, res) => {
   res.set({
     'Cache-Control': 'no-cache, no-store, must-revalidate',
     'Pragma': 'no-cache',
@@ -2238,19 +2247,325 @@ app.get('/logs', (req, res) => {
 // 2. STREAM RESOLUTION & PLAYBACK ENDPOINTS
 // ==========================================
 
-// Health check endpoint
-app.get('/health', (req, res) => {
+// Health check endpoint (both /health, /msm/health, and /api/health)
+app.get(['/health', '/msm/health', '/api/health', '/msm/api/health'], (req, res) => {
   res.json({
     status: 'ok',
     uptime: process.uptime(),
     isConnected,
     cachedStreams: db.size(),
+    targetBotUsername: BOT_USERNAME,
     authError: authError || null,
   });
 });
 
+// Settings API endpoints
+app.get(['/api/settings', '/msm/api/settings'], (req, res) => {
+  res.json({
+    success: true,
+    targetBotUsername: BOT_USERNAME,
+    isConnected,
+    uptime: process.uptime(),
+    cachedStreams: db.size(),
+    port,
+    internalPort: INTERNAL_HTTP_PORT,
+  });
+});
+
+app.post(['/api/settings', '/msm/api/settings'], (req, res) => {
+  try {
+    const { targetBotUsername } = req.body || {};
+    if (targetBotUsername && typeof targetBotUsername === 'string') {
+      const sanitized = targetBotUsername.trim().replace(/^@/, '');
+      if (sanitized.length > 0) {
+        BOT_USERNAME = sanitized;
+        savedSettings.targetBotUsername = sanitized;
+        const dataDir = path.join(__dirname, 'data');
+        if (!fs.existsSync(dataDir)) {
+          fs.mkdirSync(dataDir, { recursive: true });
+        }
+        fs.writeFileSync(SETTINGS_FILE, JSON.stringify(savedSettings, null, 2), 'utf-8');
+        console.log(`[SETTINGS] Target Telegram Bot updated to: @${BOT_USERNAME}`);
+      }
+    }
+    return res.json({ success: true, targetBotUsername: BOT_USERNAME });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Web Settings Page GUI (Served at /setting, /settings, /msm/setting, /msm/settings)
+app.get(['/setting', '/settings', '/msm/setting', '/msm/settings'], (req, res) => {
+  res.set({
+    'Cache-Control': 'no-cache, no-store, must-revalidate',
+    'Pragma': 'no-cache',
+    'Expires': '0',
+  });
+  res.send(`<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MSM Getter — Settings & Control Center</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { background-color: #0B0F17; color: #E2E8F0; font-family: ui-sans-serif, system-ui, sans-serif; }
+    .glow-box { box-shadow: 0 0 25px rgba(56, 189, 248, 0.08); }
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: #0B0F17; }
+    ::-webkit-scrollbar-thumb { background: #1E293B; border-radius: 4px; }
+  </style>
+</head>
+<body class="min-h-screen p-4 sm:p-8 flex flex-col items-center">
+  <div class="max-w-4xl w-full space-y-6">
+    <!-- Navigation Bar -->
+    <header class="flex flex-col sm:flex-row items-center justify-between bg-slate-900 border border-slate-800 rounded-2xl px-6 py-4 glow-box gap-4">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-sky-500/10 text-sky-400 border border-sky-500/20 flex items-center justify-center font-bold text-lg">
+          🎬
+        </div>
+        <div>
+          <h1 class="text-lg font-bold text-white flex items-center gap-2">
+            MSM Control Center
+            <span id="botBadge" class="text-xs px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-300 border border-sky-500/30 font-mono">@${BOT_USERNAME}</span>
+          </h1>
+          <p class="text-xs text-slate-400">Telegram MTProto Streaming Microservice</p>
+        </div>
+      </div>
+      <nav class="flex items-center gap-2">
+        <a href="/msm/auth" class="px-3.5 py-1.5 rounded-lg text-xs font-medium text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800 transition">🔐 Auth</a>
+        <a href="/msm/logs" class="px-3.5 py-1.5 rounded-lg text-xs font-medium text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800 transition">📜 Logs</a>
+        <a href="/msm/settings" class="px-3.5 py-1.5 rounded-lg text-xs font-medium text-sky-400 bg-sky-500/10 border border-sky-500/30 font-semibold">⚙️ Settings</a>
+      </nav>
+    </header>
+
+    <!-- Main Settings Grid -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      
+      <!-- Card 1: Target Bot Configuration -->
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
+        <div class="flex items-center justify-between">
+          <h2 class="text-sm font-semibold text-white flex items-center gap-2">
+            🤖 Target Telegram Bot
+          </h2>
+          <span id="connStatusPill" class="text-xs px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700">Checking...</span>
+        </div>
+        <p class="text-xs text-slate-400">Specify which MSM Telegram bot handle the resolver queries for streaming media.</p>
+        
+        <div class="space-y-2">
+          <label class="text-xs text-slate-300 font-medium">Bot Handle</label>
+          <div class="flex gap-2">
+            <div class="relative flex-1">
+              <span class="absolute left-3 top-2 text-slate-500 text-sm">@</span>
+              <input id="botInput" type="text" value="${BOT_USERNAME}" placeholder="msm34bot" class="w-full pl-7 pr-3 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-sm text-white focus:outline-none focus:border-sky-500/50" />
+            </div>
+            <button id="saveBotBtn" onclick="saveBot()" class="px-4 py-1.5 bg-sky-500 hover:bg-sky-400 text-slate-950 font-semibold text-xs rounded-xl transition">
+              Save
+            </button>
+          </div>
+          <p id="saveMsg" class="text-xs text-emerald-400 hidden">✓ Saved and applied live!</p>
+        </div>
+
+        <div class="pt-2 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-400">
+          <span>Quick presets:</span>
+          <div class="flex gap-2 font-mono">
+            <button onclick="setBotPreset('msm34bot')" class="hover:text-sky-400 text-slate-300">@msm34bot</button>
+            <span>•</span>
+            <button onclick="setBotPreset('msm32bot')" class="hover:text-sky-400 text-slate-300">@msm32bot</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 2: Server Hardware & Health -->
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
+        <h2 class="text-sm font-semibold text-white flex items-center gap-2">
+          ⚡ System & Health Status
+        </h2>
+        <div class="grid grid-cols-2 gap-3 text-xs">
+          <div class="bg-slate-950/70 p-3 rounded-xl border border-slate-800/80">
+            <span class="text-slate-400">Uptime</span>
+            <p id="statUptime" class="text-sm font-semibold text-white mt-1">--</p>
+          </div>
+          <div class="bg-slate-950/70 p-3 rounded-xl border border-slate-800/80">
+            <span class="text-slate-400">Memory RSS</span>
+            <p id="statMem" class="text-sm font-semibold text-white mt-1">--</p>
+          </div>
+          <div class="bg-slate-950/70 p-3 rounded-xl border border-slate-800/80">
+            <span class="text-slate-400">Active Streams</span>
+            <p id="statActive" class="text-sm font-semibold text-white mt-1">--</p>
+          </div>
+          <div class="bg-slate-950/70 p-3 rounded-xl border border-slate-800/80">
+            <span class="text-slate-400">Cached Streams</span>
+            <p id="statCache" class="text-sm font-semibold text-white mt-1">--</p>
+          </div>
+        </div>
+        <div class="pt-2 flex items-center justify-between text-xs">
+          <a href="/msm/health" target="_blank" class="text-sky-400 hover:underline">View raw /msm/health JSON →</a>
+          <button onclick="loadStats()" class="text-slate-400 hover:text-white">Refresh ⟳</button>
+        </div>
+      </div>
+
+      <!-- Card 3: Stream Cache Management -->
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
+        <h2 class="text-sm font-semibold text-white flex items-center gap-2">
+          💾 Stream Cache Storage
+        </h2>
+        <p class="text-xs text-slate-400">Streams resolved from Telegram are permanently mapped in <code class="text-slate-300">streams.json</code> for zero-delay instant playback.</p>
+        <div class="flex gap-3">
+          <a href="/msm/logs#cachePanel" class="flex-1 text-center py-2 bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-white rounded-xl transition">
+            Browse Cached Videos
+          </a>
+          <button onclick="clearCache()" class="px-4 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 text-xs font-semibold rounded-xl transition">
+            Clear Cache
+          </button>
+        </div>
+      </div>
+
+      <!-- Card 4: Live Query Diagnostic Sandbox -->
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
+        <h2 class="text-sm font-semibold text-white flex items-center gap-2">
+          🔍 Live Bot Query Sandbox
+        </h2>
+        <p class="text-xs text-slate-400">Test live button extraction from the active Telegram bot without playing.</p>
+        <div class="flex gap-2">
+          <input id="diagInput" type="text" value="Kudrat 1968" placeholder="Title (e.g. Spider-Man)..." class="flex-1 px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-sm text-white focus:outline-none focus:border-sky-500/50" />
+          <button id="diagBtn" onclick="runDiagnostic()" class="px-4 py-1.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold text-xs rounded-xl transition">
+            Test
+          </button>
+        </div>
+        <div id="diagResults" class="hidden space-y-2 max-h-48 overflow-y-auto text-xs bg-slate-950 p-3 rounded-xl border border-slate-800">
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    async function loadStats() {
+      try {
+        const [sysRes, healthRes] = await Promise.all([
+          fetch('/api/system/stats').then(r => r.json()),
+          fetch('/health').then(r => r.json())
+        ]);
+        
+        if (healthRes.uptime) {
+          const u = Math.floor(healthRes.uptime);
+          const d = Math.floor(u / 86400);
+          const h = Math.floor((u % 86400) / 3600);
+          const m = Math.floor((u % 3600) / 60);
+          document.getElementById('statUptime').textContent = d > 0 ? \`\${d}d \${h}h \${m}m\` : \`\${h}h \${m}m\`;
+        }
+        
+        if (sysRes.stats) {
+          document.getElementById('statMem').textContent = (sysRes.stats.memoryRSS || 0) + ' MB';
+          document.getElementById('statActive').textContent = sysRes.stats.activeStreams || 0;
+        }
+        document.getElementById('statCache').textContent = healthRes.cachedStreams || 0;
+
+        const pill = document.getElementById('connStatusPill');
+        if (healthRes.isConnected) {
+          pill.className = 'text-xs px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30';
+          pill.textContent = '● Connected';
+        } else {
+          pill.className = 'text-xs px-2.5 py-0.5 rounded-full bg-rose-500/20 text-rose-400 border border-rose-500/30';
+          pill.textContent = '○ Disconnected';
+        }
+      } catch (err) {
+        console.warn('Failed to load stats:', err);
+      }
+    }
+
+    async function saveBot() {
+      const input = document.getElementById('botInput');
+      const val = input.value.trim().replace(/^@/, '');
+      if (!val) return;
+      
+      const btn = document.getElementById('saveBotBtn');
+      btn.disabled = true;
+      btn.textContent = 'Saving...';
+      
+      try {
+        const res = await fetch('/api/settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ targetBotUsername: val })
+        });
+        const data = await res.json();
+        if (data.success) {
+          document.getElementById('botBadge').textContent = '@' + data.targetBotUsername;
+          const msg = document.getElementById('saveMsg');
+          msg.classList.remove('hidden');
+          setTimeout(() => msg.classList.add('hidden'), 3000);
+        }
+      } catch (e) {
+        alert('Failed to save bot: ' + e.message);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Save';
+      }
+    }
+
+    function setBotPreset(name) {
+      document.getElementById('botInput').value = name;
+      saveBot();
+    }
+
+    async function clearCache() {
+      if (!confirm('Are you sure you want to clear the central streams cache?')) return;
+      try {
+        const res = await fetch('/api/cache/clear', { method: 'POST' });
+        const d = await res.json();
+        alert(d.message || 'Cache cleared');
+        loadStats();
+      } catch (e) {
+        alert('Failed to clear cache: ' + e.message);
+      }
+    }
+
+    async function runDiagnostic() {
+      const query = document.getElementById('diagInput').value.trim();
+      if (!query) return;
+      const btn = document.getElementById('diagBtn');
+      const box = document.getElementById('diagResults');
+      btn.disabled = true;
+      btn.textContent = 'Querying...';
+      box.classList.remove('hidden');
+      box.innerHTML = '<span class="text-slate-400">Querying @' + document.getElementById('botInput').value.trim() + '...</span>';
+
+      try {
+        const res = await fetch('/api/debug-search?q=' + encodeURIComponent(query));
+        const data = await res.json();
+        if (data.success && data.buttons) {
+          box.innerHTML = '<div class="text-slate-300 font-semibold mb-2">Found ' + data.buttons.length + ' buttons for "' + query + '":</div>' +
+            data.buttons.map(b => 
+              '<div class="p-2 rounded bg-slate-900 border border-slate-800">' +
+                '<div class="text-white font-medium truncate">' + b.text + '</div>' +
+                '<div class="text-[10px] text-slate-500 flex gap-2 mt-1">' +
+                  '<span class="text-sky-400">' + b.className + '</span>' +
+                  (b.url ? '<span class="truncate max-w-xs text-slate-400">' + b.url + '</span>' : '') +
+                '</div>' +
+              '</div>'
+            ).join('');
+        } else {
+          box.innerHTML = '<span class="text-rose-400">No buttons found or error: ' + (data.error || 'Empty') + '</span>';
+        }
+      } catch (e) {
+        box.innerHTML = '<span class="text-rose-400">Query failed: ' + e.message + '</span>';
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Test';
+      }
+    }
+
+    loadStats();
+    setInterval(loadStats, 5000);
+  </script>
+</body>
+</html>`);
+});
+
 // Diagnostic endpoint to inspect raw buttons returned by @${BOT_USERNAME}
-app.get('/api/debug-search', async (req, res) => {
+app.get(['/api/debug-search', '/msm/api/debug-search'], async (req, res) => {
   try {
     const query = req.query.q || 'Kelas Cikgu Hiragi';
     await initTelegram();
@@ -2274,7 +2589,7 @@ app.get('/api/debug-search', async (req, res) => {
 });
 
 // Cache management endpoints
-app.get('/api/cache', (req, res) => {
+app.get(['/api/cache', '/msm/api/cache'], (req, res) => {
   const { search = '' } = req.query;
   const items = db.getAll(search);
   const totalSizeBytes = db.getTotalSizeBytes();
@@ -2309,7 +2624,7 @@ app.get('/api/cache', (req, res) => {
   });
 });
 
-app.delete('/api/cache', (req, res) => {
+app.delete(['/api/cache', '/msm/api/cache'], (req, res) => {
   const key = req.query.key || req.body?.key;
   const docId = req.query.docId || req.body?.docId;
   let evicted = false;
@@ -2318,12 +2633,12 @@ app.delete('/api/cache', (req, res) => {
   return res.json({ success: true, evicted, key, docId });
 });
 
-app.post('/api/cache/clear', (req, res) => {
+app.post(['/api/cache/clear', '/msm/api/cache/clear'], (req, res) => {
   db.clear();
   return res.json({ success: true, message: 'Central database cache cleared' });
 });
 
-app.get('/api/cache/evict', (req, res) => {
+app.get(['/api/cache/evict', '/msm/api/cache/evict'], (req, res) => {
   const { key, docId } = req.query;
   let evicted = false;
   if (key) evicted = db.delete(key) || evicted;
@@ -2332,7 +2647,7 @@ app.get('/api/cache/evict', (req, res) => {
 });
 
 // Resolver endpoint: /api/resolve?title=Kelas+Cikgu+Hiragi&season=1&episode=1
-app.get('/api/resolve', async (req, res) => {
+app.get(['/api/resolve', '/msm/api/resolve'], async (req, res) => {
   const { title, year, season, episode, totalSeasons: totalSeasonsQuery, maxQuality = '720', force, refresh } = req.query;
   if (!title) {
     return res.status(400).json({ success: false, error: 'Missing title query parameter' });
