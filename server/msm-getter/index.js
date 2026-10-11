@@ -77,6 +77,7 @@ try {
 savedSettings.pipelineBuffers = Object.assign({}, DEFAULT_PIPELINE_BUFFERS, savedSettings.pipelineBuffers || {});
 if (savedSettings.overlapPrefetch === undefined) savedSettings.overlapPrefetch = true;
 if (savedSettings.routerRamCacheMb === undefined) savedSettings.routerRamCacheMb = 16;
+if (savedSettings.videoTranscodeMode === undefined) savedSettings.videoTranscodeMode = 'disabled';
 
 export let BOT_USERNAME = (savedSettings.targetBotUsername || process.env.TG_BOT_USERNAME || 'msm34bot').replace(/^@/, '');
 
@@ -1560,6 +1561,10 @@ function isDesktopWebClient(req) {
   return isDesktopOs && !isMobileOrTv;
 }
 
+function isMobileClient(req) {
+  return !isDesktopWebClient(req);
+}
+
 // CPU Usage Tracker (Router System CPU from /proc/stat, msm-getter Node process from process.cpuUsage, and FFmpeg workers from /proc/[pid]/stat)
 let lastSystemCpu = null;
 let lastProcCpu = process.cpuUsage();
@@ -1712,6 +1717,7 @@ app.get(['/api/system/stats', '/msm/api/system/stats'], (req, res) => {
     pipelineBuffers: savedSettings.pipelineBuffers || DEFAULT_PIPELINE_BUFFERS,
     overlapPrefetch: savedSettings.overlapPrefetch !== false,
     routerRamCacheMb: savedSettings.routerRamCacheMb || 16,
+    videoTranscodeMode: savedSettings.videoTranscodeMode || 'disabled',
     blockCacheEntries: globalBlockCache.size,
     blockCacheMaxEntries: getBlockCacheMaxEntries(),
     logSizeKB,
@@ -2152,6 +2158,7 @@ app.get(['/api/settings', '/msm/api/settings'], (req, res) => {
     pipelineBuffers: savedSettings.pipelineBuffers || DEFAULT_PIPELINE_BUFFERS,
     overlapPrefetch: savedSettings.overlapPrefetch !== false,
     routerRamCacheMb: savedSettings.routerRamCacheMb || 16,
+    videoTranscodeMode: savedSettings.videoTranscodeMode || 'disabled',
     blockCacheEntries: globalBlockCache.size,
     blockCacheMaxEntries: getBlockCacheMaxEntries(),
     port,
@@ -2161,7 +2168,7 @@ app.get(['/api/settings', '/msm/api/settings'], (req, res) => {
 
 app.post(['/api/settings', '/msm/api/settings'], (req, res) => {
   try {
-    const { targetBotUsername, pipelineBuffers, overlapPrefetch, routerRamCacheMb } = req.body || {};
+    const { targetBotUsername, pipelineBuffers, overlapPrefetch, routerRamCacheMb, videoTranscodeMode } = req.body || {};
     let changed = false;
 
     if (targetBotUsername && typeof targetBotUsername === 'string') {
@@ -2204,6 +2211,15 @@ app.post(['/api/settings', '/msm/api/settings'], (req, res) => {
       }
     }
 
+    if (videoTranscodeMode !== undefined && typeof videoTranscodeMode === 'string') {
+      const mode = videoTranscodeMode.trim().toLowerCase();
+      if (['disabled', 'desktop_hevc', 'always'].includes(mode)) {
+        savedSettings.videoTranscodeMode = mode;
+        changed = true;
+        console.log(`[SETTINGS] Video Transcode Mode updated to: ${mode}`);
+      }
+    }
+
     if (changed) {
       const dataDir = path.join(__dirname, 'data');
       if (!fs.existsSync(dataDir)) {
@@ -2218,6 +2234,7 @@ app.post(['/api/settings', '/msm/api/settings'], (req, res) => {
       pipelineBuffers: savedSettings.pipelineBuffers || DEFAULT_PIPELINE_BUFFERS,
       overlapPrefetch: savedSettings.overlapPrefetch !== false,
       routerRamCacheMb: savedSettings.routerRamCacheMb || 16,
+      videoTranscodeMode: savedSettings.videoTranscodeMode || 'disabled',
       blockCacheEntries: globalBlockCache.size,
       blockCacheMaxEntries: getBlockCacheMaxEntries(),
     });
@@ -2344,7 +2361,7 @@ app.get(['/msm', '/msm/dashboard'], (req, res) => {
           ⚙️ Configure in Settings →
         </a>
       </div>
-      <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
+      <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-2.5">
         <div class="bg-slate-950/70 border border-slate-800/80 rounded-xl p-2.5">
           <span class="text-[10px] text-slate-400 font-semibold block uppercase">SD Pipeline</span>
           <span id="stripBufSd" class="text-xs font-bold font-mono text-emerald-400 block mt-0.5">2 × 512KB</span>
@@ -2374,6 +2391,11 @@ app.get(['/msm', '/msm/dashboard'], (req, res) => {
           <span class="text-[10px] text-slate-400 font-semibold block uppercase">Router RAM Cache</span>
           <span id="stripRamCache" class="text-xs font-bold font-mono text-white block mt-0.5">16 MB</span>
           <span id="stripRamBlocks" class="text-[10px] text-slate-500 font-mono block">32 blocks cap</span>
+        </div>
+        <div class="bg-slate-950/70 border border-slate-800/80 rounded-xl p-2.5">
+          <span class="text-[10px] text-slate-400 font-semibold block uppercase">Video Transcode</span>
+          <span id="stripVideoTranscode" class="text-xs font-bold font-mono text-emerald-400 block mt-0.5">Disabled</span>
+          <span id="stripVideoTranscodeDesc" class="text-[10px] text-slate-500 font-mono block">0% Video CPU</span>
         </div>
       </div>
     </div>
@@ -2543,6 +2565,25 @@ app.get(['/msm', '/msm/dashboard'], (req, res) => {
         if (d.routerRamCacheMb !== undefined) {
           document.getElementById('stripRamCache').textContent = d.routerRamCacheMb + ' MB';
           document.getElementById('stripRamBlocks').textContent = (d.routerRamCacheMb * 2) + ' blocks cap';
+        }
+        if (d.videoTranscodeMode !== undefined) {
+          const el = document.getElementById('stripVideoTranscode');
+          const descEl = document.getElementById('stripVideoTranscodeDesc');
+          if (el && descEl) {
+            if (d.videoTranscodeMode === 'desktop_hevc') {
+              el.textContent = 'PC Only';
+              el.className = 'text-xs font-bold font-mono text-amber-400 block mt-0.5';
+              descEl.textContent = 'HEVC->H264 (2 cores)';
+            } else if (d.videoTranscodeMode === 'always') {
+              el.textContent = 'Enabled';
+              el.className = 'text-xs font-bold font-mono text-rose-400 block mt-0.5';
+              descEl.textContent = 'All Devices';
+            } else {
+              el.textContent = 'Disabled';
+              el.className = 'text-xs font-bold font-mono text-emerald-400 block mt-0.5';
+              descEl.textContent = '0% Video CPU';
+            }
+          }
         }
 
         // 7. Active Clients Table
@@ -3178,6 +3219,19 @@ app.get(['/msm/setting', '/msm/settings'], (req, res) => {
             </select>
           </div>
 
+          <!-- Video Transcode Mode -->
+          <div class="flex items-center justify-between gap-3 bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/80">
+            <div>
+              <div class="text-xs font-semibold text-white">Video Transcoding</div>
+              <div id="videoTranscodeHint" class="text-[11px] text-slate-400">100% Direct Stream Copy (0% CPU load) [Recommended]</div>
+            </div>
+            <select id="videoTranscodeSelect" onchange="updateVideoTranscodeLabel()" class="bg-slate-900 border border-slate-700 text-xs text-white rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-sky-500">
+              <option value="disabled" selected>Disabled (100% Direct Copy - 0% CPU)</option>
+              <option value="desktop_hevc">Desktop Web Only (HEVC/AVI -> H.264 for PC Chrome)</option>
+              <option value="always">Enabled for All Devices</option>
+            </select>
+          </div>
+
           <div class="flex items-center justify-between pt-2">
             <span id="saveEngineMsg" class="text-xs text-emerald-400 hidden">✓ Engine settings saved & applied!</span>
             <div class="flex-1"></div>
@@ -3313,6 +3367,10 @@ app.get(['/msm/setting', '/msm/settings'], (req, res) => {
           document.getElementById('ramCacheSelect').value = String(res.routerRamCacheMb);
           updateRamCacheLabel();
         }
+        if (res.videoTranscodeMode !== undefined) {
+          document.getElementById('videoTranscodeSelect').value = String(res.videoTranscodeMode);
+          updateVideoTranscodeLabel();
+        }
       } catch (e) {}
     }
 
@@ -3331,6 +3389,20 @@ app.get(['/msm/setting', '/msm/settings'], (req, res) => {
     function updateRamCacheLabel() {
       const mb = parseInt(document.getElementById('ramCacheSelect').value, 10) || 16;
       document.getElementById('ramCacheHint').textContent = (mb * 2) + ' blocks (' + mb + ' MB cap in Node memory)';
+    }
+
+    function updateVideoTranscodeLabel() {
+      const mode = document.getElementById('videoTranscodeSelect').value;
+      const hint = document.getElementById('videoTranscodeHint');
+      if (hint) {
+        if (mode === 'desktop_hevc') {
+          hint.textContent = 'HEVC/AVI -> H.264 Baseline for PC Chrome (2 router CPU cores)';
+        } else if (mode === 'always') {
+          hint.textContent = 'Transcodes HEVC/AVI to H.264 for all devices upon request';
+        } else {
+          hint.textContent = '100% Direct Stream Copy (0% CPU load) [Recommended]';
+        }
+      }
     }
 
     async function savePipelineBuffers() {
@@ -3368,6 +3440,7 @@ app.get(['/msm/setting', '/msm/settings'], (req, res) => {
     async function saveEngineSettings() {
       const prefetch = document.getElementById('prefetchSelect').value === 'true';
       const ramMb = parseInt(document.getElementById('ramCacheSelect').value, 10) || 16;
+      const transcodeMode = document.getElementById('videoTranscodeSelect').value || 'disabled';
 
       const btn = document.getElementById('saveEngineBtn');
       btn.disabled = true;
@@ -3380,6 +3453,7 @@ app.get(['/msm/setting', '/msm/settings'], (req, res) => {
           body: JSON.stringify({
             overlapPrefetch: prefetch,
             routerRamCacheMb: ramMb,
+            videoTranscodeMode: transcodeMode,
           })
         });
         const data = await res.json();
@@ -3670,8 +3744,14 @@ app.get(['/api/resolve', '/msm/api/resolve'], async (req, res) => {
     const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'https';
     const isDesktopWeb = isDesktopWebClient(req);
     const isHevc = cached.videoCodec === 'hevc' || cached.videoCodec === 'h265' || /\b(x265|hevc|h265)\b/i.test(cached.filename || '');
-    // Video transcode is disabled. All clients receive direct stream or audio-only transcode when requested.
-    const transcodeQuery = '';
+    const isAvi = /\.avi$/i.test(cached.filename || '');
+    const transcodeSetting = savedSettings.videoTranscodeMode || 'disabled';
+    let transcodeQuery = '';
+    if (transcodeSetting === 'desktop_hevc' && isDesktopWeb && (isHevc || isAvi)) {
+      transcodeQuery = '?transcode=audio&vcodec=h264';
+    } else if (transcodeSetting === 'always' && (isHevc || isAvi)) {
+      transcodeQuery = '?transcode=audio&vcodec=h264';
+    }
     return res.json({
       success: true,
       cached: true,
@@ -3693,8 +3773,13 @@ app.get(['/api/resolve', '/msm/api/resolve'], async (req, res) => {
       const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'https';
       const isDesktopWeb = isDesktopWebClient(req);
       const isHevc = result.videoCodec === 'hevc' || result.videoCodec === 'h265' || /\b(x265|hevc|h265)\b/i.test(result.filename || '');
-      // Video transcode is disabled. All clients receive direct stream or audio-only transcode when requested.
-      const transcodeQuery = '';
+      const isAvi = /\.avi$/i.test(result.filename || '');
+      let transcodeQuery = '';
+      if (transcodeSetting === 'desktop_hevc' && isDesktopWeb && (isHevc || isAvi)) {
+        transcodeQuery = '?transcode=audio&vcodec=h264';
+      } else if (transcodeSetting === 'always' && (isHevc || isAvi)) {
+        transcodeQuery = '?transcode=audio&vcodec=h264';
+      }
       return res.json({
         success: true,
         cached: true,
@@ -4511,8 +4596,14 @@ app.get(['/api/resolve', '/msm/api/resolve'], async (req, res) => {
     const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'https';
     const isDesktopWeb = isDesktopWebClient(req);
     const isHevc = result.videoCodec === 'hevc' || result.videoCodec === 'h265' || /\b(x265|hevc|h265)\b/i.test(result.filename || '');
-    // Video transcode is disabled. All clients receive direct stream or audio-only transcode when requested.
-    const transcodeQuery = '';
+    const isAvi = /\.avi$/i.test(result.filename || '');
+    const transcodeSetting = savedSettings.videoTranscodeMode || 'disabled';
+    let transcodeQuery = '';
+    if (transcodeSetting === 'desktop_hevc' && isDesktopWeb && (isHevc || isAvi)) {
+      transcodeQuery = '?transcode=audio&vcodec=h264';
+    } else if (transcodeSetting === 'always' && (isHevc || isAvi)) {
+      transcodeQuery = '?transcode=audio&vcodec=h264';
+    }
 
     return res.json({
       success: true,
@@ -5387,16 +5478,24 @@ app.get('/stream/:docId', async (req, res) => {
     }
 
     const isMp4 = /\.mp4$/i.test(filename);
+    const isMkv = /\.mkv$/i.test(filename);
     const isDesktopWeb = isDesktopWebClient(req);
+    const isMobileDevice = isMobileClient(req);
 
-    // Audio transcode is lightweight (-c:v copy -c:a aac, 0% video CPU) and required for WebView/mobile clients to hear EAC3/AC3 5.1 surround sound.
-    // Video transcode (libx264) is disabled. Video is ALWAYS stream-copied (-c:v copy, 0% CPU).
+    const transcodeSetting = savedSettings.videoTranscodeMode || 'disabled';
     const isAudioTranscodeRequested = req.query.transcode === 'audio';
     const isVideoTranscodeRequested = req.query.transcode === 'video';
+    let autoVideoTranscodeNeeded = false;
+    if (transcodeSetting === 'desktop_hevc') {
+      autoVideoTranscodeNeeded = isDesktopWeb && (isAvi || isHevc);
+    } else if (transcodeSetting === 'always') {
+      autoVideoTranscodeNeeded = isAvi || isHevc;
+    }
 
     const shouldTranscode = !isInternalTranscoder && (
       isAudioTranscodeRequested ||
-      isVideoTranscodeRequested
+      isVideoTranscodeRequested ||
+      autoVideoTranscodeNeeded
     );
 
     if (shouldTranscode) {
@@ -5411,16 +5510,25 @@ app.get('/stream/:docId', async (req, res) => {
         mediaDetails = { audioMapSpecifier: '0:a:0', videoCodec: '', isHevc: false, isLegacyVideo: false };
       }
 
-      // Video transcoding (libx264) is 100% DISABLED across all clients. Video is ALWAYS stream-copied (-c:v copy, 0% CPU).
-      const needsVideoTranscode = false;
+      let needsVideoTranscode = false;
+      if (transcodeSetting === 'desktop_hevc') {
+        needsVideoTranscode = isDesktopWeb && (isAvi || req.query.vcodec === 'h264' || isHevc || mediaDetails.isHevc || mediaDetails.isLegacyVideo);
+      } else if (transcodeSetting === 'always') {
+        needsVideoTranscode = isAvi || req.query.vcodec === 'h264' || isHevc || mediaDetails.isHevc || mediaDetails.isLegacyVideo;
+      }
+
       const isMp4Source = /\.mp4$/i.test(filename);
-      // Fragmented MP4 is universally supported across Android WebView, iOS Safari, and Desktop browsers.
-      // Use fMP4 muxer whenever video is transcoded to H.264, source is MP4, or video codec is H.264.
-      const useMp4Muxer = isMp4Source || mediaDetails.videoCodec === 'h264';
+      const isMkvSource = /\.mkv$/i.test(filename);
+      // Container Selection:
+      // When stream-copying video (-c:v copy), preserve original container format:
+      // MKV sources MUST stay Matroska (-f matroska) to preserve B-frame DTS/PTS alignment.
+      // MP4 sources stay Fragmented MP4 (-f mp4).
+      // When video is actively re-encoded to H.264 baseline, Fragmented MP4 is universally supported.
+      const useMp4Muxer = isMp4Source || (needsVideoTranscode && !isMkvSource);
       const outputMime = useMp4Muxer ? 'video/mp4' : 'video/x-matroska';
       const outputExt = useMp4Muxer ? 'mp4' : 'mkv';
 
-      console.log(`[TRANSCODE AUDIO (Direct Video Copy)] Starting transcode for [${clientIdentity.name} (${clientIdentity.ip})] doc ${docId} (${filename}, Tier: ${detectedTier.toUpperCase()} [${tierConcurrency}x512KB]) at ${seekSec}s...`);
+      console.log(`[TRANSCODE ${needsVideoTranscode ? 'VIDEO H264' : 'AUDIO (Direct Video Copy)'}] Starting transcode for [${clientIdentity.name} (${clientIdentity.ip})] doc ${docId} (${filename}, Container: ${outputExt.toUpperCase()}, Tier: ${detectedTier.toUpperCase()} [${tierConcurrency}x512KB]) at ${seekSec}s...`);
 
       if (req.method === 'HEAD') {
         res.writeHead(200, {
@@ -5440,8 +5548,8 @@ app.get('/stream/:docId', async (req, res) => {
       }
 
       // Video encoding strategy:
-      // For AVI / legacy video or HEVC on desktop web: use baseline libx264.
-      // For standard H.264 streams and mobile clients: stream-copy 1:1 (-c:v copy, 0% CPU).
+      // For AVI / legacy video or HEVC on desktop web (when transcode enabled): use baseline libx264.
+      // For standard streams and direct copy mode: stream-copy 1:1 (-c:v copy, 0% CPU).
       const videoThreadCount = (mediaDetails.isHevc || isHevc) ? '2' : '1';
       const videoArgs = needsVideoTranscode
         ? [
@@ -5463,7 +5571,10 @@ app.get('/stream/:docId', async (req, res) => {
         : ['-flush_packets', '1', '-cluster_time_limit', '1000', '-cluster_size_limit', '524288', '-f', 'matroska'];
 
       const ffmpegBin = process.env.FFMPEG_PATH || (fs.existsSync('/opt/bin/ffmpeg') ? '/opt/bin/ffmpeg' : 'ffmpeg');
-      const inputSeekFlags = seekSec > 0 ? ['-ss', seekSec.toString(), '-seekable', '1'] : ['-seekable', '1'];
+      // When stream copying (-c:v copy) with seeking, use -noaccurate_seek so audio starts on the exact same keyframe as the video stream
+      const inputSeekFlags = seekSec > 0
+        ? ['-ss', seekSec.toString(), '-noaccurate_seek', '-seekable', '1']
+        : ['-seekable', '1'];
       const inputDecoderThreads = (needsVideoTranscode && (mediaDetails.isHevc || isHevc)) ? ['-threads', '2'] : [];
       const ffmpegArgs = [
         '-loglevel', 'error',
@@ -5483,7 +5594,7 @@ app.get('/stream/:docId', async (req, res) => {
         '-c:a', 'aac',
         '-ac', '2',
         '-b:a', '128k',
-        ...(needsVideoTranscode ? ['-af', 'aresample=async=1:first_pts=0'] : []),
+        '-af', 'aresample=async=1:first_pts=0',
         '-avoid_negative_ts', 'make_zero',
         ...muxerArgs,
         'pipe:1',
