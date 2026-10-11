@@ -32,7 +32,7 @@ interface VideoPlayerProps {
   onProviderChange: (p: StreamProvider) => void;
   onActiveServerChange?: (serverLabel: string, activeProviderId?: string) => void;
   onProbingStatusChange?: (isProbing: boolean, currentServerIndex: number, totalServers?: number) => void;
-  nextEpisodeInfo?: { season: number; episode: number; title?: string; stillPath?: string | null } | null;
+  nextEpisodeInfo?: { season: number; episode: number; title?: string; stillPath?: string | null; airDate?: string | null } | null;
   onNextEpisode?: () => void;
   initialTimestamp?: number;
   episodeRuntimeMinutes?: number;
@@ -216,6 +216,13 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   useEffect(() => {
     showUpNextRef.current = showUpNext;
   }, [showUpNext]);
+
+  // Session ref to prevent duplicate next episode prefetch requests
+  const prefetchedNextEpisodeKeyRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    prefetchedNextEpisodeKeyRef.current = null;
+  }, [tmdbId, season, episode]);
 
   // Playback position memory refs (0% React re-render overhead)
   const currentTimeRef = useRef<number>(initialTimestamp || 0);
@@ -1218,6 +1225,39 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       ? Math.round((currentSec / effectiveDuration) * 100)
       : 0;
     const progressPercent = Math.min(100, Math.max(0, unclampedProgressPercent));
+
+    // PREFETCH NEXT EPISODE (MSM PROVIDER ONLY):
+    // If watching TV series with MSM, current episode > 50% watched, and next episode is aired:
+    // Proactively prefetch next episode metadata to server cache (/api/prefetch).
+    const isUsingMsm = provider.id === 'telegram-msm' ||
+                       provider.id === 'telegram-msm32' ||
+                       provider.engine === 'telegram' ||
+                       (playerMode === 'direct' && Boolean(directStreamUrl && (directStreamUrl.includes(':3033') || directStreamUrl.includes(':3034'))));
+
+    if (
+      mediaType === 'tv' &&
+      isUsingMsm &&
+      effectiveDuration > 60 &&
+      currentSec / effectiveDuration > 0.5 &&
+      nextEpisodeInfoRef.current
+    ) {
+      const nextEp = nextEpisodeInfoRef.current;
+      const todayStr = new Date().toISOString().split('T')[0];
+      const isNextAired = Boolean(nextEp.airDate && nextEp.airDate <= todayStr);
+      const prefetchKey = `${tmdbId}_s${nextEp.season}_e${nextEp.episode}`;
+
+      if (isNextAired && prefetchedNextEpisodeKeyRef.current !== prefetchKey) {
+        prefetchedNextEpisodeKeyRef.current = prefetchKey;
+        console.log(`[VideoPlayer] MSM Stream > 50% watched (${Math.round((currentSec / effectiveDuration) * 100)}%). Next episode S${nextEp.season}E${nextEp.episode} is aired (${nextEp.airDate}). Triggering server cache prefetch...`);
+        msmService.prefetchEpisode(
+          title,
+          releaseYear,
+          nextEp.season,
+          nextEp.episode,
+          details?.number_of_seasons
+        ).catch(() => {});
+      }
+    }
 
     // Check for Up Next trigger on TV Series when Auto-Play is enabled
     // Triggers when reaching configured % (96%-104%) or when video has ended (force === true)

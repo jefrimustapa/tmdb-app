@@ -2135,8 +2135,9 @@ app.get('/msm/logs', (req, res) => {
 // 2. STREAM RESOLUTION & PLAYBACK ENDPOINTS
 // ==========================================
 
-// Health check endpoint (both /health, /msm/health, and /api/health)
-app.get(['/health', '/msm/health', '/api/health', '/msm/api/health'], (req, res) => {
+// Health check endpoint (moved /health/ to /msm/health/)
+app.get(['/health', '/health/'], (req, res) => res.redirect(301, '/msm/health/'));
+app.get(['/msm/health', '/msm/health/', '/api/health', '/api/health/', '/msm/api/health', '/msm/api/health/'], (req, res) => {
   res.json({
     status: 'ok',
     uptime: process.uptime(),
@@ -3658,14 +3659,17 @@ app.get(['/api/cache/evict', '/msm/api/cache/evict'], (req, res) => {
   return res.json({ success: true, evicted, key, docId });
 });
 
-// Resolver endpoint: /api/resolve?title=Kelas+Cikgu+Hiragi&season=1&episode=1
-app.get(['/api/resolve', '/msm/api/resolve'], async (req, res) => {
+// Resolver endpoint: /api/resolve and Prefetch endpoint: /api/prefetch
+app.get(['/api/resolve', '/msm/api/resolve', '/api/prefetch', '/msm/api/prefetch'], async (req, res) => {
   const { title, year, season, episode, totalSeasons: totalSeasonsQuery, maxQuality = '720', force, refresh } = req.query;
   if (!title) {
     return res.status(400).json({ success: false, error: 'Missing title query parameter' });
   }
 
-  const shouldBypassCache = force === 'true' || refresh === 'true';
+  const isPrefetch = req.path.includes('/prefetch') || req.query.prefetch === 'true' || req.query.prefetch === '1';
+  const logPrefix = isPrefetch ? 'PREFETCH' : 'RESOLVE';
+
+  const shouldBypassCache = !isPrefetch && (force === 'true' || refresh === 'true');
   let targetQuality = 720;
   const rawQ = String(maxQuality || '').toLowerCase().trim();
   if (rawQ === '4k' || parseInt(rawQ, 10) >= 2160) {
@@ -3695,17 +3699,20 @@ app.get(['/api/resolve', '/msm/api/resolve'], async (req, res) => {
   else qualitySuffix = '_720p';
   const cacheKey = `${baseCacheKey}${qualitySuffix}`;
 
-  console.log(`[RESOLVE] Request: "${queryTitle}" (isTv: ${isTv}, maxQuality: ${targetQuality}, bypassCache: ${shouldBypassCache}, cacheKey: "${cacheKey}")`);
+  console.log(`[${logPrefix}] Request: "${queryTitle}" (isTv: ${isTv}, maxQuality: ${targetQuality}, bypassCache: ${shouldBypassCache}, cacheKey: "${cacheKey}")`);
 
   let isAborted = false;
   const onClientClose = () => {
     if (!res.writableEnded) {
       isAborted = true;
-      console.log(`[RESOLVE] Client disconnected / aborted for "${queryTitle}"`);
+      console.log(`[${logPrefix}] Client disconnected / aborted for "${queryTitle}"`);
       inFlightResolutions.delete(cacheKey);
     }
   };
-  req.on('close', onClientClose);
+  if (!isPrefetch) {
+    req.on('close', onClientClose);
+  }
+  const checkAborted = () => !isPrefetch && (isAborted || Boolean(req.destroyed));
 
   // 1. Check Central Database first (Instant < 1ms response, 0 bot queries)
   let cached = shouldBypassCache ? null : db.get(cacheKey);
@@ -3738,8 +3745,17 @@ app.get(['/api/resolve', '/msm/api/resolve'], async (req, res) => {
   }
 
   if (cached) {
-    console.log(`[RESOLVE] Central DB Cache HIT for "${cacheKey}" -> Doc ID: ${cached.docId} (${cached.filename})`);
-    req.off('close', onClientClose);
+    console.log(`[${logPrefix}] Central DB Cache HIT for "${cacheKey}" -> Doc ID: ${cached.docId} (${cached.filename})`);
+    if (!isPrefetch) req.off('close', onClientClose);
+    if (isPrefetch) {
+      return res.json({
+        success: true,
+        cached: true,
+        docId: cached.docId,
+        filename: cached.filename,
+        size: cached.size,
+      });
+    }
     const host = req.get('host');
     const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'https';
     const isDesktopWeb = isDesktopWebClient(req);
@@ -3764,7 +3780,10 @@ app.get(['/api/resolve', '/msm/api/resolve'], async (req, res) => {
 
   // 2. In-flight Request Deduplication: if another request is currently resolving this exact title, await it
   if (inFlightResolutions.has(cacheKey)) {
-    console.log(`[RESOLVE] In-flight deduplication: attaching to existing resolution for "${cacheKey}"`);
+    console.log(`[${logPrefix}] In-flight deduplication: attaching to existing resolution for "${cacheKey}"`);
+    if (isPrefetch) {
+      return res.json({ success: true, cached: false, inFlight: true });
+    }
     try {
       const result = await inFlightResolutions.get(cacheKey);
       req.off('close', onClientClose);
@@ -3794,10 +3813,16 @@ app.get(['/api/resolve', '/msm/api/resolve'], async (req, res) => {
     }
   }
 
-  // 3. Queue resolution through sequential FIFO mutex to prevent Telegram chat interleaving
+  // 3. If prefetch request and not yet cached: immediately acknowledge HTTP 200 so client connection does not block!
+  if (isPrefetch) {
+    console.log(`[PREFETCH] Immediately acknowledging prefetch for "${queryTitle}". Continuing bot resolution in background.`);
+    res.json({ success: true, cached: false, prefetching: true });
+  }
+
+  // 4. Queue resolution through sequential FIFO mutex to prevent Telegram chat interleaving
   const resolvePromise = queueTelegramTask(async () => {
-    if (isAborted || req.destroyed) {
-      console.log(`[RESOLVE] Skipping queued resolution for "${queryTitle}" (client aborted)`);
+    if (checkAborted()) {
+      console.log(`[${logPrefix}] Skipping queued resolution for "${queryTitle}" (client aborted)`);
       const err = new Error('Client aborted resolution');
       err.status = 499;
       throw err;
@@ -3805,7 +3830,7 @@ app.get(['/api/resolve', '/msm/api/resolve'], async (req, res) => {
 
     await initTelegram();
 
-    if (isAborted || req.destroyed) {
+    if (checkAborted()) {
       const err = new Error('Client aborted resolution');
       err.status = 499;
       throw err;
@@ -4152,7 +4177,7 @@ app.get(['/api/resolve', '/msm/api/resolve'], async (req, res) => {
       const MAX_STEPS = 6;
 
       while (activeMsg && activePage !== targetPage && steps < MAX_STEPS) {
-        if (isAborted || req.destroyed) break;
+        if (checkAborted()) break;
         steps++;
         const navBtn = findPageButton(activeMsg.replyMarkup, targetPage, activePage);
         if (!navBtn) {
@@ -4218,7 +4243,7 @@ app.get(['/api/resolve', '/msm/api/resolve'], async (req, res) => {
     }
 
     for (const sq of searchQueries) {
-      if (isAborted || req.destroyed) {
+      if (checkAborted()) {
         console.log(`[RESOLVE] Aborting search query loop for "${queryTitle}" (client aborted)`);
         break;
       }
@@ -4229,7 +4254,7 @@ app.get(['/api/resolve', '/msm/api/resolve'], async (req, res) => {
       let noResults = false;
 
       for (let poll = 0; poll < 8; poll++) {
-        if (isAborted || req.destroyed) break;
+        if (checkAborted()) break;
         await new Promise(r => setTimeout(r, 400));
         const msgs = await client.getMessages(BOT_USERNAME, { limit: 5 });
         const candidates = [];
@@ -4255,7 +4280,7 @@ app.get(['/api/resolve', '/msm/api/resolve'], async (req, res) => {
               const MAX_PAGES = isTv ? 6 : 3;
 
               while (currentMsg && pageCount < MAX_PAGES) {
-                if (isAborted || req.destroyed) break;
+                if (checkAborted()) break;
                 pageCount++;
                 activeBotMsg = currentMsg;
                 activeBotPage = pageCount;
@@ -4279,7 +4304,7 @@ app.get(['/api/resolve', '/msm/api/resolve'], async (req, res) => {
                 }
 
                 // Traverse all pages to accumulate all candidate buttons for this query
-                if (pageCount >= MAX_PAGES || isAborted || req.destroyed) break;
+                if (pageCount >= MAX_PAGES || checkAborted()) break;
 
                 // Otherwise, check for pagination button to traverse to next page
                 const nextBtn = findNextPageButton(currentMsg.replyMarkup);
@@ -4312,7 +4337,7 @@ app.get(['/api/resolve', '/msm/api/resolve'], async (req, res) => {
           }
         }
 
-        if (noResults || isAborted || req.destroyed) break;
+        if (noResults || checkAborted()) break;
 
         const valid = candidates.filter(c => c.score >= 0).sort((a, b) => b.score - a.score);
         if (valid.length > 0) {
@@ -4330,7 +4355,7 @@ app.get(['/api/resolve', '/msm/api/resolve'], async (req, res) => {
           // Exhaustively try all candidate buttons across all pages for this query
           const candidatesToTry = uniqueValid;
           for (let candIdx = 0; candIdx < candidatesToTry.length; candIdx++) {
-            if (isAborted || req.destroyed) break;
+            if (checkAborted()) break;
             const cand = candidatesToTry[candIdx];
             console.log(`[RESOLVE] Trying candidate (${candIdx + 1}/${candidatesToTry.length}): "${cand.text}" (score: ${cand.score}, page: ${cand.page || 1})...`);
 
@@ -4512,9 +4537,9 @@ app.get(['/api/resolve', '/msm/api/resolve'], async (req, res) => {
             let finalFilename = candidateFilename || queryTitle;
 
             for (let attempt = 0; attempt < 8; attempt++) {
-              if (isAborted || req.destroyed) break;
+              if (checkAborted()) break;
               await new Promise(r => setTimeout(r, 1500));
-              if (isAborted || req.destroyed) break;
+              if (checkAborted()) break;
               const incoming = await client.getMessages(BOT_USERNAME, { limit: 10 });
               for (const im of incoming) {
                 if (im.id > sentMsgId && im.media?.document) {
@@ -4544,10 +4569,10 @@ app.get(['/api/resolve', '/msm/api/resolve'], async (req, res) => {
         }
       }
 
-      if (deliveredDoc || isAborted || req.destroyed) break; // Exit searchQueries loop
+      if (deliveredDoc || checkAborted()) break; // Exit searchQueries loop
     }
 
-    if (isAborted || req.destroyed) {
+    if (checkAborted()) {
       const err = new Error('Client aborted resolution');
       err.status = 499;
       throw err;
@@ -4579,7 +4604,7 @@ app.get(['/api/resolve', '/msm/api/resolve'], async (req, res) => {
       width: vAttr?.w ? Number(vAttr.w) : null,
       height: vAttr?.h ? Number(vAttr.h) : null,
     });
-    console.log(`[RESOLVE] Successfully resolved "${queryTitle}" -> Doc ID: ${docIdStr} (${filename})`);
+    console.log(`[${logPrefix}] Successfully resolved "${queryTitle}" -> Doc ID: ${docIdStr} (${filename})`);
     return resolvedItem;
   });
 
@@ -4588,7 +4613,14 @@ app.get(['/api/resolve', '/msm/api/resolve'], async (req, res) => {
   try {
     const result = await resolvePromise;
     inFlightResolutions.delete(cacheKey);
-    req.off('close', onClientClose);
+    if (!isPrefetch) {
+      req.off('close', onClientClose);
+    }
+
+    if (isPrefetch) {
+      console.log(`[PREFETCH] Background resolution complete for "${queryTitle}" -> Doc ID: ${result?.docId || result?.id} cached in Central DB.`);
+      return;
+    }
 
     if (isAborted || res.writableEnded) return;
 
@@ -4615,7 +4647,13 @@ app.get(['/api/resolve', '/msm/api/resolve'], async (req, res) => {
     });
   } catch (err) {
     inFlightResolutions.delete(cacheKey);
-    req.off('close', onClientClose);
+    if (!isPrefetch) {
+      req.off('close', onClientClose);
+    }
+    if (isPrefetch) {
+      console.warn(`[PREFETCH WARN] Background prefetch failed for "${queryTitle}":`, err.message);
+      return;
+    }
     if (err.status === 499 || isAborted || req.destroyed) {
       console.log(`[RESOLVE] Request cancelled cleanly for "${queryTitle}"`);
       return;
