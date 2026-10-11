@@ -3669,8 +3669,7 @@ app.get(['/api/resolve', '/msm/api/resolve'], async (req, res) => {
     const host = req.get('host');
     const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'https';
     const isDesktopWeb = isDesktopWebClient(req);
-    const isMp4 = /\.mp4$/i.test(cached.filename || '');
-    const isAvi = /\.avi$/i.test(cached.filename || '');
+    const isHevc = cached.videoCodec === 'hevc' || cached.videoCodec === 'h265' || /\b(x265|hevc|h265)\b/i.test(cached.filename || '');
     // Video transcode is disabled. All clients receive direct stream or audio-only transcode when requested.
     const transcodeQuery = '';
     return res.json({
@@ -3693,8 +3692,7 @@ app.get(['/api/resolve', '/msm/api/resolve'], async (req, res) => {
       const host = req.get('host');
       const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'https';
       const isDesktopWeb = isDesktopWebClient(req);
-      const isMp4 = /\.mp4$/i.test(result.filename || '');
-      const isAvi = /\.avi$/i.test(result.filename || '');
+      const isHevc = result.videoCodec === 'hevc' || result.videoCodec === 'h265' || /\b(x265|hevc|h265)\b/i.test(result.filename || '');
       // Video transcode is disabled. All clients receive direct stream or audio-only transcode when requested.
       const transcodeQuery = '';
       return res.json({
@@ -4512,8 +4510,7 @@ app.get(['/api/resolve', '/msm/api/resolve'], async (req, res) => {
     const host = req.get('host');
     const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'https';
     const isDesktopWeb = isDesktopWebClient(req);
-    const isMp4 = /\.mp4$/i.test(result.filename || '');
-    const isAvi = /\.avi$/i.test(result.filename || '');
+    const isHevc = result.videoCodec === 'hevc' || result.videoCodec === 'h265' || /\b(x265|hevc|h265)\b/i.test(result.filename || '');
     // Video transcode is disabled. All clients receive direct stream or audio-only transcode when requested.
     const transcodeQuery = '';
 
