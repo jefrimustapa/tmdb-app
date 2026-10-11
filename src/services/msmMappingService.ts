@@ -79,10 +79,16 @@ class MsmMappingService {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), 6000);
 
-      const res = await fetch(`${baseUrl}/health`, {
+      let res = await fetch(`${baseUrl}/msm/health`, {
         signal: controller.signal,
         headers: { 'Accept': 'application/json' },
       });
+      if (!res.ok && res.status === 404) {
+        res = await fetch(`${baseUrl}/health`, {
+          signal: controller.signal,
+          headers: { 'Accept': 'application/json' },
+        });
+      }
       clearTimeout(timer);
 
       if (!res.ok) {

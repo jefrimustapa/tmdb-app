@@ -2,12 +2,13 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20261011-1548';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-msm-prefetch-ne.20261011-1548';
+export const APP_BUILD_NUMBER = '20261011-1610';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-msm-prefetch-ne.20261011-1610';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
 export const APP_BRANCH = 'feat-msm-prefetch-ne';
-export const APP_CHANGELOG = `* fix(sync): fix MKV A/V desync with Matroska muxer & seeking sync, add videoTranscodeMode setting
+export const APP_CHANGELOG = `* feat(msm): prefetch and cache next episode at server when >50% watched
+* fix(sync): fix MKV A/V desync with Matroska muxer & seeking sync, add videoTranscodeMode setting
 * fix(resolve): define isHevc variable in resolve responses to prevent ReferenceError
 * fix(stream): completely disable any video transcode across all clients
 * fix(stream): strictly enforce direct video copy for mobile clients on HEVC
@@ -20,5 +21,4 @@ export const APP_CHANGELOG = `* fix(sync): fix MKV A/V desync with Matroska muxe
 * Merge branch 'perf/improve-msm-stream-speed' into main
 * fix(msm): bind pipeline buffer tier strictly to actual media quality instead of client requested quality
 * fix(msm): pass detectedTier to stream pipeline so active clients display matching quality tier
-* feat(msm): add 480p and 4k quality tiers, service restart, unified styling and dashboard metrics
-* fix(msm-getter): handle malformed JSON bodies gracefully without logging stack trace`;
+* feat(msm): add 480p and 4k quality tiers, service restart, unified styling and dashboard metrics`;
