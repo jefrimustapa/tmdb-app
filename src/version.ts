@@ -2,12 +2,15 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20261010-2347';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.fix-phone-mkv-audio-.20261010-2347';
+export const APP_BUILD_NUMBER = '20261011-1548';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-msm-prefetch-ne.20261011-1548';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
-export const APP_BRANCH = 'fix-phone-mkv-audio-';
-export const APP_CHANGELOG = `* fix(stream): strictly enforce direct video copy for mobile clients on HEVC
+export const APP_BRANCH = 'feat-msm-prefetch-ne';
+export const APP_CHANGELOG = `* fix(sync): fix MKV A/V desync with Matroska muxer & seeking sync, add videoTranscodeMode setting
+* fix(resolve): define isHevc variable in resolve responses to prevent ReferenceError
+* fix(stream): completely disable any video transcode across all clients
+* fix(stream): strictly enforce direct video copy for mobile clients on HEVC
 * fix(stream): enable mobile audio transcode with direct video copy and accurate seek
 * chore(version): update build metadata for main branch
 * Merge branch 'refactor/msm-mp4-stream-revise' into main
@@ -18,7 +21,4 @@ export const APP_CHANGELOG = `* fix(stream): strictly enforce direct video copy 
 * fix(msm): bind pipeline buffer tier strictly to actual media quality instead of client requested quality
 * fix(msm): pass detectedTier to stream pipeline so active clients display matching quality tier
 * feat(msm): add 480p and 4k quality tiers, service restart, unified styling and dashboard metrics
-* fix(msm-getter): handle malformed JSON bodies gracefully without logging stack trace
-* feat(stream): configure quality-based pipeline buffer concurrency on server and clean up client UI
-* perf(stream): harmonize 4-tier pipeline buffer (Eco, Standard, Turbo, Ultra) with 512KB blocks and overlapped prefetching
-* Merge pull request #196 from jefrimustapa/feat/msm-getter-revise`;
+* fix(msm-getter): handle malformed JSON bodies gracefully without logging stack trace`;
