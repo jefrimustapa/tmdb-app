@@ -217,6 +217,52 @@ class MsmMappingService {
   }
 
   /**
+   * Pre-fetches and caches the next episode at the server in the background (/api/prefetch).
+   * Non-blocking fire-and-forget: server acknowledges immediately and caches in background.
+   */
+  async prefetchEpisode(
+    title: string,
+    year?: number | string,
+    season?: number,
+    episode?: number,
+    totalSeasons?: number
+  ): Promise<boolean> {
+    try {
+      const baseUrl = await this.getBaseUrl();
+      const settings = await dbService.getSettings();
+      const maxQuality = settings?.msmMaxQuality || settings?.msm32MaxQuality || '1080';
+
+      const params = new URLSearchParams({ title });
+      if (year) params.append('year', String(year));
+      if (typeof season === 'number' && !isNaN(season)) params.append('season', String(season));
+      if (typeof episode === 'number' && !isNaN(episode)) params.append('episode', String(episode));
+      if (typeof totalSeasons === 'number' && !isNaN(totalSeasons)) params.append('totalSeasons', String(totalSeasons));
+      params.append('maxQuality', maxQuality);
+
+      console.log(`[MSM Prefetch] Dispatching /api/prefetch for "${title}" S${season}E${episode}...`);
+
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 10000);
+
+      const res = await fetch(`${baseUrl}/api/prefetch?${params.toString()}`, {
+        signal: controller.signal,
+        headers: { 'Accept': 'application/json' },
+      });
+      clearTimeout(timer);
+
+      if (res.ok) {
+        const data = await res.json().catch(() => ({}));
+        console.log(`[MSM Prefetch] Server acknowledged prefetch for "${title}" S${season}E${episode}:`, data);
+        return true;
+      }
+      return false;
+    } catch (err: any) {
+      console.warn(`[MSM Prefetch] Non-critical prefetch error for "${title}" S${season}E${episode}:`, err?.message || err);
+      return false;
+    }
+  }
+
+  /**
    * Fetch all cached video streams from central DB on server
    */
   async getCachedStreams(customUrl?: string, search?: string): Promise<CachedStreamsResponse> {
