@@ -701,18 +701,22 @@ export const Watch: React.FC = () => {
           season: seasonParam,
           episode: episodeParam + 1,
           title: nextInSeason.name,
-          stillPath: nextInSeason.still_path
+          stillPath: nextInSeason.still_path,
+          airDate: nextInSeason.air_date || null,
         };
       }
     }
 
     // 2. Season rollover (e.g. S1 E10 -> S2 E1)
     if (tvDetails.number_of_seasons && seasonParam < tvDetails.number_of_seasons) {
+      const nextSeasonNum = seasonParam + 1;
+      const nextSeasonMeta = tvDetails.seasons?.find((s) => s.season_number === nextSeasonNum);
       return {
-        season: seasonParam + 1,
+        season: nextSeasonNum,
         episode: 1,
         title: 'Season Premiere',
-        stillPath: null
+        stillPath: null,
+        airDate: nextSeasonMeta?.air_date || null,
       };
     }
 
