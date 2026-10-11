@@ -2135,8 +2135,9 @@ app.get('/msm/logs', (req, res) => {
 // 2. STREAM RESOLUTION & PLAYBACK ENDPOINTS
 // ==========================================
 
-// Health check endpoint (both /health, /msm/health, and /api/health)
-app.get(['/health', '/msm/health', '/api/health', '/msm/api/health'], (req, res) => {
+// Health check endpoint (moved /health/ to /msm/health/)
+app.get(['/health', '/health/'], (req, res) => res.redirect(301, '/msm/health/'));
+app.get(['/msm/health', '/msm/health/', '/api/health', '/api/health/', '/msm/api/health', '/msm/api/health/'], (req, res) => {
   res.json({
     status: 'ok',
     uptime: process.uptime(),
