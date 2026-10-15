@@ -78,6 +78,8 @@ savedSettings.pipelineBuffers = Object.assign({}, DEFAULT_PIPELINE_BUFFERS, save
 if (savedSettings.overlapPrefetch === undefined) savedSettings.overlapPrefetch = true;
 if (savedSettings.routerRamCacheMb === undefined) savedSettings.routerRamCacheMb = 16;
 if (savedSettings.videoTranscodeMode === undefined) savedSettings.videoTranscodeMode = 'disabled';
+if (savedSettings.minTvSizeMb === undefined) savedSettings.minTvSizeMb = 80;
+if (savedSettings.minMovieSizeMb === undefined) savedSettings.minMovieSizeMb = 180;
 
 export let BOT_USERNAME = (savedSettings.targetBotUsername || process.env.TG_BOT_USERNAME || 'msm34bot').replace(/^@/, '');
 
@@ -647,7 +649,9 @@ function scoreCandidateButton(btn, msg, context = {}) {
     eNum = 1,
     totalSeasons = 1,
     targetQuality = 720,
-    significantTokens = extractSignificantTokens(title)
+    significantTokens = extractSignificantTokens(title),
+    minTvSizeMb = savedSettings.minTvSizeMb ?? 80,
+    minMovieSizeMb = savedSettings.minMovieSizeMb ?? 180,
   } = context;
 
   if ((btn.className !== 'KeyboardButtonUrlAuth' && btn.className !== 'KeyboardButtonUrl') || !btn.url) return -999;
@@ -665,11 +669,9 @@ function scoreCandidateButton(btn, msg, context = {}) {
   const btnSizeMB = parseSizeFromText(btn.text) || parseSizeFromText(msg.message);
   if (btnSizeMB !== null) {
     if (isTv) {
-      if (btnSizeMB < 70) return -999;
-      if (btnSizeMB < 120) return -600;
+      if (btnSizeMB < minTvSizeMb) return -999;
     } else {
-      if (btnSizeMB < 100) return -999;
-      if (btnSizeMB < 250) return -600;
+      if (btnSizeMB < minMovieSizeMb) return -999;
     }
   }
 
@@ -2160,6 +2162,8 @@ app.get(['/api/settings', '/msm/api/settings'], (req, res) => {
     overlapPrefetch: savedSettings.overlapPrefetch !== false,
     routerRamCacheMb: savedSettings.routerRamCacheMb || 16,
     videoTranscodeMode: savedSettings.videoTranscodeMode || 'disabled',
+    minTvSizeMb: savedSettings.minTvSizeMb ?? 80,
+    minMovieSizeMb: savedSettings.minMovieSizeMb ?? 180,
     blockCacheEntries: globalBlockCache.size,
     blockCacheMaxEntries: getBlockCacheMaxEntries(),
     port,
@@ -2169,7 +2173,7 @@ app.get(['/api/settings', '/msm/api/settings'], (req, res) => {
 
 app.post(['/api/settings', '/msm/api/settings'], (req, res) => {
   try {
-    const { targetBotUsername, pipelineBuffers, overlapPrefetch, routerRamCacheMb, videoTranscodeMode } = req.body || {};
+    const { targetBotUsername, pipelineBuffers, overlapPrefetch, routerRamCacheMb, videoTranscodeMode, minTvSizeMb, minMovieSizeMb } = req.body || {};
     let changed = false;
 
     if (targetBotUsername && typeof targetBotUsername === 'string') {
@@ -2221,6 +2225,24 @@ app.post(['/api/settings', '/msm/api/settings'], (req, res) => {
       }
     }
 
+    if (minTvSizeMb !== undefined) {
+      const tvMb = parseInt(minTvSizeMb, 10);
+      if (!isNaN(tvMb) && tvMb >= 10 && tvMb <= 500) {
+        savedSettings.minTvSizeMb = tvMb;
+        changed = true;
+        console.log(`[SETTINGS] Minimum TV episode size updated to: ${tvMb} MB`);
+      }
+    }
+
+    if (minMovieSizeMb !== undefined) {
+      const movieMb = parseInt(minMovieSizeMb, 10);
+      if (!isNaN(movieMb) && movieMb >= 50 && movieMb <= 2000) {
+        savedSettings.minMovieSizeMb = movieMb;
+        changed = true;
+        console.log(`[SETTINGS] Minimum Movie size updated to: ${movieMb} MB`);
+      }
+    }
+
     if (changed) {
       const dataDir = path.join(__dirname, 'data');
       if (!fs.existsSync(dataDir)) {
@@ -2236,6 +2258,8 @@ app.post(['/api/settings', '/msm/api/settings'], (req, res) => {
       overlapPrefetch: savedSettings.overlapPrefetch !== false,
       routerRamCacheMb: savedSettings.routerRamCacheMb || 16,
       videoTranscodeMode: savedSettings.videoTranscodeMode || 'disabled',
+      minTvSizeMb: savedSettings.minTvSizeMb ?? 80,
+      minMovieSizeMb: savedSettings.minMovieSizeMb ?? 180,
       blockCacheEntries: globalBlockCache.size,
       blockCacheMaxEntries: getBlockCacheMaxEntries(),
     });
@@ -3233,6 +3257,42 @@ app.get(['/msm/setting', '/msm/settings'], (req, res) => {
             </select>
           </div>
 
+          <!-- TV Series Minimum File Size -->
+          <div class="flex items-center justify-between gap-3 bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/80">
+            <div>
+              <div class="text-xs font-semibold text-white">TV Series Minimum Size</div>
+              <div id="minTvSizeHint" class="text-[11px] text-slate-400">Files &lt; 80 MB are treated as clips/trailers and skipped</div>
+            </div>
+            <select id="minTvSizeSelect" onchange="updateMinTvSizeLabel()" class="bg-slate-900 border border-slate-700 text-xs text-white rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-sky-500">
+              <option value="40">40 MB</option>
+              <option value="50">50 MB</option>
+              <option value="60">60 MB</option>
+              <option value="70">70 MB</option>
+              <option value="80" selected>80 MB (Default)</option>
+              <option value="90">90 MB</option>
+              <option value="100">100 MB</option>
+              <option value="120">120 MB</option>
+            </select>
+          </div>
+
+          <!-- Movie Minimum File Size -->
+          <div class="flex items-center justify-between gap-3 bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/80">
+            <div>
+              <div class="text-xs font-semibold text-white">Movie Minimum Size</div>
+              <div id="minMovieSizeHint" class="text-[11px] text-slate-400">Files &lt; 180 MB are treated as clips/trailers and skipped</div>
+            </div>
+            <select id="minMovieSizeSelect" onchange="updateMinMovieSizeLabel()" class="bg-slate-900 border border-slate-700 text-xs text-white rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-sky-500">
+              <option value="80">80 MB</option>
+              <option value="100">100 MB</option>
+              <option value="120">120 MB</option>
+              <option value="150">150 MB</option>
+              <option value="180" selected>180 MB (Default)</option>
+              <option value="200">200 MB</option>
+              <option value="250">250 MB</option>
+              <option value="300">300 MB</option>
+            </select>
+          </div>
+
           <div class="flex items-center justify-between pt-2">
             <span id="saveEngineMsg" class="text-xs text-emerald-400 hidden">✓ Engine settings saved & applied!</span>
             <div class="flex-1"></div>
@@ -3372,6 +3432,14 @@ app.get(['/msm/setting', '/msm/settings'], (req, res) => {
           document.getElementById('videoTranscodeSelect').value = String(res.videoTranscodeMode);
           updateVideoTranscodeLabel();
         }
+        if (res.minTvSizeMb !== undefined) {
+          document.getElementById('minTvSizeSelect').value = String(res.minTvSizeMb);
+          updateMinTvSizeLabel();
+        }
+        if (res.minMovieSizeMb !== undefined) {
+          document.getElementById('minMovieSizeSelect').value = String(res.minMovieSizeMb);
+          updateMinMovieSizeLabel();
+        }
       } catch (e) {}
     }
 
@@ -3390,6 +3458,16 @@ app.get(['/msm/setting', '/msm/settings'], (req, res) => {
     function updateRamCacheLabel() {
       const mb = parseInt(document.getElementById('ramCacheSelect').value, 10) || 16;
       document.getElementById('ramCacheHint').textContent = (mb * 2) + ' blocks (' + mb + ' MB cap in Node memory)';
+    }
+
+    function updateMinTvSizeLabel() {
+      const mb = parseInt(document.getElementById('minTvSizeSelect').value, 10) || 80;
+      document.getElementById('minTvSizeHint').textContent = 'Files < ' + mb + ' MB are treated as clips/trailers and skipped';
+    }
+
+    function updateMinMovieSizeLabel() {
+      const mb = parseInt(document.getElementById('minMovieSizeSelect').value, 10) || 180;
+      document.getElementById('minMovieSizeHint').textContent = 'Files < ' + mb + ' MB are treated as clips/trailers and skipped';
     }
 
     function updateVideoTranscodeLabel() {
@@ -3442,6 +3520,8 @@ app.get(['/msm/setting', '/msm/settings'], (req, res) => {
       const prefetch = document.getElementById('prefetchSelect').value === 'true';
       const ramMb = parseInt(document.getElementById('ramCacheSelect').value, 10) || 16;
       const transcodeMode = document.getElementById('videoTranscodeSelect').value || 'disabled';
+      const minTvMb = parseInt(document.getElementById('minTvSizeSelect').value, 10) || 80;
+      const minMovieMb = parseInt(document.getElementById('minMovieSizeSelect').value, 10) || 180;
 
       const btn = document.getElementById('saveEngineBtn');
       btn.disabled = true;
@@ -3455,6 +3535,8 @@ app.get(['/msm/setting', '/msm/settings'], (req, res) => {
             overlapPrefetch: prefetch,
             routerRamCacheMb: ramMb,
             videoTranscodeMode: transcodeMode,
+            minTvSizeMb: minTvMb,
+            minMovieSizeMb: minMovieMb,
           })
         });
         const data = await res.json();
@@ -3661,10 +3743,15 @@ app.get(['/api/cache/evict', '/msm/api/cache/evict'], (req, res) => {
 
 // Resolver endpoint: /api/resolve and Prefetch endpoint: /api/prefetch
 app.get(['/api/resolve', '/msm/api/resolve', '/api/prefetch', '/msm/api/prefetch'], async (req, res) => {
-  const { title, year, season, episode, totalSeasons: totalSeasonsQuery, maxQuality = '720', force, refresh } = req.query;
+  const { title, year, season, episode, totalSeasons: totalSeasonsQuery, maxQuality = '720', force, refresh, minTvSize, minMovieSize } = req.query;
   if (!title) {
     return res.status(400).json({ success: false, error: 'Missing title query parameter' });
   }
+
+  const parsedMinTv = minTvSize ? parseInt(minTvSize, 10) : undefined;
+  const parsedMinMovie = minMovieSize ? parseInt(minMovieSize, 10) : undefined;
+  const effectiveMinTv = !isNaN(parsedMinTv) ? parsedMinTv : (savedSettings.minTvSizeMb ?? 80);
+  const effectiveMinMovie = !isNaN(parsedMinMovie) ? parsedMinMovie : (savedSettings.minMovieSizeMb ?? 180);
 
   const isPrefetch = req.path.includes('/prefetch') || req.query.prefetch === 'true' || req.query.prefetch === '1';
   const logPrefix = isPrefetch ? 'PREFETCH' : 'RESOLVE';
@@ -3906,7 +3993,7 @@ app.get(['/api/resolve', '/msm/api/resolve', '/api/prefetch', '/msm/api/prefetch
 
         // 2. Minimum media file size check (reject clips and trailers under threshold)
         const docSizeMB = Number(doc.size || 0) / (1024 * 1024);
-        if (isTv ? docSizeMB < 70 : docSizeMB < 100) {
+        if (isTv ? docSizeMB < effectiveMinTv : docSizeMB < effectiveMinMovie) {
           continue;
         }
 
@@ -4094,6 +4181,8 @@ app.get(['/api/resolve', '/msm/api/resolve', '/api/prefetch', '/msm/api/prefetch
         totalSeasons,
         targetQuality,
         significantTokens,
+        minTvSizeMb: effectiveMinTv,
+        minMovieSizeMb: effectiveMinMovie,
       });
     }
 
@@ -6004,4 +6093,5 @@ export {
   extractSignificantTokens,
   extractYear,
   extractSequelInfo,
+  savedSettings,
 };
