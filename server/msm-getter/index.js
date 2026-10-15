@@ -3263,16 +3263,12 @@ app.get(['/msm/setting', '/msm/settings'], (req, res) => {
               <div class="text-xs font-semibold text-white">TV Series Minimum Size</div>
               <div id="minTvSizeHint" class="text-[11px] text-slate-400">Files &lt; 80 MB are treated as clips/trailers and skipped</div>
             </div>
-            <select id="minTvSizeSelect" onchange="updateMinTvSizeLabel()" class="bg-slate-900 border border-slate-700 text-xs text-white rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-sky-500">
-              <option value="40">40 MB</option>
-              <option value="50">50 MB</option>
-              <option value="60">60 MB</option>
-              <option value="70">70 MB</option>
-              <option value="80" selected>80 MB (Default)</option>
-              <option value="90">90 MB</option>
-              <option value="100">100 MB</option>
-              <option value="120">120 MB</option>
-            </select>
+            <div class="flex items-center gap-1.5 bg-slate-900 border border-slate-700 rounded-lg p-1">
+              <button type="button" onclick="adjustMinTvSize(-5)" class="w-6 h-6 flex items-center justify-center rounded bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white font-bold text-xs transition select-none">-</button>
+              <input id="minTvSizeInput" type="number" step="5" min="10" max="500" value="80" oninput="updateMinTvSizeLabel()" class="w-12 bg-transparent text-center text-xs font-mono font-semibold text-white focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
+              <span class="text-[11px] text-slate-400 pr-1">MB</span>
+              <button type="button" onclick="adjustMinTvSize(5)" class="w-6 h-6 flex items-center justify-center rounded bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white font-bold text-xs transition select-none">+</button>
+            </div>
           </div>
 
           <!-- Movie Minimum File Size -->
@@ -3281,16 +3277,12 @@ app.get(['/msm/setting', '/msm/settings'], (req, res) => {
               <div class="text-xs font-semibold text-white">Movie Minimum Size</div>
               <div id="minMovieSizeHint" class="text-[11px] text-slate-400">Files &lt; 180 MB are treated as clips/trailers and skipped</div>
             </div>
-            <select id="minMovieSizeSelect" onchange="updateMinMovieSizeLabel()" class="bg-slate-900 border border-slate-700 text-xs text-white rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-sky-500">
-              <option value="80">80 MB</option>
-              <option value="100">100 MB</option>
-              <option value="120">120 MB</option>
-              <option value="150">150 MB</option>
-              <option value="180" selected>180 MB (Default)</option>
-              <option value="200">200 MB</option>
-              <option value="250">250 MB</option>
-              <option value="300">300 MB</option>
-            </select>
+            <div class="flex items-center gap-1.5 bg-slate-900 border border-slate-700 rounded-lg p-1">
+              <button type="button" onclick="adjustMinMovieSize(-5)" class="w-6 h-6 flex items-center justify-center rounded bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white font-bold text-xs transition select-none">-</button>
+              <input id="minMovieSizeInput" type="number" step="5" min="20" max="2000" value="180" oninput="updateMinMovieSizeLabel()" class="w-12 bg-transparent text-center text-xs font-mono font-semibold text-white focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
+              <span class="text-[11px] text-slate-400 pr-1">MB</span>
+              <button type="button" onclick="adjustMinMovieSize(5)" class="w-6 h-6 flex items-center justify-center rounded bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white font-bold text-xs transition select-none">+</button>
+            </div>
           </div>
 
           <div class="flex items-center justify-between pt-2">
@@ -3433,11 +3425,11 @@ app.get(['/msm/setting', '/msm/settings'], (req, res) => {
           updateVideoTranscodeLabel();
         }
         if (res.minTvSizeMb !== undefined) {
-          document.getElementById('minTvSizeSelect').value = String(res.minTvSizeMb);
+          document.getElementById('minTvSizeInput').value = String(res.minTvSizeMb);
           updateMinTvSizeLabel();
         }
         if (res.minMovieSizeMb !== undefined) {
-          document.getElementById('minMovieSizeSelect').value = String(res.minMovieSizeMb);
+          document.getElementById('minMovieSizeInput').value = String(res.minMovieSizeMb);
           updateMinMovieSizeLabel();
         }
       } catch (e) {}
@@ -3460,13 +3452,29 @@ app.get(['/msm/setting', '/msm/settings'], (req, res) => {
       document.getElementById('ramCacheHint').textContent = (mb * 2) + ' blocks (' + mb + ' MB cap in Node memory)';
     }
 
+    function adjustMinTvSize(delta) {
+      const input = document.getElementById('minTvSizeInput');
+      let val = (parseInt(input.value, 10) || 80) + delta;
+      val = Math.max(10, Math.min(500, Math.round(val / 5) * 5));
+      input.value = String(val);
+      updateMinTvSizeLabel();
+    }
+
+    function adjustMinMovieSize(delta) {
+      const input = document.getElementById('minMovieSizeInput');
+      let val = (parseInt(input.value, 10) || 180) + delta;
+      val = Math.max(20, Math.min(2000, Math.round(val / 5) * 5));
+      input.value = String(val);
+      updateMinMovieSizeLabel();
+    }
+
     function updateMinTvSizeLabel() {
-      const mb = parseInt(document.getElementById('minTvSizeSelect').value, 10) || 80;
+      const mb = parseInt(document.getElementById('minTvSizeInput').value, 10) || 80;
       document.getElementById('minTvSizeHint').textContent = 'Files < ' + mb + ' MB are treated as clips/trailers and skipped';
     }
 
     function updateMinMovieSizeLabel() {
-      const mb = parseInt(document.getElementById('minMovieSizeSelect').value, 10) || 180;
+      const mb = parseInt(document.getElementById('minMovieSizeInput').value, 10) || 180;
       document.getElementById('minMovieSizeHint').textContent = 'Files < ' + mb + ' MB are treated as clips/trailers and skipped';
     }
 
@@ -3520,8 +3528,8 @@ app.get(['/msm/setting', '/msm/settings'], (req, res) => {
       const prefetch = document.getElementById('prefetchSelect').value === 'true';
       const ramMb = parseInt(document.getElementById('ramCacheSelect').value, 10) || 16;
       const transcodeMode = document.getElementById('videoTranscodeSelect').value || 'disabled';
-      const minTvMb = parseInt(document.getElementById('minTvSizeSelect').value, 10) || 80;
-      const minMovieMb = parseInt(document.getElementById('minMovieSizeSelect').value, 10) || 180;
+      const minTvMb = parseInt(document.getElementById('minTvSizeInput').value, 10) || 80;
+      const minMovieMb = parseInt(document.getElementById('minMovieSizeInput').value, 10) || 180;
 
       const btn = document.getElementById('saveEngineBtn');
       btn.disabled = true;
