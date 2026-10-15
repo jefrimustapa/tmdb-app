@@ -3142,13 +3142,11 @@ app.get(['/msm/setting', '/msm/settings'], (req, res) => {
               <div class="text-xs font-semibold text-white">SD (≤ 480p / 360p)</div>
               <div id="sdBufCalc" class="text-[11px] text-slate-400 font-mono">2 × 512 KB = 1.0 MB in-flight</div>
             </div>
-            <select id="sdBufSelect" onchange="updatePipelineLabels()" class="bg-slate-900 border border-slate-700 text-xs text-white rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-sky-500">
-              <option value="1">1 pipeline (512 KB)</option>
-              <option value="2" selected>2 pipelines (1.0 MB)</option>
-              <option value="3">3 pipelines (1.5 MB)</option>
-              <option value="4">4 pipelines (2.0 MB)</option>
-              <option value="6">6 pipelines (3.0 MB)</option>
-            </select>
+            <div class="flex items-center gap-1.5 bg-slate-900 border border-slate-700 rounded-lg p-1">
+              <button type="button" onclick="adjustPipelineBuf('sd', -1)" class="w-6 h-6 flex items-center justify-center rounded bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white font-bold text-xs transition select-none">-</button>
+              <input id="sdBufInput" type="number" step="1" min="1" max="16" value="2" oninput="updatePipelineLabels()" class="w-10 bg-transparent text-center text-xs font-mono font-semibold text-white focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
+              <button type="button" onclick="adjustPipelineBuf('sd', 1)" class="w-6 h-6 flex items-center justify-center rounded bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white font-bold text-xs transition select-none">+</button>
+            </div>
           </div>
 
           <!-- HD 720p -->
@@ -3157,12 +3155,11 @@ app.get(['/msm/setting', '/msm/settings'], (req, res) => {
               <div class="text-xs font-semibold text-white">HD 720p</div>
               <div id="720pBufCalc" class="text-[11px] text-slate-400 font-mono">4 × 512 KB = 2.0 MB in-flight</div>
             </div>
-            <select id="720pBufSelect" onchange="updatePipelineLabels()" class="bg-slate-900 border border-slate-700 text-xs text-white rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-sky-500">
-              <option value="2">2 pipelines (1.0 MB)</option>
-              <option value="4" selected>4 pipelines (2.0 MB)</option>
-              <option value="6">6 pipelines (3.0 MB)</option>
-              <option value="8">8 pipelines (4.0 MB)</option>
-            </select>
+            <div class="flex items-center gap-1.5 bg-slate-900 border border-slate-700 rounded-lg p-1">
+              <button type="button" onclick="adjustPipelineBuf('720p', -1)" class="w-6 h-6 flex items-center justify-center rounded bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white font-bold text-xs transition select-none">-</button>
+              <input id="720pBufInput" type="number" step="1" min="1" max="16" value="4" oninput="updatePipelineLabels()" class="w-10 bg-transparent text-center text-xs font-mono font-semibold text-white focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
+              <button type="button" onclick="adjustPipelineBuf('720p', 1)" class="w-6 h-6 flex items-center justify-center rounded bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white font-bold text-xs transition select-none">+</button>
+            </div>
           </div>
 
           <!-- FHD 1080p -->
@@ -3171,14 +3168,11 @@ app.get(['/msm/setting', '/msm/settings'], (req, res) => {
               <div class="text-xs font-semibold text-white">Full HD 1080p</div>
               <div id="1080pBufCalc" class="text-[11px] text-slate-400 font-mono">6 × 512 KB = 3.0 MB in-flight</div>
             </div>
-            <select id="1080pBufSelect" onchange="updatePipelineLabels()" class="bg-slate-900 border border-slate-700 text-xs text-white rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-sky-500">
-              <option value="2">2 pipelines (1.0 MB)</option>
-              <option value="4">4 pipelines (2.0 MB)</option>
-              <option value="6" selected>6 pipelines (3.0 MB)</option>
-              <option value="8">8 pipelines (4.0 MB)</option>
-              <option value="10">10 pipelines (5.0 MB)</option>
-              <option value="12">12 pipelines (6.0 MB)</option>
-            </select>
+            <div class="flex items-center gap-1.5 bg-slate-900 border border-slate-700 rounded-lg p-1">
+              <button type="button" onclick="adjustPipelineBuf('1080p', -1)" class="w-6 h-6 flex items-center justify-center rounded bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white font-bold text-xs transition select-none">-</button>
+              <input id="1080pBufInput" type="number" step="1" min="1" max="16" value="6" oninput="updatePipelineLabels()" class="w-10 bg-transparent text-center text-xs font-mono font-semibold text-white focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
+              <button type="button" onclick="adjustPipelineBuf('1080p', 1)" class="w-6 h-6 flex items-center justify-center rounded bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white font-bold text-xs transition select-none">+</button>
+            </div>
           </div>
 
           <!-- 4K UHD -->
@@ -3187,14 +3181,11 @@ app.get(['/msm/setting', '/msm/settings'], (req, res) => {
               <div class="text-xs font-semibold text-white">4K UHD (2160p)</div>
               <div id="4kBufCalc" class="text-[11px] text-slate-400 font-mono">8 × 512 KB = 4.0 MB in-flight</div>
             </div>
-            <select id="4kBufSelect" onchange="updatePipelineLabels()" class="bg-slate-900 border border-slate-700 text-xs text-white rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-sky-500">
-              <option value="4">4 pipelines (2.0 MB)</option>
-              <option value="6">6 pipelines (3.0 MB)</option>
-              <option value="8" selected>8 pipelines (4.0 MB)</option>
-              <option value="10">10 pipelines (5.0 MB)</option>
-              <option value="12">12 pipelines (6.0 MB)</option>
-              <option value="16">16 pipelines (8.0 MB)</option>
-            </select>
+            <div class="flex items-center gap-1.5 bg-slate-900 border border-slate-700 rounded-lg p-1">
+              <button type="button" onclick="adjustPipelineBuf('4k', -1)" class="w-6 h-6 flex items-center justify-center rounded bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white font-bold text-xs transition select-none">-</button>
+              <input id="4kBufInput" type="number" step="1" min="1" max="16" value="8" oninput="updatePipelineLabels()" class="w-10 bg-transparent text-center text-xs font-mono font-semibold text-white focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
+              <button type="button" onclick="adjustPipelineBuf('4k', 1)" class="w-6 h-6 flex items-center justify-center rounded bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white font-bold text-xs transition select-none">+</button>
+            </div>
           </div>
 
           <div class="flex items-center justify-between pt-2">
@@ -3407,10 +3398,10 @@ app.get(['/msm/setting', '/msm/settings'], (req, res) => {
           document.getElementById('botStatusPill').textContent = '@' + res.targetBotUsername;
         }
         if (res.pipelineBuffers) {
-          if (res.pipelineBuffers.sd) document.getElementById('sdBufSelect').value = String(res.pipelineBuffers.sd);
-          if (res.pipelineBuffers['720p']) document.getElementById('720pBufSelect').value = String(res.pipelineBuffers['720p']);
-          if (res.pipelineBuffers['1080p']) document.getElementById('1080pBufSelect').value = String(res.pipelineBuffers['1080p']);
-          if (res.pipelineBuffers['4k']) document.getElementById('4kBufSelect').value = String(res.pipelineBuffers['4k']);
+          if (res.pipelineBuffers.sd) document.getElementById('sdBufInput').value = String(res.pipelineBuffers.sd);
+          if (res.pipelineBuffers['720p']) document.getElementById('720pBufInput').value = String(res.pipelineBuffers['720p']);
+          if (res.pipelineBuffers['1080p']) document.getElementById('1080pBufInput').value = String(res.pipelineBuffers['1080p']);
+          if (res.pipelineBuffers['4k']) document.getElementById('4kBufInput').value = String(res.pipelineBuffers['4k']);
           updatePipelineLabels();
         }
         if (res.overlapPrefetch !== undefined) {
@@ -3435,16 +3426,29 @@ app.get(['/msm/setting', '/msm/settings'], (req, res) => {
       } catch (e) {}
     }
 
-    function updatePipelineLabels() {
-      const sd = parseInt(document.getElementById('sdBufSelect').value, 10) || 2;
-      const p720 = parseInt(document.getElementById('720pBufSelect').value, 10) || 4;
-      const p1080 = parseInt(document.getElementById('1080pBufSelect').value, 10) || 6;
-      const p4k = parseInt(document.getElementById('4kBufSelect').value, 10) || 8;
+    function adjustPipelineBuf(tier, delta) {
+      const input = document.getElementById(tier + 'BufInput');
+      if (!input) return;
+      let val = (parseInt(input.value, 10) || 1) + delta;
+      val = Math.max(1, Math.min(16, val));
+      input.value = String(val);
+      updatePipelineLabels();
+    }
 
-      document.getElementById('sdBufCalc').textContent = sd + ' × 512 KB = ' + (sd * 0.5).toFixed(1) + ' MB in-flight';
-      document.getElementById('720pBufCalc').textContent = p720 + ' × 512 KB = ' + (p720 * 0.5).toFixed(1) + ' MB in-flight';
-      document.getElementById('1080pBufCalc').textContent = p1080 + ' × 512 KB = ' + (p1080 * 0.5).toFixed(1) + ' MB in-flight';
-      document.getElementById('4kBufCalc').textContent = p4k + ' × 512 KB = ' + (p4k * 0.5).toFixed(1) + ' MB in-flight';
+    function updatePipelineLabels() {
+      const sd = Math.max(1, Math.min(16, parseInt(document.getElementById('sdBufInput')?.value, 10) || 2));
+      const p720 = Math.max(1, Math.min(16, parseInt(document.getElementById('720pBufInput')?.value, 10) || 4));
+      const p1080 = Math.max(1, Math.min(16, parseInt(document.getElementById('1080pBufInput')?.value, 10) || 6));
+      const p4k = Math.max(1, Math.min(16, parseInt(document.getElementById('4kBufInput')?.value, 10) || 8));
+
+      const sdCalc = document.getElementById('sdBufCalc');
+      if (sdCalc) sdCalc.textContent = sd + ' × 512 KB = ' + (sd * 0.5).toFixed(1) + ' MB in-flight';
+      const p720Calc = document.getElementById('720pBufCalc');
+      if (p720Calc) p720Calc.textContent = p720 + ' × 512 KB = ' + (p720 * 0.5).toFixed(1) + ' MB in-flight';
+      const p1080Calc = document.getElementById('1080pBufCalc');
+      if (p1080Calc) p1080Calc.textContent = p1080 + ' × 512 KB = ' + (p1080 * 0.5).toFixed(1) + ' MB in-flight';
+      const p4kCalc = document.getElementById('4kBufCalc');
+      if (p4kCalc) p4kCalc.textContent = p4k + ' × 512 KB = ' + (p4k * 0.5).toFixed(1) + ' MB in-flight';
     }
 
     function updateRamCacheLabel() {
@@ -3493,10 +3497,10 @@ app.get(['/msm/setting', '/msm/settings'], (req, res) => {
     }
 
     async function savePipelineBuffers() {
-      const sd = parseInt(document.getElementById('sdBufSelect').value, 10) || 2;
-      const p720 = parseInt(document.getElementById('720pBufSelect').value, 10) || 4;
-      const p1080 = parseInt(document.getElementById('1080pBufSelect').value, 10) || 6;
-      const p4k = parseInt(document.getElementById('4kBufSelect').value, 10) || 8;
+      const sd = parseInt(document.getElementById('sdBufInput').value, 10) || 2;
+      const p720 = parseInt(document.getElementById('720pBufInput').value, 10) || 4;
+      const p1080 = parseInt(document.getElementById('1080pBufInput').value, 10) || 6;
+      const p4k = parseInt(document.getElementById('4kBufInput').value, 10) || 8;
 
       const btn = document.getElementById('savePipelineBtn');
       btn.disabled = true;
