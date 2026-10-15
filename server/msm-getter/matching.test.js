@@ -10,6 +10,7 @@ import {
   detectVideoQualityTier,
   DEFAULT_PIPELINE_BUFFERS,
   getBlockCacheMaxEntries,
+  savedSettings,
 } from './index.js';
 
 let passed = 0;
@@ -312,6 +313,114 @@ it('calculates router RAM block cache max entries accurately', () => {
   const entries = getBlockCacheMaxEntries();
   assert.strictEqual(typeof entries, 'number');
   assert.ok(entries >= 16 && entries <= 128, `Block cache entries (${entries}) should be within expected range`);
+});
+
+console.log('\n10. Configurable TV and Movie Minimum File Size Validation');
+it('accepts Episode 27 of Opsss Terpikat Cik Sombong (101.41 MB) with default 80 MB TV threshold', () => {
+  const btnEp27 = {
+    className: 'KeyboardButtonUrlAuth',
+    url: 'https://go.msmbot.club/?redirect_to=/link/44d03b',
+    text: '🔥🎞 Opsss.Terpikat.Cik.Sombong.Episod.27.mp4 101.41 MB',
+  };
+  const msg = { message: '' };
+  const contextEp27 = {
+    isTv: true,
+    title: 'Opsss Terpikat Cik Sombong',
+    year: '2018',
+    sNum: 1,
+    eNum: 27,
+    totalSeasons: 1,
+    targetQuality: 720,
+  };
+
+  const score = scoreCandidateButton(btnEp27, msg, contextEp27);
+  assert.ok(score >= 200, `Ep 27 button (101.41 MB) should score >= 200 with default 80MB min size, got: ${score}`);
+});
+
+it('disqualifies TV episodes below the minimum size threshold (e.g. 50 MB promo clip)', () => {
+  const btnClip = {
+    className: 'KeyboardButtonUrlAuth',
+    url: 'https://t.me/b/clip',
+    text: 'Opsss Terpikat Cik Sombong Ep 27 Teaser 50.0 MB',
+  };
+  const msg = { message: '' };
+  const context = {
+    isTv: true,
+    title: 'Opsss Terpikat Cik Sombong',
+    sNum: 1,
+    eNum: 27,
+  };
+
+  const score = scoreCandidateButton(btnClip, msg, context);
+  assert.strictEqual(score, -999, 'Files under default 80MB TV min size must be disqualified (-999)');
+});
+
+it('honors context minTvSizeMb override', () => {
+  const btnEp27 = {
+    className: 'KeyboardButtonUrlAuth',
+    url: 'https://t.me/b/ep27',
+    text: 'Opsss Terpikat Cik Sombong Ep 27 101.41 MB',
+  };
+  const msg = { message: '' };
+
+  // When overridden to 110 MB -> 101.41 MB must be disqualified
+  const scoreDisqualified = scoreCandidateButton(btnEp27, msg, {
+    isTv: true,
+    title: 'Opsss Terpikat Cik Sombong',
+    sNum: 1,
+    eNum: 27,
+    minTvSizeMb: 110,
+  });
+  assert.strictEqual(scoreDisqualified, -999, 'Overridden 110MB threshold must disqualify 101.41MB');
+
+  // When overridden to 60 MB -> 101.41 MB must be accepted
+  const scoreAccepted = scoreCandidateButton(btnEp27, msg, {
+    isTv: true,
+    title: 'Opsss Terpikat Cik Sombong',
+    sNum: 1,
+    eNum: 27,
+    minTvSizeMb: 60,
+  });
+  assert.ok(scoreAccepted >= 200, `Overridden 60MB threshold should accept 101.41MB with score >= 200, got: ${scoreAccepted}`);
+});
+
+it('disqualifies movies below the default 180 MB movie threshold and accepts movies above it', () => {
+  const msg = { message: '' };
+  const contextMovie = { isTv: false, title: 'Hantu Movie', year: '2024' };
+
+  const btnSmall = {
+    className: 'KeyboardButtonUrlAuth',
+    url: 'https://t.me/b/small',
+    text: 'Hantu Movie 2024 150.0 MB',
+  };
+  const btnValid = {
+    className: 'KeyboardButtonUrlAuth',
+    url: 'https://t.me/b/valid',
+    text: 'Hantu Movie 2024 220.0 MB',
+  };
+
+  const scoreSmall = scoreCandidateButton(btnSmall, msg, contextMovie);
+  const scoreValid = scoreCandidateButton(btnValid, msg, contextMovie);
+
+  assert.strictEqual(scoreSmall, -999, 'Movie < 180MB must be disqualified (-999)');
+  assert.ok(scoreValid >= 200, `Movie >= 180MB should be accepted with score >= 200, got: ${scoreValid}`);
+});
+
+it('honors context minMovieSizeMb override', () => {
+  const msg = { message: '' };
+  const btn = {
+    className: 'KeyboardButtonUrlAuth',
+    url: 'https://t.me/b/m',
+    text: 'Indie Drama 2024 120.0 MB',
+  };
+
+  // Default 180MB rejects 120MB
+  const scoreDefault = scoreCandidateButton(btn, msg, { isTv: false, title: 'Indie Drama', year: '2024' });
+  assert.strictEqual(scoreDefault, -999);
+
+  // Overridden 100MB accepts 120MB
+  const scoreOverride = scoreCandidateButton(btn, msg, { isTv: false, title: 'Indie Drama', year: '2024', minMovieSizeMb: 100 });
+  assert.ok(scoreOverride >= 200, `Overridden 100MB threshold should accept 120MB, got: ${scoreOverride}`);
 });
 
 console.log(`\nResults: ${passed}/${total} tests passed!\n`);
