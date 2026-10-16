@@ -126,7 +126,8 @@ class MsmMappingService {
     episode?: number,
     signal?: AbortSignal,
     force?: boolean,
-    totalSeasons?: number
+    totalSeasons?: number,
+    altTitle?: string
   ): Promise<MsmResolveResult | null> {
     if (signal?.aborted) {
       console.log(`[MSM] Resolution aborted prior to request for "${title}"`);
@@ -155,6 +156,7 @@ class MsmMappingService {
       const maxQuality = settings?.msmMaxQuality || settings?.msm32MaxQuality || '1080';
 
       const params = new URLSearchParams({ title });
+      if (altTitle && altTitle.trim()) params.append('altTitle', altTitle.trim());
       if (year) params.append('year', String(year));
       if (typeof season === 'number' && !isNaN(season)) params.append('season', String(season));
       if (typeof episode === 'number' && !isNaN(episode)) params.append('episode', String(episode));

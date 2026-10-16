@@ -466,20 +466,21 @@ function isJunkMedia(text) {
 
 function parseSizeFromText(text) {
   if (!text) return null;
-  const m = text.match(/(\d+(?:\.\d+)?)\s*(mb|gb)\b/i);
+  // Match file size with optional thousands commas, e.g. 1,018.52 MB or 741.31 MB
+  const m = text.match(/([\d,]+(?:\.\d+)?)\s*(mb|gb)\b/i);
   if (!m) return null;
-  const val = parseFloat(m[1]);
+  const val = parseFloat(m[1].replace(/,/g, ''));
   if (isNaN(val)) return null;
   return m[2].toLowerCase() === 'gb' ? val * 1024 : val;
 }
 
-// Clean title for bot searches (strips punctuation, colons, quotes, dashes, parentheticals, and acronym dots)
+// Clean title for bot searches (strips punctuation, colons, semicolons, quotes, dashes, parentheticals, and acronym dots)
 function cleanSearchTitle(str) {
   if (!str) return '';
   return str
     .replace(/\s*\([^)]*\)/g, ' ') // remove (2024), (US), etc.
     .replace(/\s*\[[^\]]*\]/g, ' ')
-    .replace(/[:\-–—'"`!?&,._]/g, ' ') // cleanly replace punctuation with space
+    .replace(/[:;\-–—'"`!?&,._]/g, ' ') // cleanly replace punctuation with space (including ;)
     .replace(/\s+/g, ' ')
     .trim();
 }
@@ -639,22 +640,26 @@ function isBareButton(text) {
   return tokens.every(t => /^\d+$/.test(t) || bareKeywords.has(t));
 }
 
-// Score a candidate download button against search context
-function scoreCandidateButton(btn, msg, context = {}) {
+// Score a candidate download button against search context with detailed reason
+function scoreCandidateButtonWithReason(btn, msg, context = {}) {
   const {
     isTv = false,
     title = '',
+    altTitle = '',
     year = null,
     sNum = 1,
     eNum = 1,
     totalSeasons = 1,
     targetQuality = 720,
     significantTokens = extractSignificantTokens(title),
+    altSignificantTokens = altTitle ? extractSignificantTokens(altTitle) : [],
     minTvSizeMb = savedSettings.minTvSizeMb ?? 80,
     minMovieSizeMb = savedSettings.minMovieSizeMb ?? 180,
   } = context;
 
-  if ((btn.className !== 'KeyboardButtonUrlAuth' && btn.className !== 'KeyboardButtonUrl') || !btn.url) return -999;
+  if ((btn.className !== 'KeyboardButtonUrlAuth' && btn.className !== 'KeyboardButtonUrl') || !btn.url) {
+    return { score: -999, reason: 'missing url or unsupported button class' };
+  }
   const btnText = (btn.text || '').toLowerCase();
   const normBtnText = normalizeTitle(btnText);
   const msgText = (msg.message || '').toLowerCase();
@@ -662,20 +667,19 @@ function scoreCandidateButton(btn, msg, context = {}) {
 
   // 1. Immediately disqualify junk media (trailers, teasers, samples, promos, ost)
   if (isJunkMedia(btnText) || isJunkMedia(msgText)) {
-    return -999;
+    return { score: -999, reason: 'junk media (trailer/teaser/sample/promo/ost)' };
   }
 
   // 2. Minimum file size sanity check
   const btnSizeMB = parseSizeFromText(btn.text) || parseSizeFromText(msg.message);
   if (btnSizeMB !== null) {
-    if (isTv) {
-      if (btnSizeMB < minTvSizeMb) return -999;
-    } else {
-      if (btnSizeMB < minMovieSizeMb) return -999;
+    const minThreshold = isTv ? minTvSizeMb : minMovieSizeMb;
+    if (btnSizeMB < minThreshold) {
+      return { score: -999, reason: `file size (${btnSizeMB.toFixed(1)} MB) below minimum (${minThreshold} MB)` };
     }
   }
 
-  // 3. Strict Title Token Coverage check
+  // 3. Strict Title Token Coverage check (supports both primary title and English/alternative title)
   const isBare = isBareButton(btnText);
   const cleanMsgText = cleanBotEchoHeader(msgText);
   let titleTargetText = normBtnText;
@@ -684,25 +688,45 @@ function scoreCandidateButton(btn, msg, context = {}) {
     titleTargetText = normalizeTitle(cleanMsgText);
   }
 
+  let bestCoverage = 0;
+  let primaryPassed = false;
+  let altPassed = false;
+  let covPrimary = 0;
+  let covAlt = 0;
+
   if (significantTokens.length > 0) {
-    const coverage = calculateTitleCoverage(significantTokens, titleTargetText);
-    if (significantTokens.length <= 2 && coverage < 1.0) {
-      return -999;
+    covPrimary = calculateTitleCoverage(significantTokens, titleTargetText);
+    const meetsPrimary = (significantTokens.length <= 2 ? covPrimary >= 1.0 : covPrimary >= 0.70);
+    if (meetsPrimary) {
+      primaryPassed = true;
+      bestCoverage = Math.max(bestCoverage, covPrimary);
     }
-    if (coverage < 0.70) {
-      return -999;
+  }
+
+  if (altSignificantTokens && altSignificantTokens.length > 0) {
+    covAlt = calculateTitleCoverage(altSignificantTokens, titleTargetText);
+    const meetsAlt = (altSignificantTokens.length <= 2 ? covAlt >= 1.0 : covAlt >= 0.70);
+    if (meetsAlt) {
+      altPassed = true;
+      bestCoverage = Math.max(bestCoverage, covAlt);
+    }
+  }
+
+  if (significantTokens.length > 0 || (altSignificantTokens && altSignificantTokens.length > 0)) {
+    if (!primaryPassed && !altPassed) {
+      const reasonDetail = altSignificantTokens && altSignificantTokens.length > 0
+        ? `title coverage too low (primary: ${(covPrimary * 100).toFixed(0)}%, alt: ${(covAlt * 100).toFixed(0)}%)`
+        : `title coverage too low (${(covPrimary * 100).toFixed(0)}%)`;
+      return { score: -999, reason: reasonDetail };
     }
   }
 
   let score = 0;
 
-  if (significantTokens.length > 0) {
-    const coverage = calculateTitleCoverage(significantTokens, titleTargetText);
-    if (coverage >= 1.0) {
-      score += 200;
-    } else {
-      score += Math.round(coverage * 100);
-    }
+  if (bestCoverage >= 1.0) {
+    score += 200;
+  } else if (bestCoverage > 0) {
+    score += Math.round(bestCoverage * 100);
   }
 
   if (isTv) {
@@ -717,12 +741,12 @@ function scoreCandidateButton(btn, msg, context = {}) {
         if (eNum >= epInfo.start && eNum <= epInfo.end) {
           score += 90;
         } else {
-          return -999;
+          return { score: -999, reason: `episode range [${epInfo.start}-${epInfo.end}] does not include episode ${eNum}` };
         }
       } else if (epInfo.episode === eNum) {
         score += 150;
       } else {
-        return -999;
+        return { score: -999, reason: `episode mismatch (found ep ${epInfo.episode}, expected ep ${eNum})` };
       }
     } else {
       score -= 150;
@@ -738,12 +762,12 @@ function scoreCandidateButton(btn, msg, context = {}) {
       if (seasonFound === sNum) {
         score += 80;
       } else {
-        return -999;
+        return { score: -999, reason: `season mismatch (found season ${seasonFound}, expected season ${sNum})` };
       }
     } else if (sNum > 1 && totalSeasons > 1) {
       // Multi-season protection: when watching Season 2 or later, reject un-versioned candidates with no matching year
       if (!btnYear || Math.abs(targetYear - btnYear) > 1) {
-        return -999;
+        return { score: -999, reason: `un-versioned candidate without matching year for season ${sNum}` };
       }
     }
 
@@ -752,7 +776,7 @@ function scoreCandidateButton(btn, msg, context = {}) {
       if (Math.abs(targetYear - btnYear) <= 1) {
         score += 90;
       } else if (!isNaN(explicitTargetYear)) {
-        return -999;
+        return { score: -999, reason: `release year mismatch (found ${btnYear}, expected ${targetYear})` };
       }
     }
   } else {
@@ -760,10 +784,10 @@ function scoreCandidateButton(btn, msg, context = {}) {
     const isTvCandidate = /\b(s\d{1,2}e\d{1,2}|s\d{1,2}\s*ep?\s*\d{1,2}|season\s*\d+|musim\s*\d+|episode\s*\d+|episod\s*\d+|ep\s*\d+|\.end\.)\b/i.test(btnText) ||
                           /\b(s\d{1,2}e\d{1,2}|s\d{1,2}\s*ep?\s*\d{1,2}|season\s*\d+|musim\s*\d+|episode\s*\d+|episod\s*\d+|ep\s*\d+|\.end\.)\b/i.test(msgText);
     if (isTvCandidate) {
-      return -999;
+      return { score: -999, reason: 'TV series/episode indicator found in movie candidate' };
     }
 
-    if (significantTokens.length === 1) {
+    if (significantTokens.length === 1 && (!altSignificantTokens || altSignificantTokens.length <= 1)) {
       const singleWord = significantTokens[0];
       const textToInspect = isBare ? titleTargetText : (normBtnText || titleTargetText);
       const prefixMatch = textToInspect.match(new RegExp(`\\b([a-z0-9]+)\\s+${singleWord}\\b`, 'i'));
@@ -777,19 +801,19 @@ function scoreCandidateButton(btn, msg, context = {}) {
           ignorePrefixes.add('an');
         }
         if (!ignorePrefixes.has(prefixWord) && !/^msm\d*$/i.test(prefixWord)) {
-          return -999;
+          return { score: -999, reason: `conflicting title prefix "${prefixWord}" for single-word title` };
         }
       }
       const suffixMatch = textToInspect.match(new RegExp(`\\b${singleWord}\\s+([a-z0-9]+)\\b`, 'i'));
       if (suffixMatch) {
         const suffixWord = suffixMatch[1].toLowerCase();
         if (!isAllowedTitleSuffix(suffixWord)) {
-          return -999;
+          return { score: -999, reason: `conflicting title suffix "${suffixWord}" for single-word title` };
         }
       }
     }
 
-    const targetSequel = extractSequelInfo(title);
+    const targetSequel = extractSequelInfo(title) || (altTitle ? extractSequelInfo(altTitle) : null);
     const btnSequel = extractSequelInfo(btnText);
     if (targetSequel) {
       if (btnSequel === targetSequel) {
@@ -812,7 +836,7 @@ function scoreCandidateButton(btn, msg, context = {}) {
       if (Math.abs(targetYear - btnYear) <= 1) {
         score += 120;
       } else if (!isNaN(explicitTargetYear)) {
-        return -999;
+        return { score: -999, reason: `release year mismatch (found ${btnYear}, expected ${targetYear})` };
       }
     }
   }
@@ -841,7 +865,12 @@ function scoreCandidateButton(btn, msg, context = {}) {
   if (btnText.toLowerCase().includes('.mp4') || btnText.toLowerCase().includes('mp4')) score += 15;
   if (btnText.includes('malaysub') || btnText.includes('msm')) score += 5;
 
-  return score;
+  return { score, reason: score >= 0 ? `accepted (score: ${score})` : `penalized (score: ${score})` };
+}
+
+// Score a candidate download button against search context
+function scoreCandidateButton(btn, msg, context = {}) {
+  return scoreCandidateButtonWithReason(btn, msg, context).score;
 }
 
 // Web Auth State in RAM
@@ -3755,10 +3784,12 @@ app.get(['/api/cache/evict', '/msm/api/cache/evict'], (req, res) => {
 
 // Resolver endpoint: /api/resolve and Prefetch endpoint: /api/prefetch
 app.get(['/api/resolve', '/msm/api/resolve', '/api/prefetch', '/msm/api/prefetch'], async (req, res) => {
-  const { title, year, season, episode, totalSeasons: totalSeasonsQuery, maxQuality = '720', force, refresh, minTvSize, minMovieSize } = req.query;
+  const { title, year, season, episode, totalSeasons: totalSeasonsQuery, maxQuality = '720', force, refresh, minTvSize, minMovieSize, altTitle: altTitleQuery, englishTitle } = req.query;
   if (!title) {
     return res.status(400).json({ success: false, error: 'Missing title query parameter' });
   }
+
+  const altTitle = String(altTitleQuery || englishTitle || '').trim();
 
   const parsedMinTv = minTvSize ? parseInt(minTvSize, 10) : undefined;
   const parsedMinMovie = minMovieSize ? parseInt(minMovieSize, 10) : undefined;
@@ -3798,7 +3829,7 @@ app.get(['/api/resolve', '/msm/api/resolve', '/api/prefetch', '/msm/api/prefetch
   else qualitySuffix = '_720p';
   const cacheKey = `${baseCacheKey}${qualitySuffix}`;
 
-  console.log(`[${logPrefix}] Request: "${queryTitle}" (isTv: ${isTv}, maxQuality: ${targetQuality}, bypassCache: ${shouldBypassCache}, cacheKey: "${cacheKey}")`);
+  console.log(`[${logPrefix}] Request: "${queryTitle}" (isTv: ${isTv}, maxQuality: ${targetQuality}, bypassCache: ${shouldBypassCache}, cacheKey: "${cacheKey}"${altTitle ? `, altTitle: "${altTitle}"` : ''})`);
 
   let isAborted = false;
   const onClientClose = () => {
@@ -4158,11 +4189,23 @@ app.get(['/api/resolve', '/msm/api/resolve', '/api/prefetch', '/msm/api/prefetch
 
     // Prepare prioritized search queries using clean, unpunctuated titles
     const cleanT = cleanSearchTitle(title);
+    let effectiveAltTitle = altTitle ? cleanSearchTitle(altTitle) : '';
+    if (!effectiveAltTitle) {
+      if (/\bproject\b/i.test(cleanT)) {
+        effectiveAltTitle = cleanT.replace(/\bproject\b/gi, 'Projek');
+      } else if (/\bprojek\b/i.test(cleanT)) {
+        effectiveAltTitle = cleanT.replace(/\bprojek\b/gi, 'Project');
+      }
+    }
+
     const searchQueries = [];
     if (isTv) {
       searchQueries.push(...generateSeriesSearchQueries(cleanT, sNum, eNum, totalSeasons, year));
       if (cleanT !== title) {
         searchQueries.push(...generateSeriesSearchQueries(title, sNum, eNum, totalSeasons, year));
+      }
+      if (effectiveAltTitle && effectiveAltTitle.toLowerCase() !== cleanT.toLowerCase()) {
+        searchQueries.push(...generateSeriesSearchQueries(effectiveAltTitle, sNum, eNum, totalSeasons, year));
       }
     } else {
       if (year) searchQueries.push(`${cleanT} ${year}`);
@@ -4171,7 +4214,14 @@ app.get(['/api/resolve', '/msm/api/resolve', '/api/prefetch', '/msm/api/prefetch
         if (year) searchQueries.push(`${title} ${year}`);
         searchQueries.push(title);
       }
+      if (effectiveAltTitle && effectiveAltTitle.toLowerCase() !== cleanT.toLowerCase()) {
+        if (year) searchQueries.push(`${effectiveAltTitle} ${year}`);
+        searchQueries.push(effectiveAltTitle);
+      }
     }
+
+    const uniqueSearchQueries = Array.from(new Set(searchQueries));
+    const altTokens = effectiveAltTitle ? extractSignificantTokens(effectiveAltTitle) : [];
 
     let targetMsgId = null;
     let targetButtonId = null;
@@ -4182,17 +4232,19 @@ app.get(['/api/resolve', '/msm/api/resolve', '/api/prefetch', '/msm/api/prefetch
     let deliveredMsgId = null;
     let resolvedFilename = null;
 
-    // Helper: Score a candidate download button
+    // Helper: Score a candidate download button with detailed reason
     function scoreButton(btn, msg) {
-      return scoreCandidateButton(btn, msg, {
+      return scoreCandidateButtonWithReason(btn, msg, {
         isTv,
         title,
+        altTitle: effectiveAltTitle,
         year,
         sNum,
         eNum,
         totalSeasons,
         targetQuality,
         significantTokens,
+        altSignificantTokens: altTokens,
         minTvSizeMb: effectiveMinTv,
         minMovieSizeMb: effectiveMinMovie,
       });
@@ -4343,7 +4395,7 @@ app.get(['/api/resolve', '/msm/api/resolve', '/api/prefetch', '/msm/api/prefetch
       throw lastErr;
     }
 
-    for (const sq of searchQueries) {
+    for (const sq of uniqueSearchQueries) {
       if (checkAborted()) {
         console.log(`[RESOLVE] Aborting search query loop for "${queryTitle}" (client aborted)`);
         break;
@@ -4385,24 +4437,35 @@ app.get(['/api/resolve', '/msm/api/resolve', '/api/prefetch', '/msm/api/prefetch
                 pageCount++;
                 activeBotMsg = currentMsg;
                 activeBotPage = pageCount;
+                let pageBtnCount = 0;
+                let pageAcceptedCount = 0;
                 if (currentMsg.replyMarkup?.rows) {
                   for (const row of currentMsg.replyMarkup.rows) {
                     for (const btn of row.buttons) {
-                      const score = scoreButton(btn, currentMsg);
-                      if (score > -999) {
+                      pageBtnCount++;
+                      const evalRes = scoreButton(btn, currentMsg);
+                      const isAccepted = evalRes.score >= 0;
+                      if (isAccepted) {
+                        pageAcceptedCount++;
+                        console.log(`[RESOLVE EVAL] [Page ${pageCount}] "${btn.text}" -> score: ${evalRes.score} (ACCEPTED)`);
+                      } else {
+                        console.log(`[RESOLVE EVAL] [Page ${pageCount}] "${btn.text}" -> score: ${evalRes.score} (REJECTED: ${evalRes.reason})`);
+                      }
+                      if (evalRes.score > -999) {
                         candidates.push({
                           msgId: currentMsg.id,
                           buttonId: btn.buttonId,
                           url: btn.url,
                           text: btn.text,
                           className: btn.className,
-                          score,
+                          score: evalRes.score,
                           page: pageCount,
                         });
                       }
                     }
                   }
                 }
+                console.log(`[RESOLVE EVAL] Page ${pageCount} evaluation summary for "${sq}": ${pageAcceptedCount} accepted, ${pageBtnCount - pageAcceptedCount} rejected out of ${pageBtnCount} button(s)`);
 
                 // Traverse all pages to accumulate all candidate buttons for this query
                 if (pageCount >= MAX_PAGES || checkAborted()) break;
@@ -6099,6 +6162,8 @@ export {
   cleanSearchTitle,
   isBareButton,
   scoreCandidateButton,
+  scoreCandidateButtonWithReason,
+  parseSizeFromText,
   generateSeriesSearchQueries,
   calculateTitleCoverage,
   normalizeTitle,

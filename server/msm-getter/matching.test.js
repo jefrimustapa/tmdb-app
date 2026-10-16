@@ -6,6 +6,8 @@ import {
   cleanSearchTitle,
   isBareButton,
   scoreCandidateButton,
+  scoreCandidateButtonWithReason,
+  parseSizeFromText,
   generateSeriesSearchQueries,
   detectVideoQualityTier,
   DEFAULT_PIPELINE_BUFFERS,
@@ -423,9 +425,87 @@ it('honors context minMovieSizeMb override', () => {
   assert.ok(scoreOverride >= 200, `Overridden 100MB threshold should accept 120MB, got: ${scoreOverride}`);
 });
 
+console.log('11. Dual-Title Matching, Punctuation & Large Comma-Formatted File Sizes');
+
+it('correctly parses sizes with commas (e.g. 1,018.52 MB)', () => {
+  assert.strictEqual(parseSizeFromText('🔥🎞 1. Projek.Exit.2024.S01E06.1080p.Finale.WEB-DL.mkv - 1,018.52 MB'), 1018.52);
+  assert.strictEqual(parseSizeFromText('Movie.2024.mkv - 2,450.5 MB'), 2450.5);
+  assert.strictEqual(parseSizeFromText('Movie.2024.mkv - 1,200 MB'), 1200);
+  assert.strictEqual(parseSizeFromText('Movie.2024.mkv - 1.5 GB'), 1536);
+});
+
+it('strips semicolons from cleanSearchTitle (e.g. Project; Exit -> Project Exit)', () => {
+  assert.strictEqual(cleanSearchTitle('Project; Exit'), 'Project Exit');
+  assert.strictEqual(cleanSearchTitle('Project; Exit: Season 1'), 'Project Exit Season 1');
+});
+
+it('accepts button matching alternative title (Projek Exit) when primary title is Project; Exit', () => {
+  const msg = { message: '' };
+  const btn = {
+    className: 'KeyboardButtonUrlAuth',
+    url: 'https://t.me/b/projexit6',
+    text: '🔥🎞 1. Projek.Exit.2024.S01E06.1080p.Finale.WEB-DL.AAC2.0.H.264-tGx.mkv - 1,018.52 MB',
+  };
+  const context = {
+    isTv: true,
+    title: 'Project; Exit',
+    altTitle: 'Projek: Exit',
+    year: '2024',
+    sNum: 1,
+    eNum: 6,
+  };
+
+  const { score, reason } = scoreCandidateButtonWithReason(btn, msg, context);
+  assert.ok(reason.startsWith('accepted'), `Candidate should be accepted, got reason: ${reason}`);
+  assert.ok(score >= 350, `Score should be >= 350, got: ${score}`);
+});
+
+it('accepts button matching primary title (Project Exit) when alternative title is Projek: Exit', () => {
+  const msg = { message: '' };
+  const btn = {
+    className: 'KeyboardButtonUrlAuth',
+    url: 'https://t.me/b/projexit1',
+    text: '🔥🎞 1. Project.Exit.2024.S01E01.720p.WEB-DL.mkv - 520.15 MB',
+  };
+  const context = {
+    isTv: true,
+    title: 'Projek: Exit',
+    altTitle: 'Project: Exit',
+    year: '2024',
+    sNum: 1,
+    eNum: 1,
+  };
+
+  const { score, reason } = scoreCandidateButtonWithReason(btn, msg, context);
+  assert.ok(reason.startsWith('accepted'), `Candidate should be accepted, got reason: ${reason}`);
+  assert.ok(score >= 350, `Score should be >= 350, got: ${score}`);
+});
+
+it('returns informative rejection reason on episode mismatch with scoreCandidateButtonWithReason', () => {
+  const msg = { message: '' };
+  const btn = {
+    className: 'KeyboardButtonUrlAuth',
+    url: 'https://t.me/b/projexit5',
+    text: '🔥🎞 1. Projek.Exit.2024.S01E05.1080p.WEB-DL.mkv - 950 MB',
+  };
+  const context = {
+    isTv: true,
+    title: 'Project; Exit',
+    altTitle: 'Projek: Exit',
+    year: '2024',
+    sNum: 1,
+    eNum: 6,
+  };
+
+  const { score, reason } = scoreCandidateButtonWithReason(btn, msg, context);
+  assert.strictEqual(score, -999);
+  assert.ok(reason.includes('episode mismatch'), `Reason should mention episode mismatch, got: ${reason}`);
+});
+
 console.log(`\nResults: ${passed}/${total} tests passed!\n`);
 if (passed === total) {
   console.log('🎉 ALL UNIT TESTS PASSED SUCCESSFULLY!\n');
 } else {
   process.exit(1);
 }
+
