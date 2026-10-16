@@ -1291,8 +1291,26 @@ app.get('/msm/auth', (req, res) => {
     }
 
     checkStatus();
+
+    window.addEventListener('scroll', () => {
+      const btn = document.getElementById('backToTopBtn');
+      if (!btn) return;
+      if (window.scrollY > 250) {
+        btn.classList.remove('opacity-0', 'translate-y-4', 'pointer-events-none');
+        btn.classList.add('opacity-100', 'translate-y-0', 'pointer-events-auto');
+      } else {
+        btn.classList.add('opacity-0', 'translate-y-4', 'pointer-events-none');
+        btn.classList.remove('opacity-100', 'translate-y-0', 'pointer-events-auto');
+      }
+    }, { passive: true });
   </script>
   </div>
+  <!-- Floating Back to Top Button -->
+  <button id="backToTopBtn" onclick="window.scrollTo({top: 0, behavior: 'smooth'})" title="Scroll to top" aria-label="Scroll to top" class="fixed bottom-6 right-6 z-50 p-3 rounded-full bg-slate-800/90 hover:bg-sky-500 text-slate-300 hover:text-slate-950 border border-slate-700/80 hover:border-sky-400 shadow-xl backdrop-blur transition-all duration-300 opacity-0 translate-y-4 pointer-events-none focus:outline-none glow-box cursor-pointer">
+    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 10l7-7m0 0l7 7m-7-7v18"></path>
+    </svg>
+  </button>
 </body>
 </html>`);
 });
@@ -2158,7 +2176,25 @@ app.get('/msm/logs', (req, res) => {
 
     fetchInitialLogs();
     connectSSE();
+
+    window.addEventListener('scroll', () => {
+      const btn = document.getElementById('backToTopBtn');
+      if (!btn) return;
+      if (window.scrollY > 250) {
+        btn.classList.remove('opacity-0', 'translate-y-4', 'pointer-events-none');
+        btn.classList.add('opacity-100', 'translate-y-0', 'pointer-events-auto');
+      } else {
+        btn.classList.add('opacity-0', 'translate-y-4', 'pointer-events-none');
+        btn.classList.remove('opacity-100', 'translate-y-0', 'pointer-events-auto');
+      }
+    }, { passive: true });
   </script>
+  <!-- Floating Back to Top Button -->
+  <button id="backToTopBtn" onclick="window.scrollTo({top: 0, behavior: 'smooth'})" title="Scroll to top" aria-label="Scroll to top" class="fixed bottom-6 right-6 z-50 p-3 rounded-full bg-slate-800/90 hover:bg-sky-500 text-slate-300 hover:text-slate-950 border border-slate-700/80 hover:border-sky-400 shadow-xl backdrop-blur transition-all duration-300 opacity-0 translate-y-4 pointer-events-none focus:outline-none glow-box cursor-pointer">
+    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 10l7-7m0 0l7 7m-7-7v18"></path>
+    </svg>
+  </button>
 </body>
 </html>`);
 });
@@ -2737,7 +2773,25 @@ app.get(['/msm', '/msm/dashboard'], (req, res) => {
 
     loadStats();
     setInterval(loadStats, 3000);
+
+    window.addEventListener('scroll', () => {
+      const btn = document.getElementById('backToTopBtn');
+      if (!btn) return;
+      if (window.scrollY > 250) {
+        btn.classList.remove('opacity-0', 'translate-y-4', 'pointer-events-none');
+        btn.classList.add('opacity-100', 'translate-y-0', 'pointer-events-auto');
+      } else {
+        btn.classList.add('opacity-0', 'translate-y-4', 'pointer-events-none');
+        btn.classList.remove('opacity-100', 'translate-y-0', 'pointer-events-auto');
+      }
+    }, { passive: true });
   </script>
+  <!-- Floating Back to Top Button -->
+  <button id="backToTopBtn" onclick="window.scrollTo({top: 0, behavior: 'smooth'})" title="Scroll to top" aria-label="Scroll to top" class="fixed bottom-6 right-6 z-50 p-3 rounded-full bg-slate-800/90 hover:bg-sky-500 text-slate-300 hover:text-slate-950 border border-slate-700/80 hover:border-sky-400 shadow-xl backdrop-blur transition-all duration-300 opacity-0 translate-y-4 pointer-events-none focus:outline-none glow-box cursor-pointer">
+    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 10l7-7m0 0l7 7m-7-7v18"></path>
+    </svg>
+  </button>
 </body>
 </html>`);
 });
@@ -3064,7 +3118,25 @@ app.get(['/msm/streams', '/msm/cache'], (req, res) => {
     }
 
     loadStreams();
+
+    window.addEventListener('scroll', () => {
+      const btn = document.getElementById('backToTopBtn');
+      if (!btn) return;
+      if (window.scrollY > 250) {
+        btn.classList.remove('opacity-0', 'translate-y-4', 'pointer-events-none');
+        btn.classList.add('opacity-100', 'translate-y-0', 'pointer-events-auto');
+      } else {
+        btn.classList.add('opacity-0', 'translate-y-4', 'pointer-events-none');
+        btn.classList.remove('opacity-100', 'translate-y-0', 'pointer-events-auto');
+      }
+    }, { passive: true });
   </script>
+  <!-- Floating Back to Top Button -->
+  <button id="backToTopBtn" onclick="window.scrollTo({top: 0, behavior: 'smooth'})" title="Scroll to top" aria-label="Scroll to top" class="fixed bottom-6 right-6 z-50 p-3 rounded-full bg-slate-800/90 hover:bg-sky-500 text-slate-300 hover:text-slate-950 border border-slate-700/80 hover:border-sky-400 shadow-xl backdrop-blur transition-all duration-300 opacity-0 translate-y-4 pointer-events-none focus:outline-none glow-box cursor-pointer">
+    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 10l7-7m0 0l7 7m-7-7v18"></path>
+    </svg>
+  </button>
 </body>
 </html>`);
 });
@@ -3739,7 +3811,25 @@ app.get(['/msm/setting', '/msm/settings'], (req, res) => {
     }
 
     loadSettingsData();
+
+    window.addEventListener('scroll', () => {
+      const btn = document.getElementById('backToTopBtn');
+      if (!btn) return;
+      if (window.scrollY > 250) {
+        btn.classList.remove('opacity-0', 'translate-y-4', 'pointer-events-none');
+        btn.classList.add('opacity-100', 'translate-y-0', 'pointer-events-auto');
+      } else {
+        btn.classList.add('opacity-0', 'translate-y-4', 'pointer-events-none');
+        btn.classList.remove('opacity-100', 'translate-y-0', 'pointer-events-auto');
+      }
+    }, { passive: true });
   </script>
+  <!-- Floating Back to Top Button -->
+  <button id="backToTopBtn" onclick="window.scrollTo({top: 0, behavior: 'smooth'})" title="Scroll to top" aria-label="Scroll to top" class="fixed bottom-6 right-6 z-50 p-3 rounded-full bg-slate-800/90 hover:bg-sky-500 text-slate-300 hover:text-slate-950 border border-slate-700/80 hover:border-sky-400 shadow-xl backdrop-blur transition-all duration-300 opacity-0 translate-y-4 pointer-events-none focus:outline-none glow-box cursor-pointer">
+    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 10l7-7m0 0l7 7m-7-7v18"></path>
+    </svg>
+  </button>
 </body>
 </html>`);
 });
