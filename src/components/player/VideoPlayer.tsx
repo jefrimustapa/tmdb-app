@@ -574,10 +574,10 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           if (isSoutheastAsian && hasDiffOriginal && cleanOrig) candidateSet.add(cleanOrig);
           candidateSet.add(cleanTitle);
           if (hasDiffOriginal && cleanOrig) candidateSet.add(cleanOrig);
-          if (/[:\-–—]/.test(cleanTitle)) {
-            const prefix = cleanTitle.split(/[:\-–—]/)[0].trim();
+          if (/[:;\-–—]/.test(cleanTitle)) {
+            const prefix = cleanTitle.split(/[:;\-–—]/)[0].trim();
             if (prefix.length >= 3 && prefix.toLowerCase() !== cleanTitle.toLowerCase()) candidateSet.add(prefix);
-            const stripped = cleanTitle.replace(/[:\-–—]/g, ' ').replace(/\s+/g, ' ').trim();
+            const stripped = cleanTitle.replace(/[:;\-–—]/g, ' ').replace(/\s+/g, ' ').trim();
             if (stripped.toLowerCase() !== cleanTitle.toLowerCase()) candidateSet.add(stripped);
           }
           const telegramSearchTitles: string[] = Array.from(candidateSet);
@@ -627,6 +627,9 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             }
             console.log(`[Resolver] Telegram Provider (${provider.name}) searching for "${searchTitle}" (year: ${queryYear || 'none'}, s: ${querySeason}, e: ${queryEpisode}, forceFresh: ${isForceFresh})...`);
             setResolvingStatus(`Searching @msmbot for "${searchTitle}"...`);
+            const candidateAltTitle = (searchTitle.toLowerCase() === cleanTitle.toLowerCase())
+              ? (hasDiffOriginal ? cleanOrig : undefined)
+              : cleanTitle;
             const res = await msmService.resolveStream(
               searchTitle,
               queryYear,
@@ -634,7 +637,8 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
               queryEpisode,
               abortController.signal,
               isForceFresh,
-              effectiveTotalSeasons
+              effectiveTotalSeasons,
+              candidateAltTitle
             );
 
             if (!isMounted || abortController.signal.aborted) {

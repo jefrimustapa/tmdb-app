@@ -80,6 +80,7 @@ if (savedSettings.routerRamCacheMb === undefined) savedSettings.routerRamCacheMb
 if (savedSettings.videoTranscodeMode === undefined) savedSettings.videoTranscodeMode = 'disabled';
 if (savedSettings.minTvSizeMb === undefined) savedSettings.minTvSizeMb = 80;
 if (savedSettings.minMovieSizeMb === undefined) savedSettings.minMovieSizeMb = 180;
+if (savedSettings.resolverMaxPages === undefined) savedSettings.resolverMaxPages = 3;
 
 export let BOT_USERNAME = (savedSettings.targetBotUsername || process.env.TG_BOT_USERNAME || 'msm34bot').replace(/^@/, '');
 
@@ -466,20 +467,21 @@ function isJunkMedia(text) {
 
 function parseSizeFromText(text) {
   if (!text) return null;
-  const m = text.match(/(\d+(?:\.\d+)?)\s*(mb|gb)\b/i);
+  // Match file size with optional thousands commas, e.g. 1,018.52 MB or 741.31 MB
+  const m = text.match(/([\d,]+(?:\.\d+)?)\s*(mb|gb)\b/i);
   if (!m) return null;
-  const val = parseFloat(m[1]);
+  const val = parseFloat(m[1].replace(/,/g, ''));
   if (isNaN(val)) return null;
   return m[2].toLowerCase() === 'gb' ? val * 1024 : val;
 }
 
-// Clean title for bot searches (strips punctuation, colons, quotes, dashes, parentheticals, and acronym dots)
+// Clean title for bot searches (strips punctuation, colons, semicolons, quotes, dashes, parentheticals, and acronym dots)
 function cleanSearchTitle(str) {
   if (!str) return '';
   return str
     .replace(/\s*\([^)]*\)/g, ' ') // remove (2024), (US), etc.
     .replace(/\s*\[[^\]]*\]/g, ' ')
-    .replace(/[:\-–—'"`!?&,._]/g, ' ') // cleanly replace punctuation with space
+    .replace(/[:;\-–—'"`!?&,._]/g, ' ') // cleanly replace punctuation with space (including ;)
     .replace(/\s+/g, ' ')
     .trim();
 }
@@ -639,22 +641,26 @@ function isBareButton(text) {
   return tokens.every(t => /^\d+$/.test(t) || bareKeywords.has(t));
 }
 
-// Score a candidate download button against search context
-function scoreCandidateButton(btn, msg, context = {}) {
+// Score a candidate download button against search context with detailed reason
+function scoreCandidateButtonWithReason(btn, msg, context = {}) {
   const {
     isTv = false,
     title = '',
+    altTitle = '',
     year = null,
     sNum = 1,
     eNum = 1,
     totalSeasons = 1,
     targetQuality = 720,
     significantTokens = extractSignificantTokens(title),
+    altSignificantTokens = altTitle ? extractSignificantTokens(altTitle) : [],
     minTvSizeMb = savedSettings.minTvSizeMb ?? 80,
     minMovieSizeMb = savedSettings.minMovieSizeMb ?? 180,
   } = context;
 
-  if ((btn.className !== 'KeyboardButtonUrlAuth' && btn.className !== 'KeyboardButtonUrl') || !btn.url) return -999;
+  if ((btn.className !== 'KeyboardButtonUrlAuth' && btn.className !== 'KeyboardButtonUrl') || !btn.url) {
+    return { score: -999, reason: 'missing url or unsupported button class' };
+  }
   const btnText = (btn.text || '').toLowerCase();
   const normBtnText = normalizeTitle(btnText);
   const msgText = (msg.message || '').toLowerCase();
@@ -662,20 +668,19 @@ function scoreCandidateButton(btn, msg, context = {}) {
 
   // 1. Immediately disqualify junk media (trailers, teasers, samples, promos, ost)
   if (isJunkMedia(btnText) || isJunkMedia(msgText)) {
-    return -999;
+    return { score: -999, reason: 'junk media (trailer/teaser/sample/promo/ost)' };
   }
 
   // 2. Minimum file size sanity check
   const btnSizeMB = parseSizeFromText(btn.text) || parseSizeFromText(msg.message);
   if (btnSizeMB !== null) {
-    if (isTv) {
-      if (btnSizeMB < minTvSizeMb) return -999;
-    } else {
-      if (btnSizeMB < minMovieSizeMb) return -999;
+    const minThreshold = isTv ? minTvSizeMb : minMovieSizeMb;
+    if (btnSizeMB < minThreshold) {
+      return { score: -999, reason: `file size (${btnSizeMB.toFixed(1)} MB) below minimum (${minThreshold} MB)` };
     }
   }
 
-  // 3. Strict Title Token Coverage check
+  // 3. Strict Title Token Coverage check (supports both primary title and English/alternative title)
   const isBare = isBareButton(btnText);
   const cleanMsgText = cleanBotEchoHeader(msgText);
   let titleTargetText = normBtnText;
@@ -684,25 +689,45 @@ function scoreCandidateButton(btn, msg, context = {}) {
     titleTargetText = normalizeTitle(cleanMsgText);
   }
 
+  let bestCoverage = 0;
+  let primaryPassed = false;
+  let altPassed = false;
+  let covPrimary = 0;
+  let covAlt = 0;
+
   if (significantTokens.length > 0) {
-    const coverage = calculateTitleCoverage(significantTokens, titleTargetText);
-    if (significantTokens.length <= 2 && coverage < 1.0) {
-      return -999;
+    covPrimary = calculateTitleCoverage(significantTokens, titleTargetText);
+    const meetsPrimary = (significantTokens.length <= 2 ? covPrimary >= 1.0 : covPrimary >= 0.70);
+    if (meetsPrimary) {
+      primaryPassed = true;
+      bestCoverage = Math.max(bestCoverage, covPrimary);
     }
-    if (coverage < 0.70) {
-      return -999;
+  }
+
+  if (altSignificantTokens && altSignificantTokens.length > 0) {
+    covAlt = calculateTitleCoverage(altSignificantTokens, titleTargetText);
+    const meetsAlt = (altSignificantTokens.length <= 2 ? covAlt >= 1.0 : covAlt >= 0.70);
+    if (meetsAlt) {
+      altPassed = true;
+      bestCoverage = Math.max(bestCoverage, covAlt);
+    }
+  }
+
+  if (significantTokens.length > 0 || (altSignificantTokens && altSignificantTokens.length > 0)) {
+    if (!primaryPassed && !altPassed) {
+      const reasonDetail = altSignificantTokens && altSignificantTokens.length > 0
+        ? `title coverage too low (primary: ${(covPrimary * 100).toFixed(0)}%, alt: ${(covAlt * 100).toFixed(0)}%)`
+        : `title coverage too low (${(covPrimary * 100).toFixed(0)}%)`;
+      return { score: -999, reason: reasonDetail };
     }
   }
 
   let score = 0;
 
-  if (significantTokens.length > 0) {
-    const coverage = calculateTitleCoverage(significantTokens, titleTargetText);
-    if (coverage >= 1.0) {
-      score += 200;
-    } else {
-      score += Math.round(coverage * 100);
-    }
+  if (bestCoverage >= 1.0) {
+    score += 200;
+  } else if (bestCoverage > 0) {
+    score += Math.round(bestCoverage * 100);
   }
 
   if (isTv) {
@@ -717,12 +742,12 @@ function scoreCandidateButton(btn, msg, context = {}) {
         if (eNum >= epInfo.start && eNum <= epInfo.end) {
           score += 90;
         } else {
-          return -999;
+          return { score: -999, reason: `episode range [${epInfo.start}-${epInfo.end}] does not include episode ${eNum}` };
         }
       } else if (epInfo.episode === eNum) {
         score += 150;
       } else {
-        return -999;
+        return { score: -999, reason: `episode mismatch (found ep ${epInfo.episode}, expected ep ${eNum})` };
       }
     } else {
       score -= 150;
@@ -738,12 +763,12 @@ function scoreCandidateButton(btn, msg, context = {}) {
       if (seasonFound === sNum) {
         score += 80;
       } else {
-        return -999;
+        return { score: -999, reason: `season mismatch (found season ${seasonFound}, expected season ${sNum})` };
       }
     } else if (sNum > 1 && totalSeasons > 1) {
       // Multi-season protection: when watching Season 2 or later, reject un-versioned candidates with no matching year
       if (!btnYear || Math.abs(targetYear - btnYear) > 1) {
-        return -999;
+        return { score: -999, reason: `un-versioned candidate without matching year for season ${sNum}` };
       }
     }
 
@@ -752,7 +777,7 @@ function scoreCandidateButton(btn, msg, context = {}) {
       if (Math.abs(targetYear - btnYear) <= 1) {
         score += 90;
       } else if (!isNaN(explicitTargetYear)) {
-        return -999;
+        return { score: -999, reason: `release year mismatch (found ${btnYear}, expected ${targetYear})` };
       }
     }
   } else {
@@ -760,10 +785,10 @@ function scoreCandidateButton(btn, msg, context = {}) {
     const isTvCandidate = /\b(s\d{1,2}e\d{1,2}|s\d{1,2}\s*ep?\s*\d{1,2}|season\s*\d+|musim\s*\d+|episode\s*\d+|episod\s*\d+|ep\s*\d+|\.end\.)\b/i.test(btnText) ||
                           /\b(s\d{1,2}e\d{1,2}|s\d{1,2}\s*ep?\s*\d{1,2}|season\s*\d+|musim\s*\d+|episode\s*\d+|episod\s*\d+|ep\s*\d+|\.end\.)\b/i.test(msgText);
     if (isTvCandidate) {
-      return -999;
+      return { score: -999, reason: 'TV series/episode indicator found in movie candidate' };
     }
 
-    if (significantTokens.length === 1) {
+    if (significantTokens.length === 1 && (!altSignificantTokens || altSignificantTokens.length <= 1)) {
       const singleWord = significantTokens[0];
       const textToInspect = isBare ? titleTargetText : (normBtnText || titleTargetText);
       const prefixMatch = textToInspect.match(new RegExp(`\\b([a-z0-9]+)\\s+${singleWord}\\b`, 'i'));
@@ -777,19 +802,19 @@ function scoreCandidateButton(btn, msg, context = {}) {
           ignorePrefixes.add('an');
         }
         if (!ignorePrefixes.has(prefixWord) && !/^msm\d*$/i.test(prefixWord)) {
-          return -999;
+          return { score: -999, reason: `conflicting title prefix "${prefixWord}" for single-word title` };
         }
       }
       const suffixMatch = textToInspect.match(new RegExp(`\\b${singleWord}\\s+([a-z0-9]+)\\b`, 'i'));
       if (suffixMatch) {
         const suffixWord = suffixMatch[1].toLowerCase();
         if (!isAllowedTitleSuffix(suffixWord)) {
-          return -999;
+          return { score: -999, reason: `conflicting title suffix "${suffixWord}" for single-word title` };
         }
       }
     }
 
-    const targetSequel = extractSequelInfo(title);
+    const targetSequel = extractSequelInfo(title) || (altTitle ? extractSequelInfo(altTitle) : null);
     const btnSequel = extractSequelInfo(btnText);
     if (targetSequel) {
       if (btnSequel === targetSequel) {
@@ -812,7 +837,7 @@ function scoreCandidateButton(btn, msg, context = {}) {
       if (Math.abs(targetYear - btnYear) <= 1) {
         score += 120;
       } else if (!isNaN(explicitTargetYear)) {
-        return -999;
+        return { score: -999, reason: `release year mismatch (found ${btnYear}, expected ${targetYear})` };
       }
     }
   }
@@ -841,7 +866,12 @@ function scoreCandidateButton(btn, msg, context = {}) {
   if (btnText.toLowerCase().includes('.mp4') || btnText.toLowerCase().includes('mp4')) score += 15;
   if (btnText.includes('malaysub') || btnText.includes('msm')) score += 5;
 
-  return score;
+  return { score, reason: score >= 0 ? `accepted (score: ${score})` : `penalized (score: ${score})` };
+}
+
+// Score a candidate download button against search context
+function scoreCandidateButton(btn, msg, context = {}) {
+  return scoreCandidateButtonWithReason(btn, msg, context).score;
 }
 
 // Web Auth State in RAM
@@ -1261,8 +1291,26 @@ app.get('/msm/auth', (req, res) => {
     }
 
     checkStatus();
+
+    window.addEventListener('scroll', () => {
+      const btn = document.getElementById('backToTopBtn');
+      if (!btn) return;
+      if (window.scrollY > 250) {
+        btn.classList.remove('opacity-0', 'translate-y-4', 'pointer-events-none');
+        btn.classList.add('opacity-100', 'translate-y-0', 'pointer-events-auto');
+      } else {
+        btn.classList.add('opacity-0', 'translate-y-4', 'pointer-events-none');
+        btn.classList.remove('opacity-100', 'translate-y-0', 'pointer-events-auto');
+      }
+    }, { passive: true });
   </script>
   </div>
+  <!-- Floating Back to Top Button -->
+  <button id="backToTopBtn" onclick="window.scrollTo({top: 0, behavior: 'smooth'})" title="Scroll to top" aria-label="Scroll to top" class="fixed bottom-6 right-6 z-50 p-3 rounded-full bg-slate-800/90 hover:bg-sky-500 text-slate-300 hover:text-slate-950 border border-slate-700/80 hover:border-sky-400 shadow-xl backdrop-blur transition-all duration-300 opacity-0 translate-y-4 pointer-events-none focus:outline-none glow-box cursor-pointer">
+    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 10l7-7m0 0l7 7m-7-7v18"></path>
+    </svg>
+  </button>
 </body>
 </html>`);
 });
@@ -2128,7 +2176,25 @@ app.get('/msm/logs', (req, res) => {
 
     fetchInitialLogs();
     connectSSE();
+
+    window.addEventListener('scroll', () => {
+      const btn = document.getElementById('backToTopBtn');
+      if (!btn) return;
+      if (window.scrollY > 250) {
+        btn.classList.remove('opacity-0', 'translate-y-4', 'pointer-events-none');
+        btn.classList.add('opacity-100', 'translate-y-0', 'pointer-events-auto');
+      } else {
+        btn.classList.add('opacity-0', 'translate-y-4', 'pointer-events-none');
+        btn.classList.remove('opacity-100', 'translate-y-0', 'pointer-events-auto');
+      }
+    }, { passive: true });
   </script>
+  <!-- Floating Back to Top Button -->
+  <button id="backToTopBtn" onclick="window.scrollTo({top: 0, behavior: 'smooth'})" title="Scroll to top" aria-label="Scroll to top" class="fixed bottom-6 right-6 z-50 p-3 rounded-full bg-slate-800/90 hover:bg-sky-500 text-slate-300 hover:text-slate-950 border border-slate-700/80 hover:border-sky-400 shadow-xl backdrop-blur transition-all duration-300 opacity-0 translate-y-4 pointer-events-none focus:outline-none glow-box cursor-pointer">
+    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 10l7-7m0 0l7 7m-7-7v18"></path>
+    </svg>
+  </button>
 </body>
 </html>`);
 });
@@ -2164,6 +2230,7 @@ app.get(['/api/settings', '/msm/api/settings'], (req, res) => {
     videoTranscodeMode: savedSettings.videoTranscodeMode || 'disabled',
     minTvSizeMb: savedSettings.minTvSizeMb ?? 80,
     minMovieSizeMb: savedSettings.minMovieSizeMb ?? 180,
+    resolverMaxPages: savedSettings.resolverMaxPages ?? 3,
     blockCacheEntries: globalBlockCache.size,
     blockCacheMaxEntries: getBlockCacheMaxEntries(),
     port,
@@ -2173,7 +2240,7 @@ app.get(['/api/settings', '/msm/api/settings'], (req, res) => {
 
 app.post(['/api/settings', '/msm/api/settings'], (req, res) => {
   try {
-    const { targetBotUsername, pipelineBuffers, overlapPrefetch, routerRamCacheMb, videoTranscodeMode, minTvSizeMb, minMovieSizeMb } = req.body || {};
+    const { targetBotUsername, pipelineBuffers, overlapPrefetch, routerRamCacheMb, videoTranscodeMode, minTvSizeMb, minMovieSizeMb, resolverMaxPages } = req.body || {};
     let changed = false;
 
     if (targetBotUsername && typeof targetBotUsername === 'string') {
@@ -2243,6 +2310,15 @@ app.post(['/api/settings', '/msm/api/settings'], (req, res) => {
       }
     }
 
+    if (resolverMaxPages !== undefined) {
+      const maxP = parseInt(resolverMaxPages, 10);
+      if (!isNaN(maxP) && maxP >= 1 && maxP <= 20) {
+        savedSettings.resolverMaxPages = maxP;
+        changed = true;
+        console.log(`[SETTINGS] Resolver max paging updated to: ${maxP}`);
+      }
+    }
+
     if (changed) {
       const dataDir = path.join(__dirname, 'data');
       if (!fs.existsSync(dataDir)) {
@@ -2260,6 +2336,7 @@ app.post(['/api/settings', '/msm/api/settings'], (req, res) => {
       videoTranscodeMode: savedSettings.videoTranscodeMode || 'disabled',
       minTvSizeMb: savedSettings.minTvSizeMb ?? 80,
       minMovieSizeMb: savedSettings.minMovieSizeMb ?? 180,
+      resolverMaxPages: savedSettings.resolverMaxPages ?? 3,
       blockCacheEntries: globalBlockCache.size,
       blockCacheMaxEntries: getBlockCacheMaxEntries(),
     });
@@ -2696,7 +2773,25 @@ app.get(['/msm', '/msm/dashboard'], (req, res) => {
 
     loadStats();
     setInterval(loadStats, 3000);
+
+    window.addEventListener('scroll', () => {
+      const btn = document.getElementById('backToTopBtn');
+      if (!btn) return;
+      if (window.scrollY > 250) {
+        btn.classList.remove('opacity-0', 'translate-y-4', 'pointer-events-none');
+        btn.classList.add('opacity-100', 'translate-y-0', 'pointer-events-auto');
+      } else {
+        btn.classList.add('opacity-0', 'translate-y-4', 'pointer-events-none');
+        btn.classList.remove('opacity-100', 'translate-y-0', 'pointer-events-auto');
+      }
+    }, { passive: true });
   </script>
+  <!-- Floating Back to Top Button -->
+  <button id="backToTopBtn" onclick="window.scrollTo({top: 0, behavior: 'smooth'})" title="Scroll to top" aria-label="Scroll to top" class="fixed bottom-6 right-6 z-50 p-3 rounded-full bg-slate-800/90 hover:bg-sky-500 text-slate-300 hover:text-slate-950 border border-slate-700/80 hover:border-sky-400 shadow-xl backdrop-blur transition-all duration-300 opacity-0 translate-y-4 pointer-events-none focus:outline-none glow-box cursor-pointer">
+    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 10l7-7m0 0l7 7m-7-7v18"></path>
+    </svg>
+  </button>
 </body>
 </html>`);
 });
@@ -3023,7 +3118,25 @@ app.get(['/msm/streams', '/msm/cache'], (req, res) => {
     }
 
     loadStreams();
+
+    window.addEventListener('scroll', () => {
+      const btn = document.getElementById('backToTopBtn');
+      if (!btn) return;
+      if (window.scrollY > 250) {
+        btn.classList.remove('opacity-0', 'translate-y-4', 'pointer-events-none');
+        btn.classList.add('opacity-100', 'translate-y-0', 'pointer-events-auto');
+      } else {
+        btn.classList.add('opacity-0', 'translate-y-4', 'pointer-events-none');
+        btn.classList.remove('opacity-100', 'translate-y-0', 'pointer-events-auto');
+      }
+    }, { passive: true });
   </script>
+  <!-- Floating Back to Top Button -->
+  <button id="backToTopBtn" onclick="window.scrollTo({top: 0, behavior: 'smooth'})" title="Scroll to top" aria-label="Scroll to top" class="fixed bottom-6 right-6 z-50 p-3 rounded-full bg-slate-800/90 hover:bg-sky-500 text-slate-300 hover:text-slate-950 border border-slate-700/80 hover:border-sky-400 shadow-xl backdrop-blur transition-all duration-300 opacity-0 translate-y-4 pointer-events-none focus:outline-none glow-box cursor-pointer">
+    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 10l7-7m0 0l7 7m-7-7v18"></path>
+    </svg>
+  </button>
 </body>
 </html>`);
 });
@@ -3276,6 +3389,19 @@ app.get(['/msm/setting', '/msm/settings'], (req, res) => {
             </div>
           </div>
 
+          <!-- Resolver Max Paging -->
+          <div class="flex items-center justify-between gap-3 bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/80">
+            <div>
+              <div class="text-xs font-semibold text-white">Resolver Max Paging</div>
+              <div id="resolverMaxPagesHint" class="text-[11px] text-slate-400">Traverse up to 3 pages per search query during media resolution</div>
+            </div>
+            <div class="flex items-center gap-1.5 bg-slate-900 border border-slate-700 rounded-lg p-1">
+              <button type="button" onclick="adjustResolverMaxPages(-1)" class="w-6 h-6 flex items-center justify-center rounded bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white font-bold text-xs transition select-none">-</button>
+              <input id="resolverMaxPagesInput" type="number" step="1" min="1" max="15" value="3" oninput="updateResolverMaxPagesLabel()" class="w-10 bg-transparent text-center text-xs font-mono font-semibold text-white focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
+              <button type="button" onclick="adjustResolverMaxPages(1)" class="w-6 h-6 flex items-center justify-center rounded bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white font-bold text-xs transition select-none">+</button>
+            </div>
+          </div>
+
           <div class="flex items-center justify-between pt-2">
             <span id="saveEngineMsg" class="text-xs text-emerald-400 hidden">✓ Engine settings saved & applied!</span>
             <div class="flex-1"></div>
@@ -3423,6 +3549,10 @@ app.get(['/msm/setting', '/msm/settings'], (req, res) => {
           document.getElementById('minMovieSizeInput').value = String(res.minMovieSizeMb);
           updateMinMovieSizeLabel();
         }
+        if (res.resolverMaxPages !== undefined) {
+          document.getElementById('resolverMaxPagesInput').value = String(res.resolverMaxPages);
+          updateResolverMaxPagesLabel();
+        }
       } catch (e) {}
     }
 
@@ -3482,6 +3612,19 @@ app.get(['/msm/setting', '/msm/settings'], (req, res) => {
       document.getElementById('minMovieSizeHint').textContent = 'Files < ' + mb + ' MB are treated as clips/trailers and skipped';
     }
 
+    function adjustResolverMaxPages(delta) {
+      const input = document.getElementById('resolverMaxPagesInput');
+      let val = (parseInt(input.value, 10) || 3) + delta;
+      val = Math.max(1, Math.min(15, val));
+      input.value = String(val);
+      updateResolverMaxPagesLabel();
+    }
+
+    function updateResolverMaxPagesLabel() {
+      const pages = parseInt(document.getElementById('resolverMaxPagesInput').value, 10) || 3;
+      document.getElementById('resolverMaxPagesHint').textContent = 'Traverse up to ' + pages + ' page' + (pages === 1 ? '' : 's') + ' per search query during media resolution';
+    }
+
     function updateVideoTranscodeLabel() {
       const mode = document.getElementById('videoTranscodeSelect').value;
       const hint = document.getElementById('videoTranscodeHint');
@@ -3534,6 +3677,7 @@ app.get(['/msm/setting', '/msm/settings'], (req, res) => {
       const transcodeMode = document.getElementById('videoTranscodeSelect').value || 'disabled';
       const minTvMb = parseInt(document.getElementById('minTvSizeInput').value, 10) || 80;
       const minMovieMb = parseInt(document.getElementById('minMovieSizeInput').value, 10) || 180;
+      const resolverMaxPages = parseInt(document.getElementById('resolverMaxPagesInput').value, 10) || 3;
 
       const btn = document.getElementById('saveEngineBtn');
       btn.disabled = true;
@@ -3549,6 +3693,7 @@ app.get(['/msm/setting', '/msm/settings'], (req, res) => {
             videoTranscodeMode: transcodeMode,
             minTvSizeMb: minTvMb,
             minMovieSizeMb: minMovieMb,
+            resolverMaxPages: resolverMaxPages,
           })
         });
         const data = await res.json();
@@ -3666,7 +3811,25 @@ app.get(['/msm/setting', '/msm/settings'], (req, res) => {
     }
 
     loadSettingsData();
+
+    window.addEventListener('scroll', () => {
+      const btn = document.getElementById('backToTopBtn');
+      if (!btn) return;
+      if (window.scrollY > 250) {
+        btn.classList.remove('opacity-0', 'translate-y-4', 'pointer-events-none');
+        btn.classList.add('opacity-100', 'translate-y-0', 'pointer-events-auto');
+      } else {
+        btn.classList.add('opacity-0', 'translate-y-4', 'pointer-events-none');
+        btn.classList.remove('opacity-100', 'translate-y-0', 'pointer-events-auto');
+      }
+    }, { passive: true });
   </script>
+  <!-- Floating Back to Top Button -->
+  <button id="backToTopBtn" onclick="window.scrollTo({top: 0, behavior: 'smooth'})" title="Scroll to top" aria-label="Scroll to top" class="fixed bottom-6 right-6 z-50 p-3 rounded-full bg-slate-800/90 hover:bg-sky-500 text-slate-300 hover:text-slate-950 border border-slate-700/80 hover:border-sky-400 shadow-xl backdrop-blur transition-all duration-300 opacity-0 translate-y-4 pointer-events-none focus:outline-none glow-box cursor-pointer">
+    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 10l7-7m0 0l7 7m-7-7v18"></path>
+    </svg>
+  </button>
 </body>
 </html>`);
 });
@@ -3755,15 +3918,21 @@ app.get(['/api/cache/evict', '/msm/api/cache/evict'], (req, res) => {
 
 // Resolver endpoint: /api/resolve and Prefetch endpoint: /api/prefetch
 app.get(['/api/resolve', '/msm/api/resolve', '/api/prefetch', '/msm/api/prefetch'], async (req, res) => {
-  const { title, year, season, episode, totalSeasons: totalSeasonsQuery, maxQuality = '720', force, refresh, minTvSize, minMovieSize } = req.query;
+  const { title, year, season, episode, totalSeasons: totalSeasonsQuery, maxQuality = '720', force, refresh, minTvSize, minMovieSize, altTitle: altTitleQuery, englishTitle, maxPages: maxPagesQuery } = req.query;
   if (!title) {
     return res.status(400).json({ success: false, error: 'Missing title query parameter' });
   }
+
+  const altTitle = String(altTitleQuery || englishTitle || '').trim();
 
   const parsedMinTv = minTvSize ? parseInt(minTvSize, 10) : undefined;
   const parsedMinMovie = minMovieSize ? parseInt(minMovieSize, 10) : undefined;
   const effectiveMinTv = !isNaN(parsedMinTv) ? parsedMinTv : (savedSettings.minTvSizeMb ?? 80);
   const effectiveMinMovie = !isNaN(parsedMinMovie) ? parsedMinMovie : (savedSettings.minMovieSizeMb ?? 180);
+  const parsedMaxPages = maxPagesQuery ? parseInt(maxPagesQuery, 10) : undefined;
+  const effectiveMaxPages = (!isNaN(parsedMaxPages) && parsedMaxPages >= 1)
+    ? parsedMaxPages
+    : (savedSettings.resolverMaxPages ?? 3);
 
   const isPrefetch = req.path.includes('/prefetch') || req.query.prefetch === 'true' || req.query.prefetch === '1';
   const logPrefix = isPrefetch ? 'PREFETCH' : 'RESOLVE';
@@ -3798,7 +3967,7 @@ app.get(['/api/resolve', '/msm/api/resolve', '/api/prefetch', '/msm/api/prefetch
   else qualitySuffix = '_720p';
   const cacheKey = `${baseCacheKey}${qualitySuffix}`;
 
-  console.log(`[${logPrefix}] Request: "${queryTitle}" (isTv: ${isTv}, maxQuality: ${targetQuality}, bypassCache: ${shouldBypassCache}, cacheKey: "${cacheKey}")`);
+  console.log(`[${logPrefix}] Request: "${queryTitle}" (isTv: ${isTv}, maxQuality: ${targetQuality}, maxPages: ${effectiveMaxPages}, bypassCache: ${shouldBypassCache}, cacheKey: "${cacheKey}"${altTitle ? `, altTitle: "${altTitle}"` : ''})`);
 
   let isAborted = false;
   const onClientClose = () => {
@@ -4158,11 +4327,23 @@ app.get(['/api/resolve', '/msm/api/resolve', '/api/prefetch', '/msm/api/prefetch
 
     // Prepare prioritized search queries using clean, unpunctuated titles
     const cleanT = cleanSearchTitle(title);
+    let effectiveAltTitle = altTitle ? cleanSearchTitle(altTitle) : '';
+    if (!effectiveAltTitle) {
+      if (/\bproject\b/i.test(cleanT)) {
+        effectiveAltTitle = cleanT.replace(/\bproject\b/gi, 'Projek');
+      } else if (/\bprojek\b/i.test(cleanT)) {
+        effectiveAltTitle = cleanT.replace(/\bprojek\b/gi, 'Project');
+      }
+    }
+
     const searchQueries = [];
     if (isTv) {
       searchQueries.push(...generateSeriesSearchQueries(cleanT, sNum, eNum, totalSeasons, year));
       if (cleanT !== title) {
         searchQueries.push(...generateSeriesSearchQueries(title, sNum, eNum, totalSeasons, year));
+      }
+      if (effectiveAltTitle && effectiveAltTitle.toLowerCase() !== cleanT.toLowerCase()) {
+        searchQueries.push(...generateSeriesSearchQueries(effectiveAltTitle, sNum, eNum, totalSeasons, year));
       }
     } else {
       if (year) searchQueries.push(`${cleanT} ${year}`);
@@ -4171,7 +4352,14 @@ app.get(['/api/resolve', '/msm/api/resolve', '/api/prefetch', '/msm/api/prefetch
         if (year) searchQueries.push(`${title} ${year}`);
         searchQueries.push(title);
       }
+      if (effectiveAltTitle && effectiveAltTitle.toLowerCase() !== cleanT.toLowerCase()) {
+        if (year) searchQueries.push(`${effectiveAltTitle} ${year}`);
+        searchQueries.push(effectiveAltTitle);
+      }
     }
+
+    const uniqueSearchQueries = Array.from(new Set(searchQueries));
+    const altTokens = effectiveAltTitle ? extractSignificantTokens(effectiveAltTitle) : [];
 
     let targetMsgId = null;
     let targetButtonId = null;
@@ -4182,17 +4370,19 @@ app.get(['/api/resolve', '/msm/api/resolve', '/api/prefetch', '/msm/api/prefetch
     let deliveredMsgId = null;
     let resolvedFilename = null;
 
-    // Helper: Score a candidate download button
+    // Helper: Score a candidate download button with detailed reason
     function scoreButton(btn, msg) {
-      return scoreCandidateButton(btn, msg, {
+      return scoreCandidateButtonWithReason(btn, msg, {
         isTv,
         title,
+        altTitle: effectiveAltTitle,
         year,
         sNum,
         eNum,
         totalSeasons,
         targetQuality,
         significantTokens,
+        altSignificantTokens: altTokens,
         minTvSizeMb: effectiveMinTv,
         minMovieSizeMb: effectiveMinMovie,
       });
@@ -4343,7 +4533,7 @@ app.get(['/api/resolve', '/msm/api/resolve', '/api/prefetch', '/msm/api/prefetch
       throw lastErr;
     }
 
-    for (const sq of searchQueries) {
+    for (const sq of uniqueSearchQueries) {
       if (checkAborted()) {
         console.log(`[RESOLVE] Aborting search query loop for "${queryTitle}" (client aborted)`);
         break;
@@ -4378,31 +4568,42 @@ app.get(['/api/resolve', '/msm/api/resolve', '/api/prefetch', '/msm/api/prefetch
             if (m.replyMarkup?.rows) {
               let currentMsg = m;
               let pageCount = 0;
-              const MAX_PAGES = isTv ? 6 : 3;
+              const MAX_PAGES = effectiveMaxPages;
 
               while (currentMsg && pageCount < MAX_PAGES) {
                 if (checkAborted()) break;
                 pageCount++;
                 activeBotMsg = currentMsg;
                 activeBotPage = pageCount;
+                let pageBtnCount = 0;
+                let pageAcceptedCount = 0;
                 if (currentMsg.replyMarkup?.rows) {
                   for (const row of currentMsg.replyMarkup.rows) {
                     for (const btn of row.buttons) {
-                      const score = scoreButton(btn, currentMsg);
-                      if (score > -999) {
+                      pageBtnCount++;
+                      const evalRes = scoreButton(btn, currentMsg);
+                      const isAccepted = evalRes.score >= 0;
+                      if (isAccepted) {
+                        pageAcceptedCount++;
+                        console.log(`[RESOLVE EVAL] [Page ${pageCount}] "${btn.text}" -> score: ${evalRes.score} (ACCEPTED)`);
+                      } else {
+                        console.log(`[RESOLVE EVAL] [Page ${pageCount}] "${btn.text}" -> score: ${evalRes.score} (REJECTED: ${evalRes.reason})`);
+                      }
+                      if (evalRes.score > -999) {
                         candidates.push({
                           msgId: currentMsg.id,
                           buttonId: btn.buttonId,
                           url: btn.url,
                           text: btn.text,
                           className: btn.className,
-                          score,
+                          score: evalRes.score,
                           page: pageCount,
                         });
                       }
                     }
                   }
                 }
+                console.log(`[RESOLVE EVAL] Page ${pageCount} evaluation summary for "${sq}": ${pageAcceptedCount} accepted, ${pageBtnCount - pageAcceptedCount} rejected out of ${pageBtnCount} button(s)`);
 
                 // Traverse all pages to accumulate all candidate buttons for this query
                 if (pageCount >= MAX_PAGES || checkAborted()) break;
@@ -6099,6 +6300,8 @@ export {
   cleanSearchTitle,
   isBareButton,
   scoreCandidateButton,
+  scoreCandidateButtonWithReason,
+  parseSizeFromText,
   generateSeriesSearchQueries,
   calculateTitleCoverage,
   normalizeTitle,
