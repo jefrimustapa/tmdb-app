@@ -80,6 +80,7 @@ if (savedSettings.routerRamCacheMb === undefined) savedSettings.routerRamCacheMb
 if (savedSettings.videoTranscodeMode === undefined) savedSettings.videoTranscodeMode = 'disabled';
 if (savedSettings.minTvSizeMb === undefined) savedSettings.minTvSizeMb = 80;
 if (savedSettings.minMovieSizeMb === undefined) savedSettings.minMovieSizeMb = 180;
+if (savedSettings.resolverMaxPages === undefined) savedSettings.resolverMaxPages = 3;
 
 export let BOT_USERNAME = (savedSettings.targetBotUsername || process.env.TG_BOT_USERNAME || 'msm34bot').replace(/^@/, '');
 
@@ -2193,6 +2194,7 @@ app.get(['/api/settings', '/msm/api/settings'], (req, res) => {
     videoTranscodeMode: savedSettings.videoTranscodeMode || 'disabled',
     minTvSizeMb: savedSettings.minTvSizeMb ?? 80,
     minMovieSizeMb: savedSettings.minMovieSizeMb ?? 180,
+    resolverMaxPages: savedSettings.resolverMaxPages ?? 3,
     blockCacheEntries: globalBlockCache.size,
     blockCacheMaxEntries: getBlockCacheMaxEntries(),
     port,
@@ -2202,7 +2204,7 @@ app.get(['/api/settings', '/msm/api/settings'], (req, res) => {
 
 app.post(['/api/settings', '/msm/api/settings'], (req, res) => {
   try {
-    const { targetBotUsername, pipelineBuffers, overlapPrefetch, routerRamCacheMb, videoTranscodeMode, minTvSizeMb, minMovieSizeMb } = req.body || {};
+    const { targetBotUsername, pipelineBuffers, overlapPrefetch, routerRamCacheMb, videoTranscodeMode, minTvSizeMb, minMovieSizeMb, resolverMaxPages } = req.body || {};
     let changed = false;
 
     if (targetBotUsername && typeof targetBotUsername === 'string') {
@@ -2272,6 +2274,15 @@ app.post(['/api/settings', '/msm/api/settings'], (req, res) => {
       }
     }
 
+    if (resolverMaxPages !== undefined) {
+      const maxP = parseInt(resolverMaxPages, 10);
+      if (!isNaN(maxP) && maxP >= 1 && maxP <= 20) {
+        savedSettings.resolverMaxPages = maxP;
+        changed = true;
+        console.log(`[SETTINGS] Resolver max paging updated to: ${maxP}`);
+      }
+    }
+
     if (changed) {
       const dataDir = path.join(__dirname, 'data');
       if (!fs.existsSync(dataDir)) {
@@ -2289,6 +2300,7 @@ app.post(['/api/settings', '/msm/api/settings'], (req, res) => {
       videoTranscodeMode: savedSettings.videoTranscodeMode || 'disabled',
       minTvSizeMb: savedSettings.minTvSizeMb ?? 80,
       minMovieSizeMb: savedSettings.minMovieSizeMb ?? 180,
+      resolverMaxPages: savedSettings.resolverMaxPages ?? 3,
       blockCacheEntries: globalBlockCache.size,
       blockCacheMaxEntries: getBlockCacheMaxEntries(),
     });
@@ -3305,6 +3317,19 @@ app.get(['/msm/setting', '/msm/settings'], (req, res) => {
             </div>
           </div>
 
+          <!-- Resolver Max Paging -->
+          <div class="flex items-center justify-between gap-3 bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/80">
+            <div>
+              <div class="text-xs font-semibold text-white">Resolver Max Paging</div>
+              <div id="resolverMaxPagesHint" class="text-[11px] text-slate-400">Traverse up to 3 pages per search query during media resolution</div>
+            </div>
+            <div class="flex items-center gap-1.5 bg-slate-900 border border-slate-700 rounded-lg p-1">
+              <button type="button" onclick="adjustResolverMaxPages(-1)" class="w-6 h-6 flex items-center justify-center rounded bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white font-bold text-xs transition select-none">-</button>
+              <input id="resolverMaxPagesInput" type="number" step="1" min="1" max="15" value="3" oninput="updateResolverMaxPagesLabel()" class="w-10 bg-transparent text-center text-xs font-mono font-semibold text-white focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
+              <button type="button" onclick="adjustResolverMaxPages(1)" class="w-6 h-6 flex items-center justify-center rounded bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white font-bold text-xs transition select-none">+</button>
+            </div>
+          </div>
+
           <div class="flex items-center justify-between pt-2">
             <span id="saveEngineMsg" class="text-xs text-emerald-400 hidden">✓ Engine settings saved & applied!</span>
             <div class="flex-1"></div>
@@ -3452,6 +3477,10 @@ app.get(['/msm/setting', '/msm/settings'], (req, res) => {
           document.getElementById('minMovieSizeInput').value = String(res.minMovieSizeMb);
           updateMinMovieSizeLabel();
         }
+        if (res.resolverMaxPages !== undefined) {
+          document.getElementById('resolverMaxPagesInput').value = String(res.resolverMaxPages);
+          updateResolverMaxPagesLabel();
+        }
       } catch (e) {}
     }
 
@@ -3511,6 +3540,19 @@ app.get(['/msm/setting', '/msm/settings'], (req, res) => {
       document.getElementById('minMovieSizeHint').textContent = 'Files < ' + mb + ' MB are treated as clips/trailers and skipped';
     }
 
+    function adjustResolverMaxPages(delta) {
+      const input = document.getElementById('resolverMaxPagesInput');
+      let val = (parseInt(input.value, 10) || 3) + delta;
+      val = Math.max(1, Math.min(15, val));
+      input.value = String(val);
+      updateResolverMaxPagesLabel();
+    }
+
+    function updateResolverMaxPagesLabel() {
+      const pages = parseInt(document.getElementById('resolverMaxPagesInput').value, 10) || 3;
+      document.getElementById('resolverMaxPagesHint').textContent = 'Traverse up to ' + pages + ' page' + (pages === 1 ? '' : 's') + ' per search query during media resolution';
+    }
+
     function updateVideoTranscodeLabel() {
       const mode = document.getElementById('videoTranscodeSelect').value;
       const hint = document.getElementById('videoTranscodeHint');
@@ -3563,6 +3605,7 @@ app.get(['/msm/setting', '/msm/settings'], (req, res) => {
       const transcodeMode = document.getElementById('videoTranscodeSelect').value || 'disabled';
       const minTvMb = parseInt(document.getElementById('minTvSizeInput').value, 10) || 80;
       const minMovieMb = parseInt(document.getElementById('minMovieSizeInput').value, 10) || 180;
+      const resolverMaxPages = parseInt(document.getElementById('resolverMaxPagesInput').value, 10) || 3;
 
       const btn = document.getElementById('saveEngineBtn');
       btn.disabled = true;
@@ -3578,6 +3621,7 @@ app.get(['/msm/setting', '/msm/settings'], (req, res) => {
             videoTranscodeMode: transcodeMode,
             minTvSizeMb: minTvMb,
             minMovieSizeMb: minMovieMb,
+            resolverMaxPages: resolverMaxPages,
           })
         });
         const data = await res.json();
@@ -3784,7 +3828,7 @@ app.get(['/api/cache/evict', '/msm/api/cache/evict'], (req, res) => {
 
 // Resolver endpoint: /api/resolve and Prefetch endpoint: /api/prefetch
 app.get(['/api/resolve', '/msm/api/resolve', '/api/prefetch', '/msm/api/prefetch'], async (req, res) => {
-  const { title, year, season, episode, totalSeasons: totalSeasonsQuery, maxQuality = '720', force, refresh, minTvSize, minMovieSize, altTitle: altTitleQuery, englishTitle } = req.query;
+  const { title, year, season, episode, totalSeasons: totalSeasonsQuery, maxQuality = '720', force, refresh, minTvSize, minMovieSize, altTitle: altTitleQuery, englishTitle, maxPages: maxPagesQuery } = req.query;
   if (!title) {
     return res.status(400).json({ success: false, error: 'Missing title query parameter' });
   }
@@ -3795,6 +3839,10 @@ app.get(['/api/resolve', '/msm/api/resolve', '/api/prefetch', '/msm/api/prefetch
   const parsedMinMovie = minMovieSize ? parseInt(minMovieSize, 10) : undefined;
   const effectiveMinTv = !isNaN(parsedMinTv) ? parsedMinTv : (savedSettings.minTvSizeMb ?? 80);
   const effectiveMinMovie = !isNaN(parsedMinMovie) ? parsedMinMovie : (savedSettings.minMovieSizeMb ?? 180);
+  const parsedMaxPages = maxPagesQuery ? parseInt(maxPagesQuery, 10) : undefined;
+  const effectiveMaxPages = (!isNaN(parsedMaxPages) && parsedMaxPages >= 1)
+    ? parsedMaxPages
+    : (savedSettings.resolverMaxPages ?? 3);
 
   const isPrefetch = req.path.includes('/prefetch') || req.query.prefetch === 'true' || req.query.prefetch === '1';
   const logPrefix = isPrefetch ? 'PREFETCH' : 'RESOLVE';
@@ -3829,7 +3877,7 @@ app.get(['/api/resolve', '/msm/api/resolve', '/api/prefetch', '/msm/api/prefetch
   else qualitySuffix = '_720p';
   const cacheKey = `${baseCacheKey}${qualitySuffix}`;
 
-  console.log(`[${logPrefix}] Request: "${queryTitle}" (isTv: ${isTv}, maxQuality: ${targetQuality}, bypassCache: ${shouldBypassCache}, cacheKey: "${cacheKey}"${altTitle ? `, altTitle: "${altTitle}"` : ''})`);
+  console.log(`[${logPrefix}] Request: "${queryTitle}" (isTv: ${isTv}, maxQuality: ${targetQuality}, maxPages: ${effectiveMaxPages}, bypassCache: ${shouldBypassCache}, cacheKey: "${cacheKey}"${altTitle ? `, altTitle: "${altTitle}"` : ''})`);
 
   let isAborted = false;
   const onClientClose = () => {
@@ -4430,7 +4478,7 @@ app.get(['/api/resolve', '/msm/api/resolve', '/api/prefetch', '/msm/api/prefetch
             if (m.replyMarkup?.rows) {
               let currentMsg = m;
               let pageCount = 0;
-              const MAX_PAGES = isTv ? 6 : 3;
+              const MAX_PAGES = effectiveMaxPages;
 
               while (currentMsg && pageCount < MAX_PAGES) {
                 if (checkAborted()) break;
