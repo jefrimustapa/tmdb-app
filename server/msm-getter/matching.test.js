@@ -502,10 +502,17 @@ it('returns informative rejection reason on episode mismatch with scoreCandidate
   assert.ok(reason.includes('episode mismatch'), `Reason should mention episode mismatch, got: ${reason}`);
 });
 
+console.log('12. Resolver Max Paging Settings');
+
+it('has resolverMaxPages defaulting to 3', () => {
+  assert.strictEqual(savedSettings.resolverMaxPages, 3);
+});
+
 console.log(`\nResults: ${passed}/${total} tests passed!\n`);
 if (passed === total) {
   console.log('🎉 ALL UNIT TESTS PASSED SUCCESSFULLY!\n');
 } else {
   process.exit(1);
 }
+
 
