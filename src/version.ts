@@ -2,23 +2,23 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20261011-2236';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.main.20261011-2236';
+export const APP_BUILD_NUMBER = '20261016-0110';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.main.20261016-0110';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
 export const APP_BRANCH = 'main';
-export const APP_CHANGELOG = `* Merge branch 'feat/msm-prefetch-next-episode' into main
+export const APP_CHANGELOG = `* Merge branch 'fix/msm-project-exit-search' into main
+* feat(msm): add floating scroll-to-top icon button to /msm web pages
+* feat(msm-getter): add configurable resolver max paging (button style) defaulting to 3
+* feat(msm-getter): add dual-title english search, candidate scoring logs, and size comma parsing
+* Merge branch 'fix/msm-opps-terpikat-cik-sombong-ep27' into main
+* feat(msm-getter): make pipeline buffer settings button adjustable with 1 pipeline resolution
+* feat(msm-getter): make min size controls adjustable with +/- buttons (res 5 MB)
+* feat(msm-getter): make tv and movie min file size thresholds configurable via settings
+* chore(version): update build metadata for main branch
+* Merge branch 'feat/msm-prefetch-next-episode' into main
 * refactor(server): move /health/ to /msm/health/ with 301 redirect
 * feat(msm): prefetch and cache next episode at server when >50% watched
 * fix(sync): fix MKV A/V desync with Matroska muxer & seeking sync, add videoTranscodeMode setting
 * fix(resolve): define isHevc variable in resolve responses to prevent ReferenceError
-* fix(stream): completely disable any video transcode across all clients
-* fix(stream): strictly enforce direct video copy for mobile clients on HEVC
-* fix(stream): enable mobile audio transcode with direct video copy and accurate seek
-* chore(version): update build metadata for main branch
-* Merge branch 'refactor/msm-mp4-stream-revise' into main
-* feat(msm): stream native MP4 files direct without CPU transcode on desktop web
-* fix(msm): dynamically apply server configured pipeline concurrency to transcode streams
-* chore(version): update build metadata for main branch
-* Merge branch 'perf/improve-msm-stream-speed' into main
-* fix(msm): bind pipeline buffer tier strictly to actual media quality instead of client requested quality`;
+* fix(stream): completely disable any video transcode across all clients`;
