@@ -11,6 +11,7 @@ import { getProviderById, extractMediaOriginCountries, isProviderMatchingMedia, 
 import { isAnimeMedia } from '../../services/animeMappingService';
 import { isAseanMedia, isKoreanMedia } from '../../services/lariMappingService';
 import { msmService } from '../../services/msmMappingService';
+import { isEpisodeAired } from '../../services/episodeAirStatus';
 import { ArrowLeft, SkipForward, SkipBack, Settings, FastForward, Rewind } from 'lucide-react';
 
 import type { VirtualCursorStyle, StreamResolverType } from '../../types/db';
@@ -697,12 +698,14 @@ export const Watch: React.FC = () => {
     if (seasonDetails && seasonDetails.episodes) {
       const nextInSeason = seasonDetails.episodes.find((e) => e.episode_number === episodeParam + 1);
       if (nextInSeason) {
+        const airDate = nextInSeason.air_date || null;
         return {
           season: seasonParam,
           episode: episodeParam + 1,
           title: nextInSeason.name,
           stillPath: nextInSeason.still_path,
-          airDate: nextInSeason.air_date || null,
+          airDate,
+          isAired: isEpisodeAired(seasonParam, episodeParam + 1, airDate, tvDetails),
         };
       }
     }
@@ -711,12 +714,14 @@ export const Watch: React.FC = () => {
     if (tvDetails.number_of_seasons && seasonParam < tvDetails.number_of_seasons) {
       const nextSeasonNum = seasonParam + 1;
       const nextSeasonMeta = tvDetails.seasons?.find((s) => s.season_number === nextSeasonNum);
+      const airDate = nextSeasonMeta?.air_date || null;
       return {
         season: nextSeasonNum,
         episode: 1,
         title: 'Season Premiere',
         stillPath: null,
-        airDate: nextSeasonMeta?.air_date || null,
+        airDate,
+        isAired: isEpisodeAired(nextSeasonNum, 1, airDate, tvDetails),
       };
     }
 
@@ -751,7 +756,7 @@ export const Watch: React.FC = () => {
   }, [mediaType, details, seasonDetails, seasonParam, episodeParam]);
 
   const handleNextEpisode = React.useCallback(() => {
-    if (!nextEpisodeInfo) return;
+    if (!nextEpisodeInfo || !nextEpisodeInfo.isAired) return;
     navigate(`/watch/tv/${tmdbId}?s=${nextEpisodeInfo.season}&e=${nextEpisodeInfo.episode}`, { replace: true });
   }, [nextEpisodeInfo, navigate, tmdbId]);
 
@@ -865,7 +870,7 @@ export const Watch: React.FC = () => {
           </div>
 
           {/* Row 2: Season & Episode Info (Left) + Episode Navigation (Prev & Next) (Right) */}
-          {mediaType === 'tv' && (episodeLabel || prevEpisodeInfo || nextEpisodeInfo) && (
+          {mediaType === 'tv' && (episodeLabel || prevEpisodeInfo || (nextEpisodeInfo && nextEpisodeInfo.isAired)) && (
             <div className="flex items-center justify-between gap-3 w-full pl-0.5 sm:pl-1">
               {/* Left: S1:E4 • Episode Title without box (with smooth gradient fade edge) */}
               <div className="flex items-center gap-2 min-w-0 flex-1 max-w-[calc(100%-160px)] sm:max-w-xl">
@@ -913,7 +918,7 @@ export const Watch: React.FC = () => {
                   </button>
                 )}
 
-                {nextEpisodeInfo && (
+                {nextEpisodeInfo && nextEpisodeInfo.isAired && (
                   <button
                     type="button"
                     onClick={handleNextEpisode}

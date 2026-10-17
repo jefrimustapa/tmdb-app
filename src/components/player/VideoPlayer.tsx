@@ -16,6 +16,7 @@ import { msmService, type MsmResolveResult } from '../../services/msmMappingServ
 import { SubtitleOverlay } from './SubtitleOverlay';
 import type { SubtitleCue } from '../../services/subtitleService';
 import { CustomDirectPlayer } from './CustomDirectPlayer';
+import { isEpisodeAired } from '../../services/episodeAirStatus';
 
 interface VideoPlayerProps {
   mediaType: 'movie' | 'tv';
@@ -32,7 +33,7 @@ interface VideoPlayerProps {
   onProviderChange: (p: StreamProvider) => void;
   onActiveServerChange?: (serverLabel: string, activeProviderId?: string) => void;
   onProbingStatusChange?: (isProbing: boolean, currentServerIndex: number, totalServers?: number) => void;
-  nextEpisodeInfo?: { season: number; episode: number; title?: string; stillPath?: string | null; airDate?: string | null } | null;
+  nextEpisodeInfo?: { season: number; episode: number; title?: string; stillPath?: string | null; airDate?: string | null; isAired?: boolean } | null;
   onNextEpisode?: () => void;
   initialTimestamp?: number;
   episodeRuntimeMinutes?: number;
@@ -1246,13 +1247,12 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       nextEpisodeInfoRef.current
     ) {
       const nextEp = nextEpisodeInfoRef.current;
-      const todayStr = new Date().toISOString().split('T')[0];
-      const isNextAired = Boolean(nextEp.airDate && nextEp.airDate <= todayStr);
+      const isNextAired = nextEp.isAired ?? isEpisodeAired(nextEp.season, nextEp.episode, nextEp.airDate, details);
       const prefetchKey = `${tmdbId}_s${nextEp.season}_e${nextEp.episode}`;
 
       if (isNextAired && prefetchedNextEpisodeKeyRef.current !== prefetchKey) {
         prefetchedNextEpisodeKeyRef.current = prefetchKey;
-        console.log(`[VideoPlayer] MSM Stream > 50% watched (${Math.round((currentSec / effectiveDuration) * 100)}%). Next episode S${nextEp.season}E${nextEp.episode} is aired (${nextEp.airDate}). Triggering server cache prefetch...`);
+        console.log(`[VideoPlayer] MSM Stream > 50% watched (${Math.round((currentSec / effectiveDuration) * 100)}%). Next episode S${nextEp.season}E${nextEp.episode} is aired (${nextEp.airDate || 'confirmed'}). Triggering server cache prefetch...`);
         msmService.prefetchEpisode(
           title,
           releaseYear,
@@ -1265,15 +1265,20 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
     // Check for Up Next trigger on TV Series when Auto-Play is enabled
     // Triggers when reaching configured % (96%-104%) or when video has ended (force === true)
+    // Strictly requires the next episode to be confirmed aired so playback doesn't auto-advance to unaired episodes
     const targetPercent = upNextTriggerPercentRef.current || 96;
     const isAtOrPastTarget = unclampedProgressPercent >= targetPercent;
     const isNearEnd = totalDurationSec > 120 && (totalDurationSec - currentSec <= 75) && targetPercent <= 100;
     const isEnded = force && effectiveDuration > 0 && currentSec >= (effectiveDuration * 0.95);
+    const isNextEpAired = nextEpisodeInfoRef.current
+      ? (nextEpisodeInfoRef.current.isAired ?? isEpisodeAired(nextEpisodeInfoRef.current.season, nextEpisodeInfoRef.current.episode, nextEpisodeInfoRef.current.airDate, details))
+      : false;
 
     if (
       autoplayNextEnabledRef.current &&
       mediaType === 'tv' &&
       nextEpisodeInfoRef.current &&
+      isNextEpAired &&
       !showUpNextRef.current &&
       !dismissedUpNextRef.current &&
       (isAtOrPastTarget || isNearEnd || isEnded)
@@ -2678,7 +2683,10 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             if (durationRef.current > 0) {
               recordProgress(durationRef.current, durationRef.current, true);
             }
-            if (mediaType === 'tv' && nextEpisodeInfo) {
+            const isNextAired = nextEpisodeInfo
+              ? (nextEpisodeInfo.isAired ?? isEpisodeAired(nextEpisodeInfo.season, nextEpisodeInfo.episode, nextEpisodeInfo.airDate, details))
+              : false;
+            if (mediaType === 'tv' && nextEpisodeInfo && isNextAired) {
               setShowUpNext(true);
               setCountdown(upNextTimeoutRef.current || 20);
               setTimeout(() => {
