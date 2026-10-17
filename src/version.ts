@@ -2,12 +2,13 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20261016-0110';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.main.20261016-0110';
+export const APP_BUILD_NUMBER = '20261017-0524';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.fix-197-prefetch-una.20261017-0524';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
-export const APP_BRANCH = 'main';
-export const APP_CHANGELOG = `* Merge branch 'fix/msm-project-exit-search' into main
+export const APP_BRANCH = 'fix-197-prefetch-una';
+export const APP_CHANGELOG = `* chore(version): update build metadata for main branch
+* Merge branch 'fix/msm-project-exit-search' into main
 * feat(msm): add floating scroll-to-top icon button to /msm web pages
 * feat(msm-getter): add configurable resolver max paging (button style) defaulting to 3
 * feat(msm-getter): add dual-title english search, candidate scoring logs, and size comma parsing
@@ -20,5 +21,4 @@ export const APP_CHANGELOG = `* Merge branch 'fix/msm-project-exit-search' into 
 * refactor(server): move /health/ to /msm/health/ with 301 redirect
 * feat(msm): prefetch and cache next episode at server when >50% watched
 * fix(sync): fix MKV A/V desync with Matroska muxer & seeking sync, add videoTranscodeMode setting
-* fix(resolve): define isHevc variable in resolve responses to prevent ReferenceError
-* fix(stream): completely disable any video transcode across all clients`;
+* fix(resolve): define isHevc variable in resolve responses to prevent ReferenceError`;
