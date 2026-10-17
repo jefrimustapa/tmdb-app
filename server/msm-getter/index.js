@@ -16,6 +16,7 @@ import fs from 'fs';
 import os from 'os';
 import { spawn, execSync } from 'child_process';
 import { db } from './db.js';
+import { createGeoBlockMiddleware, isMalaysiaIp, isPrivateIp, checkGeoAccess } from './geoblock.js';
 
 class QuietLogger extends Logger {
   _log(level, message, color) {
@@ -52,6 +53,9 @@ app.use((err, req, res, next) => {
   next(err);
 });
 
+// Geo-blocking: Restrict incoming public WAN requests exclusively to Malaysia (MY)
+app.use(createGeoBlockMiddleware(() => savedSettings));
+
 const port = process.env.PORT || 3033;
 const INTERNAL_HTTP_PORT = parseInt(process.env.INTERNAL_PORT || '3034', 10);
 const apiId = parseInt(process.env.TG_API_ID, 10);
@@ -81,6 +85,9 @@ if (savedSettings.videoTranscodeMode === undefined) savedSettings.videoTranscode
 if (savedSettings.minTvSizeMb === undefined) savedSettings.minTvSizeMb = 80;
 if (savedSettings.minMovieSizeMb === undefined) savedSettings.minMovieSizeMb = 180;
 if (savedSettings.resolverMaxPages === undefined) savedSettings.resolverMaxPages = 3;
+if (savedSettings.geoBlockEnabled === undefined) savedSettings.geoBlockEnabled = true;
+if (savedSettings.geoBlockAllowedCountries === undefined) savedSettings.geoBlockAllowedCountries = ['MY'];
+if (savedSettings.geoBlockWhitelistedIps === undefined) savedSettings.geoBlockWhitelistedIps = [];
 
 export let BOT_USERNAME = (savedSettings.targetBotUsername || process.env.TG_BOT_USERNAME || 'msm34bot').replace(/^@/, '');
 
@@ -2320,6 +2327,9 @@ app.get(['/api/settings', '/msm/api/settings'], (req, res) => {
     minTvSizeMb: savedSettings.minTvSizeMb ?? 80,
     minMovieSizeMb: savedSettings.minMovieSizeMb ?? 180,
     resolverMaxPages: savedSettings.resolverMaxPages ?? 3,
+    geoBlockEnabled: savedSettings.geoBlockEnabled !== false,
+    geoBlockAllowedCountries: savedSettings.geoBlockAllowedCountries || ['MY'],
+    geoBlockWhitelistedIps: savedSettings.geoBlockWhitelistedIps || [],
     blockCacheEntries: globalBlockCache.size,
     blockCacheMaxEntries: getBlockCacheMaxEntries(),
     port,
@@ -2329,7 +2339,18 @@ app.get(['/api/settings', '/msm/api/settings'], (req, res) => {
 
 app.post(['/api/settings', '/msm/api/settings'], (req, res) => {
   try {
-    const { targetBotUsername, pipelineBuffers, overlapPrefetch, routerRamCacheMb, videoTranscodeMode, minTvSizeMb, minMovieSizeMb, resolverMaxPages } = req.body || {};
+    const {
+      targetBotUsername,
+      pipelineBuffers,
+      overlapPrefetch,
+      routerRamCacheMb,
+      videoTranscodeMode,
+      minTvSizeMb,
+      minMovieSizeMb,
+      resolverMaxPages,
+      geoBlockEnabled,
+      geoBlockWhitelistedIps,
+    } = req.body || {};
     let changed = false;
 
     if (targetBotUsername && typeof targetBotUsername === 'string') {
@@ -2408,6 +2429,24 @@ app.post(['/api/settings', '/msm/api/settings'], (req, res) => {
       }
     }
 
+    if (geoBlockEnabled !== undefined) {
+      savedSettings.geoBlockEnabled = Boolean(geoBlockEnabled);
+      changed = true;
+      console.log(`[SETTINGS] Geo-Blocking Enabled updated to:`, savedSettings.geoBlockEnabled);
+    }
+
+    if (geoBlockWhitelistedIps !== undefined) {
+      let ips = [];
+      if (Array.isArray(geoBlockWhitelistedIps)) {
+        ips = geoBlockWhitelistedIps.map(s => String(s).trim()).filter(Boolean);
+      } else if (typeof geoBlockWhitelistedIps === 'string') {
+        ips = geoBlockWhitelistedIps.split(/[\n,]/).map(s => s.trim()).filter(Boolean);
+      }
+      savedSettings.geoBlockWhitelistedIps = ips;
+      changed = true;
+      console.log(`[SETTINGS] Geo-Blocking Whitelisted IPs updated to:`, JSON.stringify(ips));
+    }
+
     if (changed) {
       const dataDir = path.join(__dirname, 'data');
       if (!fs.existsSync(dataDir)) {
@@ -2426,6 +2465,9 @@ app.post(['/api/settings', '/msm/api/settings'], (req, res) => {
       minTvSizeMb: savedSettings.minTvSizeMb ?? 80,
       minMovieSizeMb: savedSettings.minMovieSizeMb ?? 180,
       resolverMaxPages: savedSettings.resolverMaxPages ?? 3,
+      geoBlockEnabled: savedSettings.geoBlockEnabled !== false,
+      geoBlockAllowedCountries: savedSettings.geoBlockAllowedCountries || ['MY'],
+      geoBlockWhitelistedIps: savedSettings.geoBlockWhitelistedIps || [],
       blockCacheEntries: globalBlockCache.size,
       blockCacheMaxEntries: getBlockCacheMaxEntries(),
     });
@@ -2480,6 +2522,7 @@ app.get(['/msm', '/msm/dashboard'], (req, res) => {
           <h1 class="text-lg font-bold text-white flex items-center gap-2">
             MSM Dashboard
             <span id="botBadge" class="text-xs px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-300 border border-sky-500/30 font-mono">@${BOT_USERNAME}</span>
+            <span id="geoBadge" class="text-xs px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-mono hidden sm:inline-block">🛡️ MY Only</span>
           </h1>
           <p class="text-xs text-slate-400">Telegram MTProto Cloud Streaming Gateway</p>
         </div>
@@ -3567,6 +3610,53 @@ app.get(['/msm/setting', '/msm/settings'], (req, res) => {
         </div>
       </div>
 
+      <!-- Card 7: Geo-Blocking (Malaysia Only) -->
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 glow-box space-y-4 md:col-span-2">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center justify-center font-bold text-lg">
+              🛡️
+            </div>
+            <div>
+              <h2 class="text-sm font-semibold text-white flex items-center gap-2">
+                Geo-Blocking (Malaysia Only)
+              </h2>
+              <p class="text-xs text-slate-400">Restricts public streaming and resolver endpoints strictly to Malaysia (MY) IP addresses.</p>
+            </div>
+          </div>
+          <span id="geoBlockStatusBadge" class="text-xs px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-mono">Active (MY)</span>
+        </div>
+
+        <div class="space-y-3 pt-1">
+          <!-- Toggle Geo-Blocking -->
+          <div class="flex items-center justify-between gap-3 bg-slate-950/60 p-3 rounded-xl border border-slate-800/80">
+            <div>
+              <div class="text-xs font-semibold text-white">Enforce Malaysia Geo-Blocking</div>
+              <div class="text-[11px] text-slate-400">Deny all public WAN connections originating outside Malaysia (403 Forbidden). Local LAN and loopback traffic are always permitted.</div>
+            </div>
+            <label class="relative inline-flex items-center cursor-pointer select-none">
+              <input id="geoBlockToggle" type="checkbox" checked onchange="updateGeoBlockToggleUI()" class="sr-only peer" />
+              <div class="w-11 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
+            </label>
+          </div>
+
+          <!-- IP Whitelist -->
+          <div class="space-y-1.5 bg-slate-950/60 p-3 rounded-xl border border-slate-800/80">
+            <div class="text-xs font-semibold text-white">Custom Whitelisted IPs / Subnets</div>
+            <div class="text-[11px] text-slate-400">Explicitly permit specific IPs or CIDR blocks outside Malaysia (one per line or comma-separated).</div>
+            <textarea id="geoBlockWhitelistInput" rows="2" placeholder="e.g. 1.2.3.4, 195.154.0.0/16" class="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs font-mono text-slate-200 focus:outline-none focus:border-sky-500/50 resize-y"></textarea>
+          </div>
+
+          <div class="flex items-center justify-between pt-1">
+            <span id="saveGeoMsg" class="text-xs text-emerald-400 hidden">✓ Geo-blocking settings saved!</span>
+            <div class="flex-1"></div>
+            <button id="saveGeoBtn" onclick="saveGeoSettings()" class="px-4 py-1.5 bg-sky-500 hover:bg-sky-400 text-slate-950 font-semibold text-xs rounded-xl transition">
+              Save Geo Settings
+            </button>
+          </div>
+        </div>
+      </div>
+
     </div>
   </div>
 
@@ -3642,7 +3732,69 @@ app.get(['/msm/setting', '/msm/settings'], (req, res) => {
           document.getElementById('resolverMaxPagesInput').value = String(res.resolverMaxPages);
           updateResolverMaxPagesLabel();
         }
+        if (res.geoBlockEnabled !== undefined) {
+          const toggle = document.getElementById('geoBlockToggle');
+          if (toggle) toggle.checked = Boolean(res.geoBlockEnabled);
+          updateGeoBlockToggleUI();
+        }
+        if (res.geoBlockWhitelistedIps) {
+          const wl = document.getElementById('geoBlockWhitelistInput');
+          if (wl) wl.value = res.geoBlockWhitelistedIps.join('\\n');
+        }
       } catch (e) {}
+    }
+
+    function updateGeoBlockToggleUI() {
+      const checked = document.getElementById('geoBlockToggle')?.checked;
+      const badge = document.getElementById('geoBlockStatusBadge');
+      if (badge) {
+        if (checked) {
+          badge.className = 'text-xs px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-mono';
+          badge.textContent = 'Active (MY)';
+        } else {
+          badge.className = 'text-xs px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700 font-mono';
+          badge.textContent = 'Disabled';
+        }
+      }
+    }
+
+    async function saveGeoSettings() {
+      const enabled = document.getElementById('geoBlockToggle')?.checked;
+      const rawIps = document.getElementById('geoBlockWhitelistInput')?.value || '';
+      const ips = rawIps.split(/[\\n,]/).map(s => s.trim()).filter(Boolean);
+
+      const btn = document.getElementById('saveGeoBtn');
+      if (btn) {
+        btn.disabled = true;
+        btn.textContent = 'Saving...';
+      }
+
+      try {
+        const res = await fetch('/msm/api/settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            geoBlockEnabled: enabled,
+            geoBlockWhitelistedIps: ips,
+          })
+        });
+        const data = await res.json();
+        if (data.success) {
+          const msg = document.getElementById('saveGeoMsg');
+          if (msg) {
+            msg.classList.remove('hidden');
+            setTimeout(() => msg.classList.add('hidden'), 3000);
+          }
+          updateGeoBlockToggleUI();
+        }
+      } catch (e) {
+        alert('Failed to save Geo settings: ' + e.message);
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.textContent = 'Save Geo Settings';
+        }
+      }
     }
 
     function adjustPipelineBuf(tier, delta) {
@@ -6379,5 +6531,9 @@ export {
   extractSequelInfo,
   isAllowedTitleSuffix,
   validateTitleBoundaries,
+  createGeoBlockMiddleware,
+  isMalaysiaIp,
+  isPrivateIp,
+  checkGeoAccess,
   savedSettings,
 };
