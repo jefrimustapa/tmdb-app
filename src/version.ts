@@ -2,12 +2,16 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20261017-0603';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.main.20261017-0603';
+export const APP_BUILD_NUMBER = '20261017-1521';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.main.20261017-1521';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
 export const APP_BRANCH = 'main';
-export const APP_CHANGELOG = `* Merge branch 'fix/197-prefetch-unaired-episode' into main (closes #197)
+export const APP_CHANGELOG = `* Merge branch 'fix/198-msm-apostrophe-title-resolve' into main (closes #198)
+* test(msm-getter): make resolverMaxPages assertion robust to custom router settings
+* fix(msm-getter): strip apostrophes without whitespace in search and normalize titles (#198)
+* chore(version): update build metadata for main branch
+* Merge branch 'fix/197-prefetch-unaired-episode' into main (closes #197)
 * fix(watch): prevent next episode prefetch and auto-play on unaired episodes (#197)
 * chore(version): update build metadata for main branch
 * Merge branch 'fix/msm-project-exit-search' into main
@@ -17,8 +21,4 @@ export const APP_CHANGELOG = `* Merge branch 'fix/197-prefetch-unaired-episode' 
 * Merge branch 'fix/msm-opps-terpikat-cik-sombong-ep27' into main
 * feat(msm-getter): make pipeline buffer settings button adjustable with 1 pipeline resolution
 * feat(msm-getter): make min size controls adjustable with +/- buttons (res 5 MB)
-* feat(msm-getter): make tv and movie min file size thresholds configurable via settings
-* chore(version): update build metadata for main branch
-* Merge branch 'feat/msm-prefetch-next-episode' into main
-* refactor(server): move /health/ to /msm/health/ with 301 redirect
-* feat(msm): prefetch and cache next episode at server when >50% watched`;
+* feat(msm-getter): make tv and movie min file size thresholds configurable via settings`;
