@@ -5,6 +5,7 @@ import {
   cleanBotEchoHeader,
   cleanSearchTitle,
   isBareButton,
+  normalizeTitle,
   scoreCandidateButton,
   scoreCandidateButtonWithReason,
   parseSizeFromText,
@@ -78,11 +79,27 @@ it('strips emoji-prefixed and multi-line echo headers', () => {
   assert.strictEqual(cleanBotEchoHeader(plainEcho), 'Gadis Masa E04 720p');
 });
 
-console.log('\n4. Title Sanitization (cleanSearchTitle)');
+console.log('\n4. Title Sanitization (cleanSearchTitle) & Normalization (normalizeTitle)');
 it('sanitizes titles and acronym punctuation cleanly', () => {
   assert.strictEqual(cleanSearchTitle('Spider-Man: No Way Home (2021)'), 'Spider Man No Way Home');
   assert.strictEqual(cleanSearchTitle('S.W.A.T.'), 'S W A T');
   assert.strictEqual(cleanSearchTitle('Hantu Punya Boss [Astro]'), 'Hantu Punya Boss');
+});
+
+it('strips apostrophes and smart quotes without inserting whitespace (#198)', () => {
+  // cleanSearchTitle
+  assert.strictEqual(cleanSearchTitle("Isn't"), 'Isnt');
+  assert.strictEqual(cleanSearchTitle("Isn't It Romantic"), 'Isnt It Romantic');
+  assert.strictEqual(cleanSearchTitle("Grey's Anatomy"), 'Greys Anatomy');
+  assert.strictEqual(cleanSearchTitle("Marvel’s Agents of S.H.I.E.L.D."), 'Marvels Agents of S H I E L D');
+  assert.strictEqual(cleanSearchTitle("Don't Look Up"), 'Dont Look Up');
+  assert.strictEqual(cleanSearchTitle("`Backtick's`"), 'Backticks');
+
+  // normalizeTitle
+  assert.strictEqual(normalizeTitle("Isn't"), 'isnt');
+  assert.strictEqual(normalizeTitle("Isn't It Romantic"), 'isnt it romantic');
+  assert.strictEqual(normalizeTitle("Grey's Anatomy"), 'greys anatomy');
+  assert.strictEqual(normalizeTitle("Marvel’s"), 'marvels');
 });
 
 console.log('\n5. Bare Button Detection (isBareButton)');
@@ -500,6 +517,24 @@ it('returns informative rejection reason on episode mismatch with scoreCandidate
   const { score, reason } = scoreCandidateButtonWithReason(btn, msg, context);
   assert.strictEqual(score, -999);
   assert.ok(reason.includes('episode mismatch'), `Reason should mention episode mismatch, got: ${reason}`);
+});
+
+it('correctly scores candidate matching title with apostrophe without splitting into single letters (#198)', () => {
+  const msg = { message: '' };
+  const btn = {
+    className: 'KeyboardButtonUrlAuth',
+    url: 'https://t.me/b/isntitromantic',
+    text: '🔥🎞 1. Isnt.It.Romantic.2019.720p.WEBRip.x264.mkv - 850 MB',
+  };
+  const context = {
+    isTv: false,
+    title: "Isn't It Romantic",
+    year: '2019',
+    targetQuality: 720,
+  };
+
+  const { score, reason } = scoreCandidateButtonWithReason(btn, msg, context);
+  assert.ok(score >= 200, `Expected score >= 200 for matching apostrophe title, got ${score} (reason: ${reason})`);
 });
 
 console.log('12. Resolver Max Paging Settings');
