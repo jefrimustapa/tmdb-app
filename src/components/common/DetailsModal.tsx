@@ -144,7 +144,7 @@ export const DetailsModal: React.FC<DetailsModalProps> = ({ item, onClose }) => 
             onError={(e) => tmdbImages.handleImgError(e, true)}
             className="w-full h-full object-cover"
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-hbo-card via-hbo-card/40 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-t from-hbo-card from-15% via-hbo-card/60 to-transparent" />
 
           {/* Modal Header Actions */}
           <div className="absolute bottom-6 left-6 right-6 flex items-end justify-between gap-4">

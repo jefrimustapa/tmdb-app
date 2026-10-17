@@ -214,7 +214,7 @@ export const Home: React.FC = () => {
     return (
       <div className="min-h-screen pb-16 bg-hbo-dark">
         <div data-hero-banner="true" className="relative w-full h-[65vh] sm:h-[75vh] min-h-[460px] max-h-[750px] overflow-hidden bg-[#050508] select-none">
-          <div className="absolute inset-0 bg-gradient-to-t from-hbo-dark via-hbo-dark/60 to-transparent z-10" />
+          <div className="absolute inset-0 bg-gradient-to-t from-hbo-dark from-15% via-hbo-dark/70 to-transparent z-10" />
           <div className="relative z-20 h-full flex flex-col justify-end p-6 sm:p-12 lg:p-16 max-w-4xl">
             <div className="h-6 w-32 bg-white/10 rounded-full mb-3 animate-pulse" />
             <div className="h-10 sm:h-14 w-3/4 bg-white/10 rounded-xl mb-4 animate-pulse" />
