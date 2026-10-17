@@ -4227,28 +4227,51 @@ app.get(['/api/resolve', '/msm/api/resolve', '/api/prefetch', '/msm/api/prefetch
   let cached = shouldBypassCache ? null : db.get(cacheKey);
   let fallbackCached = null;
 
-  if (!cached && !shouldBypassCache) {
-    // Check legacy baseCacheKey without quality suffix
-    const legacyCached = db.get(baseCacheKey);
-    if (legacyCached && legacyCached.filename) {
-      const fnLower = legacyCached.filename.toLowerCase();
-      const is4k = fnLower.includes('2160p') || fnLower.includes('4k') || fnLower.includes('uhd');
-      const is1080 = fnLower.includes('1080p') || fnLower.includes('1080');
-      const is720 = fnLower.includes('720p') || fnLower.includes('720');
-      const isLowerRes = fnLower.includes('480p') || fnLower.includes('540p') || fnLower.includes('360p');
+  let preferredFallbacks = [];
+  if (targetQuality >= 2160) {
+    preferredFallbacks = ['_1080p', '_720p', '_480p'];
+  } else if (targetQuality >= 1080) {
+    preferredFallbacks = ['_720p', '_4k', '_480p'];
+  } else if (targetQuality <= 480) {
+    preferredFallbacks = ['_720p', '_1080p', '_4k'];
+  } else {
+    // 720p target
+    preferredFallbacks = ['_1080p', '_480p', '_4k'];
+  }
 
-      if (targetQuality >= 2160) {
-        if (is4k) cached = legacyCached;
-        else if (is1080) fallbackCached = legacyCached;
-      } else if (targetQuality <= 480) {
-        if (isLowerRes) cached = legacyCached;
-        else if (is720) fallbackCached = legacyCached;
-      } else if (targetQuality <= 720) {
-        if (is720 || isLowerRes) cached = legacyCached;
-        else if (is1080) fallbackCached = legacyCached;
-      } else {
-        if (is1080) cached = legacyCached;
-        else if (is720) fallbackCached = legacyCached;
+  if (!cached && !shouldBypassCache) {
+    // Check other quality tiers for the same title as fallback candidates
+    for (const qSuffix of preferredFallbacks) {
+      const cand = db.get(`${baseCacheKey}${qSuffix}`);
+      if (cand) {
+        fallbackCached = cand;
+        break;
+      }
+    }
+
+    // Also check legacy baseCacheKey without quality suffix
+    if (!fallbackCached) {
+      const legacyCached = db.get(baseCacheKey);
+      if (legacyCached && legacyCached.filename) {
+        const fnLower = legacyCached.filename.toLowerCase();
+        const is4k = fnLower.includes('2160p') || fnLower.includes('4k') || fnLower.includes('uhd');
+        const is1080 = fnLower.includes('1080p') || fnLower.includes('1080');
+        const is720 = fnLower.includes('720p') || fnLower.includes('720');
+        const isLowerRes = fnLower.includes('480p') || fnLower.includes('540p') || fnLower.includes('360p');
+
+        if (targetQuality >= 2160) {
+          if (is4k) cached = legacyCached;
+          else if (is1080) fallbackCached = legacyCached;
+        } else if (targetQuality <= 480) {
+          if (isLowerRes) cached = legacyCached;
+          else if (is720) fallbackCached = legacyCached;
+        } else if (targetQuality <= 720) {
+          if (is720 || isLowerRes) cached = legacyCached;
+          else if (is1080) fallbackCached = legacyCached;
+        } else {
+          if (is1080) cached = legacyCached;
+          else if (is720) fallbackCached = legacyCached;
+        }
       }
     }
   }
@@ -4524,12 +4547,34 @@ app.get(['/api/resolve', '/msm/api/resolve', '/api/prefetch', '/msm/api/prefetch
     if (matchingRecentDocs.length > 0) {
       matchingRecentDocs.sort((a, b) => b.qualityScore - a.qualityScore);
       const chosen = matchingRecentDocs[0];
-      // Pick immediately if it meets the desired quality (score >= 30) or if targetQuality > 720
-      if (chosen.qualityScore >= 30 || targetQuality > 720) {
+      const chosenTier = detectVideoQualityTier(chosen.filename, '', chosen.doc);
+
+      // Determine if chosen document actually matches the requested target quality
+      let isTargetQualityMet = false;
+      if (targetQuality >= 2160) {
+        isTargetQualityMet = chosenTier === '4k';
+      } else if (targetQuality >= 1080) {
+        isTargetQualityMet = chosenTier === '1080p' || chosenTier === '4k';
+      } else if (targetQuality <= 480) {
+        isTargetQualityMet = chosenTier === 'sd';
+      } else {
+        // 720p target
+        isTargetQualityMet = chosenTier === '720p' || chosenTier === '1080p' || chosenTier === '4k';
+      }
+
+      let chosenQualitySuffix = '_720p';
+      if (chosenTier === '4k') chosenQualitySuffix = '_4k';
+      else if (chosenTier === '1080p') chosenQualitySuffix = '_1080p';
+      else if (chosenTier === 'sd') chosenQualitySuffix = '_480p';
+      else chosenQualitySuffix = '_720p';
+
+      const actualCacheKey = `${baseCacheKey}${chosenQualitySuffix}`;
+
+      if (isTargetQualityMet && chosen.qualityScore >= 30) {
         const docIdStr = chosen.doc.id.toString();
-        console.log(`[RESOLVE] Found matching recent document in chat: ${chosen.filename} (ID: ${docIdStr}, score: ${chosen.qualityScore})`);
+        console.log(`[RESOLVE] Found matching recent document in chat: ${chosen.filename} (ID: ${docIdStr}, score: ${chosen.qualityScore}, tier: ${chosenTier})`);
         const vAttr = chosen.doc.attributes?.find(a => a.className === 'DocumentAttributeVideo' || (a.w && a.h));
-        const streamItem = db.set(cacheKey, {
+        const streamItem = db.set(actualCacheKey, {
           docId: docIdStr,
           msgId: chosen.msgId,
           accessHash: chosen.doc.accessHash?.toString() || '',
@@ -4543,6 +4588,26 @@ app.get(['/api/resolve', '/msm/api/resolve', '/api/prefetch', '/msm/api/prefetch
           height: vAttr?.h ? Number(vAttr.h) : null,
         });
         return streamItem;
+      } else {
+        // Chat doc has lower/different quality than requested. Store as fallback without overriding target quality key
+        if (!fallbackCached) {
+          const docIdStr = chosen.doc.id.toString();
+          const vAttr = chosen.doc.attributes?.find(a => a.className === 'DocumentAttributeVideo' || (a.w && a.h));
+          fallbackCached = db.set(actualCacheKey, {
+            docId: docIdStr,
+            msgId: chosen.msgId,
+            accessHash: chosen.doc.accessHash?.toString() || '',
+            fileReference: chosen.doc.fileReference ? chosen.doc.fileReference.toString('hex') : '',
+            filename: chosen.filename,
+            size: chosen.doc.size?.toString() || '0',
+            mimeType: chosen.doc.mimeType || 'video/mp4',
+            dcId: chosen.doc.dcId || 4,
+            date: chosen.doc.date,
+            width: vAttr?.w ? Number(vAttr.w) : null,
+            height: vAttr?.h ? Number(vAttr.h) : null,
+          });
+          console.log(`[RESOLVE] Chat document ${chosen.filename} is ${chosenTier} (requested ${targetQuality}p). Preserving as fallback "${actualCacheKey}" while querying bot.`);
+        }
       }
     }
 
@@ -5103,7 +5168,7 @@ app.get(['/api/resolve', '/msm/api/resolve', '/api/prefetch', '/msm/api/prefetch
 
     if (!deliveredDoc) {
       if (fallbackCached) {
-        console.log(`[RESOLVE] 720p not found from bot, falling back to cached 1080p stream for "${baseCacheKey}"`);
+        console.log(`[RESOLVE] Requested quality ${targetQuality}p not found from bot, falling back to cached "${fallbackCached.queryKey || fallbackCached.filename}" for "${baseCacheKey}"`);
         return fallbackCached;
       }
       const err = new Error(`No downloadable media found for "${queryTitle}" on @${BOT_USERNAME}`);
@@ -5114,7 +5179,17 @@ app.get(['/api/resolve', '/msm/api/resolve', '/api/prefetch', '/msm/api/prefetch
     const docIdStr = deliveredDoc.id.toString();
     const filename = resolvedFilename || chosenFilename || queryTitle;
     const vAttr = deliveredDoc.attributes?.find(a => a.className === 'DocumentAttributeVideo' || (a.w && a.h));
-    const resolvedItem = db.set(cacheKey, {
+    
+    // Detect ACTUAL video quality tier from delivered document attributes and filename
+    const actualTier = detectVideoQualityTier(filename, '', deliveredDoc);
+    let actualQualitySuffix = '_720p';
+    if (actualTier === '4k') actualQualitySuffix = '_4k';
+    else if (actualTier === '1080p') actualQualitySuffix = '_1080p';
+    else if (actualTier === 'sd') actualQualitySuffix = '_480p';
+    else actualQualitySuffix = '_720p';
+
+    const actualCacheKey = `${baseCacheKey}${actualQualitySuffix}`;
+    const resolvedItem = db.set(actualCacheKey, {
       docId: docIdStr,
       msgId: deliveredMsgId,
       accessHash: deliveredDoc.accessHash?.toString() || '',
@@ -5127,7 +5202,7 @@ app.get(['/api/resolve', '/msm/api/resolve', '/api/prefetch', '/msm/api/prefetch
       width: vAttr?.w ? Number(vAttr.w) : null,
       height: vAttr?.h ? Number(vAttr.h) : null,
     });
-    console.log(`[${logPrefix}] Successfully resolved "${queryTitle}" -> Doc ID: ${docIdStr} (${filename})`);
+    console.log(`[${logPrefix}] Successfully resolved "${queryTitle}" -> Doc ID: ${docIdStr} (${filename}) as ${actualCacheKey} (tier: ${actualTier})`);
     return resolvedItem;
   });
 

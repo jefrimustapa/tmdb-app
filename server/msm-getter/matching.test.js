@@ -1,4 +1,8 @@
 import assert from 'assert';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { CentralDatabase } from './db.js';
 import {
   extractEpisodeInfo,
   extractSeasonInfo,
@@ -666,6 +670,148 @@ it('disqualifies Street Fighter with "The" leading suffix like Street Fighter: T
   assert.strictEqual(score, -999);
   assert.ok(reason.includes('conflicting title suffix'), `Reason should mention conflicting title suffix, got: ${reason}`);
 });
+
+console.log('\n14. Quality-Specific Caching & Multi-Tier DB Persistence (#201)');
+
+const __testFilename = fileURLToPath(import.meta.url);
+const __testDirname = path.dirname(__testFilename);
+const TEST_DB_FILE = path.join(__testDirname, 'data', 'test_streams_201.json');
+
+try {
+  if (fs.existsSync(TEST_DB_FILE)) fs.unlinkSync(TEST_DB_FILE);
+  if (fs.existsSync(`${TEST_DB_FILE}.tmp`)) fs.unlinkSync(`${TEST_DB_FILE}.tmp`);
+} catch {}
+
+it('stores different quality cache entries for the same title without overwriting (#201)', () => {
+  const testDb = new CentralDatabase(TEST_DB_FILE);
+  
+  testDb.set('oppenheimer_2023_720p', {
+    docId: '1001',
+    filename: 'Oppenheimer.2023.720p.BluRay.mp4',
+    size: '1500000000',
+  });
+  testDb.set('oppenheimer_2023_1080p', {
+    docId: '2002',
+    filename: 'Oppenheimer.2023.1080p.BluRay.mp4',
+    size: '3500000000',
+  });
+  testDb.set('oppenheimer_2023_4k', {
+    docId: '3003',
+    filename: 'Oppenheimer.2023.2160p.UHD.mp4',
+    size: '8000000000',
+  });
+
+  // Verify all 3 qualities exist in memory
+  const rec720 = testDb.get('oppenheimer_2023_720p');
+  const rec1080 = testDb.get('oppenheimer_2023_1080p');
+  const rec4k = testDb.get('oppenheimer_2023_4k');
+
+  assert.strictEqual(rec720?.docId, '1001');
+  assert.strictEqual(rec1080?.docId, '2002');
+  assert.strictEqual(rec4k?.docId, '3003');
+
+  // Verify lookup by docId returns each distinct stream
+  assert.strictEqual(testDb.getByDocId('1001')?.filename, 'Oppenheimer.2023.720p.BluRay.mp4');
+  assert.strictEqual(testDb.getByDocId('2002')?.filename, 'Oppenheimer.2023.1080p.BluRay.mp4');
+  assert.strictEqual(testDb.getByDocId('3003')?.filename, 'Oppenheimer.2023.2160p.UHD.mp4');
+});
+
+it('persists all distinct quality tiers to streams.json without dropping any queryKey (#201)', () => {
+  const testDb = new CentralDatabase(TEST_DB_FILE);
+  testDb.set('oppenheimer_2023_720p', { docId: '1001', filename: 'Oppenheimer.2023.720p.mp4' });
+  testDb.set('oppenheimer_2023_1080p', { docId: '2002', filename: 'Oppenheimer.2023.1080p.mp4' });
+  testDb.set('oppenheimer_2023_4k', { docId: '3003', filename: 'Oppenheimer.2023.2160p.mp4' });
+  testDb.saveSync();
+
+  // Reload from fresh database instance
+  const reloadedDb = new CentralDatabase(TEST_DB_FILE);
+  assert.strictEqual(reloadedDb.get('oppenheimer_2023_720p')?.docId, '1001');
+  assert.strictEqual(reloadedDb.get('oppenheimer_2023_1080p')?.docId, '2002');
+  assert.strictEqual(reloadedDb.get('oppenheimer_2023_4k')?.docId, '3003');
+  assert.strictEqual(reloadedDb.getAll().length, 3);
+});
+
+it('preserves multiple quality tiers when pointing to the same media file docId (#201)', () => {
+  const testDb = new CentralDatabase(TEST_DB_FILE);
+  testDb.clear();
+
+  // For example, 720p and 480p queries both mapped to docId 5005
+  testDb.set('short_film_720p', { docId: '5005', filename: 'short_film.mp4' });
+  testDb.set('short_film_480p', { docId: '5005', filename: 'short_film.mp4' });
+  testDb.saveSync();
+
+  const reloadedDb = new CentralDatabase(TEST_DB_FILE);
+  assert.strictEqual(reloadedDb.get('short_film_720p')?.docId, '5005');
+  assert.strictEqual(reloadedDb.get('short_film_480p')?.docId, '5005');
+  assert.strictEqual(reloadedDb.getByDocId('5005')?.docId, '5005');
+});
+
+it('does not purge remaining quality cache entries when one quality is deleted (#201)', () => {
+  const testDb = new CentralDatabase(TEST_DB_FILE);
+  testDb.clear();
+  testDb.set('title_720p', { docId: '777', filename: 'title_720p.mp4' });
+  testDb.set('title_1080p', { docId: '888', filename: 'title_1080p.mp4' });
+
+  // Delete 720p
+  const evicted = testDb.delete('title_720p');
+  assert.strictEqual(evicted, true);
+  assert.strictEqual(testDb.get('title_720p'), undefined);
+  assert.strictEqual(testDb.getByDocId('777'), undefined);
+
+  // 1080p remains untouched and intact
+  assert.strictEqual(testDb.get('title_1080p')?.docId, '888');
+  assert.strictEqual(testDb.getByDocId('888')?.filename, 'title_1080p.mp4');
+});
+
+it('maps delivered video document to actual quality tier key regardless of requested quality (#201)', () => {
+  // Scenario 1: User requested 1080p, but delivered document is 720p
+  const doc720 = {
+    id: 9911,
+    attributes: [{ className: 'DocumentAttributeVideo', w: 1280, h: 720 }],
+  };
+  const tier720 = detectVideoQualityTier('Show.S01E01.720p.mp4', '', doc720);
+  assert.strictEqual(tier720, '720p');
+
+  let suffix720 = '_720p';
+  if (tier720 === '4k') suffix720 = '_4k';
+  else if (tier720 === '1080p') suffix720 = '_1080p';
+  else if (tier720 === 'sd') suffix720 = '_480p';
+  assert.strictEqual(suffix720, '_720p');
+
+  // Scenario 2: User requested 4K, but delivered document is 1080p
+  const doc1080 = {
+    id: 9922,
+    attributes: [{ className: 'DocumentAttributeVideo', w: 1920, h: 1080 }],
+  };
+  const tier1080 = detectVideoQualityTier('Movie.2024.1080p.BluRay.mp4', '', doc1080);
+  assert.strictEqual(tier1080, '1080p');
+
+  let suffix1080 = '_720p';
+  if (tier1080 === '4k') suffix1080 = '_4k';
+  else if (tier1080 === '1080p') suffix1080 = '_1080p';
+  else if (tier1080 === 'sd') suffix1080 = '_480p';
+  assert.strictEqual(suffix1080, '_1080p');
+
+  // Scenario 3: Real 4K file delivered
+  const doc4k = {
+    id: 9933,
+    attributes: [{ className: 'DocumentAttributeVideo', w: 3840, h: 2160 }],
+  };
+  const tier4k = detectVideoQualityTier('Nature.2024.2160p.UHD.mp4', '', doc4k);
+  assert.strictEqual(tier4k, '4k');
+
+  let suffix4k = '_720p';
+  if (tier4k === '4k') suffix4k = '_4k';
+  else if (tier4k === '1080p') suffix4k = '_1080p';
+  else if (tier4k === 'sd') suffix4k = '_480p';
+  assert.strictEqual(suffix4k, '_4k');
+});
+
+// Clean up temporary test files
+try {
+  if (fs.existsSync(TEST_DB_FILE)) fs.unlinkSync(TEST_DB_FILE);
+  if (fs.existsSync(`${TEST_DB_FILE}.tmp`)) fs.unlinkSync(`${TEST_DB_FILE}.tmp`);
+} catch {}
 
 console.log(`\nResults: ${passed}/${total} tests passed!\n`);
 if (passed === total) {
