@@ -1008,12 +1008,19 @@ export const Settings: React.FC = () => {
                             : 'You are on the latest build'}
                         </span>
                       </div>
-                      {updateInfo.hasUpdate && (
+                      {updateInfo.hasUpdate ? (
                         <button
                           onClick={() => setShowUpdateModal(true)}
                           className="px-3 py-1 bg-hbo-cyan text-black font-bold rounded-lg text-xs flex-shrink-0"
                         >
                           View Update
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => setShowUpdateModal(true)}
+                          className="px-2.5 py-1 bg-white/10 hover:bg-white/20 text-gray-200 hover:text-white font-medium rounded-lg text-xs flex-shrink-0 border border-white/15 transition-colors cursor-pointer"
+                        >
+                          View Release Notes
                         </button>
                       )}
                     </div>
