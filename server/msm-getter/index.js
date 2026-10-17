@@ -3027,14 +3027,6 @@ app.get(['/msm/streams', '/msm/cache'], (req, res) => {
         </div>
 
         <div class="flex items-center gap-2 flex-wrap">
-          <select id="qualitySelect" onchange="handleQualitySelectChange()" class="bg-slate-950 border border-slate-800 text-slate-300 text-xs rounded-xl px-3 py-2 outline-none focus:border-sky-500/50 cursor-pointer">
-            <option value="all">Quality: All</option>
-            <option value="4k">Quality: 4K UHD</option>
-            <option value="1080p">Quality: 1080p FHD</option>
-            <option value="720p">Quality: 720p HD</option>
-            <option value="sd">Quality: 480p SD</option>
-          </select>
-
           <select id="sortSelect" onchange="applyFilterAndSort()" class="bg-slate-950 border border-slate-800 text-slate-300 text-xs rounded-xl px-3 py-2 outline-none focus:border-sky-500/50 cursor-pointer">
             <option value="newest">Sort: Newest First</option>
             <option value="oldest">Sort: Oldest First</option>
@@ -3151,15 +3143,6 @@ app.get(['/msm/streams', '/msm/cache'], (req, res) => {
 
     function setQualityFilter(quality) {
       currentQuality = quality;
-      const select = document.getElementById('qualitySelect');
-      if (select) select.value = quality;
-      updateQualityTabStyles();
-      applyFilterAndSort();
-    }
-
-    function handleQualitySelectChange() {
-      const select = document.getElementById('qualitySelect');
-      currentQuality = select ? select.value : 'all';
       updateQualityTabStyles();
       applyFilterAndSort();
     }
@@ -3216,8 +3199,6 @@ app.get(['/msm/streams', '/msm/cache'], (req, res) => {
         document.getElementById('statTotalCount').textContent = totalCount;
         document.getElementById('statTotalSize').textContent = formattedSize;
 
-        const select = document.getElementById('qualitySelect');
-        if (select) select.value = currentQuality;
         updateQualityTabStyles();
         updateQualityCounts();
 
