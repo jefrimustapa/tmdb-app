@@ -2,12 +2,14 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20261017-1521';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.main.20261017-1521';
+export const APP_BUILD_NUMBER = '20261017-1747';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.main.20261017-1747';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
 export const APP_BRANCH = 'main';
-export const APP_CHANGELOG = `* Merge branch 'fix/198-msm-apostrophe-title-resolve' into main (closes #198)
+export const APP_CHANGELOG = `* Merge pull request #204 from jefrimustapa/fix/203-short-title-overmatch-long-title
+* chore(version): update build metadata for main branch
+* Merge branch 'fix/198-msm-apostrophe-title-resolve' into main (closes #198)
 * test(msm-getter): make resolverMaxPages assertion robust to custom router settings
 * fix(msm-getter): strip apostrophes without whitespace in search and normalize titles (#198)
 * chore(version): update build metadata for main branch
@@ -19,6 +21,4 @@ export const APP_CHANGELOG = `* Merge branch 'fix/198-msm-apostrophe-title-resol
 * feat(msm-getter): add configurable resolver max paging (button style) defaulting to 3
 * feat(msm-getter): add dual-title english search, candidate scoring logs, and size comma parsing
 * Merge branch 'fix/msm-opps-terpikat-cik-sombong-ep27' into main
-* feat(msm-getter): make pipeline buffer settings button adjustable with 1 pipeline resolution
-* feat(msm-getter): make min size controls adjustable with +/- buttons (res 5 MB)
-* feat(msm-getter): make tv and movie min file size thresholds configurable via settings`;
+* feat(msm-getter): make pipeline buffer settings button adjustable with 1 pipeline resolution`;
