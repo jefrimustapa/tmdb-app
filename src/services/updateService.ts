@@ -33,6 +33,92 @@ export interface UpdateInfo {
   isNightly: boolean;
   isPrerelease: boolean;
   htmlUrl: string;
+  fullChangelogUrl?: string | null;
+}
+
+const COMPARE_CACHE = new Map<string, string[]>();
+
+function cleanCommitText(raw: string): string {
+  let text = raw.replace(/^[\*\-•]\s*/, '').trim();
+  // Strip GitHub PR author and URL suffix: e.g. "by @user in https://github.com/..."
+  text = text.replace(/\s+by\s+@[a-zA-Z0-9_\-]+\s+in\s+https?:\/\/\S+/i, '');
+  return text.trim();
+}
+
+function isNoiseCommit(msg: string): boolean {
+  return /^(chore\(version\)|chore\(release\)|Merge pull request|Merge branch)/i.test(msg.trim());
+}
+
+export function extractReleaseHighlights(
+  rawBody: string,
+  maxHighlights = 5
+): { highlights: string[]; fullChangelogUrl: string | null; total: number; hasMore: boolean } {
+  const lines = rawBody.split('\n');
+  const highlights: string[] = [];
+  let fullChangelogUrl: string | null = null;
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+
+    const changelogMatch = trimmed.match(/https?:\/\/github\.com\/[^\/]+\/[^\/]+\/compare\/\S+/i);
+    if (changelogMatch) {
+      fullChangelogUrl = changelogMatch[0].replace(/\)+$/, '');
+      continue;
+    }
+
+    if (trimmed.startsWith('#') || trimmed.startsWith('---') || trimmed.startsWith('📦')) {
+      continue;
+    }
+
+    const clean = cleanCommitText(trimmed);
+    if (!clean || isNoiseCommit(clean)) {
+      continue;
+    }
+
+    highlights.push(clean);
+  }
+
+  // Prioritize conventional commits: feat > fix > perf > ui > other
+  const score = (msg: string) => {
+    if (/^(feat|feature)/i.test(msg)) return 4;
+    if (/^fix/i.test(msg)) return 3;
+    if (/^perf/i.test(msg)) return 2;
+    if (/^ui/i.test(msg)) return 1;
+    return 0;
+  };
+
+  highlights.sort((a, b) => score(b) - score(a));
+  const total = highlights.length;
+  const top = highlights.slice(0, maxHighlights);
+
+  return {
+    highlights: top,
+    fullChangelogUrl,
+    total,
+    hasMore: total > maxHighlights
+  };
+}
+
+async function fetchCompareCommits(compareRange: string): Promise<string[]> {
+  const cached = COMPARE_CACHE.get(compareRange);
+  if (cached) return cached;
+
+  try {
+    const res = await fetch(`https://api.github.com/repos/jefrimustapa/tmdb-app/compare/${compareRange}`, {
+      headers: { Accept: 'application/vnd.github.v3+json' }
+    });
+    if (!res.ok) return [];
+    const data = await res.json();
+    if (data && Array.isArray(data.commits)) {
+      const msgs = data.commits.map((c: any) => (c.commit?.message || '').split('\n')[0]);
+      COMPARE_CACHE.set(compareRange, msgs);
+      return msgs;
+    }
+  } catch (err) {
+    console.warn('[UpdateService] Failed to fetch compare commits:', err);
+  }
+  return [];
 }
 
 // Compare semantic versions (returns >0 if v1 > v2, <0 if v1 < v2, 0 if equal)
@@ -145,13 +231,54 @@ export const updateService = {
 
       // Aggregate release notes in chronological descending order (latest release first)
       const releaseNotesSections: string[] = [];
-      for (const rel of eligibleReleases) {
-        if (rel.body && rel.body.trim()) {
-          const relDate = rel.published_at ? new Date(rel.published_at).toLocaleDateString() : '';
-          const relTitle = rel.name && rel.name !== rel.tag_name ? `${rel.name} (${rel.tag_name})` : rel.tag_name;
-          const header = `📦 ${relTitle}${relDate ? ` • ${relDate}` : ''}`;
-          releaseNotesSections.push(`${header}\n${rel.body.trim()}`);
+      let overallChangelogUrl: string | null = null;
+
+      for (let i = 0; i < eligibleReleases.length; i++) {
+        const rel = eligibleReleases[i];
+        const relBody = rel.body ? rel.body.trim() : '';
+        const relDate = rel.published_at ? new Date(rel.published_at).toLocaleDateString() : '';
+        const relTitle = rel.name && rel.name !== rel.tag_name ? `${rel.name} (${rel.tag_name})` : rel.tag_name;
+        const header = `📦 ${relTitle}${relDate ? ` • ${relDate}` : ''}`;
+
+        let { highlights, fullChangelogUrl, hasMore, total } = extractReleaseHighlights(relBody, 5);
+        if (!overallChangelogUrl && fullChangelogUrl) {
+          overallChangelogUrl = fullChangelogUrl;
         }
+
+        // If release body only had a compare link or lacked highlights, fetch commits from compare API
+        if (highlights.length === 0) {
+          let compareRange = '';
+          if (fullChangelogUrl) {
+            const match = fullChangelogUrl.match(/compare\/(\S+)/i);
+            if (match) compareRange = match[1];
+          } else if (i + 1 < eligibleReleases.length) {
+            compareRange = `${eligibleReleases[i + 1].tag_name}...${rel.tag_name}`;
+          }
+
+          if (compareRange) {
+            const commits = await fetchCompareCommits(compareRange);
+            if (commits.length > 0) {
+              const res = extractReleaseHighlights(commits.join('\n'), 5);
+              highlights = res.highlights;
+              hasMore = res.hasMore;
+              total = res.total;
+              if (!overallChangelogUrl) {
+                overallChangelogUrl = `https://github.com/jefrimustapa/tmdb-app/compare/${compareRange}`;
+              }
+            }
+          }
+        }
+
+        if (highlights.length > 0) {
+          const lines = highlights.map(h => `* ${h}`);
+          if (hasMore) {
+            lines.push(`* + ${total - 5} more improvements`);
+          }
+          releaseNotesSections.push(`${header}\n${lines.join('\n')}`);
+        } else if (relBody) {
+          releaseNotesSections.push(`${header}\n${relBody}`);
+        }
+
         // Stop after 3 recent releases to keep modal concise or when hitting current installed version
         if (releaseNotesSections.length >= 3 || APP_VERSION_FULL.includes(rel.tag_name.replace(/^v/, ''))) {
           break;
@@ -174,7 +301,8 @@ export const updateService = {
         apkSizeFormatted,
         isNightly,
         isPrerelease: latest.prerelease,
-        htmlUrl: latest.html_url
+        htmlUrl: latest.html_url,
+        fullChangelogUrl: overallChangelogUrl || latest.html_url
       };
     } catch (e: any) {
       console.error('[UpdateService] Check failed:', e);

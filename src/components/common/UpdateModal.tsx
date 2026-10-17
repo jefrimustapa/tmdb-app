@@ -159,7 +159,9 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({ updateInfo, onClose })
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h3 className="text-xl font-bold font-display text-white">Software Update Available</h3>
+              <h3 className="text-xl font-bold font-display text-white">
+                {updateInfo.hasUpdate ? 'Software Update Available' : 'Release Notes & Highlights'}
+              </h3>
               <span className={`text-[10px] font-mono uppercase px-2 py-0.5 rounded-full font-bold border ${
                 updateInfo.isNightly 
                   ? 'bg-amber-500/20 text-amber-300 border-amber-500/40' 
@@ -196,21 +198,33 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({ updateInfo, onClose })
           </div>
         </div>
 
-        {/* Release Notes / Changelog (Latest First) */}
+        {/* Release Notes Header */}
+        <div className="flex items-center justify-between mb-2 px-0.5 flex-shrink-0">
+          <p className="text-xs font-bold text-gray-300 uppercase tracking-wider">Release Highlights:</p>
+          <span className="text-[10px] text-gray-400 font-mono italic">(D-Pad Up/Down to scroll)</span>
+        </div>
+
+        {/* Release Notes / Changelog Box */}
         <div
           ref={changelogRef}
           data-modal-scroll="true"
           tabIndex={0}
           onKeyDown={handleChangelogKeyDown}
-          className="flex-1 overflow-y-auto pr-1 mb-5 space-y-2 border-t border-b border-hbo-border/60 py-3 scrollbar-thin scrollbar-thumb-hbo-purple tv-focus-target focus:outline-none focus:ring-2 focus:ring-hbo-cyan/60 rounded-xl px-2 transition-all"
+          className="flex-1 overflow-y-auto mb-5 p-3.5 bg-black/40 border border-white/5 rounded-2xl scrollbar-thin scrollbar-thumb-hbo-purple tv-focus-target focus:outline-none focus:ring-2 focus:ring-hbo-cyan/60 transition-all max-h-60 space-y-2.5"
         >
-          <div className="flex items-center justify-between">
-            <p className="text-xs font-bold text-gray-300 uppercase tracking-wider">What's New in this Build:</p>
-            <span className="text-[10px] text-gray-400 font-mono italic">(D-Pad Up/Down to scroll)</span>
-          </div>
-          <div className="bg-black/40 p-3.5 rounded-xl border border-white/5 font-sans max-h-56 overflow-y-auto">
-            <FormattedChangelog notes={updateInfo.releaseNotes} />
-          </div>
+          <FormattedChangelog notes={updateInfo.releaseNotes} />
+          {updateInfo.fullChangelogUrl && (
+            <div className="pt-2 flex justify-end border-t border-white/5">
+              <button
+                type="button"
+                onClick={() => openExternalUrl(updateInfo.fullChangelogUrl!)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white border border-white/10 text-xs font-medium transition-colors cursor-pointer tv-focus-target"
+              >
+                <span>Full GitHub Log</span>
+                <ArrowRight className="w-3.5 h-3.5 text-hbo-cyan" />
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Error Banner */}
@@ -251,7 +265,7 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({ updateInfo, onClose })
             }`}
           >
             <Download className="w-4 h-4" />
-            <span>{downloading ? 'Downloading...' : 'Download & Install'}</span>
+            <span>{downloading ? 'Downloading...' : (updateInfo.hasUpdate ? 'Download & Install' : 'Reinstall / Download')}</span>
             {!downloading && updateInfo.apkSizeFormatted && (
               <span className="text-xs opacity-80 font-normal">({updateInfo.apkSizeFormatted})</span>
             )}
@@ -265,7 +279,7 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({ updateInfo, onClose })
             disabled={downloading}
             className="px-4 py-3 rounded-xl bg-white/10 hover:bg-white/20 text-gray-300 hover:text-white text-sm font-bold transition-all tv-focus-target focus:ring-2 focus:ring-gray-400"
           >
-            Later
+            {updateInfo.hasUpdate ? 'Later' : 'Close'}
           </button>
         </div>
       </div>

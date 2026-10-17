@@ -118,15 +118,26 @@ function calculateVersionCode(version, buildNum) {
 
 const versionCode = calculateVersionCode(baseVersion, buildNumber);
 
-// Collect recent commits for this build's changelog
+// Collect recent commits for this build's changelog (clean top-5 highlights)
 function getRecentChangelog() {
   try {
-    const gitLog = getGitOutput('git log -n 15 --pretty=format:"* %s"');
+    const gitLog = getGitOutput('git log -n 35 --pretty=format:"* %s"');
     if (gitLog && gitLog.trim()) {
-      return gitLog.trim();
+      const lines = gitLog.split('\n');
+      const meaningful = [];
+      for (const line of lines) {
+        const text = line.replace(/^[\*\-•]\s*/, '').trim();
+        if (!text) continue;
+        if (/^(chore\(version\)|chore\(release\)|Merge pull request|Merge branch)/i.test(text)) continue;
+        meaningful.push(`* ${text}`);
+        if (meaningful.length >= 5) break;
+      }
+      if (meaningful.length > 0) {
+        return meaningful.join('\n');
+      }
     }
   } catch (e) {}
-  return '* Initial build and core features';
+  return '* Bug fixes, performance improvements, and media streaming updates.';
 }
 
 const changelog = getRecentChangelog().replace(/`/g, '\\`').replace(/\${/g, '\\${');
