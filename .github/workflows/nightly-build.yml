@@ -17,6 +17,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -71,14 +73,40 @@ jobs:
           name: nightly-apk
           path: ${{ steps.find_apk.outputs.apk_path }}
 
+      - name: Generate Nightly Release Notes Highlights
+        id: release_notes
+        run: |
+          PREV_TAG=$(git describe --tags --abbrev=0 --match "nightly-*" HEAD^ 2>/dev/null || echo "")
+          echo "Previous tag: $PREV_TAG"
+          if [ -n "$PREV_TAG" ]; then
+            COMMITS=$(git log "$PREV_TAG..HEAD" --pretty=format:"* %s" | grep -vE "^[*] (chore\(version\)|chore\(release\)|Merge pull request|Merge branch)" | head -n 5 || echo "")
+            COMPARE_URL="https://github.com/${{ github.repository }}/compare/$PREV_TAG...${{ steps.meta.outputs.tag }}"
+          else
+            COMMITS=$(git log -n 5 --pretty=format:"* %s" | grep -vE "^[*] (chore\(version\)|chore\(release\)|Merge pull request|Merge branch)" || echo "")
+            COMPARE_URL="https://github.com/${{ github.repository }}/releases/tag/${{ steps.meta.outputs.tag }}"
+          fi
+
+          if [ -n "$COMMITS" ]; then
+            BODY="$COMMITS"$'\n\n'"**Full Changelog**: $COMPARE_URL"
+          else
+            BODY="* Bug fixes, performance improvements, and media streaming updates."$'\n\n'"**Full Changelog**: $COMPARE_URL"
+          fi
+
+          {
+            echo "body<<EOF"
+            echo "$BODY"
+            echo "EOF"
+          } >> $GITHUB_OUTPUT
+
       - name: Publish Nightly Pre-Release on GitHub
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.meta.outputs.tag }}
           name: "Nightly Build ${{ steps.meta.outputs.date }}"
+          body: ${{ steps.release_notes.outputs.body }}
           prerelease: true
           draft: false
-          generate_release_notes: true
+          generate_release_notes: false
           files: ${{ steps.find_apk.outputs.apk_path }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

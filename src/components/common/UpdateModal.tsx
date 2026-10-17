@@ -202,15 +202,27 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({ updateInfo, onClose })
           data-modal-scroll="true"
           tabIndex={0}
           onKeyDown={handleChangelogKeyDown}
-          className="flex-1 overflow-y-auto pr-1 mb-5 space-y-2 border-t border-b border-hbo-border/60 py-3 scrollbar-thin scrollbar-thumb-hbo-purple tv-focus-target focus:outline-none focus:ring-2 focus:ring-hbo-cyan/60 rounded-xl px-2 transition-all"
+          className="flex-1 overflow-y-auto pr-1 mb-5 space-y-2.5 border-t border-b border-hbo-border/60 py-3 scrollbar-thin scrollbar-thumb-hbo-purple tv-focus-target focus:outline-none focus:ring-2 focus:ring-hbo-cyan/60 rounded-xl px-2 transition-all max-h-64"
         >
-          <div className="flex items-center justify-between">
-            <p className="text-xs font-bold text-gray-300 uppercase tracking-wider">What's New in this Build:</p>
+          <div className="flex items-center justify-between sticky top-0 bg-hbo-card/95 backdrop-blur-sm pb-1.5 z-10">
+            <p className="text-xs font-bold text-gray-300 uppercase tracking-wider">Release Highlights:</p>
             <span className="text-[10px] text-gray-400 font-mono italic">(D-Pad Up/Down to scroll)</span>
           </div>
-          <div className="bg-black/40 p-3.5 rounded-xl border border-white/5 font-sans max-h-56 overflow-y-auto">
+          <div className="bg-black/40 p-3.5 rounded-xl border border-white/5 font-sans">
             <FormattedChangelog notes={updateInfo.releaseNotes} />
           </div>
+          {updateInfo.fullChangelogUrl && (
+            <div className="pt-1 flex justify-end">
+              <button
+                type="button"
+                onClick={() => openExternalUrl(updateInfo.fullChangelogUrl!)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white border border-white/10 text-xs font-medium transition-colors cursor-pointer tv-focus-target"
+              >
+                <span>Full GitHub Log</span>
+                <ArrowRight className="w-3.5 h-3.5 text-hbo-cyan" />
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Error Banner */}

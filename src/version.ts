@@ -2,23 +2,13 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20261017-1850';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.main.20261017-1850';
+export const APP_BUILD_NUMBER = '20261017-1859';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-202-update-note.20261017-1859';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
-export const APP_BRANCH = 'main';
-export const APP_CHANGELOG = `* Merge pull request #206 from jefrimustapa/fix/199-tablet-backdrop-edge-transition
-* chore(version): update build metadata for main branch
-* feat(msm-getter): restrict server access exclusively to Malaysia (MY) IP addresses (#205)
-* chore(version): update build metadata for main branch
-* Merge pull request #204 from jefrimustapa/fix/203-short-title-overmatch-long-title
-* chore(version): update build metadata for main branch
-* Merge branch 'fix/198-msm-apostrophe-title-resolve' into main (closes #198)
+export const APP_BRANCH = 'feat-202-update-note';
+export const APP_CHANGELOG = `* feat(msm-getter): restrict server access exclusively to Malaysia (MY) IP addresses (#205)
 * test(msm-getter): make resolverMaxPages assertion robust to custom router settings
 * fix(msm-getter): strip apostrophes without whitespace in search and normalize titles (#198)
-* chore(version): update build metadata for main branch
-* Merge branch 'fix/197-prefetch-unaired-episode' into main (closes #197)
 * fix(watch): prevent next episode prefetch and auto-play on unaired episodes (#197)
-* chore(version): update build metadata for main branch
-* Merge branch 'fix/msm-project-exit-search' into main
 * feat(msm): add floating scroll-to-top icon button to /msm web pages`;
