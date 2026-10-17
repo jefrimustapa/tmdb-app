@@ -88,6 +88,36 @@ export interface TMDBTVDetails extends TMDBMediaItem {
     posters: TMDBImageItem[];
     logos?: TMDBImageItem[];
   };
+  last_episode_to_air?: {
+    id: number;
+    name: string;
+    overview?: string;
+    vote_average?: number;
+    vote_count?: number;
+    air_date?: string | null;
+    episode_number: number;
+    episode_type?: string;
+    production_code?: string;
+    runtime?: number | null;
+    season_number: number;
+    show_id?: number;
+    still_path?: string | null;
+  } | null;
+  next_episode_to_air?: {
+    id: number;
+    name: string;
+    overview?: string;
+    vote_average?: number;
+    vote_count?: number;
+    air_date?: string | null;
+    episode_number: number;
+    episode_type?: string;
+    production_code?: string;
+    runtime?: number | null;
+    season_number: number;
+    show_id?: number;
+    still_path?: string | null;
+  } | null;
 }
 
 export interface TMDBImageItem {
