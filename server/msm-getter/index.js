@@ -312,10 +312,12 @@ function extractSequelInfo(str) {
   // 1. Bot search results headers: "8 results for..."
   // 2. Audio channel descriptions: "AAC 2.0", "DD 5.1", "2.0", "5.1"
   // 3. Pagination tags: "(1/1)", "(2/2)"
+  // 4. File sizes: "1.8 GB", "850 MB"
   const cleaned = str
     .replace(/\b\d+\s*results\b/gi, ' ')
     .replace(/\b(aac|ac3|eac3|dts|ddp|flac|audio)?\s*[257]\.[01]\b/gi, ' ')
     .replace(/\b\d+\/\d+\b/g, ' ')
+    .replace(/[\d,]+(?:\.\d+)?\s*(mb|gb|kb)\b/gi, ' ')
     .replace(/\b(19\d\d|20[0-3]\d)\b/g, ' '); // Strip 4-digit years so "2025" isn't confused
 
   const s = ` ${cleaned.toLowerCase()} `;
@@ -488,16 +490,18 @@ function cleanSearchTitle(str) {
     .trim();
 }
 
-// Whitelist legitimate release metadata tokens that can directly follow a single-word movie title
+// Whitelist legitimate release metadata tokens that can directly follow a movie or TV title
 function isAllowedTitleSuffix(word) {
   if (!word) return true;
   const w = word.toLowerCase();
-  // Pure digits: 4-digit years (1990-2030), resolution heights, channel digits, part numbers
+  // Pure digits: 4-digit years (1990-2030), resolution heights, channel digits, part numbers, episode/season digits
   if (/^\d+$/.test(w)) return true;
   // Resolution patterns: 1080p, 720p, 4k, 2160p, etc.
   if (/^\d+(p|k)$/.test(w)) return true;
   // Disc/part patterns: cd1, cd2, pt1, part1, etc.
   if (/^(?:cd|pt|part)\d+$/.test(w)) return true;
+  // Episode & Season patterns: s01, s1, e01, e1, s01e01, ep01, ep1, ep, etc.
+  if (/^(?:s\d{1,2}(?:e\d{1,3})?|e\d{1,3}|ep\d{1,3})$/.test(w)) return true;
 
   const allowed = new Set([
     // Resolutions & standards
@@ -513,10 +517,86 @@ function isAllowedTitleSuffix(word) {
     // Languages & subtitles
     'malay', 'malaysub', 'sub', 'subs', 'subtitle', 'subtitles', 'eng', 'engsub', 'indo', 'indosub', 'tam', 'tamil', 'multi', 'dual', 'dub', 'dubbed',
     // Release descriptors
-    'movie', 'film', 'part', 'pt', 'vol', 'volume', 'complete', 'repack', 'proper', 'extended', 'unrated', 'directors', 'cut', 'edition', 'version', 'remastered', 'imax', 'internal'
+    'movie', 'film', 'part', 'pt', 'vol', 'volume', 'complete', 'repack', 'proper', 'extended', 'unrated', 'directors', 'cut', 'edition', 'version', 'remastered', 'imax', 'internal',
+    // Episode & Season keywords
+    'ep', 'eps', 'episod', 'episode', 'episodes', 's', 'e', 'season', 'seasons', 'musim', 'end', 'finale', 'batch',
+    // Country qualifiers for regional adaptations
+    'us', 'uk', 'au', 'my', 'id', 'kr', 'jp', 'cn'
   ]);
 
   return allowed.has(w);
+}
+
+function escapeRegex(str) {
+  return (str || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+// Check title boundaries to prevent short titles matching longer titles with different subtitles or prefixes
+function validateTitleBoundaries(textToInspect, targetTitle) {
+  if (!textToInspect || !targetTitle) return { matched: false };
+  const normTarget = normalizeTitle(targetTitle);
+  if (!normTarget) return { matched: false };
+
+  const targetHasArticle = /^(the|a|an)\b/i.test(normTarget);
+  const withoutArticle = normTarget.replace(/^(?:the|a|an)\s+/i, '');
+
+  const titlePattern = targetHasArticle
+    ? '(?:(?:the|a|an)\\s+)?' + escapeRegex(withoutArticle).replace(/\\s+/g, '\\s+')
+    : escapeRegex(normTarget).replace(/\\s+/g, '\\s+');
+
+  const regex = new RegExp('(?:^|\\s)(?:([a-z0-9]+)\\s+)?(' + titlePattern + ')(?:\\s+([a-z0-9]+))?(?:\\s+([a-z0-9]+))?(?:\\s|$)', 'i');
+  const match = textToInspect.match(regex);
+  if (!match) return { matched: false };
+
+  const prefixWord = match[1] ? match[1].toLowerCase() : null;
+  const suffix1 = match[3] ? match[3].toLowerCase() : null;
+  const suffix2 = match[4] ? match[4].toLowerCase() : null;
+
+  if (prefixWord) {
+    const ignorePrefixes = new Set([
+      'movie', 'film', 'series', 'tv', 'koleksi',
+      'msm', 'msm32', 'msm34', 'msmbot',
+      BOT_USERNAME.toLowerCase()
+    ]);
+    if (targetHasArticle) {
+      ignorePrefixes.add('the');
+      ignorePrefixes.add('a');
+      ignorePrefixes.add('an');
+    }
+    const isAllowedPrefix =
+      ignorePrefixes.has(prefixWord) ||
+      /^\d+$/.test(prefixWord) ||
+      /^msm\d*$/i.test(prefixWord);
+
+    if (!isAllowedPrefix) {
+      return {
+        matched: true,
+        ok: false,
+        reason: `conflicting title prefix "${prefixWord}" for title "${targetTitle}"`
+      };
+    }
+  }
+
+  if (suffix1) {
+    if (suffix1 === 'the' || suffix1 === 'a' || suffix1 === 'an') {
+      const allowedAfterArticle = new Set(['movie', 'film', 'series', 'final', 'end', 'complete', 'batch', 'animated']);
+      if (!suffix2 || !allowedAfterArticle.has(suffix2)) {
+        return {
+          matched: true,
+          ok: false,
+          reason: `conflicting title suffix "${suffix1}${suffix2 ? ' ' + suffix2 : ''}" for title "${targetTitle}"`
+        };
+      }
+    } else if (!isAllowedTitleSuffix(suffix1)) {
+      return {
+        matched: true,
+        ok: false,
+        reason: `conflicting title suffix "${suffix1}" for title "${targetTitle}"`
+      };
+    }
+  }
+
+  return { matched: true, ok: true };
 }
 
 // Extract primary keywords excluding common stopwords for strict coverage validation
@@ -733,6 +813,38 @@ function scoreCandidateButtonWithReason(btn, msg, context = {}) {
     score += Math.round(bestCoverage * 100);
   }
 
+  // 4. Title boundary collision check (prevents short titles matching longer titles with different subtitles or prefixes)
+  const textToInspect = isBare ? titleTargetText : (normBtnText || titleTargetText);
+  let boundaryPassed = false;
+  let boundaryReason = '';
+  let boundaryMatched = false;
+
+  const checkPrimary = validateTitleBoundaries(textToInspect, title);
+  if (checkPrimary.matched) {
+    boundaryMatched = true;
+    if (checkPrimary.ok) {
+      boundaryPassed = true;
+    } else {
+      boundaryReason = checkPrimary.reason;
+    }
+  }
+
+  if (altTitle) {
+    const checkAlt = validateTitleBoundaries(textToInspect, altTitle);
+    if (checkAlt.matched) {
+      boundaryMatched = true;
+      if (checkAlt.ok) {
+        boundaryPassed = true;
+      } else if (!boundaryReason) {
+        boundaryReason = checkAlt.reason;
+      }
+    }
+  }
+
+  if (boundaryMatched && !boundaryPassed) {
+    return { score: -999, reason: boundaryReason || 'title boundary collision' };
+  }
+
   if (isTv) {
     // 1. Episode matching
     let epInfo = extractEpisodeInfo(btnText);
@@ -789,32 +901,6 @@ function scoreCandidateButtonWithReason(btn, msg, context = {}) {
                           /\b(s\d{1,2}e\d{1,2}|s\d{1,2}\s*ep?\s*\d{1,2}|season\s*\d+|musim\s*\d+|episode\s*\d+|episod\s*\d+|ep\s*\d+|\.end\.)\b/i.test(msgText);
     if (isTvCandidate) {
       return { score: -999, reason: 'TV series/episode indicator found in movie candidate' };
-    }
-
-    if (significantTokens.length === 1 && (!altSignificantTokens || altSignificantTokens.length <= 1)) {
-      const singleWord = significantTokens[0];
-      const textToInspect = isBare ? titleTargetText : (normBtnText || titleTargetText);
-      const prefixMatch = textToInspect.match(new RegExp(`\\b([a-z0-9]+)\\s+${singleWord}\\b`, 'i'));
-      if (prefixMatch) {
-        const prefixWord = prefixMatch[1].toLowerCase();
-        const targetHasArticle = /^(the|a|an)\b/i.test(title.trim());
-        const ignorePrefixes = new Set(['movie', 'film', 'msm', 'msm32', BOT_USERNAME.toLowerCase()]);
-        if (targetHasArticle) {
-          ignorePrefixes.add('the');
-          ignorePrefixes.add('a');
-          ignorePrefixes.add('an');
-        }
-        if (!ignorePrefixes.has(prefixWord) && !/^msm\d*$/i.test(prefixWord)) {
-          return { score: -999, reason: `conflicting title prefix "${prefixWord}" for single-word title` };
-        }
-      }
-      const suffixMatch = textToInspect.match(new RegExp(`\\b${singleWord}\\s+([a-z0-9]+)\\b`, 'i'));
-      if (suffixMatch) {
-        const suffixWord = suffixMatch[1].toLowerCase();
-        if (!isAllowedTitleSuffix(suffixWord)) {
-          return { score: -999, reason: `conflicting title suffix "${suffixWord}" for single-word title` };
-        }
-      }
     }
 
     const targetSequel = extractSequelInfo(title) || (altTitle ? extractSequelInfo(altTitle) : null);
@@ -4187,6 +4273,14 @@ app.get(['/api/resolve', '/msm/api/resolve', '/api/prefetch', '/msm/api/prefetch
           continue;
         }
 
+        // 4. Title boundary collision check (prevents short titles matching longer titles with different subtitles or prefixes)
+        const checkBoundary = validateTitleBoundaries(normFn, title);
+        if (checkBoundary.matched && !checkBoundary.ok) {
+          if (!altTitle || !validateTitleBoundaries(normFn, altTitle).ok) {
+            continue;
+          }
+        }
+
         let matchesCandidate = true;
 
         if (isTv) {
@@ -4222,34 +4316,6 @@ app.get(['/api/resolve', '/msm/api/resolve', '/api/prefetch', '/msm/api/prefetch
                           /\b(s\d{1,2}e\d{1,2}|s\d{1,2}\s*ep?\s*\d{1,2}|season\s*\d+|musim\s*\d+|episode\s*\d+|episod\s*\d+|ep\s*\d+|\.end\.)\b/i.test(msg.message || '');
           if (isTvDoc) {
             matchesCandidate = false;
-          }
-
-          // Single-word title collision guard: reject "Gold Digger" or "Runner Runner" when searching for "Digger" / "Runner"
-          if (matchesCandidate && significantTokens.length === 1) {
-            const singleWord = significantTokens[0];
-            const prefixMatch = normFn.match(new RegExp(`\\b([a-z0-9]+)\\s+${singleWord}\\b`, 'i'));
-            if (prefixMatch) {
-              const prefixWord = prefixMatch[1].toLowerCase();
-              const targetHasArticle = /^(the|a|an)\b/i.test(title.trim());
-              const ignorePrefixes = new Set(['movie', 'film', 'msm', 'msm32', BOT_USERNAME.toLowerCase()]);
-              if (targetHasArticle) {
-                ignorePrefixes.add('the');
-                ignorePrefixes.add('a');
-                ignorePrefixes.add('an');
-              }
-              if (!ignorePrefixes.has(prefixWord) && !/^msm\d*$/i.test(prefixWord)) {
-                matchesCandidate = false;
-              }
-            }
-            if (matchesCandidate) {
-              const suffixMatch = normFn.match(new RegExp(`\\b${singleWord}\\s+([a-z0-9]+)\\b`, 'i'));
-              if (suffixMatch) {
-                const suffixWord = suffixMatch[1].toLowerCase();
-                if (!isAllowedTitleSuffix(suffixWord)) {
-                  matchesCandidate = false;
-                }
-              }
-            }
           }
 
           // Movie validation: strictly enforce sequel number and release year alignment
@@ -6311,5 +6377,7 @@ export {
   extractSignificantTokens,
   extractYear,
   extractSequelInfo,
+  isAllowedTitleSuffix,
+  validateTitleBoundaries,
   savedSettings,
 };

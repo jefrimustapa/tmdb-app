@@ -13,6 +13,8 @@ import {
   detectVideoQualityTier,
   DEFAULT_PIPELINE_BUFFERS,
   getBlockCacheMaxEntries,
+  isAllowedTitleSuffix,
+  validateTitleBoundaries,
   savedSettings,
 } from './index.js';
 
@@ -541,6 +543,128 @@ console.log('12. Resolver Max Paging Settings');
 
 it('has valid resolverMaxPages configured', () => {
   assert.ok(typeof savedSettings.resolverMaxPages === 'number' && savedSettings.resolverMaxPages >= 1);
+});
+
+console.log('\n13. Short Title Boundary & Suffix Collision Protection (#203)');
+
+it('disqualifies Street Fighter: Legend of Chun Li when Street Fighter is searched (#203)', () => {
+  const msg = { message: '' };
+  const btn = {
+    className: 'KeyboardButtonUrlAuth',
+    url: 'https://t.me/b/sfchunli',
+    text: '🔥🎞 1. Street.Fighter.Legend.of.Chun.Li.2009.1080p.mkv - 2.1 GB',
+  };
+  const context = {
+    isTv: false,
+    title: 'Street Fighter',
+    year: '1994',
+    targetQuality: 1080,
+  };
+
+  const { score, reason } = scoreCandidateButtonWithReason(btn, msg, context);
+  assert.strictEqual(score, -999);
+  assert.ok(reason.includes('conflicting title suffix "legend"'), `Reason should mention conflicting suffix "legend", got: ${reason}`);
+});
+
+it('accepts matching Street Fighter 1994 candidate (#203)', () => {
+  const msg = { message: '' };
+  const btn = {
+    className: 'KeyboardButtonUrlAuth',
+    url: 'https://t.me/b/sf1994',
+    text: '🔥🎞 1. Street.Fighter.1994.1080p.BluRay.x264.mkv - 1.8 GB',
+  };
+  const context = {
+    isTv: false,
+    title: 'Street Fighter',
+    year: '1994',
+    targetQuality: 1080,
+  };
+
+  const { score, reason } = scoreCandidateButtonWithReason(btn, msg, context);
+  assert.ok(score >= 200, `Expected score >= 200 for matching Street Fighter 1994, got ${score} (reason: ${reason})`);
+});
+
+it('disqualifies The Office Mover when The Office is searched (#203)', () => {
+  const msg = { message: '' };
+  const btn = {
+    className: 'KeyboardButtonUrlAuth',
+    url: 'https://t.me/b/officemover',
+    text: '🔥🎞 1. The.Office.Mover.S01E01.720p.HDTV.mkv - 450 MB',
+  };
+  const context = {
+    isTv: true,
+    title: 'The Office',
+    year: '2005',
+    sNum: 1,
+    eNum: 1,
+    totalSeasons: 9,
+    targetQuality: 720,
+  };
+
+  const { score, reason } = scoreCandidateButtonWithReason(btn, msg, context);
+  assert.strictEqual(score, -999);
+  assert.ok(reason.includes('conflicting title suffix "mover"'), `Reason should mention conflicting suffix "mover", got: ${reason}`);
+});
+
+it('accepts matching The Office S01E01 candidate (#203)', () => {
+  const msg = { message: '' };
+  const btn = {
+    className: 'KeyboardButtonUrlAuth',
+    url: 'https://t.me/b/theoffice',
+    text: '🔥🎞 1. The.Office.S01E01.720p.HDTV.x264.mkv - 400 MB',
+  };
+  const context = {
+    isTv: true,
+    title: 'The Office',
+    year: '2005',
+    sNum: 1,
+    eNum: 1,
+    totalSeasons: 9,
+    targetQuality: 720,
+  };
+
+  const { score, reason } = scoreCandidateButtonWithReason(btn, msg, context);
+  assert.ok(score >= 200, `Expected score >= 200 for matching The Office S01E01, got ${score} (reason: ${reason})`);
+});
+
+it('accepts regional adaptation title suffix like The Office US S01E01 (#203)', () => {
+  const msg = { message: '' };
+  const btn = {
+    className: 'KeyboardButtonUrlAuth',
+    url: 'https://t.me/b/theofficeus',
+    text: '🔥🎞 The.Office.US.S01E01.720p.WEB-DL.mkv - 350 MB',
+  };
+  const context = {
+    isTv: true,
+    title: 'The Office',
+    year: '2005',
+    sNum: 1,
+    eNum: 1,
+    totalSeasons: 9,
+    targetQuality: 720,
+  };
+
+  const { score, reason } = scoreCandidateButtonWithReason(btn, msg, context);
+  assert.ok(score >= 200, `Expected score >= 200 for matching The Office US, got ${score} (reason: ${reason})`);
+});
+
+it('disqualifies Street Fighter with "The" leading suffix like Street Fighter: The Legend of Chun-Li (#203)', () => {
+  const msg = { message: '' };
+  const btn = {
+    className: 'KeyboardButtonUrlAuth',
+    url: 'https://t.me/b/sfthelegend',
+    text: 'Street Fighter The Legend of Chun-Li 1080p',
+  };
+  const context = {
+    isTv: false,
+    title: 'Street Fighter',
+    year: '1994',
+    targetQuality: 1080,
+  };
+
+  const { score, reason } = scoreCandidateButtonWithReason(btn, msg, context);
+  assert.strictEqual(score, -999);
+  assert.ok(reason.includes('conflicting title suffix'), `Reason should mention conflicting title suffix, got: ${reason}`);
 });
 
 console.log(`\nResults: ${passed}/${total} tests passed!\n`);
