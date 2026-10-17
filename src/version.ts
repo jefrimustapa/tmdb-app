@@ -2,13 +2,13 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20261017-2008';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-202-update-note.20261017-2008';
+export const APP_BUILD_NUMBER = '20261017-2115';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-201-quality-spe.20261017-2115';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
-export const APP_BRANCH = 'feat-202-update-note';
-export const APP_CHANGELOG = `* feat(updates): extract release highlights (max-5 per release) and eliminate update notes cramp (#202)
+export const APP_BRANCH = 'feat-201-quality-spe';
+export const APP_CHANGELOG = `* feat(msm-getter): store quality-specific cache and prevent cache purging (#201)
+* feat(updates): extract release highlights (max-5 per release) and eliminate update notes cramp (#202)
 * feat(msm-getter): restrict server access exclusively to Malaysia (MY) IP addresses (#205)
 * test(msm-getter): make resolverMaxPages assertion robust to custom router settings
-* fix(msm-getter): strip apostrophes without whitespace in search and normalize titles (#198)
-* fix(watch): prevent next episode prefetch and auto-play on unaired episodes (#197)`;
+* fix(msm-getter): strip apostrophes without whitespace in search and normalize titles (#198)`;
