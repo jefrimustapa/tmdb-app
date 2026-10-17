@@ -299,6 +299,7 @@ function queueTelegramTask(taskFn) {
 function normalizeTitle(str) {
   return (str || '')
     .toLowerCase()
+    .replace(/['’‘`]/g, '')
     .replace(/[^\w\s]/gi, ' ')
     .replace(/\s+/g, ' ')
     .trim();
@@ -481,7 +482,8 @@ function cleanSearchTitle(str) {
   return str
     .replace(/\s*\([^)]*\)/g, ' ') // remove (2024), (US), etc.
     .replace(/\s*\[[^\]]*\]/g, ' ')
-    .replace(/[:;\-–—'"`!?&,._]/g, ' ') // cleanly replace punctuation with space (including ;)
+    .replace(/['’‘`]/g, '') // strip apostrophes without whitespace (e.g. Isn't -> Isnt, Grey's -> Greys)
+    .replace(/[:;\-–—"!?&,._]/g, ' ') // cleanly replace remaining punctuation with space (including ;)
     .replace(/\s+/g, ' ')
     .trim();
 }
@@ -620,6 +622,7 @@ function isBareButton(text) {
   if (!text) return true;
   const clean = text
     .toLowerCase()
+    .replace(/['’‘`]/g, '')
     .replace(/[\[\]\(\)\{\}\-_:\|]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
