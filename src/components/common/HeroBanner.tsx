@@ -308,6 +308,7 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ items, onActiveItemChang
       <div className="absolute inset-0 z-20 pointer-events-none select-none">
         <div className="absolute inset-0 hero-gradient-overlay" />
         <div className="absolute inset-0 bg-gradient-to-r from-black/75 via-black/35 to-transparent max-w-3xl" />
+        <div className="absolute inset-x-0 bottom-0 h-36 bg-gradient-to-t from-[#050508] via-[#050508]/85 to-transparent" />
         <div className="absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-black/50 to-transparent" />
       </div>
 
