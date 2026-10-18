@@ -875,6 +875,51 @@ it('preserves legitimate movie whose title legitimately contains a keyword (#221
   assert.strictEqual(isJunk, false, 'Title containing review keyword must not be falsely disqualified');
 });
 
+console.log('\n16. Widescope Aspect Ratios & Quality Tier Tag Preservation (#218)');
+it('preserves 1080p quality tier for exact issue stream with 1100x619 attributes (#218)', () => {
+  const doc = {
+    attributes: [{ className: 'DocumentAttributeVideo', w: 1100, h: 619 }]
+  };
+  const tier = detectVideoQualityTier(
+    'Nak Dengar Cerita Hantu (2026) S02EP03 1080p MVSVAP.mp4',
+    'nak dengar cerita hantu s02e03_1080p',
+    doc
+  );
+  assert.strictEqual(tier, '1080p', '1080p filename with 1100x619 dimensions must classify as 1080p');
+});
+
+it('correctly classifies cinemascope widescreen 1080p (e.g. 1920x800) without filename tag (#218)', () => {
+  const doc = {
+    attributes: [{ className: 'DocumentAttributeVideo', w: 1920, h: 800 }]
+  };
+  const tier = detectVideoQualityTier('Dune.Part.Two.2024.mp4', '', doc);
+  assert.strictEqual(tier, '1080p', '1920x800 video must classify as 1080p');
+});
+
+it('correctly classifies cinemascope widescreen 720p (e.g. 1280x536 or 1280x640) without filename tag (#218)', () => {
+  const doc = {
+    attributes: [{ className: 'DocumentAttributeVideo', w: 1280, h: 640 }]
+  };
+  const tier = detectVideoQualityTier('Dont.Move.2024.mp4', '', doc);
+  assert.strictEqual(tier, '720p', '1280x640 video must classify as 720p, not demoted to SD');
+});
+
+it('correctly classifies cinemascope widescreen 4K (e.g. 3840x1600) without filename tag (#218)', () => {
+  const doc = {
+    attributes: [{ className: 'DocumentAttributeVideo', w: 3840, h: 1600 }]
+  };
+  const tier = detectVideoQualityTier('Avatar.The.Way.Of.Water.2022.mp4', '', doc);
+  assert.strictEqual(tier, '4k', '3840x1600 video must classify as 4k');
+});
+
+it('does not allow letterbox or dimension quirks to downgrade an explicit 720p filename (#218)', () => {
+  const doc = {
+    attributes: [{ className: 'DocumentAttributeVideo', w: 640, h: 480 }]
+  };
+  const tier = detectVideoQualityTier('Show.S01E01.720p.HDTV.mp4', '', doc);
+  assert.strictEqual(tier, '720p', '720p filename must not be downgraded to SD by dimension quirks');
+});
+
 // Clean up temporary test files
 try {
   if (fs.existsSync(TEST_DB_FILE)) fs.unlinkSync(TEST_DB_FILE);

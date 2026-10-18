@@ -92,33 +92,49 @@ if (savedSettings.geoBlockWhitelistedIps === undefined) savedSettings.geoBlockWh
 export let BOT_USERNAME = (savedSettings.targetBotUsername || process.env.TG_BOT_USERNAME || 'msm34bot').replace(/^@/, '');
 
 export function detectVideoQualityTier(filename = '', queryKey = '', targetDoc = null) {
-  // 1. Direct Telegram Video Dimensions (Highest authority: real pixel height of the stream)
+  // 1. Check explicit quality tag from filename
+  const fn = String(filename || '').toLowerCase().replace(/[_\.\-\+\[\]\(\)]/g, ' ');
+  let fnTier = null;
+  if (/\b(4k|2160p|uhd)\b/i.test(fn)) fnTier = '4k';
+  else if (/\b(1080p|1080|fhd)\b/i.test(fn)) fnTier = '1080p';
+  else if (/\b(720p|720|hd)\b/i.test(fn)) fnTier = '720p';
+  else if (/\b(480p|360p|540p|sd)\b/i.test(fn)) fnTier = 'sd';
+
+  // 2. Direct Telegram Video Dimensions (supports widescreen & cinemascope aspect ratios)
+  let dimTier = null;
   if (targetDoc && Array.isArray(targetDoc.attributes)) {
     const videoAttr = targetDoc.attributes.find(a => a.className === 'DocumentAttributeVideo' || (a.w && a.h));
-    if (videoAttr && videoAttr.h) {
-      const h = Number(videoAttr.h);
-      if (h >= 2160) return '4k';
-      if (h >= 1080) return '1080p';
-      if (h >= 720) return '720p';
-      return 'sd';
+    if (videoAttr) {
+      const w = Number(videoAttr.w) || 0;
+      const h = Number(videoAttr.h) || 0;
+      if (w >= 3200 || h >= 1800) dimTier = '4k';
+      else if (w >= 1600 || h >= 900) dimTier = '1080p';
+      else if (w >= 960 || h >= 530) dimTier = '720p';
+      else if (w > 0 || h > 0) dimTier = 'sd';
     }
   }
 
-  // 2. Check the ACTUAL video filename itself
-  const fn = String(filename || '').toLowerCase().replace(/[_\.\-\+\[\]\(\)]/g, ' ');
-  if (/\b(4k|2160p|uhd)\b/i.test(fn)) return '4k';
-  if (/\b(1080p|1080|fhd)\b/i.test(fn)) return '1080p';
-  if (/\b(720p|720|hd)\b/i.test(fn)) return '720p';
-  if (/\b(480p|360p|540p|sd)\b/i.test(fn)) return 'sd';
+  // 3. Harmonize: If filename explicitly declared a tier, do NOT allow video dimension
+  // quirks (letterbox cropping or nonstandard anamorphic dimensions) to downgrade it.
+  if (fnTier) {
+    const RANK = { sd: 1, '720p': 2, '1080p': 3, '4k': 4 };
+    if (dimTier && RANK[dimTier] > RANK[fnTier]) {
+      return dimTier;
+    }
+    return fnTier;
+  }
 
-  // 3. Fallback: Secondary check on queryKey only if neither attributes nor filename has quality tags
+  // If no filename tag, real video dimensions take precedence
+  if (dimTier) return dimTier;
+
+  // 4. Fallback: Secondary check on queryKey only if neither filename nor attributes has quality
   const qk = String(queryKey || '').toLowerCase().replace(/[_\.\-\+\[\]\(\)]/g, ' ');
   if (/\b(4k|2160p|uhd)\b/i.test(qk)) return '4k';
   if (/\b(1080p|1080|fhd)\b/i.test(qk)) return '1080p';
   if (/\b(720p|720|hd)\b/i.test(qk)) return '720p';
   if (/\b(480p|360p|540p|sd)\b/i.test(qk)) return 'sd';
 
-  // 4. Default to standard 720p HD pipeline
+  // 5. Default to standard 720p HD pipeline
   return '720p';
 }
 
