@@ -2,13 +2,13 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20261018-1512';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-213-continue-wa.20261018-1512';
+export const APP_BUILD_NUMBER = '20261018-1555';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.fix-221-msm-exclude-.20261018-1555';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
-export const APP_BRANCH = 'feat-213-continue-wa';
-export const APP_CHANGELOG = `* revert: revert all rail scrolling changes for #213 and #209
-* fix(rail): right-bind final card on last page without disturbing standard rails (#213)
-* fix(rail): align cards with discrete stride columns and count fully visible cards (#213)
-* fix(rail): invariant getBoundingClientRect calculation to bind last card flush against right boundary (#213)
-* fix(rail): bind last card flush against right boundary on final page (#213)`;
+export const APP_BRANCH = 'fix-221-msm-exclude-';
+export const APP_CHANGELOG = `* feat(rail): hide left arrow on first page and right arrow on last page (#213) (#220)
+* fix: resolve blank details page when returning from watch page (#217) (#219)
+* feat: show key crew and season-based cast on details (#211) (#214)
+* fix(update): robust version and run-number check for auto-update (#200) (#212)
+* fix(rail): discrete card-stride pagination and right-aligned final page (#209) (#210)`;
