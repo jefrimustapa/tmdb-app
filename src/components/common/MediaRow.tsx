@@ -1,7 +1,9 @@
 import React, { useRef, useState, useCallback, useEffect, memo } from 'react';
+import { flushSync } from 'react-dom';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import type { TMDBMediaItem } from '../../types/tmdb';
 import { MediaCard } from './MediaCard';
+import { scrollContentRail, getRailScrollState } from '../../utils/railScroll';
 
 interface MediaRowProps {
   title: string;
@@ -16,12 +18,29 @@ const INITIAL_RENDER_COUNT = 10;
 const MediaRowComponent: React.FC<MediaRowProps> = ({ title, subtitle, items, type, variant = 'poster' }) => {
   const rowRef = useRef<HTMLDivElement>(null);
   const [renderedCount, setRenderedCount] = useState(() => Math.min(items?.length || 0, INITIAL_RENDER_COUNT));
+  const [scrollState, setScrollState] = useState<{ canScrollLeft: boolean; canScrollRight: boolean }>({
+    canScrollLeft: false,
+    canScrollRight: true
+  });
+
+  const updateScrollButtons = useCallback(() => {
+    if (rowRef.current) {
+      setScrollState(getRailScrollState(rowRef.current));
+    }
+  }, []);
 
   useEffect(() => {
     if (items?.length && renderedCount < INITIAL_RENDER_COUNT) {
       setRenderedCount(Math.min(items.length, INITIAL_RENDER_COUNT));
     }
   }, [items?.length, renderedCount]);
+
+  useEffect(() => {
+    updateScrollButtons();
+    const handleResize = () => updateScrollButtons();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [updateScrollButtons, renderedCount, items?.length]);
 
   const expandItems = useCallback(() => {
     if (renderedCount < (items?.length || 0)) {
@@ -30,13 +49,13 @@ const MediaRowComponent: React.FC<MediaRowProps> = ({ title, subtitle, items, ty
   }, [renderedCount, items?.length]);
 
   const scroll = (direction: 'left' | 'right') => {
-    expandItems();
-    if (rowRef.current) {
-      const scrollAmount = rowRef.current.clientWidth * 0.75;
-      rowRef.current.scrollBy({
-        left: direction === 'left' ? -scrollAmount : scrollAmount,
-        behavior: 'smooth'
+    if (renderedCount < (items?.length || 0)) {
+      flushSync(() => {
+        setRenderedCount(items.length);
       });
+    }
+    if (rowRef.current) {
+      scrollContentRail(rowRef.current, direction);
     }
   };
 
@@ -57,17 +76,20 @@ const MediaRowComponent: React.FC<MediaRowProps> = ({ title, subtitle, items, ty
       {/* Row Container with Navigation Buttons */}
       <div className="relative w-full">
         {/* Left Scroll Button */}
-        <button
-          onClick={() => scroll('left')}
-          className="absolute left-2 top-1/2 -translate-y-1/2 z-30 w-10 h-10 rounded-full bg-hbo-card/90 border border-hbo-border text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 hover:bg-hbo-purple hover:scale-110 shadow-lg hidden sm:flex"
-          aria-label="Scroll left"
-        >
-          <ChevronLeft className="w-6 h-6" />
-        </button>
+        {scrollState.canScrollLeft && (
+          <button
+            onClick={() => scroll('left')}
+            className="absolute left-2 top-1/2 -translate-y-1/2 z-30 w-10 h-10 rounded-full bg-hbo-card/90 border border-hbo-border text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 hover:bg-hbo-purple hover:scale-110 shadow-lg hidden sm:flex"
+            aria-label="Scroll left"
+          >
+            <ChevronLeft className="w-6 h-6" />
+          </button>
+        )}
 
         {/* Horizontal Carousel */}
         <div
           ref={rowRef}
+          onScroll={updateScrollButtons}
           onFocusCapture={expandItems}
           onMouseEnter={expandItems}
           style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-x pan-y' }}
@@ -76,16 +98,19 @@ const MediaRowComponent: React.FC<MediaRowProps> = ({ title, subtitle, items, ty
           {items.slice(0, renderedCount).map((item) => (
             <MediaCard key={item.id} item={item} type={type} variant={variant} />
           ))}
+          <div className="flex-shrink-0 w-8 sm:w-[calc(100vw-180px)] max-w-xl h-1 pointer-events-none" aria-hidden="true" />
         </div>
 
         {/* Right Scroll Button */}
-        <button
-          onClick={() => scroll('right')}
-          className="absolute right-2 top-1/2 -translate-y-1/2 z-30 w-10 h-10 rounded-full bg-hbo-card/90 border border-hbo-border text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 hover:bg-hbo-purple hover:scale-110 shadow-lg hidden sm:flex"
-          aria-label="Scroll right"
-        >
-          <ChevronRight className="w-6 h-6" />
-        </button>
+        {scrollState.canScrollRight && (
+          <button
+            onClick={() => scroll('right')}
+            className="absolute right-2 top-1/2 -translate-y-1/2 z-30 w-10 h-10 rounded-full bg-hbo-card/90 border border-hbo-border text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 hover:bg-hbo-purple hover:scale-110 shadow-lg hidden sm:flex"
+            aria-label="Scroll right"
+          >
+            <ChevronRight className="w-6 h-6" />
+          </button>
+        )}
       </div>
     </section>
   );
