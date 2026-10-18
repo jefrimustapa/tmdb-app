@@ -121,17 +121,138 @@ async function fetchCompareCommits(compareRange: string): Promise<string[]> {
   return [];
 }
 
-// Compare semantic versions (returns >0 if v1 > v2, <0 if v1 < v2, 0 if equal)
-function compareVersions(v1: string, v2: string): number {
-  const clean1 = v1.replace(/^v/, '').split('-')[0].split('.').map(n => parseInt(n, 10) || 0);
-  const clean2 = v2.replace(/^v/, '').split('-')[0].split('.').map(n => parseInt(n, 10) || 0);
+// Extract version from APK file name: e.g. "tmdb-stream-v1.2.0-nightly.20261017.81-debug.apk" -> "1.2.0-nightly.20261017.81"
+export function extractVersionFromApkName(apkName: string): string | null {
+  if (!apkName) return null;
+  const match = apkName.match(/^tmdb-stream-v?(.+?)(?:-(?:debug|release))?\.apk$/i);
+  return match ? match[1] : null;
+}
 
-  for (let i = 0; i < Math.max(clean1.length, clean2.length); i++) {
-    const num1 = clean1[i] || 0;
-    const num2 = clean2[i] || 0;
-    if (num1 !== num2) return num1 - num2;
+// Extract CI run number: e.g. "1.2.0-nightly.20261017.81" or "...81-debug.apk" -> 81
+export function extractRunNumber(str: string): number {
+  if (!str) return 0;
+  const match = str.match(/nightly[.-]\d{8}[.-](\d+)/i) || str.match(/\.(\d+)(?:-(?:debug|release))?\.apk$/i);
+  return match ? parseInt(match[1], 10) : 0;
+}
+
+// Extract 8-digit date (YYYYMMDD): e.g. "nightly-20261017" or "20261017" -> 20261017
+export function extractDateNumber(str: string): number {
+  if (!str) return 0;
+  const match = str.match(/\b\d{8}\b/) || str.match(/\d{8}/);
+  return match ? parseInt(match[0], 10) : 0;
+}
+
+// Compare semantic versions (returns >0 if v1 > v2, <0 if v1 < v2, 0 if equal)
+export function compareSemVer(v1: string, v2: string): number {
+  const parse = (v: string) => {
+    const clean = v.replace(/^v/, '').trim();
+    const [mainPart, ...preParts] = clean.split('-');
+    const nums = mainPart.split('.').map(n => parseInt(n, 10) || 0);
+    while (nums.length < 3) nums.push(0);
+    const pre = preParts.join('-');
+    return { nums, pre };
+  };
+
+  const p1 = parse(v1);
+  const p2 = parse(v2);
+
+  for (let i = 0; i < Math.max(p1.nums.length, p2.nums.length); i++) {
+    const n1 = p1.nums[i] || 0;
+    const n2 = p2.nums[i] || 0;
+    if (n1 !== n2) return n1 - n2;
   }
-  return 0;
+
+  // Official release without prerelease is higher than prerelease with same base
+  if (!p1.pre && p2.pre) return 1;
+  if (p1.pre && !p2.pre) return -1;
+  if (!p1.pre && !p2.pre) return 0;
+
+  return p1.pre.localeCompare(p2.pre, undefined, { numeric: true });
+}
+
+export function compareVersions(v1: string, v2: string): number {
+  return compareSemVer(v1, v2);
+}
+
+export interface IsInstalledUpToDateParams {
+  candidateVersion: string;
+  candidateIsNightly: boolean;
+  currentFullVersion: string;
+  currentBuildNumber: string;
+  currentChannel: string;
+}
+
+export function isInstalledUpToDate({
+  candidateVersion,
+  candidateIsNightly,
+  currentFullVersion,
+  currentBuildNumber,
+  currentChannel
+}: IsInstalledUpToDateParams): boolean {
+  if (candidateIsNightly) {
+    const candidateDate = extractDateNumber(candidateVersion);
+    const candidateRun = extractRunNumber(candidateVersion);
+    const localDate = extractDateNumber(currentFullVersion) || extractDateNumber(currentBuildNumber);
+    const localRun = extractRunNumber(currentFullVersion);
+
+    if (currentChannel === 'nightly') {
+      if (candidateDate > localDate) return false;
+      if (candidateDate < localDate) return true;
+      // Same date: compare run number if both present
+      if (candidateRun > 0 && localRun > 0) {
+        return candidateRun <= localRun;
+      }
+      return true;
+    }
+
+    if (currentChannel === 'dev') {
+      if (candidateDate > localDate) return false;
+      if (candidateDate < localDate) return true;
+      // Same date: candidate is an official CI release with run number > 0, whereas local is a dev build
+      if (candidateRun > 0) return false;
+      return true;
+    }
+
+    // Stable/RC user opted into Nightly updates:
+    const baseDiff = compareSemVer(candidateVersion, currentFullVersion);
+    if (baseDiff > 0) return false;
+    return false;
+  }
+
+  // Candidate is stable / pre-release
+  if (currentChannel === 'dev') {
+    const baseLocal = currentFullVersion.split('-')[0];
+    const diff = compareSemVer(candidateVersion, baseLocal);
+    return diff <= 0;
+  }
+
+  const diff = compareSemVer(candidateVersion, currentFullVersion);
+  return diff <= 0;
+}
+
+export function isReleaseMatchingInstalled(
+  rel: GitHubRelease,
+  currentFullVersion: string,
+  currentChannel: string
+): boolean {
+  const isNightly = rel.prerelease || /nightly/i.test(rel.tag_name);
+  if (isNightly) {
+    if (currentChannel !== 'nightly') return false;
+    const relDate = extractDateNumber(rel.tag_name);
+    const localDate = extractDateNumber(currentFullVersion);
+    if (!relDate || !localDate || relDate !== localDate) return false;
+
+    const localRun = extractRunNumber(currentFullVersion);
+    if (localRun > 0) {
+      const matchingAsset = (rel.assets || []).some(a => extractRunNumber(a.name) === localRun);
+      if (matchingAsset) return true;
+    }
+    return true;
+  }
+
+  const cleanTag = rel.tag_name.replace(/^v/, '').trim();
+  const cleanLocal = currentFullVersion.replace(/^v/, '').trim();
+  return cleanTag === cleanLocal;
 }
 
 export const updateService = {
@@ -165,10 +286,12 @@ export const updateService = {
         };
       }
 
-      // Filter based on user preference (Stable vs Nightly/Pre-release)
+      // Filter based on user preference (Stable vs Nightly/Pre-release).
+      // If current app is already a Nightly or Dev build, nightly pre-releases are always eligible.
+      const allowNightly = includeNightly || APP_BUILD_CHANNEL === 'nightly' || APP_BUILD_CHANNEL === 'dev';
       const eligibleReleases = releases.filter(r => {
         if (r.draft) return false;
-        if (!includeNightly && r.prerelease) return false;
+        if (!allowNightly && r.prerelease) return false;
         return true;
       });
 
@@ -193,41 +316,32 @@ export const updateService = {
       const cleanTag = latest.tag_name.replace(/^v/, '');
       const isNightly = latest.prerelease || latest.tag_name.toLowerCase().includes('nightly');
 
-      // Find latest APK asset (sort descending so highest run number / latest APK is chosen)
+      // Find latest APK asset (sort descending by numeric run number so highest run number / latest APK is chosen)
       const apkAssets = (latest.assets || []).filter(a => a.name.toLowerCase().endsWith('.apk'));
-      apkAssets.sort((a, b) => b.name.localeCompare(a.name));
+      apkAssets.sort((a, b) => {
+        const runA = extractRunNumber(a.name);
+        const runB = extractRunNumber(b.name);
+        if (runA !== runB) {
+          return runB - runA;
+        }
+        return b.name.localeCompare(a.name);
+      });
       const apkAsset = apkAssets[0];
       const apkUrl = apkAsset ? apkAsset.browser_download_url : null;
       const apkName = apkAsset ? apkAsset.name : `tmdb-stream-v${cleanTag}.apk`;
       const apkSizeFormatted = apkAsset?.size ? `${(apkAsset.size / (1024 * 1024)).toFixed(1)} MB` : undefined;
 
+      const apkVersion = apkAsset ? extractVersionFromApkName(apkAsset.name) : null;
+      const latestVersion = apkVersion || cleanTag;
+
       // Determine if it is actually newer than current build
-      let hasUpdate = false;
-
-      if (isNightly) {
-        // Extract 8-digit date (YYYYMMDD) from tag e.g. "nightly-20260828" -> 20260828
-        const tagDateMatch = latest.tag_name.match(/\d{8}/);
-        const localDateMatch = APP_BUILD_NUMBER.match(/\d{8}/);
-
-        const tagDate = tagDateMatch ? parseInt(tagDateMatch[0], 10) : 0;
-        const localDate = localDateMatch ? parseInt(localDateMatch[0], 10) : 0;
-
-        if (tagDate > localDate) {
-          hasUpdate = true;
-        } else if (tagDate === localDate) {
-          // If on official nightly, check if the cleanTag or asset run number is different
-          if (APP_BUILD_CHANNEL === 'nightly' && !APP_VERSION_FULL.includes(cleanTag)) {
-            hasUpdate = true;
-          }
-        }
-      } else {
-        const versionDiff = compareVersions(cleanTag, APP_VERSION);
-        if (versionDiff > 0) {
-          hasUpdate = true;
-        } else if (versionDiff === 0 && APP_BUILD_CHANNEL !== 'dev' && !APP_VERSION_FULL.includes(cleanTag)) {
-          hasUpdate = true;
-        }
-      }
+      const hasUpdate = !isInstalledUpToDate({
+        candidateVersion: latestVersion,
+        candidateIsNightly: isNightly,
+        currentFullVersion: APP_VERSION_FULL,
+        currentBuildNumber: APP_BUILD_NUMBER,
+        currentChannel: APP_BUILD_CHANNEL
+      });
 
       // Aggregate release notes in chronological descending order (latest release first)
       const releaseNotesSections: string[] = [];
@@ -280,7 +394,7 @@ export const updateService = {
         }
 
         // Stop after 3 recent releases to keep modal concise or when hitting current installed version
-        if (releaseNotesSections.length >= 3 || APP_VERSION_FULL.includes(rel.tag_name.replace(/^v/, ''))) {
+        if (releaseNotesSections.length >= 3 || isReleaseMatchingInstalled(rel, APP_VERSION_FULL, APP_BUILD_CHANNEL)) {
           break;
         }
       }
@@ -292,7 +406,7 @@ export const updateService = {
       return {
         hasUpdate,
         currentVersion: APP_VERSION_FULL,
-        latestVersion: cleanTag,
+        latestVersion,
         releaseName: latest.name || latest.tag_name,
         releaseNotes,
         publishedAt: latest.published_at ? new Date(latest.published_at).toLocaleDateString() : '',
