@@ -19,10 +19,10 @@ export function getRailLayout(row: HTMLElement) {
   const secondChild = children[1];
   const stride = secondChild ? secondChild.offsetLeft - firstChild.offsetLeft : firstChild.offsetWidth;
 
-  // Count how many card columns are fully visible across the rail container width
+  // Count how many card columns are visible across the rail container width
   let columnsCount = 0;
   for (let i = 0; i < children.length; i++) {
-    if (children[i].offsetLeft + children[i].offsetWidth <= paddingLeft + availableWidth + 2) {
+    if (children[i].offsetLeft < paddingLeft + availableWidth) {
       columnsCount++;
     } else {
       break;
@@ -34,9 +34,32 @@ export function getRailLayout(row: HTMLElement) {
   const scrollStep = Math.max(1, columnsCount > 1 ? columnsCount - 1 : 1);
   const maxStartIndex = Math.max(0, children.length - columnsCount);
 
-  const maxStrideScroll = maxStartIndex > 0 && children[maxStartIndex]
+  // Last card position
+  const lastChild = children[children.length - 1];
+  const lastCardRight = lastChild ? lastChild.offsetLeft + lastChild.offsetWidth : 0;
+  const containerRight = row.clientWidth - paddingRight;
+  const hasOverflow = lastCardRight > containerRight + 2;
+
+  // Maximum scroll position to bind the last card flush against the right margin
+  const endBoundScroll = Math.max(0, lastCardRight + paddingRight - row.clientWidth);
+
+  // Stride-based scroll position for maxStartIndex
+  const strideMaxScroll = maxStartIndex > 0 && children[maxStartIndex]
     ? children[maxStartIndex].offsetLeft - paddingLeft
     : 0;
+
+  // If at strideMaxScroll the last card is noticeably cut off (> clientWidth) or leaves an empty gap (< containerRight - 10px),
+  // or if maxStartIndex is 0 but the row overflows (e.g. 7 landscape cards in Continue Watching),
+  // bound the last card to the right using endBoundScroll.
+  // Otherwise, use strideMaxScroll (preserving exact discrete column alignment for rails like Trending Now).
+  const lastCardRightAtStride = lastCardRight - strideMaxScroll;
+  const isLastCardMisaligned = (lastCardRightAtStride > row.clientWidth + 5)
+    || (lastCardRightAtStride < containerRight - 10)
+    || (maxStartIndex === 0 && hasOverflow);
+
+  const maxStrideScroll = isLastCardMisaligned
+    ? endBoundScroll
+    : strideMaxScroll;
 
   return {
     children,
@@ -46,7 +69,9 @@ export function getRailLayout(row: HTMLElement) {
     columnsCount,
     scrollStep,
     maxStartIndex,
-    maxStrideScroll
+    maxStrideScroll,
+    endBoundScroll,
+    hasOverflow
   };
 }
 
@@ -68,7 +93,7 @@ export function scrollContentRail(row: HTMLElement | null, direction: 'left' | '
   const layout = getRailLayout(row);
   if (!layout) return;
 
-  const { children, paddingLeft, scrollStep, maxStartIndex } = layout;
+  const { children, paddingLeft, scrollStep, maxStartIndex, maxStrideScroll } = layout;
   const currScroll = row.scrollLeft;
 
   // Identify current card index whose left edge is at or nearest the left padding boundary
@@ -83,19 +108,27 @@ export function scrollContentRail(row: HTMLElement | null, direction: 'left' | '
   }
 
   let targetIndex: number;
+  let targetScrollLeft: number;
+
   if (direction === 'right') {
     targetIndex = Math.min(maxStartIndex, currentIndex + scrollStep);
+    if (targetIndex >= maxStartIndex || maxStartIndex === 0) {
+      targetScrollLeft = maxStrideScroll;
+    } else {
+      targetScrollLeft = children[targetIndex].offsetLeft - paddingLeft;
+    }
   } else {
-    if (currentIndex === maxStartIndex) {
-      targetIndex = Math.max(0, Math.floor((maxStartIndex - 1) / scrollStep) * scrollStep);
+    // Scrolling left
+    if (currScroll >= maxStrideScroll - 15) {
+      targetIndex = maxStartIndex > 0
+        ? Math.max(0, Math.floor((maxStartIndex - 1) / scrollStep) * scrollStep)
+        : 0;
+      targetScrollLeft = targetIndex === 0 ? 0 : children[targetIndex].offsetLeft - paddingLeft;
     } else {
       targetIndex = Math.max(0, currentIndex - scrollStep);
+      targetScrollLeft = targetIndex === 0 ? 0 : children[targetIndex].offsetLeft - paddingLeft;
     }
   }
-
-  const targetScrollLeft = targetIndex === 0
-    ? 0
-    : children[targetIndex].offsetLeft - paddingLeft;
 
   row.scrollTo({
     left: targetScrollLeft,
