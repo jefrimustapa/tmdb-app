@@ -20,6 +20,8 @@ import {
   isAllowedTitleSuffix,
   validateTitleBoundaries,
   savedSettings,
+  isJunkMedia,
+  JUNK_MEDIA_REGEX,
 } from './index.js';
 
 let passed = 0;
@@ -805,6 +807,72 @@ it('maps delivered video document to actual quality tier key regardless of reque
   else if (tier4k === '1080p') suffix4k = '_1080p';
   else if (tier4k === 'sd') suffix4k = '_480p';
   assert.strictEqual(suffix4k, '_4k');
+});
+
+console.log('\n15. Junk Media & Review Candidate Disqualification (#221)');
+it('identifies exact issue candidate BADUT GENDONG - Movie Review.mp4 as junk media (#221)', () => {
+  const isJunk = isJunkMedia('BADUT GENDONG - Movie Review.mp4', 'Badut Gendong');
+  assert.strictEqual(isJunk, true, 'BADUT GENDONG - Movie Review.mp4 must be flagged as junk media');
+});
+
+it('disqualifies candidate button for BADUT GENDONG - Movie Review.mp4 with score -999 (#221)', () => {
+  const btnReview = {
+    className: 'KeyboardButtonUrlAuth',
+    url: 'https://t.me/msmbot/link/review',
+    text: 'BADUT GENDONG - Movie Review 720p (260.9 MB)',
+  };
+  const msg = { message: 'BADUT GENDONG - Movie Review.mp4' };
+  const contextMovie = {
+    isTv: false,
+    title: 'Badut Gendong',
+    year: '2026',
+    targetQuality: 720,
+    significantTokens: ['badut', 'gendong'],
+    minMovieSizeMb: 180,
+  };
+
+  const res = scoreCandidateButtonWithReason(btnReview, msg, contextMovie);
+  assert.strictEqual(res.score, -999, 'Movie review candidate must be hard-disqualified with -999');
+  assert.ok(res.reason.includes('junk media'), `Reason must specify junk media, got: ${res.reason}`);
+});
+
+it('identifies various regional review, recap, and synopsis patterns as junk media (#221)', () => {
+  assert.strictEqual(isJunkMedia('Badut Gendong (2026) 720p Review.mkv', 'Badut Gendong'), true);
+  assert.strictEqual(isJunkMedia('Badut Gendong Recap 1080p.mp4', 'Badut Gendong'), true);
+  assert.strictEqual(isJunkMedia('Ulasan Filem Badut Gendong 720p.mp4', 'Badut Gendong'), true);
+  assert.strictEqual(isJunkMedia('Badut Gendong Alur Cerita.mp4', 'Badut Gendong'), true);
+  assert.strictEqual(isJunkMedia('Badut Gendong Sinopsis.mp4', 'Badut Gendong'), true);
+  assert.strictEqual(isJunkMedia('Badut Gendong Reaction.mp4', 'Badut Gendong'), true);
+  assert.strictEqual(isJunkMedia('Badut Gendong Bedah Film.mp4', 'Badut Gendong'), true);
+  assert.strictEqual(isJunkMedia('Badut Gendong Ringkasan Cerita.mp4', 'Badut Gendong'), true);
+});
+
+it('accepts legitimate movie candidate without review/recap keywords (#221)', () => {
+  assert.strictEqual(isJunkMedia('Badut Gendong 2026 720p WEB-DL.mp4', 'Badut Gendong'), false);
+
+  const btnValid = {
+    className: 'KeyboardButtonUrlAuth',
+    url: 'https://t.me/msmbot/link/valid',
+    text: 'Badut Gendong 2026 720p WEB-DL (850 MB)',
+  };
+  const msg = { message: 'Badut Gendong 2026' };
+  const contextMovie = {
+    isTv: false,
+    title: 'Badut Gendong',
+    year: '2026',
+    targetQuality: 720,
+    significantTokens: ['badut', 'gendong'],
+    minMovieSizeMb: 180,
+  };
+
+  const res = scoreCandidateButtonWithReason(btnValid, msg, contextMovie);
+  assert.ok(res.score > 0, `Legitimate candidate must receive positive score, got: ${res.score} (${res.reason})`);
+});
+
+it('preserves legitimate movie whose title legitimately contains a keyword (#221)', () => {
+  // If the searched title itself is "The Great Review"
+  const isJunk = isJunkMedia('The.Great.Review.2024.1080p.WEB-DL.mp4', 'The Great Review');
+  assert.strictEqual(isJunk, false, 'Title containing review keyword must not be falsely disqualified');
 });
 
 // Clean up temporary test files
