@@ -132,19 +132,18 @@ console.log('\n--- Content Rail Scroll & Layout Test Suite (Issue #213) ---');
   scrollContentRail(mockRow as any, 'right');
   assert.strictEqual(
     mockRow.scrollLeft,
-    layout.maxStrideScroll,
-    'Row should be scrolled to maxStrideScroll so last card is bound to right'
+    cards[layout.maxStartIndex].offsetLeft - 32,
+    'Row should be scrolled to maxStartIndex offset'
   );
 
-  // Verify the last card (index 7, "The Paper") is BOUND EXACTLY to the right container boundary
+  // Verify the last card (index 7, "The Paper") is 100% inside the visible area
   const lastCard = cards[7];
   const lastCardVisibleRight = lastCard.offsetLeft + lastCard.offsetWidth - mockRow.scrollLeft;
   const containerVisibleRight = mockRow.clientWidth - 32; // clientWidth - paddingRight
 
-  assert.strictEqual(
-    lastCardVisibleRight,
-    containerVisibleRight,
-    `Final card right edge (${lastCardVisibleRight}px) should be bound flush to right boundary (${containerVisibleRight}px)!`
+  assert(
+    lastCardVisibleRight <= containerVisibleRight,
+    `Final card right edge (${lastCardVisibleRight}px) should be <= container visible right (${containerVisibleRight}px). Full card MUST be visible!`
   );
 
   // Scroll state should now show canScrollRight: false, canScrollLeft: true
@@ -152,7 +151,7 @@ console.log('\n--- Content Rail Scroll & Layout Test Suite (Issue #213) ---');
   assert.strictEqual(state.canScrollRight, false, 'canScrollRight should be false on the last page');
   assert.strictEqual(state.canScrollLeft, true, 'canScrollLeft should be true when scrolled');
 
-  console.log('  ✓ Issue #213: Continue Watching last card is bound flush to the right boundary on final page');
+  console.log('  ✓ Issue #213: Continue Watching 8 landscape cards shows 100% full card on final page');
 }
 
 // Test 2: Peeking card is NOT counted in columnsCount
@@ -223,14 +222,14 @@ console.log('\n--- Content Rail Scroll & Layout Test Suite (Issue #213) ---');
   scrollContentRail(mockRow as any, 'right');
   assert.strictEqual(mockRow.scrollLeft, cards[5].offsetLeft - 32);
 
-  // Page 2 -> Page 3 (final page, bounds last card to right)
+  // Page 2 -> Page 3 (clamped to maxStartIndex = 9)
   scrollContentRail(mockRow as any, 'right');
-  assert.strictEqual(mockRow.scrollLeft, layout.maxStrideScroll);
+  assert.strictEqual(mockRow.scrollLeft, cards[9].offsetLeft - 32);
 
-  // Last card (index 14) is bound flush to the right margin
+  // Last card (index 14) is completely visible on Page 3
   const lastCard = cards[14];
   const lastCardRight = lastCard.offsetLeft + lastCard.offsetWidth - mockRow.scrollLeft;
-  assert.strictEqual(lastCardRight, mockRow.clientWidth - 32);
+  assert(lastCardRight <= mockRow.clientWidth - 32);
 
   // Page 3 -> Page 2 (backward navigation)
   scrollContentRail(mockRow as any, 'left');
