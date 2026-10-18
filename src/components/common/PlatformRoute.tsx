@@ -1,5 +1,6 @@
 import React, { Suspense } from 'react';
 import { useDevice } from '../../hooks/useDevice';
+import { RouteErrorBoundary } from './RouteErrorBoundary';
 
 interface PlatformRouteProps {
   tv: React.LazyExoticComponent<React.ComponentType<any>> | React.ComponentType<any>;
@@ -30,8 +31,10 @@ export const PlatformRoute: React.FC<PlatformRouteProps> = ({
   }
 
   return (
-    <Suspense fallback={fallback || <div className="min-h-screen bg-hbo-dark" />}>
-      <ComponentToRender />
-    </Suspense>
+    <RouteErrorBoundary>
+      <Suspense fallback={fallback || <div className="min-h-screen bg-hbo-dark" />}>
+        <ComponentToRender />
+      </Suspense>
+    </RouteErrorBoundary>
   );
 };
