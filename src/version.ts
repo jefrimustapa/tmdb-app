@@ -2,13 +2,13 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20261018-0635';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.main.20261018-0635';
+export const APP_BUILD_NUMBER = '20261018-1512';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-213-continue-wa.20261018-1512';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
-export const APP_BRANCH = 'main';
-export const APP_CHANGELOG = `* fix(rail): discrete card-stride pagination and right-aligned final page (#209) (#210)
-* feat: store quality-specific cache for each title without purging (#201) (#208)
-* feat(updates): extract release highlights (max-5 per release) and eliminate update notes cramp (#202)
-* feat(msm-getter): restrict server access exclusively to Malaysia (MY) IP addresses (#205)
-* test(msm-getter): make resolverMaxPages assertion robust to custom router settings`;
+export const APP_BRANCH = 'feat-213-continue-wa';
+export const APP_CHANGELOG = `* revert: revert all rail scrolling changes for #213 and #209
+* fix(rail): right-bind final card on last page without disturbing standard rails (#213)
+* fix(rail): align cards with discrete stride columns and count fully visible cards (#213)
+* fix(rail): invariant getBoundingClientRect calculation to bind last card flush against right boundary (#213)
+* fix(rail): bind last card flush against right boundary on final page (#213)`;
