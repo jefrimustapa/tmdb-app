@@ -3010,7 +3010,7 @@ app.get(['/msm/streams', '/msm/cache'], (req, res) => {
       </div>
       <div class="bg-slate-900 border border-slate-800/80 rounded-2xl p-4 glow-box">
         <span class="text-xs text-slate-400 font-medium">Eviction Policy</span>
-        <p class="text-sm font-bold font-mono text-emerald-400 mt-1">LRU Cap: 2,000</p>
+        <p class="text-sm font-bold font-mono text-emerald-400 mt-1">LRU Cap: 3,000</p>
         <span class="text-[10px] text-slate-500 font-mono block mt-0.5">Auto-prunes oldest items</span>
       </div>
     </div>
@@ -3049,6 +3049,30 @@ app.get(['/msm/streams', '/msm/cache'], (req, res) => {
         </div>
       </div>
 
+      <!-- Quick Quality Filter Pills -->
+      <div class="flex items-center gap-1.5 flex-wrap pt-1">
+        <button type="button" onclick="setQualityFilter('all')" id="qTab_all" class="quality-tab px-3 py-1.5 rounded-xl text-xs font-semibold bg-sky-500/20 text-sky-300 border border-sky-500/40 transition flex items-center gap-1">
+          <span>🎬 All</span>
+          <span id="count_all" class="ml-1 px-1.5 py-0.5 rounded-full text-[10px] bg-sky-500/30 text-sky-200 font-mono">0</span>
+        </button>
+        <button type="button" onclick="setQualityFilter('4k')" id="qTab_4k" class="quality-tab px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-950 text-slate-400 hover:text-white border border-slate-800 transition flex items-center gap-1">
+          <span>✨ 4K UHD</span>
+          <span id="count_4k" class="ml-1 px-1.5 py-0.5 rounded-full text-[10px] bg-slate-800 text-slate-400 font-mono">0</span>
+        </button>
+        <button type="button" onclick="setQualityFilter('1080p')" id="qTab_1080p" class="quality-tab px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-950 text-slate-400 hover:text-white border border-slate-800 transition flex items-center gap-1">
+          <span>💎 1080p FHD</span>
+          <span id="count_1080p" class="ml-1 px-1.5 py-0.5 rounded-full text-[10px] bg-slate-800 text-slate-400 font-mono">0</span>
+        </button>
+        <button type="button" onclick="setQualityFilter('720p')" id="qTab_720p" class="quality-tab px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-950 text-slate-400 hover:text-white border border-slate-800 transition flex items-center gap-1">
+          <span>📺 720p HD</span>
+          <span id="count_720p" class="ml-1 px-1.5 py-0.5 rounded-full text-[10px] bg-slate-800 text-slate-400 font-mono">0</span>
+        </button>
+        <button type="button" onclick="setQualityFilter('sd')" id="qTab_sd" class="quality-tab px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-950 text-slate-400 hover:text-white border border-slate-800 transition flex items-center gap-1">
+          <span>📱 480p SD</span>
+          <span id="count_sd" class="ml-1 px-1.5 py-0.5 rounded-full text-[10px] bg-slate-800 text-slate-400 font-mono">0</span>
+        </button>
+      </div>
+
       <div class="flex items-center justify-between text-xs text-slate-400 pt-1 border-t border-slate-800/80">
         <span id="resultsCount">Showing 0 of 0 cached streams</span>
         <span class="text-[11px] text-slate-500 font-mono">Live Central DB Viewer</span>
@@ -3069,6 +3093,16 @@ app.get(['/msm/streams', '/msm/cache'], (req, res) => {
   <script>
     let allStreams = [];
     let searchTimer = null;
+    let currentQuality = 'all';
+
+    // Parse initial quality parameter from URL if provided (e.g. /msm/streams?quality=1080p)
+    try {
+      const urlParams = new URLSearchParams(window.location.search);
+      const qParam = (urlParams.get('quality') || '').toLowerCase().trim();
+      if (['4k', '1080p', '720p', 'sd', '480p'].includes(qParam)) {
+        currentQuality = qParam === '480p' ? 'sd' : qParam;
+      }
+    } catch {}
 
     function escapeHtml(str) {
       if (!str) return '';
@@ -3107,6 +3141,45 @@ app.get(['/msm/streams', '/msm/cache'], (req, res) => {
       applyFilterAndSort();
     }
 
+    function setQualityFilter(quality) {
+      currentQuality = quality;
+      updateQualityTabStyles();
+      applyFilterAndSort();
+    }
+
+    function updateQualityTabStyles() {
+      const tabs = ['all', '4k', '1080p', '720p', 'sd'];
+      tabs.forEach(t => {
+        const btn = document.getElementById('qTab_' + t);
+        if (!btn) return;
+        const countSpan = document.getElementById('count_' + t);
+        if (t === currentQuality) {
+          btn.className = 'quality-tab px-3 py-1.5 rounded-xl text-xs font-semibold bg-sky-500/20 text-sky-300 border border-sky-500/40 transition flex items-center gap-1';
+          if (countSpan) countSpan.className = 'ml-1 px-1.5 py-0.5 rounded-full text-[10px] bg-sky-500/30 text-sky-200 font-mono';
+        } else {
+          btn.className = 'quality-tab px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-950 text-slate-400 hover:text-white border border-slate-800 transition flex items-center gap-1';
+          if (countSpan) countSpan.className = 'ml-1 px-1.5 py-0.5 rounded-full text-[10px] bg-slate-800 text-slate-400 font-mono';
+        }
+      });
+    }
+
+    function updateQualityCounts() {
+      let countAll = allStreams.length;
+      let count4k = 0, count1080 = 0, count720 = 0, countSd = 0;
+      allStreams.forEach(item => {
+        const tier = item.qualityTier || '720p';
+        if (tier === '4k') count4k++;
+        else if (tier === '1080p') count1080++;
+        else if (tier === 'sd') countSd++;
+        else count720++;
+      });
+      const elAll = document.getElementById('count_all'); if (elAll) elAll.textContent = countAll;
+      const el4k = document.getElementById('count_4k'); if (el4k) el4k.textContent = count4k;
+      const el1080 = document.getElementById('count_1080p'); if (el1080) el1080.textContent = count1080;
+      const el720 = document.getElementById('count_720p'); if (el720) el720.textContent = count720;
+      const elSd = document.getElementById('count_sd'); if (elSd) elSd.textContent = countSd;
+    }
+
     async function loadStreams() {
       try {
         const res = await fetch('/msm/api/cache');
@@ -3126,6 +3199,9 @@ app.get(['/msm/streams', '/msm/cache'], (req, res) => {
         document.getElementById('statTotalCount').textContent = totalCount;
         document.getElementById('statTotalSize').textContent = formattedSize;
 
+        updateQualityTabStyles();
+        updateQualityCounts();
+
         applyFilterAndSort();
       } catch (err) {
         console.error('Failed to load streams:', err);
@@ -3140,6 +3216,12 @@ app.get(['/msm/streams', '/msm/cache'], (req, res) => {
       const sortMode = sortEl ? sortEl.value : 'newest';
 
       let filtered = allStreams.filter(item => {
+        // Quality Filter
+        if (currentQuality !== 'all') {
+          const itemTier = item.qualityTier || '720p';
+          if (itemTier !== currentQuality) return false;
+        }
+
         if (!q) return true;
         const fn = (item.filename || '').toLowerCase();
         const key = (item.queryKey || '').toLowerCase();
@@ -3163,14 +3245,15 @@ app.get(['/msm/streams', '/msm/cache'], (req, res) => {
       const container = document.getElementById('streamListContainer');
       const countEl = document.getElementById('resultsCount');
       if (countEl) {
-        countEl.textContent = 'Showing ' + items.length + ' of ' + allStreams.length + ' cached streams';
+        const qualitySuffix = currentQuality !== 'all' ? ' (' + currentQuality.toUpperCase() + ')' : '';
+        countEl.textContent = 'Showing ' + items.length + ' of ' + allStreams.length + ' cached streams' + qualitySuffix;
       }
 
       if (items.length === 0) {
         container.innerHTML = '<div class="p-12 text-center bg-slate-900 border border-slate-800 rounded-2xl space-y-2">' +
           '<div class="text-3xl">📭</div>' +
           '<p class="text-sm font-semibold text-slate-300">No stream records found</p>' +
-          '<p class="text-xs text-slate-500">Try adjusting your search query or resolve a title from TMDB Stream.</p>' +
+          '<p class="text-xs text-slate-500">Try adjusting your search query, selecting another quality filter, or resolve a title from TMDB Stream.</p>' +
           '</div>';
         return;
       }
@@ -3178,6 +3261,17 @@ app.get(['/msm/streams', '/msm/cache'], (req, res) => {
       container.innerHTML = items.map(item => {
         const title = item.filename || item.queryKey || 'Untitled Stream';
         const dateStr = item.createdAt ? new Date(item.createdAt).toLocaleString() : '--';
+        const tier = item.qualityTier || '720p';
+
+        let qualityBadge = '<span class="px-2 py-0.5 rounded bg-sky-500/10 text-sky-400 border border-sky-500/20 font-bold">720p HD</span>';
+        if (tier === '4k') {
+          qualityBadge = '<span class="px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20 font-bold">4K UHD</span>';
+        } else if (tier === '1080p') {
+          qualityBadge = '<span class="px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 font-bold">1080p FHD</span>';
+        } else if (tier === 'sd') {
+          qualityBadge = '<span class="px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700 font-bold">480p SD</span>';
+        }
+
         return '<div class="bg-slate-900 hover:bg-slate-900/90 border border-slate-800/90 hover:border-slate-700/80 rounded-2xl p-4 transition glow-box flex flex-col md:flex-row md:items-center justify-between gap-3.5">' +
           '<div class="min-w-0 flex-1 space-y-1.5">' +
             '<div class="flex items-center gap-2">' +
@@ -3185,9 +3279,11 @@ app.get(['/msm/streams', '/msm/cache'], (req, res) => {
               '<h3 class="text-sm font-bold text-white truncate" title="' + escapeHtml(title) + '">' + escapeHtml(title) + '</h3>' +
             '</div>' +
             '<div class="flex items-center gap-2 flex-wrap text-[11px] font-mono">' +
+              qualityBadge +
               '<span class="px-2 py-0.5 rounded bg-sky-500/10 text-sky-400 border border-sky-500/20 font-bold">' + escapeHtml(item.sizeFormatted) + '</span>' +
               '<span class="px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700/70">Key: ' + escapeHtml(item.queryKey || '--') + '</span>' +
               '<span class="px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700/70">DC ' + escapeHtml(item.dcId || 4) + '</span>' +
+              (item.videoCodec ? '<span class="px-2 py-0.5 rounded bg-purple-500/10 text-purple-400 border border-purple-500/20 uppercase">' + escapeHtml(item.videoCodec) + '</span>' : '') +
               '<span class="text-slate-500 text-[10px]">' + escapeHtml(dateStr) + '</span>' +
             '</div>' +
           '</div>' +
@@ -4101,11 +4197,11 @@ app.get(['/api/debug-search', '/msm/api/debug-search'], async (req, res) => {
 
 // Cache management endpoints
 app.get(['/api/cache', '/msm/api/cache'], (req, res) => {
-  const { search = '' } = req.query;
+  const { search = '', quality = '' } = req.query;
   const items = db.getAll(search);
   const totalSizeBytes = db.getTotalSizeBytes();
 
-  const formattedItems = items.map(item => {
+  let formattedItems = items.map(item => {
     const bytes = parseInt(item.size, 10);
     let sizeFormatted = '0 B';
     if (!isNaN(bytes) && bytes > 0) {
@@ -4115,17 +4211,35 @@ app.get(['/api/cache', '/msm/api/cache'], (req, res) => {
         sizeFormatted = `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
       }
     }
+    const fakeDoc = (item.width || item.height) ? { attributes: [{ className: 'DocumentAttributeVideo', w: item.width, h: item.height }] } : null;
+    const qualityTier = detectVideoQualityTier(item.filename || '', item.queryKey || '', fakeDoc);
+
     return {
       queryKey: item.queryKey,
       docId: item.docId,
       filename: item.filename,
       size: !isNaN(bytes) ? bytes : 0,
       sizeFormatted,
+      qualityTier,
+      videoCodec: item.videoCodec,
+      width: item.width,
+      height: item.height,
       mimeType: item.mimeType || 'video/mp4',
       dcId: item.dcId || 4,
       createdAt: item.createdAt || (item.date ? item.date * 1000 : 0),
     };
   });
+
+  if (quality && quality.trim() && quality.trim().toLowerCase() !== 'all') {
+    const qLower = quality.trim().toLowerCase();
+    formattedItems = formattedItems.filter(item => {
+      if (qLower === '4k' || qLower === '2160p') return item.qualityTier === '4k';
+      if (qLower === '1080p') return item.qualityTier === '1080p';
+      if (qLower === '720p') return item.qualityTier === '720p';
+      if (qLower === 'sd' || qLower === '480p') return item.qualityTier === 'sd';
+      return item.qualityTier === qLower;
+    });
+  }
 
   return res.json({
     success: true,
@@ -4227,28 +4341,51 @@ app.get(['/api/resolve', '/msm/api/resolve', '/api/prefetch', '/msm/api/prefetch
   let cached = shouldBypassCache ? null : db.get(cacheKey);
   let fallbackCached = null;
 
-  if (!cached && !shouldBypassCache) {
-    // Check legacy baseCacheKey without quality suffix
-    const legacyCached = db.get(baseCacheKey);
-    if (legacyCached && legacyCached.filename) {
-      const fnLower = legacyCached.filename.toLowerCase();
-      const is4k = fnLower.includes('2160p') || fnLower.includes('4k') || fnLower.includes('uhd');
-      const is1080 = fnLower.includes('1080p') || fnLower.includes('1080');
-      const is720 = fnLower.includes('720p') || fnLower.includes('720');
-      const isLowerRes = fnLower.includes('480p') || fnLower.includes('540p') || fnLower.includes('360p');
+  let preferredFallbacks = [];
+  if (targetQuality >= 2160) {
+    preferredFallbacks = ['_1080p', '_720p', '_480p'];
+  } else if (targetQuality >= 1080) {
+    preferredFallbacks = ['_720p', '_4k', '_480p'];
+  } else if (targetQuality <= 480) {
+    preferredFallbacks = ['_720p', '_1080p', '_4k'];
+  } else {
+    // 720p target
+    preferredFallbacks = ['_1080p', '_480p', '_4k'];
+  }
 
-      if (targetQuality >= 2160) {
-        if (is4k) cached = legacyCached;
-        else if (is1080) fallbackCached = legacyCached;
-      } else if (targetQuality <= 480) {
-        if (isLowerRes) cached = legacyCached;
-        else if (is720) fallbackCached = legacyCached;
-      } else if (targetQuality <= 720) {
-        if (is720 || isLowerRes) cached = legacyCached;
-        else if (is1080) fallbackCached = legacyCached;
-      } else {
-        if (is1080) cached = legacyCached;
-        else if (is720) fallbackCached = legacyCached;
+  if (!cached && !shouldBypassCache) {
+    // Check other quality tiers for the same title as fallback candidates
+    for (const qSuffix of preferredFallbacks) {
+      const cand = db.get(`${baseCacheKey}${qSuffix}`);
+      if (cand) {
+        fallbackCached = cand;
+        break;
+      }
+    }
+
+    // Also check legacy baseCacheKey without quality suffix
+    if (!fallbackCached) {
+      const legacyCached = db.get(baseCacheKey);
+      if (legacyCached && legacyCached.filename) {
+        const fnLower = legacyCached.filename.toLowerCase();
+        const is4k = fnLower.includes('2160p') || fnLower.includes('4k') || fnLower.includes('uhd');
+        const is1080 = fnLower.includes('1080p') || fnLower.includes('1080');
+        const is720 = fnLower.includes('720p') || fnLower.includes('720');
+        const isLowerRes = fnLower.includes('480p') || fnLower.includes('540p') || fnLower.includes('360p');
+
+        if (targetQuality >= 2160) {
+          if (is4k) cached = legacyCached;
+          else if (is1080) fallbackCached = legacyCached;
+        } else if (targetQuality <= 480) {
+          if (isLowerRes) cached = legacyCached;
+          else if (is720) fallbackCached = legacyCached;
+        } else if (targetQuality <= 720) {
+          if (is720 || isLowerRes) cached = legacyCached;
+          else if (is1080) fallbackCached = legacyCached;
+        } else {
+          if (is1080) cached = legacyCached;
+          else if (is720) fallbackCached = legacyCached;
+        }
       }
     }
   }
@@ -4524,12 +4661,34 @@ app.get(['/api/resolve', '/msm/api/resolve', '/api/prefetch', '/msm/api/prefetch
     if (matchingRecentDocs.length > 0) {
       matchingRecentDocs.sort((a, b) => b.qualityScore - a.qualityScore);
       const chosen = matchingRecentDocs[0];
-      // Pick immediately if it meets the desired quality (score >= 30) or if targetQuality > 720
-      if (chosen.qualityScore >= 30 || targetQuality > 720) {
+      const chosenTier = detectVideoQualityTier(chosen.filename, '', chosen.doc);
+
+      // Determine if chosen document actually matches the requested target quality
+      let isTargetQualityMet = false;
+      if (targetQuality >= 2160) {
+        isTargetQualityMet = chosenTier === '4k';
+      } else if (targetQuality >= 1080) {
+        isTargetQualityMet = chosenTier === '1080p' || chosenTier === '4k';
+      } else if (targetQuality <= 480) {
+        isTargetQualityMet = chosenTier === 'sd';
+      } else {
+        // 720p target
+        isTargetQualityMet = chosenTier === '720p' || chosenTier === '1080p' || chosenTier === '4k';
+      }
+
+      let chosenQualitySuffix = '_720p';
+      if (chosenTier === '4k') chosenQualitySuffix = '_4k';
+      else if (chosenTier === '1080p') chosenQualitySuffix = '_1080p';
+      else if (chosenTier === 'sd') chosenQualitySuffix = '_480p';
+      else chosenQualitySuffix = '_720p';
+
+      const actualCacheKey = `${baseCacheKey}${chosenQualitySuffix}`;
+
+      if (isTargetQualityMet && chosen.qualityScore >= 30) {
         const docIdStr = chosen.doc.id.toString();
-        console.log(`[RESOLVE] Found matching recent document in chat: ${chosen.filename} (ID: ${docIdStr}, score: ${chosen.qualityScore})`);
+        console.log(`[RESOLVE] Found matching recent document in chat: ${chosen.filename} (ID: ${docIdStr}, score: ${chosen.qualityScore}, tier: ${chosenTier})`);
         const vAttr = chosen.doc.attributes?.find(a => a.className === 'DocumentAttributeVideo' || (a.w && a.h));
-        const streamItem = db.set(cacheKey, {
+        const streamItem = db.set(actualCacheKey, {
           docId: docIdStr,
           msgId: chosen.msgId,
           accessHash: chosen.doc.accessHash?.toString() || '',
@@ -4543,6 +4702,26 @@ app.get(['/api/resolve', '/msm/api/resolve', '/api/prefetch', '/msm/api/prefetch
           height: vAttr?.h ? Number(vAttr.h) : null,
         });
         return streamItem;
+      } else {
+        // Chat doc has lower/different quality than requested. Store as fallback without overriding target quality key
+        if (!fallbackCached) {
+          const docIdStr = chosen.doc.id.toString();
+          const vAttr = chosen.doc.attributes?.find(a => a.className === 'DocumentAttributeVideo' || (a.w && a.h));
+          fallbackCached = db.set(actualCacheKey, {
+            docId: docIdStr,
+            msgId: chosen.msgId,
+            accessHash: chosen.doc.accessHash?.toString() || '',
+            fileReference: chosen.doc.fileReference ? chosen.doc.fileReference.toString('hex') : '',
+            filename: chosen.filename,
+            size: chosen.doc.size?.toString() || '0',
+            mimeType: chosen.doc.mimeType || 'video/mp4',
+            dcId: chosen.doc.dcId || 4,
+            date: chosen.doc.date,
+            width: vAttr?.w ? Number(vAttr.w) : null,
+            height: vAttr?.h ? Number(vAttr.h) : null,
+          });
+          console.log(`[RESOLVE] Chat document ${chosen.filename} is ${chosenTier} (requested ${targetQuality}p). Preserving as fallback "${actualCacheKey}" while querying bot.`);
+        }
       }
     }
 
@@ -5103,7 +5282,7 @@ app.get(['/api/resolve', '/msm/api/resolve', '/api/prefetch', '/msm/api/prefetch
 
     if (!deliveredDoc) {
       if (fallbackCached) {
-        console.log(`[RESOLVE] 720p not found from bot, falling back to cached 1080p stream for "${baseCacheKey}"`);
+        console.log(`[RESOLVE] Requested quality ${targetQuality}p not found from bot, falling back to cached "${fallbackCached.queryKey || fallbackCached.filename}" for "${baseCacheKey}"`);
         return fallbackCached;
       }
       const err = new Error(`No downloadable media found for "${queryTitle}" on @${BOT_USERNAME}`);
@@ -5114,7 +5293,17 @@ app.get(['/api/resolve', '/msm/api/resolve', '/api/prefetch', '/msm/api/prefetch
     const docIdStr = deliveredDoc.id.toString();
     const filename = resolvedFilename || chosenFilename || queryTitle;
     const vAttr = deliveredDoc.attributes?.find(a => a.className === 'DocumentAttributeVideo' || (a.w && a.h));
-    const resolvedItem = db.set(cacheKey, {
+    
+    // Detect ACTUAL video quality tier from delivered document attributes and filename
+    const actualTier = detectVideoQualityTier(filename, '', deliveredDoc);
+    let actualQualitySuffix = '_720p';
+    if (actualTier === '4k') actualQualitySuffix = '_4k';
+    else if (actualTier === '1080p') actualQualitySuffix = '_1080p';
+    else if (actualTier === 'sd') actualQualitySuffix = '_480p';
+    else actualQualitySuffix = '_720p';
+
+    const actualCacheKey = `${baseCacheKey}${actualQualitySuffix}`;
+    const resolvedItem = db.set(actualCacheKey, {
       docId: docIdStr,
       msgId: deliveredMsgId,
       accessHash: deliveredDoc.accessHash?.toString() || '',
@@ -5127,7 +5316,7 @@ app.get(['/api/resolve', '/msm/api/resolve', '/api/prefetch', '/msm/api/prefetch
       width: vAttr?.w ? Number(vAttr.w) : null,
       height: vAttr?.h ? Number(vAttr.h) : null,
     });
-    console.log(`[${logPrefix}] Successfully resolved "${queryTitle}" -> Doc ID: ${docIdStr} (${filename})`);
+    console.log(`[${logPrefix}] Successfully resolved "${queryTitle}" -> Doc ID: ${docIdStr} (${filename}) as ${actualCacheKey} (tier: ${actualTier})`);
     return resolvedItem;
   });
 
