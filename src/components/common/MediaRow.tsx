@@ -16,12 +16,29 @@ const INITIAL_RENDER_COUNT = 10;
 const MediaRowComponent: React.FC<MediaRowProps> = ({ title, subtitle, items, type, variant = 'poster' }) => {
   const rowRef = useRef<HTMLDivElement>(null);
   const [renderedCount, setRenderedCount] = useState(() => Math.min(items?.length || 0, INITIAL_RENDER_COUNT));
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(true);
+
+  const updateScrollButtons = useCallback(() => {
+    const el = rowRef.current;
+    if (!el) return;
+    const { scrollLeft, scrollWidth, clientWidth } = el;
+    setCanScrollLeft(scrollLeft > 10);
+    setCanScrollRight(scrollWidth > clientWidth && scrollLeft < scrollWidth - clientWidth - 10);
+  }, []);
 
   useEffect(() => {
     if (items?.length && renderedCount < INITIAL_RENDER_COUNT) {
       setRenderedCount(Math.min(items.length, INITIAL_RENDER_COUNT));
     }
   }, [items?.length, renderedCount]);
+
+  useEffect(() => {
+    updateScrollButtons();
+    const handleResize = () => updateScrollButtons();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [updateScrollButtons, renderedCount, items?.length]);
 
   const expandItems = useCallback(() => {
     if (renderedCount < (items?.length || 0)) {
@@ -57,17 +74,20 @@ const MediaRowComponent: React.FC<MediaRowProps> = ({ title, subtitle, items, ty
       {/* Row Container with Navigation Buttons */}
       <div className="relative w-full">
         {/* Left Scroll Button */}
-        <button
-          onClick={() => scroll('left')}
-          className="absolute left-2 top-1/2 -translate-y-1/2 z-30 w-10 h-10 rounded-full bg-hbo-card/90 border border-hbo-border text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 hover:bg-hbo-purple hover:scale-110 shadow-lg hidden sm:flex"
-          aria-label="Scroll left"
-        >
-          <ChevronLeft className="w-6 h-6" />
-        </button>
+        {canScrollLeft && (
+          <button
+            onClick={() => scroll('left')}
+            className="absolute left-2 top-1/2 -translate-y-1/2 z-30 w-10 h-10 rounded-full bg-hbo-card/90 border border-hbo-border text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 hover:bg-hbo-purple hover:scale-110 shadow-lg hidden sm:flex"
+            aria-label="Scroll left"
+          >
+            <ChevronLeft className="w-6 h-6" />
+          </button>
+        )}
 
         {/* Horizontal Carousel */}
         <div
           ref={rowRef}
+          onScroll={updateScrollButtons}
           onFocusCapture={expandItems}
           onMouseEnter={expandItems}
           style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-x pan-y' }}
@@ -79,13 +99,15 @@ const MediaRowComponent: React.FC<MediaRowProps> = ({ title, subtitle, items, ty
         </div>
 
         {/* Right Scroll Button */}
-        <button
-          onClick={() => scroll('right')}
-          className="absolute right-2 top-1/2 -translate-y-1/2 z-30 w-10 h-10 rounded-full bg-hbo-card/90 border border-hbo-border text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 hover:bg-hbo-purple hover:scale-110 shadow-lg hidden sm:flex"
-          aria-label="Scroll right"
-        >
-          <ChevronRight className="w-6 h-6" />
-        </button>
+        {canScrollRight && (
+          <button
+            onClick={() => scroll('right')}
+            className="absolute right-2 top-1/2 -translate-y-1/2 z-30 w-10 h-10 rounded-full bg-hbo-card/90 border border-hbo-border text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 hover:bg-hbo-purple hover:scale-110 shadow-lg hidden sm:flex"
+            aria-label="Scroll right"
+          >
+            <ChevronRight className="w-6 h-6" />
+          </button>
+        )}
       </div>
     </section>
   );

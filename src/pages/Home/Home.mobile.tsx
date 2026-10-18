@@ -77,6 +77,24 @@ export const Home: React.FC = () => {
     };
   }, [updateDominantColor]);
 
+  const [continueWatchingCanScrollLeft, setContinueWatchingCanScrollLeft] = useState(false);
+  const [continueWatchingCanScrollRight, setContinueWatchingCanScrollRight] = useState(true);
+
+  const updateContinueWatchingScrollButtons = useCallback(() => {
+    const el = continueWatchingRef.current;
+    if (!el) return;
+    const { scrollLeft, scrollWidth, clientWidth } = el;
+    setContinueWatchingCanScrollLeft(scrollLeft > 10);
+    setContinueWatchingCanScrollRight(scrollWidth > clientWidth && scrollLeft < scrollWidth - clientWidth - 10);
+  }, []);
+
+  useEffect(() => {
+    updateContinueWatchingScrollButtons();
+    const handleResize = () => updateContinueWatchingScrollButtons();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [updateContinueWatchingScrollButtons, history.length]);
+
   const scrollContinueWatching = (direction: 'left' | 'right') => {
     if (continueWatchingRef.current) {
       const scrollAmount = continueWatchingRef.current.clientWidth * 0.75;
@@ -202,17 +220,20 @@ export const Home: React.FC = () => {
             {/* Row Container with Navigation Buttons */}
             <div className="relative w-full">
               {/* Left Scroll Button */}
-              <button
-                onClick={() => scrollContinueWatching('left')}
-                className="absolute left-2 top-1/2 -translate-y-1/2 z-30 w-10 h-10 rounded-full bg-hbo-card/90 border border-hbo-border text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 hover:bg-hbo-purple hover:scale-110 shadow-lg hidden sm:flex"
-                aria-label="Scroll left"
-              >
-                <ChevronLeft className="w-6 h-6" />
-              </button>
+              {continueWatchingCanScrollLeft && (
+                <button
+                  onClick={() => scrollContinueWatching('left')}
+                  className="absolute left-2 top-1/2 -translate-y-1/2 z-30 w-10 h-10 rounded-full bg-hbo-card/90 border border-hbo-border text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 hover:bg-hbo-purple hover:scale-110 shadow-lg hidden sm:flex"
+                  aria-label="Scroll left"
+                >
+                  <ChevronLeft className="w-6 h-6" />
+                </button>
+              )}
 
               {/* Horizontal Carousel */}
               <div
                 ref={continueWatchingRef}
+                onScroll={updateContinueWatchingScrollButtons}
                 style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-x pan-y' }}
                 className="flex items-center gap-3.5 overflow-x-auto no-scrollbar py-4 pl-4 sm:pl-8 pr-6 sm:pr-8 -my-2 touch-pan-x touch-pan-y overscroll-x-contain"
               >
@@ -243,13 +264,15 @@ export const Home: React.FC = () => {
               </div>
 
               {/* Right Scroll Button */}
-              <button
-                onClick={() => scrollContinueWatching('right')}
-                className="absolute right-2 top-1/2 -translate-y-1/2 z-30 w-10 h-10 rounded-full bg-hbo-card/90 border border-hbo-border text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 hover:bg-hbo-purple hover:scale-110 shadow-lg hidden sm:flex"
-                aria-label="Scroll right"
-              >
-                <ChevronRight className="w-6 h-6" />
-              </button>
+              {continueWatchingCanScrollRight && (
+                <button
+                  onClick={() => scrollContinueWatching('right')}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 z-30 w-10 h-10 rounded-full bg-hbo-card/90 border border-hbo-border text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 hover:bg-hbo-purple hover:scale-110 shadow-lg hidden sm:flex"
+                  aria-label="Scroll right"
+                >
+                  <ChevronRight className="w-6 h-6" />
+                </button>
+              )}
             </div>
           </section>
         )}
