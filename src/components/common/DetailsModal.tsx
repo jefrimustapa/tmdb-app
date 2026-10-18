@@ -6,6 +6,7 @@ import { tmdbApi, tmdbImages, extractContentRating, isExplicitAdultCertification
 import { dbService } from '../../services/db';
 import { getMediaOriginCountries } from '../../services/streamProviders';
 import { extractDominantColor, getAdaptiveBackgroundStyle, type DominantColor } from '../../services/colorExtractor';
+import { extractCrewMembers, getCrewRoleColor } from '../../utils/crewHelper';
 
 interface DetailsModalProps {
   item: TMDBMediaItem | null;
@@ -21,23 +22,8 @@ export const DetailsModal: React.FC<DetailsModalProps> = ({ item, onClose }) => 
 
   const mediaType: 'movie' | 'tv' = item?.media_type === 'tv' ? 'tv' : 'movie';
 
-  const { directors, creators } = React.useMemo(() => {
-    if (!details) return { directors: [], creators: [] };
-
-    const rawDirectors: TMDBCrew[] = details.credits?.crew?.filter((c) => c.job === 'Director') || [];
-    const seenDirectorIds = new Set<number>();
-    const uniqueDirectors = rawDirectors.filter((d) => {
-      if (!d || !d.id || seenDirectorIds.has(d.id)) return false;
-      seenDirectorIds.add(d.id);
-      return true;
-    });
-
-    let tvCreators: { id: number; name: string; profile_path: string | null }[] = [];
-    if (mediaType === 'tv' && 'created_by' in details && Array.isArray(details.created_by)) {
-      tvCreators = details.created_by;
-    }
-
-    return { directors: uniqueDirectors, creators: tvCreators };
+  const crewMembers = React.useMemo(() => {
+    return extractCrewMembers(details, mediaType);
   }, [details, mediaType]);
 
   useEffect(() => {
@@ -293,57 +279,32 @@ export const DetailsModal: React.FC<DetailsModalProps> = ({ item, onClose }) => 
             </p>
           </div>
 
-          {/* Director & Creator Section */}
-          {(directors.length > 0 || creators.length > 0) && (
+          {/* Crew Section */}
+          {crewMembers.length > 0 && (
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <h4 className="text-sm font-bold text-gray-200 uppercase tracking-wider">
-                  {mediaType === 'movie'
-                    ? (directors.length > 1 ? 'Directors' : 'Director')
-                    : (creators.length > 0 && directors.length > 0
-                        ? 'Directors & Creators'
-                        : (directors.length > 0
-                            ? (directors.length > 1 ? 'Directors' : 'Director')
-                            : (creators.length > 1 ? 'Creators' : 'Creator')))}
-                </h4>
+                <h4 className="text-sm font-bold text-gray-200 uppercase tracking-wider">Crew</h4>
                 <span className="text-[11px] text-gray-400">Click to filter filmography</span>
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                {directors.map((director) => (
+                {crewMembers.map((person) => (
                   <Link
-                    key={`modal-director-${director.id}`}
-                    to={`/search?personId=${director.id}&personName=${encodeURIComponent(director.name)}`}
+                    key={`modal-crew-${person.department}-${person.id}`}
+                    to={`/search?personId=${person.id}&personName=${encodeURIComponent(person.name)}`}
                     onClick={onClose}
                     className="flex items-center gap-2.5 bg-hbo-dark/60 hover:bg-hbo-dark p-2 rounded-xl border border-hbo-border/40 hover:border-hbo-cyan/40 transition hover:scale-[1.02] group"
-                    title={`View ${director.name}'s filmography`}
+                    title={`View ${person.name}'s filmography`}
                   >
                     <img
-                      src={tmdbImages.profile(director.profile_path || null, 'w185')}
-                      alt={director.name}
+                      src={tmdbImages.profile(person.profile_path || null, 'w185')}
+                      alt={person.name}
                       className="w-10 h-10 rounded-full object-cover bg-gray-800 flex-shrink-0 group-hover:ring-2 ring-hbo-cyan transition"
                     />
                     <div className="min-w-0">
-                      <p className="text-xs font-bold text-white truncate group-hover:text-hbo-cyan transition">{director.name}</p>
-                      <p className="text-[11px] text-hbo-cyan font-medium truncate">Director</p>
-                    </div>
-                  </Link>
-                ))}
-                {creators.map((creator) => (
-                  <Link
-                    key={`modal-creator-${creator.id}`}
-                    to={`/search?personId=${creator.id}&personName=${encodeURIComponent(creator.name)}`}
-                    onClick={onClose}
-                    className="flex items-center gap-2.5 bg-hbo-dark/60 hover:bg-hbo-dark p-2 rounded-xl border border-hbo-border/40 hover:border-hbo-cyan/40 transition hover:scale-[1.02] group"
-                    title={`View ${creator.name}'s filmography`}
-                  >
-                    <img
-                      src={tmdbImages.profile(creator.profile_path, 'w185')}
-                      alt={creator.name}
-                      className="w-10 h-10 rounded-full object-cover bg-gray-800 flex-shrink-0 group-hover:ring-2 ring-hbo-cyan transition"
-                    />
-                    <div className="min-w-0">
-                      <p className="text-xs font-bold text-white truncate group-hover:text-hbo-cyan transition">{creator.name}</p>
-                      <p className="text-[11px] text-hbo-purple-light font-medium truncate">Creator</p>
+                      <p className="text-xs font-bold text-white truncate group-hover:text-hbo-cyan transition">{person.name}</p>
+                      <p className={`text-[11px] font-medium truncate ${getCrewRoleColor(person.department)}`}>
+                        {person.job || person.department}
+                      </p>
                     </div>
                   </Link>
                 ))}
