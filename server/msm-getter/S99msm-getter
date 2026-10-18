@@ -18,11 +18,24 @@ rotate_log() {
     fi
 }
 
+check_and_heal_node() {
+    if ! /opt/bin/node -v >/dev/null 2>&1; then
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] [SUPERVISOR ERROR] /opt/bin/node is corrupted or non-functional!" >> "$LOG_FILE"
+        if [ -f "/jffs/bin/node.clean" ] && /jffs/bin/node.clean -v >/dev/null 2>&1; then
+            echo "[$(date '+%Y-%m-%d %H:%M:%S')] [SUPERVISOR HEAL] Auto-restoring clean Node binary from /jffs/bin/node.clean..." >> "$LOG_FILE"
+            cp /jffs/bin/node.clean /opt/bin/node && chmod 755 /opt/bin/node
+        fi
+    fi
+}
+
 supervisor_loop() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] [SUPERVISOR] Starting supervisor loop (PID $$)..." >> "$LOG_FILE"
     CRASH_COUNT=0
     while [ -f "$SUP_PID_FILE" ]; do
         rotate_log
+
+        # Auto-heal: verify /opt/bin/node works before attempting spawn
+        check_and_heal_node
 
         # Verify node binary and index.js exist before attempting spawn
         if [ ! -x "/opt/bin/node" ] || [ ! -f "$APP_DIR/index.js" ]; then
@@ -53,6 +66,11 @@ supervisor_loop() {
             CRASH_COUNT=0
         fi
 
+        # If crashing repeatedly, check and auto-heal binary
+        if [ "$CRASH_COUNT" -ge 3 ]; then
+            check_and_heal_node
+        fi
+
         if [ "$CRASH_COUNT" -gt 5 ]; then
             BACKOFF=60
         elif [ "$CRASH_COUNT" -gt 2 ]; then
@@ -76,6 +94,9 @@ start() {
 
     # Rotate log if it exceeds 5 MB to protect RAM disk space
     rotate_log
+
+    # Verify and heal node before launching supervisor
+    check_and_heal_node
 
     # Ensure overcommit memory is enabled for V8 engine
     echo 1 > /proc/sys/vm/overcommit_memory
