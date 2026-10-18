@@ -59,10 +59,29 @@ function createMockRail({
       if (selector === '.tv-focus-target') return cards;
       return [];
     },
+    getBoundingClientRect: () => ({
+      left: 0,
+      right: clientWidth,
+      width: clientWidth,
+      top: 0,
+      bottom: 300,
+      height: 300
+    }),
     scrollTo: ({ left }: { left: number; behavior?: string }) => {
       scrollLeftVal = left;
     }
   };
+
+  cards.forEach(card => {
+    card.getBoundingClientRect = () => ({
+      left: card.offsetLeft - scrollLeftVal,
+      right: card.offsetLeft + card.offsetWidth - scrollLeftVal,
+      width: card.offsetWidth,
+      top: 0,
+      bottom: 300,
+      height: 300
+    });
+  });
 
   // Mock global window and getComputedStyle
   (global as any).window = {
