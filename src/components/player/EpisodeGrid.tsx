@@ -11,6 +11,7 @@ interface EpisodeGridProps {
   currentEpisode: number;
   hasWatchedHistory?: boolean;
   onSelectEpisode: (season: number, episode: number, title?: string) => void;
+  onSeasonChange?: (seasonNumber: number, seasonData: TMDBSeasonDetails) => void;
 }
 
 export const EpisodeGrid: React.FC<EpisodeGridProps> = ({
@@ -18,12 +19,18 @@ export const EpisodeGrid: React.FC<EpisodeGridProps> = ({
   currentSeason,
   currentEpisode,
   hasWatchedHistory = false,
-  onSelectEpisode
+  onSelectEpisode,
+  onSeasonChange
 }) => {
   const [selectedSeason, setSelectedSeason] = useState(currentSeason || 1);
   const [seasonData, setSeasonData] = useState<TMDBSeasonDetails | null>(null);
   const [historyMap, setHistoryMap] = useState<Map<string, WatchHistoryItem>>(new Map());
   const [isLoading, setIsLoading] = useState(false);
+  const onSeasonChangeRef = React.useRef(onSeasonChange);
+
+  useEffect(() => {
+    onSeasonChangeRef.current = onSeasonChange;
+  }, [onSeasonChange]);
 
   // Filter out season 0 (Specials) if needed or keep regular seasons
   const regularSeasons = tvDetails.seasons.filter((s) => s.season_number > 0);
@@ -52,18 +59,27 @@ export const EpisodeGrid: React.FC<EpisodeGridProps> = ({
   }, [tvDetails.id]);
 
   useEffect(() => {
+    let active = true;
     const fetchSeason = async () => {
       setIsLoading(true);
       try {
         const data = await tmdbApi.getSeasonDetails(tvDetails.id, selectedSeason);
-        setSeasonData(data);
+        if (active) {
+          setSeasonData(data);
+          if (data && onSeasonChangeRef.current) {
+            onSeasonChangeRef.current(selectedSeason, data);
+          }
+        }
       } catch (err) {
         console.error('Failed to load season details:', err);
       } finally {
-        setIsLoading(false);
+        if (active) {
+          setIsLoading(false);
+        }
       }
     };
     fetchSeason();
+    return () => { active = false; };
   }, [tvDetails.id, selectedSeason]);
 
   return (
