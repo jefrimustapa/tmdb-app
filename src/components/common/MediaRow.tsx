@@ -98,7 +98,7 @@ const MediaRowComponent: React.FC<MediaRowProps> = ({ title, subtitle, items, ty
           {items.slice(0, renderedCount).map((item) => (
             <MediaCard key={item.id} item={item} type={type} variant={variant} />
           ))}
-          <div className="flex-shrink-0 w-8 sm:w-[calc(100vw-180px)] max-w-xl h-1 pointer-events-none" aria-hidden="true" />
+          <div className="flex-shrink-0 w-2 h-1 pointer-events-none" aria-hidden="true" />
         </div>
 
         {/* Right Scroll Button */}
