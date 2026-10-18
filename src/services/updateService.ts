@@ -207,6 +207,9 @@ export function isInstalledUpToDate({
 
     if (currentChannel === 'dev') {
       if (candidateDate > localDate) return false;
+      if (candidateDate < localDate) return true;
+      // Same date: candidate is an official CI release with run number > 0, whereas local is a dev build
+      if (candidateRun > 0) return false;
       return true;
     }
 
@@ -283,10 +286,12 @@ export const updateService = {
         };
       }
 
-      // Filter based on user preference (Stable vs Nightly/Pre-release)
+      // Filter based on user preference (Stable vs Nightly/Pre-release).
+      // If current app is already a Nightly or Dev build, nightly pre-releases are always eligible.
+      const allowNightly = includeNightly || APP_BUILD_CHANNEL === 'nightly' || APP_BUILD_CHANNEL === 'dev';
       const eligibleReleases = releases.filter(r => {
         if (r.draft) return false;
-        if (!includeNightly && r.prerelease) return false;
+        if (!allowNightly && r.prerelease) return false;
         return true;
       });
 

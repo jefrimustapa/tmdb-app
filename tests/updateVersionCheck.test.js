@@ -138,6 +138,17 @@ async function run() {
     assert.strictEqual(isUpToDate, true, 'Previous day nightly is not an update');
   });
 
+  await it('Dev build detects newer official nightly release on the same date', () => {
+    const isUpToDate = isInstalledUpToDate({
+      candidateVersion: '1.2.0-nightly.20261018.82',
+      candidateIsNightly: true,
+      currentFullVersion: '1.2.0-dev.jefri.20261018-0749',
+      currentBuildNumber: '20261018-0749',
+      currentChannel: 'dev'
+    });
+    assert.strictEqual(isUpToDate, false, 'Dev build should detect official CI nightly release on same date');
+  });
+
   await it('Stable official release correctly updates a nightly build of the same base version', () => {
     const isUpToDate = isInstalledUpToDate({
       candidateVersion: '1.2.0',
