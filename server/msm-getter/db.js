@@ -31,6 +31,7 @@ export class CentralDatabase {
         const raw = fs.readFileSync(this.dbFile, 'utf-8');
         const records = JSON.parse(raw);
         for (const r of records) {
+          if (!r || typeof r !== 'object') continue;
           if (r.queryKey) this.byQuery.set(r.queryKey, r);
           if (r.docId) this.byDocId.set(String(r.docId), r);
         }
