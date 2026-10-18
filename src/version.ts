@@ -2,13 +2,13 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20261018-1453';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-213-continue-wa.20261018-1453';
+export const APP_BUILD_NUMBER = '20261018-1503';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-213-continue-wa.20261018-1503';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
 export const APP_BRANCH = 'feat-213-continue-wa';
-export const APP_CHANGELOG = `* fix(rail): align cards with discrete stride columns and count fully visible cards (#213)
+export const APP_CHANGELOG = `* fix(rail): right-bind final card on last page without disturbing standard rails (#213)
+* fix(rail): align cards with discrete stride columns and count fully visible cards (#213)
 * fix(rail): invariant getBoundingClientRect calculation to bind last card flush against right boundary (#213)
 * fix(rail): bind last card flush against right boundary on final page (#213)
-* fix(rail): show full card on final page of continue watch and media rails (#213)
-* fix: resolve blank details page when returning from watch page (#217) (#219)`;
+* fix(rail): show full card on final page of continue watch and media rails (#213)`;
