@@ -258,6 +258,7 @@ export const Home: React.FC = () => {
                     timestamp={hist.timestamp}
                   />
                 ))}
+                <div className="flex-shrink-0 w-8 sm:w-[calc(100vw-180px)] max-w-xl h-1 pointer-events-none" aria-hidden="true" />
               </div>
 
               {/* Right Scroll Button */}
