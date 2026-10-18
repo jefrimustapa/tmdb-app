@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { X, Play, Heart, Bookmark, Star, Calendar, Clock, Film, ShieldAlert } from 'lucide-react';
-import type { TMDBMediaItem, TMDBMovieDetails, TMDBTVDetails } from '../../types/tmdb';
+import type { TMDBMediaItem, TMDBMovieDetails, TMDBTVDetails, TMDBCrew } from '../../types/tmdb';
 import { tmdbApi, tmdbImages, extractContentRating, isExplicitAdultCertification } from '../../services/tmdb';
 import { dbService } from '../../services/db';
 import { getMediaOriginCountries } from '../../services/streamProviders';
 import { extractDominantColor, getAdaptiveBackgroundStyle, type DominantColor } from '../../services/colorExtractor';
+import { extractCrewMembers, getCrewRoleColor } from '../../utils/crewHelper';
 
 interface DetailsModalProps {
   item: TMDBMediaItem | null;
@@ -20,6 +21,10 @@ export const DetailsModal: React.FC<DetailsModalProps> = ({ item, onClose }) => 
   const originCountries = React.useMemo(() => getMediaOriginCountries(details || item), [details, item]);
 
   const mediaType: 'movie' | 'tv' = item?.media_type === 'tv' ? 'tv' : 'movie';
+
+  const crewMembers = React.useMemo(() => {
+    return extractCrewMembers(details, mediaType);
+  }, [details, mediaType]);
 
   useEffect(() => {
     if (!item) return;
@@ -274,11 +279,44 @@ export const DetailsModal: React.FC<DetailsModalProps> = ({ item, onClose }) => 
             </p>
           </div>
 
-          {/* Cast */}
+          {/* Crew Section */}
+          {crewMembers.length > 0 && (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h4 className="text-sm font-bold text-gray-200 uppercase tracking-wider">Crew</h4>
+                <span className="text-[11px] text-gray-400">Click to filter filmography</span>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {crewMembers.map((person) => (
+                  <Link
+                    key={`modal-crew-${person.department}-${person.id}`}
+                    to={`/search?personId=${person.id}&personName=${encodeURIComponent(person.name)}`}
+                    onClick={onClose}
+                    className="flex items-center gap-2.5 bg-hbo-dark/60 hover:bg-hbo-dark p-2 rounded-xl border border-hbo-border/40 hover:border-hbo-cyan/40 transition hover:scale-[1.02] group"
+                    title={`View ${person.name}'s filmography`}
+                  >
+                    <img
+                      src={tmdbImages.profile(person.profile_path || null, 'w185')}
+                      alt={person.name}
+                      className="w-10 h-10 rounded-full object-cover bg-gray-800 flex-shrink-0 group-hover:ring-2 ring-hbo-cyan transition"
+                    />
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold text-white truncate group-hover:text-hbo-cyan transition">{person.name}</p>
+                      <p className={`text-[11px] font-medium truncate ${getCrewRoleColor(person.department)}`}>
+                        {person.job || person.department}
+                      </p>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Cast Section */}
           {details?.credits?.cast && details.credits.cast.length > 0 && (
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <h4 className="text-sm font-bold text-gray-200 uppercase tracking-wider">Top Cast</h4>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h4 className="text-sm font-bold text-gray-200 uppercase tracking-wider">Cast</h4>
                 <span className="text-[11px] text-gray-400">Click to filter filmography</span>
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">

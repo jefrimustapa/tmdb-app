@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import { Play, Heart, Bookmark, Star, ArrowLeft, Plus, Check, RotateCcw } from 'lucide-react';
-import type { TMDBMovieDetails, TMDBTVDetails, TMDBMediaItem, TMDBImageItem } from '../../types/tmdb';
+import type { TMDBMovieDetails, TMDBTVDetails, TMDBMediaItem, TMDBImageItem, TMDBCast, TMDBCrew } from '../../types/tmdb';
 import type { WatchHistoryItem } from '../../types/db';
 import { tmdbApi, tmdbImages, extractContentRating, resolveGenresFromIds, isExplicitAdultCertification } from '../../services/tmdb';
 import { dbService } from '../../services/db';
@@ -11,6 +11,7 @@ import { EpisodeGrid } from '../../components/player/EpisodeGrid';
 import { useDevice } from '../../hooks/useDevice';
 import { getMediaOriginCountries } from '../../services/streamProviders';
 import { extractDominantColor, getAdaptiveBackgroundStyle, type DominantColor } from '../../services/colorExtractor';
+import { extractCrewMembers, getCrewRoleColor } from '../../utils/crewHelper';
 
 const pickRandomPoster = (
   item: { poster_path?: string | null; backdrop_path?: string | null; images?: { posters?: TMDBImageItem[] } } | null
@@ -85,6 +86,11 @@ export const Details: React.FC = () => {
   const [activeEpisodeStill, setActiveEpisodeStill] = useState<string | null>(null);
   const [isHeroLoaded, setIsHeroLoaded] = useState(false);
   const [isPosterLoaded, setIsPosterLoaded] = useState(false);
+  const [selectedSeasonData, setSelectedSeasonData] = useState<{
+    season: number;
+    cast: TMDBCast[];
+    crew: TMDBCrew[];
+  } | null>(null);
   const [isLoading, setIsLoading] = useState(() => !initialPreview || initialPreview.id !== tmdbId);
   const originCountries = React.useMemo(() => getMediaOriginCountries(details), [details]);
 
@@ -98,6 +104,7 @@ export const Details: React.FC = () => {
     setWatchProgress(null);
     setLastWatched(null);
     setTvHistory([]);
+    setSelectedSeasonData(null);
     setRandomPosterPath(null);
     setRandomBackdropPath(null);
     setActiveEpisodeStill(null);
@@ -446,6 +453,17 @@ export const Details: React.FC = () => {
   const releaseYear = (details.release_date || details.first_air_date || '').split('-')[0];
   const contentRating = extractContentRating(details);
 
+  const crewMembers = React.useMemo(() => {
+    return extractCrewMembers(details, mediaType, selectedSeasonData);
+  }, [details, mediaType, selectedSeasonData]);
+
+  const displayCast = React.useMemo(() => {
+    if (mediaType === 'tv' && selectedSeasonData?.cast && selectedSeasonData.cast.length > 0) {
+      return selectedSeasonData.cast;
+    }
+    return details?.credits?.cast || [];
+  }, [mediaType, selectedSeasonData, details]);
+
   return (
     <div
       className="relative min-h-screen bg-hbo-dark text-white pb-28 sm:pb-36 overflow-x-hidden"
@@ -737,6 +755,13 @@ export const Details: React.FC = () => {
               currentSeason={playbackTarget.season}
               currentEpisode={playbackTarget.episode}
               hasWatchedHistory={Boolean(lastWatched)}
+              onSeasonChange={(sNum, sData) => {
+                setSelectedSeasonData({
+                  season: sNum,
+                  cast: sData.credits?.cast || [],
+                  crew: sData.credits?.crew || [],
+                });
+              }}
               onSelectEpisode={async (s, e) => {
                 const epHistory = await dbService.getHistoryItem(tmdbId, 'tv', s, e);
                 const isEpCompleted = Boolean(epHistory && epHistory.progressPercent >= 92);
@@ -748,20 +773,57 @@ export const Details: React.FC = () => {
           </div>
         )}
 
-        {/* Top Cast Section */}
-        {details.credits?.cast && details.credits.cast.length > 0 && (
+        {/* Crew Section */}
+        {crewMembers.length > 0 && (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="text-lg sm:text-xl font-bold font-display text-white flex items-center gap-2">
                 <span className="w-1.5 h-5 bg-gradient-to-b from-hbo-purple to-hbo-cyan rounded-full inline-block"></span>
-                Cast & Crew
+                Crew {mediaType === 'tv' && selectedSeasonData ? `(Season ${selectedSeasonData.season})` : ''}
+              </h3>
+              <span className="text-xs text-gray-400">Select person to see filmography</span>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3.5 sm:gap-4.5 p-1">
+              {crewMembers.map((person) => (
+                <Link
+                  key={`crew-${person.department}-${person.id}`}
+                  to={`/search?personId=${person.id}&personName=${encodeURIComponent(person.name)}`}
+                  className="flex items-center gap-3 p-3 rounded-xl bg-hbo-card/80 border border-hbo-border/60 hover:border-hbo-cyan/50 hover:bg-hbo-hover transition hover:scale-105 group tv-focus-target"
+                >
+                  <img
+                    src={tmdbImages.profile(person.profile_path || null, 'w185')}
+                    alt={person.name}
+                    loading="lazy"
+                    decoding="async"
+                    onError={tmdbImages.handleImgError}
+                    className="w-12 h-12 rounded-full object-cover border border-hbo-border group-hover:border-hbo-cyan flex-shrink-0"
+                  />
+                  <div className="min-w-0">
+                    <p className="text-xs sm:text-sm font-bold text-white truncate group-hover:text-hbo-cyan transition">{person.name}</p>
+                    <p className={`text-[11px] font-medium truncate ${getCrewRoleColor(person.department)}`}>
+                      {person.job || person.department}
+                    </p>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Cast Section */}
+        {displayCast.length > 0 && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg sm:text-xl font-bold font-display text-white flex items-center gap-2">
+                <span className="w-1.5 h-5 bg-gradient-to-b from-hbo-purple to-hbo-cyan rounded-full inline-block"></span>
+                Cast {mediaType === 'tv' && selectedSeasonData ? `(Season ${selectedSeasonData.season})` : ''}
               </h3>
               <span className="text-xs text-gray-400">Select actor to see filmography</span>
             </div>
             <div data-cast-grid="true" className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3.5 sm:gap-4.5 p-1">
-              {details.credits.cast.slice(0, 12).map((actor) => (
+              {displayCast.slice(0, 12).map((actor) => (
                 <Link
-                  key={actor.id}
+                  key={`${actor.id}-${actor.character || ''}`}
                   to={`/search?personId=${actor.id}&personName=${encodeURIComponent(actor.name)}`}
                   className="flex items-center gap-3 p-3 rounded-xl bg-hbo-card/80 border border-hbo-border/60 hover:border-hbo-cyan/50 hover:bg-hbo-hover transition hover:scale-105 group tv-focus-target"
                 >
