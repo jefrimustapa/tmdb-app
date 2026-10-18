@@ -10,7 +10,6 @@ import { MediaRow } from '../../components/common/MediaRow';
 import { MediaCard } from '../../components/common/MediaCard';
 import { tmdbImages } from '../../services/tmdb';
 import { extractDominantColor, getAdaptiveBackgroundStyle, type DominantColor } from '../../services/colorExtractor';
-import { scrollContentRail, getRailScrollState } from '../../utils/railScroll';
 
 interface HomeFeedCache {
   trending: TMDBMediaItem[];
@@ -78,15 +77,15 @@ export const Home: React.FC = () => {
     };
   }, [updateDominantColor]);
 
-  const [continueWatchingScrollState, setContinueWatchingScrollState] = useState<{ canScrollLeft: boolean; canScrollRight: boolean }>({
-    canScrollLeft: false,
-    canScrollRight: true
-  });
+  const [continueWatchingCanScrollLeft, setContinueWatchingCanScrollLeft] = useState(false);
+  const [continueWatchingCanScrollRight, setContinueWatchingCanScrollRight] = useState(true);
 
   const updateContinueWatchingScrollButtons = useCallback(() => {
-    if (continueWatchingRef.current) {
-      setContinueWatchingScrollState(getRailScrollState(continueWatchingRef.current));
-    }
+    const el = continueWatchingRef.current;
+    if (!el) return;
+    const { scrollLeft, scrollWidth, clientWidth } = el;
+    setContinueWatchingCanScrollLeft(scrollLeft > 10);
+    setContinueWatchingCanScrollRight(scrollWidth > clientWidth && scrollLeft < scrollWidth - clientWidth - 10);
   }, []);
 
   useEffect(() => {
@@ -98,7 +97,11 @@ export const Home: React.FC = () => {
 
   const scrollContinueWatching = (direction: 'left' | 'right') => {
     if (continueWatchingRef.current) {
-      scrollContentRail(continueWatchingRef.current, direction);
+      const scrollAmount = continueWatchingRef.current.clientWidth * 0.75;
+      continueWatchingRef.current.scrollBy({
+        left: direction === 'left' ? -scrollAmount : scrollAmount,
+        behavior: 'smooth'
+      });
     }
   };
 
@@ -217,7 +220,7 @@ export const Home: React.FC = () => {
             {/* Row Container with Navigation Buttons */}
             <div className="relative w-full">
               {/* Left Scroll Button */}
-              {continueWatchingScrollState.canScrollLeft && (
+              {continueWatchingCanScrollLeft && (
                 <button
                   onClick={() => scrollContinueWatching('left')}
                   className="absolute left-2 top-1/2 -translate-y-1/2 z-30 w-10 h-10 rounded-full bg-hbo-card/90 border border-hbo-border text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 hover:bg-hbo-purple hover:scale-110 shadow-lg hidden sm:flex"
@@ -258,11 +261,10 @@ export const Home: React.FC = () => {
                     timestamp={hist.timestamp}
                   />
                 ))}
-                <div className="flex-shrink-0 w-8 sm:w-[calc(100vw-180px)] max-w-xl h-1 pointer-events-none" aria-hidden="true" />
               </div>
 
               {/* Right Scroll Button */}
-              {continueWatchingScrollState.canScrollRight && (
+              {continueWatchingCanScrollRight && (
                 <button
                   onClick={() => scrollContinueWatching('right')}
                   className="absolute right-2 top-1/2 -translate-y-1/2 z-30 w-10 h-10 rounded-full bg-hbo-card/90 border border-hbo-border text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 hover:bg-hbo-purple hover:scale-110 shadow-lg hidden sm:flex"

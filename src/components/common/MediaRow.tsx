@@ -1,9 +1,7 @@
 import React, { useRef, useState, useCallback, useEffect, memo } from 'react';
-import { flushSync } from 'react-dom';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import type { TMDBMediaItem } from '../../types/tmdb';
 import { MediaCard } from './MediaCard';
-import { scrollContentRail, getRailScrollState } from '../../utils/railScroll';
 
 interface MediaRowProps {
   title: string;
@@ -18,15 +16,15 @@ const INITIAL_RENDER_COUNT = 10;
 const MediaRowComponent: React.FC<MediaRowProps> = ({ title, subtitle, items, type, variant = 'poster' }) => {
   const rowRef = useRef<HTMLDivElement>(null);
   const [renderedCount, setRenderedCount] = useState(() => Math.min(items?.length || 0, INITIAL_RENDER_COUNT));
-  const [scrollState, setScrollState] = useState<{ canScrollLeft: boolean; canScrollRight: boolean }>({
-    canScrollLeft: false,
-    canScrollRight: true
-  });
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(true);
 
   const updateScrollButtons = useCallback(() => {
-    if (rowRef.current) {
-      setScrollState(getRailScrollState(rowRef.current));
-    }
+    const el = rowRef.current;
+    if (!el) return;
+    const { scrollLeft, scrollWidth, clientWidth } = el;
+    setCanScrollLeft(scrollLeft > 10);
+    setCanScrollRight(scrollWidth > clientWidth && scrollLeft < scrollWidth - clientWidth - 10);
   }, []);
 
   useEffect(() => {
@@ -49,13 +47,13 @@ const MediaRowComponent: React.FC<MediaRowProps> = ({ title, subtitle, items, ty
   }, [renderedCount, items?.length]);
 
   const scroll = (direction: 'left' | 'right') => {
-    if (renderedCount < (items?.length || 0)) {
-      flushSync(() => {
-        setRenderedCount(items.length);
-      });
-    }
+    expandItems();
     if (rowRef.current) {
-      scrollContentRail(rowRef.current, direction);
+      const scrollAmount = rowRef.current.clientWidth * 0.75;
+      rowRef.current.scrollBy({
+        left: direction === 'left' ? -scrollAmount : scrollAmount,
+        behavior: 'smooth'
+      });
     }
   };
 
@@ -76,7 +74,7 @@ const MediaRowComponent: React.FC<MediaRowProps> = ({ title, subtitle, items, ty
       {/* Row Container with Navigation Buttons */}
       <div className="relative w-full">
         {/* Left Scroll Button */}
-        {scrollState.canScrollLeft && (
+        {canScrollLeft && (
           <button
             onClick={() => scroll('left')}
             className="absolute left-2 top-1/2 -translate-y-1/2 z-30 w-10 h-10 rounded-full bg-hbo-card/90 border border-hbo-border text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 hover:bg-hbo-purple hover:scale-110 shadow-lg hidden sm:flex"
@@ -98,11 +96,10 @@ const MediaRowComponent: React.FC<MediaRowProps> = ({ title, subtitle, items, ty
           {items.slice(0, renderedCount).map((item) => (
             <MediaCard key={item.id} item={item} type={type} variant={variant} />
           ))}
-          <div className="flex-shrink-0 w-8 sm:w-[calc(100vw-180px)] max-w-xl h-1 pointer-events-none" aria-hidden="true" />
         </div>
 
         {/* Right Scroll Button */}
-        {scrollState.canScrollRight && (
+        {canScrollRight && (
           <button
             onClick={() => scroll('right')}
             className="absolute right-2 top-1/2 -translate-y-1/2 z-30 w-10 h-10 rounded-full bg-hbo-card/90 border border-hbo-border text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 hover:bg-hbo-purple hover:scale-110 shadow-lg hidden sm:flex"
