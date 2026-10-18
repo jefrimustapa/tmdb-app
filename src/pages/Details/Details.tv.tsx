@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import { Play, Heart, Bookmark, Star, ArrowLeft, Plus, Check, RotateCcw } from 'lucide-react';
-import type { TMDBMovieDetails, TMDBTVDetails, TMDBMediaItem, TMDBImageItem } from '../../types/tmdb';
+import type { TMDBMovieDetails, TMDBTVDetails, TMDBMediaItem, TMDBImageItem, TMDBCast, TMDBCrew } from '../../types/tmdb';
 import type { WatchHistoryItem } from '../../types/db';
 import { tmdbApi, tmdbImages, extractContentRating, resolveGenresFromIds, isExplicitAdultCertification } from '../../services/tmdb';
 import { dbService } from '../../services/db';
@@ -85,6 +85,11 @@ export const Details: React.FC = () => {
   const [activeEpisodeStill, setActiveEpisodeStill] = useState<string | null>(null);
   const [isHeroLoaded, setIsHeroLoaded] = useState(false);
   const [isPosterLoaded, setIsPosterLoaded] = useState(false);
+  const [selectedSeasonData, setSelectedSeasonData] = useState<{
+    season: number;
+    cast: TMDBCast[];
+    crew: TMDBCrew[];
+  } | null>(null);
   const [isLoading, setIsLoading] = useState(() => !initialPreview || initialPreview.id !== tmdbId);
   const originCountries = React.useMemo(() => getMediaOriginCountries(details), [details]);
 
@@ -98,6 +103,7 @@ export const Details: React.FC = () => {
     setWatchProgress(null);
     setLastWatched(null);
     setTvHistory([]);
+    setSelectedSeasonData(null);
     setRandomPosterPath(null);
     setRandomBackdropPath(null);
     setActiveEpisodeStill(null);
@@ -446,6 +452,40 @@ export const Details: React.FC = () => {
   const releaseYear = (details.release_date || details.first_air_date || '').split('-')[0];
   const contentRating = extractContentRating(details);
 
+  const { directors, creators } = React.useMemo(() => {
+    if (!details) return { directors: [], creators: [] };
+
+    let rawDirectors: TMDBCrew[] = [];
+    if (mediaType === 'movie') {
+      rawDirectors = details.credits?.crew?.filter((c) => c.job === 'Director') || [];
+    } else {
+      const seasonDirectors = selectedSeasonData?.crew?.filter((c) => c.job === 'Director') || [];
+      const showDirectors = details.credits?.crew?.filter((c) => c.job === 'Director') || [];
+      rawDirectors = seasonDirectors.length > 0 ? seasonDirectors : showDirectors;
+    }
+
+    const seenDirectorIds = new Set<number>();
+    const uniqueDirectors = rawDirectors.filter((d) => {
+      if (!d || !d.id || seenDirectorIds.has(d.id)) return false;
+      seenDirectorIds.add(d.id);
+      return true;
+    });
+
+    let tvCreators: { id: number; name: string; profile_path: string | null }[] = [];
+    if (mediaType === 'tv' && 'created_by' in details && Array.isArray(details.created_by)) {
+      tvCreators = details.created_by;
+    }
+
+    return { directors: uniqueDirectors, creators: tvCreators };
+  }, [details, mediaType, selectedSeasonData]);
+
+  const displayCast = React.useMemo(() => {
+    if (mediaType === 'tv' && selectedSeasonData?.cast && selectedSeasonData.cast.length > 0) {
+      return selectedSeasonData.cast;
+    }
+    return details?.credits?.cast || [];
+  }, [mediaType, selectedSeasonData, details]);
+
   return (
     <div
       className="relative min-h-screen bg-hbo-dark text-white pb-28 sm:pb-36 overflow-x-hidden"
@@ -625,6 +665,48 @@ export const Details: React.FC = () => {
               )}
             </div>
 
+            {/* Director / Creator Row */}
+            {(directors.length > 0 || creators.length > 0) && (
+              <div className="flex items-center justify-center sm:justify-start gap-x-4 gap-y-1.5 text-xs sm:text-sm text-gray-300 flex-wrap pt-0.5">
+                {directors.length > 0 && (
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="text-gray-400 font-medium">
+                      Director{directors.length > 1 ? 's' : ''}:
+                    </span>
+                    {directors.slice(0, 4).map((d, idx, arr) => (
+                      <React.Fragment key={d.id}>
+                        <Link
+                          to={`/search?personId=${d.id}&personName=${encodeURIComponent(d.name)}`}
+                          className="text-white hover:text-hbo-cyan underline decoration-white/30 hover:decoration-hbo-cyan transition font-semibold tv-focus-target"
+                        >
+                          {d.name}
+                        </Link>
+                        {idx < arr.length - 1 && <span className="text-gray-500">,</span>}
+                      </React.Fragment>
+                    ))}
+                  </div>
+                )}
+                {creators.length > 0 && (
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="text-gray-400 font-medium">
+                      Creator{creators.length > 1 ? 's' : ''}:
+                    </span>
+                    {creators.map((c, idx, arr) => (
+                      <React.Fragment key={c.id}>
+                        <Link
+                          to={`/search?personId=${c.id}&personName=${encodeURIComponent(c.name)}`}
+                          className="text-white hover:text-hbo-cyan underline decoration-white/30 hover:decoration-hbo-cyan transition font-semibold tv-focus-target"
+                        >
+                          {c.name}
+                        </Link>
+                        {idx < arr.length - 1 && <span className="text-gray-500">,</span>}
+                      </React.Fragment>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Primary Action Buttons */}
             <div data-details-action-bar="true" className="flex items-center justify-center sm:justify-start gap-3 sm:gap-4 pt-2 flex-wrap p-1">
               {(() => {
@@ -737,6 +819,13 @@ export const Details: React.FC = () => {
               currentSeason={playbackTarget.season}
               currentEpisode={playbackTarget.episode}
               hasWatchedHistory={Boolean(lastWatched)}
+              onSeasonChange={(sNum, sData) => {
+                setSelectedSeasonData({
+                  season: sNum,
+                  cast: sData.credits?.cast || [],
+                  crew: sData.credits?.crew || [],
+                });
+              }}
               onSelectEpisode={async (s, e) => {
                 const epHistory = await dbService.getHistoryItem(tmdbId, 'tv', s, e);
                 const isEpCompleted = Boolean(epHistory && epHistory.progressPercent >= 92);
@@ -749,19 +838,19 @@ export const Details: React.FC = () => {
         )}
 
         {/* Top Cast Section */}
-        {details.credits?.cast && details.credits.cast.length > 0 && (
+        {displayCast.length > 0 && (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="text-lg sm:text-xl font-bold font-display text-white flex items-center gap-2">
                 <span className="w-1.5 h-5 bg-gradient-to-b from-hbo-purple to-hbo-cyan rounded-full inline-block"></span>
-                Cast & Crew
+                Cast &amp; Crew {mediaType === 'tv' && selectedSeasonData ? `(Season ${selectedSeasonData.season})` : ''}
               </h3>
               <span className="text-xs text-gray-400">Select actor to see filmography</span>
             </div>
             <div data-cast-grid="true" className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3.5 sm:gap-4.5 p-1">
-              {details.credits.cast.slice(0, 12).map((actor) => (
+              {displayCast.slice(0, 12).map((actor) => (
                 <Link
-                  key={actor.id}
+                  key={`${actor.id}-${actor.character || ''}`}
                   to={`/search?personId=${actor.id}&personName=${encodeURIComponent(actor.name)}`}
                   className="flex items-center gap-3 p-3 rounded-xl bg-hbo-card/80 border border-hbo-border/60 hover:border-hbo-cyan/50 hover:bg-hbo-hover transition hover:scale-105 group tv-focus-target"
                 >

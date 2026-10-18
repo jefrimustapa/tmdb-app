@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { X, Play, Heart, Bookmark, Star, Calendar, Clock, Film, ShieldAlert } from 'lucide-react';
-import type { TMDBMediaItem, TMDBMovieDetails, TMDBTVDetails } from '../../types/tmdb';
+import type { TMDBMediaItem, TMDBMovieDetails, TMDBTVDetails, TMDBCrew } from '../../types/tmdb';
 import { tmdbApi, tmdbImages, extractContentRating, isExplicitAdultCertification } from '../../services/tmdb';
 import { dbService } from '../../services/db';
 import { getMediaOriginCountries } from '../../services/streamProviders';
@@ -20,6 +20,25 @@ export const DetailsModal: React.FC<DetailsModalProps> = ({ item, onClose }) => 
   const originCountries = React.useMemo(() => getMediaOriginCountries(details || item), [details, item]);
 
   const mediaType: 'movie' | 'tv' = item?.media_type === 'tv' ? 'tv' : 'movie';
+
+  const { directors, creators } = React.useMemo(() => {
+    if (!details) return { directors: [], creators: [] };
+
+    const rawDirectors: TMDBCrew[] = details.credits?.crew?.filter((c) => c.job === 'Director') || [];
+    const seenDirectorIds = new Set<number>();
+    const uniqueDirectors = rawDirectors.filter((d) => {
+      if (!d || !d.id || seenDirectorIds.has(d.id)) return false;
+      seenDirectorIds.add(d.id);
+      return true;
+    });
+
+    let tvCreators: { id: number; name: string; profile_path: string | null }[] = [];
+    if (mediaType === 'tv' && 'created_by' in details && Array.isArray(details.created_by)) {
+      tvCreators = details.created_by;
+    }
+
+    return { directors: uniqueDirectors, creators: tvCreators };
+  }, [details, mediaType]);
 
   useEffect(() => {
     if (!item) return;
@@ -263,6 +282,46 @@ export const DetailsModal: React.FC<DetailsModalProps> = ({ item, onClose }) => 
                   {g.name}
                 </span>
               ))}
+            </div>
+          )}
+
+          {/* Director / Creator Row */}
+          {(directors.length > 0 || creators.length > 0) && (
+            <div className="flex items-center gap-x-4 gap-y-1 text-xs text-gray-300 flex-wrap">
+              {directors.length > 0 && (
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="text-gray-400 font-medium">Director{directors.length > 1 ? 's' : ''}:</span>
+                  {directors.slice(0, 3).map((d, idx, arr) => (
+                    <React.Fragment key={d.id}>
+                      <Link
+                        to={`/search?personId=${d.id}&personName=${encodeURIComponent(d.name)}`}
+                        onClick={onClose}
+                        className="text-white hover:text-hbo-cyan underline decoration-white/30 hover:decoration-hbo-cyan transition font-semibold"
+                      >
+                        {d.name}
+                      </Link>
+                      {idx < arr.length - 1 && <span className="text-gray-500">,</span>}
+                    </React.Fragment>
+                  ))}
+                </div>
+              )}
+              {creators.length > 0 && (
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="text-gray-400 font-medium">Creator{creators.length > 1 ? 's' : ''}:</span>
+                  {creators.map((c, idx, arr) => (
+                    <React.Fragment key={c.id}>
+                      <Link
+                        to={`/search?personId=${c.id}&personName=${encodeURIComponent(c.name)}`}
+                        onClick={onClose}
+                        className="text-white hover:text-hbo-cyan underline decoration-white/30 hover:decoration-hbo-cyan transition font-semibold"
+                      >
+                        {c.name}
+                      </Link>
+                      {idx < arr.length - 1 && <span className="text-gray-500">,</span>}
+                    </React.Fragment>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 

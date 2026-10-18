@@ -470,7 +470,9 @@ export const tmdbApi = {
       include_image_language: 'en,null',
     }),
   getSeasonDetails: (tvId: number, seasonNumber: number) =>
-    tmdbFetch<TMDBSeasonDetails>(`/tv/${tvId}/season/${seasonNumber}`),
+    tmdbFetch<TMDBSeasonDetails>(`/tv/${tvId}/season/${seasonNumber}`, {
+      append_to_response: 'credits',
+    }),
 
   // Recommendations & Similar
   getRecommendations: (type: 'movie' | 'tv', id: number, page = 1) =>

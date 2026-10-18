@@ -64,6 +64,11 @@ export interface TMDBTVDetails extends TMDBMediaItem {
   tagline: string;
   status: string;
   episode_run_time: number[];
+  created_by?: {
+    id: number;
+    name: string;
+    profile_path: string | null;
+  }[];
   credits?: {
     cast: TMDBCast[];
     crew: TMDBCrew[];
@@ -147,6 +152,10 @@ export interface TMDBSeasonDetails {
   poster_path: string | null;
   season_number: number;
   episodes: TMDBEpisode[];
+  credits?: {
+    cast: TMDBCast[];
+    crew: TMDBCrew[];
+  };
 }
 
 export interface TMDBEpisode {
