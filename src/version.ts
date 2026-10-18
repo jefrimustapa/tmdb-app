@@ -2,12 +2,12 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20261017-2115';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-201-quality-spe.20261017-2115';
+export const APP_BUILD_NUMBER = '20261018-0601';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.fix-209-rail-indent-.20261018-0601';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
-export const APP_BRANCH = 'feat-201-quality-spe';
-export const APP_CHANGELOG = `* feat(msm-getter): store quality-specific cache and prevent cache purging (#201)
+export const APP_BRANCH = 'fix-209-rail-indent-';
+export const APP_CHANGELOG = `* feat: store quality-specific cache for each title without purging (#201) (#208)
 * feat(updates): extract release highlights (max-5 per release) and eliminate update notes cramp (#202)
 * feat(msm-getter): restrict server access exclusively to Malaysia (MY) IP addresses (#205)
 * test(msm-getter): make resolverMaxPages assertion robust to custom router settings
