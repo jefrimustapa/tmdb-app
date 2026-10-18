@@ -2,13 +2,13 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20261018-0618';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.fix-209-rail-indent-.20261018-0618';
+export const APP_BUILD_NUMBER = '20261018-0630';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.fix-209-rail-indent-.20261018-0630';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
 export const APP_BRANCH = 'fix-209-rail-indent-';
-export const APP_CHANGELOG = `* fix(rail): align cards with container padding and discrete stride pagination (#209)
+export const APP_CHANGELOG = `* fix(rail): ensure final page cards align to column grid with maxStartIndex clamping and trailing spacer
+* fix(rail): align cards with container padding and discrete stride pagination (#209)
 * feat: store quality-specific cache for each title without purging (#201) (#208)
 * feat(updates): extract release highlights (max-5 per release) and eliminate update notes cramp (#202)
-* feat(msm-getter): restrict server access exclusively to Malaysia (MY) IP addresses (#205)
-* test(msm-getter): make resolverMaxPages assertion robust to custom router settings`;
+* feat(msm-getter): restrict server access exclusively to Malaysia (MY) IP addresses (#205)`;
