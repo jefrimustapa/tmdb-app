@@ -92,19 +92,20 @@ if (savedSettings.geoBlockWhitelistedIps === undefined) savedSettings.geoBlockWh
 export let BOT_USERNAME = (savedSettings.targetBotUsername || process.env.TG_BOT_USERNAME || 'msm34bot').replace(/^@/, '');
 
 export function detectVideoQualityTier(filename = '', queryKey = '', targetDoc = null) {
-  // 1. Direct Telegram Video Dimensions (Highest authority: real pixel height of the stream)
+  // 1. Direct Telegram Video Dimensions (Highest authority: real pixel metadata of the stream)
   if (targetDoc && Array.isArray(targetDoc.attributes)) {
     const videoAttr = targetDoc.attributes.find(a => a.className === 'DocumentAttributeVideo' || (a.w && a.h));
-    if (videoAttr && videoAttr.h) {
-      const h = Number(videoAttr.h);
-      if (h >= 2160) return '4k';
-      if (h >= 1080) return '1080p';
-      if (h >= 720) return '720p';
-      return 'sd';
+    if (videoAttr) {
+      const w = Number(videoAttr.w) || 0;
+      const h = Number(videoAttr.h) || 0;
+      if (w >= 3200 || h >= 1800) return '4k';
+      if (w >= 1600 || h >= 900) return '1080p';
+      if (w >= 960 || h >= 530) return '720p';
+      if (w > 0 || h > 0) return 'sd';
     }
   }
 
-  // 2. Check the ACTUAL video filename itself
+  // 2. Fallback: Check the video filename only if document dimension metadata is absent
   const fn = String(filename || '').toLowerCase().replace(/[_\.\-\+\[\]\(\)]/g, ' ');
   if (/\b(4k|2160p|uhd)\b/i.test(fn)) return '4k';
   if (/\b(1080p|1080|fhd)\b/i.test(fn)) return '1080p';
