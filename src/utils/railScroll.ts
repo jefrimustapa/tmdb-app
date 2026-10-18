@@ -2,7 +2,7 @@
  * Utility functions for horizontal content rail discrete pagination and alignment.
  */
 
-function getRailLayout(row: HTMLElement) {
+export function getRailLayout(row: HTMLElement) {
   const cardElements = row.querySelectorAll<HTMLElement>('.tv-focus-target');
   const children = cardElements.length > 0
     ? Array.from(cardElements)
@@ -19,10 +19,11 @@ function getRailLayout(row: HTMLElement) {
   const secondChild = children[1];
   const stride = secondChild ? secondChild.offsetLeft - firstChild.offsetLeft : firstChild.offsetWidth;
 
-  // Count how many card columns are visible across the rail container width
+  // Count how many card columns are fully visible across the rail container width
   let columnsCount = 0;
   for (let i = 0; i < children.length; i++) {
-    if (children[i].offsetLeft < paddingLeft + availableWidth) {
+    const cardRight = children[i].offsetLeft + children[i].offsetWidth;
+    if (cardRight <= paddingLeft + availableWidth + 2) {
       columnsCount++;
     } else {
       break;
@@ -36,7 +37,7 @@ function getRailLayout(row: HTMLElement) {
 
   const maxStrideScroll = maxStartIndex > 0 && children[maxStartIndex]
     ? children[maxStartIndex].offsetLeft - paddingLeft
-    : Math.max(0, row.scrollWidth - row.clientWidth);
+    : 0;
 
   return {
     children,
