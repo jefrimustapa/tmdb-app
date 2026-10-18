@@ -285,46 +285,6 @@ export const DetailsModal: React.FC<DetailsModalProps> = ({ item, onClose }) => 
             </div>
           )}
 
-          {/* Director / Creator Row */}
-          {(directors.length > 0 || creators.length > 0) && (
-            <div className="flex items-center gap-x-4 gap-y-1 text-xs text-gray-300 flex-wrap">
-              {directors.length > 0 && (
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  <span className="text-gray-400 font-medium">Director{directors.length > 1 ? 's' : ''}:</span>
-                  {directors.slice(0, 3).map((d, idx, arr) => (
-                    <React.Fragment key={d.id}>
-                      <Link
-                        to={`/search?personId=${d.id}&personName=${encodeURIComponent(d.name)}`}
-                        onClick={onClose}
-                        className="text-white hover:text-hbo-cyan underline decoration-white/30 hover:decoration-hbo-cyan transition font-semibold"
-                      >
-                        {d.name}
-                      </Link>
-                      {idx < arr.length - 1 && <span className="text-gray-500">,</span>}
-                    </React.Fragment>
-                  ))}
-                </div>
-              )}
-              {creators.length > 0 && (
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  <span className="text-gray-400 font-medium">Creator{creators.length > 1 ? 's' : ''}:</span>
-                  {creators.map((c, idx, arr) => (
-                    <React.Fragment key={c.id}>
-                      <Link
-                        to={`/search?personId=${c.id}&personName=${encodeURIComponent(c.name)}`}
-                        onClick={onClose}
-                        className="text-white hover:text-hbo-cyan underline decoration-white/30 hover:decoration-hbo-cyan transition font-semibold"
-                      >
-                        {c.name}
-                      </Link>
-                      {idx < arr.length - 1 && <span className="text-gray-500">,</span>}
-                    </React.Fragment>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
           {/* Synopsis */}
           <div>
             <h4 className="text-sm font-bold text-gray-200 uppercase tracking-wider mb-2">Synopsis</h4>
@@ -333,11 +293,69 @@ export const DetailsModal: React.FC<DetailsModalProps> = ({ item, onClose }) => 
             </p>
           </div>
 
-          {/* Cast */}
+          {/* Director & Creator Section */}
+          {(directors.length > 0 || creators.length > 0) && (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h4 className="text-sm font-bold text-gray-200 uppercase tracking-wider">
+                  {mediaType === 'movie'
+                    ? (directors.length > 1 ? 'Directors' : 'Director')
+                    : (creators.length > 0 && directors.length > 0
+                        ? 'Directors & Creators'
+                        : (directors.length > 0
+                            ? (directors.length > 1 ? 'Directors' : 'Director')
+                            : (creators.length > 1 ? 'Creators' : 'Creator')))}
+                </h4>
+                <span className="text-[11px] text-gray-400">Click to filter filmography</span>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {directors.map((director) => (
+                  <Link
+                    key={`modal-director-${director.id}`}
+                    to={`/search?personId=${director.id}&personName=${encodeURIComponent(director.name)}`}
+                    onClick={onClose}
+                    className="flex items-center gap-2.5 bg-hbo-dark/60 hover:bg-hbo-dark p-2 rounded-xl border border-hbo-border/40 hover:border-hbo-cyan/40 transition hover:scale-[1.02] group"
+                    title={`View ${director.name}'s filmography`}
+                  >
+                    <img
+                      src={tmdbImages.profile(director.profile_path || null, 'w185')}
+                      alt={director.name}
+                      className="w-10 h-10 rounded-full object-cover bg-gray-800 flex-shrink-0 group-hover:ring-2 ring-hbo-cyan transition"
+                    />
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold text-white truncate group-hover:text-hbo-cyan transition">{director.name}</p>
+                      <p className="text-[11px] text-hbo-cyan font-medium truncate">Director</p>
+                    </div>
+                  </Link>
+                ))}
+                {creators.map((creator) => (
+                  <Link
+                    key={`modal-creator-${creator.id}`}
+                    to={`/search?personId=${creator.id}&personName=${encodeURIComponent(creator.name)}`}
+                    onClick={onClose}
+                    className="flex items-center gap-2.5 bg-hbo-dark/60 hover:bg-hbo-dark p-2 rounded-xl border border-hbo-border/40 hover:border-hbo-cyan/40 transition hover:scale-[1.02] group"
+                    title={`View ${creator.name}'s filmography`}
+                  >
+                    <img
+                      src={tmdbImages.profile(creator.profile_path, 'w185')}
+                      alt={creator.name}
+                      className="w-10 h-10 rounded-full object-cover bg-gray-800 flex-shrink-0 group-hover:ring-2 ring-hbo-cyan transition"
+                    />
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold text-white truncate group-hover:text-hbo-cyan transition">{creator.name}</p>
+                      <p className="text-[11px] text-hbo-purple-light font-medium truncate">Creator</p>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Cast Section */}
           {details?.credits?.cast && details.credits.cast.length > 0 && (
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <h4 className="text-sm font-bold text-gray-200 uppercase tracking-wider">Top Cast</h4>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h4 className="text-sm font-bold text-gray-200 uppercase tracking-wider">Cast</h4>
                 <span className="text-[11px] text-gray-400">Click to filter filmography</span>
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">

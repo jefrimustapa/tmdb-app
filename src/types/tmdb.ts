@@ -183,6 +183,7 @@ export interface TMDBCrew {
   name: string;
   job: string;
   department: string;
+  profile_path?: string | null;
 }
 
 export interface TMDBVideo {
