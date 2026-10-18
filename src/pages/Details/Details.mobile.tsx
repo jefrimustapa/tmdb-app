@@ -508,6 +508,17 @@ export const Details: React.FC = () => {
     }
   }, [heroUrl, posterCardUrl]);
 
+  const crewMembers = React.useMemo(() => {
+    return extractCrewMembers(details, mediaType, selectedSeasonData);
+  }, [details, mediaType, selectedSeasonData]);
+
+  const displayCast = React.useMemo(() => {
+    if (mediaType === 'tv' && selectedSeasonData?.cast && selectedSeasonData.cast.length > 0) {
+      return selectedSeasonData.cast;
+    }
+    return details?.credits?.cast || [];
+  }, [mediaType, selectedSeasonData, details]);
+
   if (isLoading || !details) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-hbo-dark">
@@ -525,17 +536,6 @@ export const Details: React.FC = () => {
 
   const releaseYear = (details.release_date || details.first_air_date || '').split('-')[0];
   const contentRating = extractContentRating(details);
-
-  const crewMembers = React.useMemo(() => {
-    return extractCrewMembers(details, mediaType, selectedSeasonData);
-  }, [details, mediaType, selectedSeasonData]);
-
-  const displayCast = React.useMemo(() => {
-    if (mediaType === 'tv' && selectedSeasonData?.cast && selectedSeasonData.cast.length > 0) {
-      return selectedSeasonData.cast;
-    }
-    return details?.credits?.cast || [];
-  }, [mediaType, selectedSeasonData, details]);
 
   return (
     <div
