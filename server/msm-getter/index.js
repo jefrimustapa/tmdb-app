@@ -461,8 +461,8 @@ function extractTitleTokens(str) {
   });
 }
 
-// Junk blacklist: trailers, teasers, samples, promos, soundtracks, behind-the-scenes
-const JUNK_MEDIA_REGEX = /\b(trailer|teaser|sample|clip|promo|ost|soundtrack|behind\s*the\s*scenes|bts|interview|preview|pendek|short)\b/i;
+// Junk blacklist: trailers, teasers, samples, promos, soundtracks, behind-the-scenes, reviews, recaps, reactions
+const JUNK_MEDIA_REGEX = /\b(trailer|teaser|sample|clip|promo|ost|soundtrack|behind\s*the\s*scenes|bts|interview|preview|pendek|short|review|reviews|recap|recaps|reaction|reactions|ulasan|sinopsis|synopsis|alur\s*cerita|bedah\s*film|bedah\s*filem|ringkasan)\b/i;
 
 // Split archives and non-streamable files: .zip, .rar, .7z, .tar, .001, .002, .part1, etc.
 const UNPLAYABLE_ARCHIVE_REGEX = /\.(zip|rar|7z|tar|gz|00[1-9]|part\d+)(\s|\.|$)/i;
@@ -470,9 +470,24 @@ const UNPLAYABLE_ARCHIVE_REGEX = /\.(zip|rar|7z|tar|gz|00[1-9]|part\d+)(\s|\.|$)
 // Stopwords for title coverage calculations
 const STOPWORDS = new Set(['the', 'a', 'an', 'dan', 'di', 'ke', 'yang', 'si', 'pada', 'dari', 'of', 'in', 'on', 'at', 'to', 'for', 'with', 'by']);
 
-function isJunkMedia(text) {
+function isJunkMedia(text, contextTitle = '', altContextTitle = '') {
   if (!text) return false;
-  return JUNK_MEDIA_REGEX.test(text) || UNPLAYABLE_ARCHIVE_REGEX.test(text);
+  if (UNPLAYABLE_ARCHIVE_REGEX.test(text)) return true;
+
+  const match = text.match(JUNK_MEDIA_REGEX);
+  if (!match) return false;
+
+  // Context-aware protection: if the matched term is part of the legitimate movie/show title, do not disqualify
+  const combinedContext = `${contextTitle || ''} ${altContextTitle || ''}`.trim();
+  if (combinedContext) {
+    const tokens = extractTitleTokens(combinedContext).map(t => t.toLowerCase());
+    const matchedTerm = match[0].toLowerCase().trim().replace(/\s+/g, ' ');
+    if (tokens.some(t => matchedTerm === t || matchedTerm.includes(t) || t.includes(matchedTerm))) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 function parseSizeFromText(text) {
@@ -756,9 +771,9 @@ function scoreCandidateButtonWithReason(btn, msg, context = {}) {
   const msgText = (msg.message || '').toLowerCase();
   const normMsgText = normalizeTitle(msgText);
 
-  // 1. Immediately disqualify junk media (trailers, teasers, samples, promos, ost)
-  if (isJunkMedia(btnText) || isJunkMedia(msgText)) {
-    return { score: -999, reason: 'junk media (trailer/teaser/sample/promo/ost)' };
+  // 1. Immediately disqualify junk media (trailers, teasers, samples, promos, ost, reviews)
+  if (isJunkMedia(btnText, title, altTitle) || isJunkMedia(msgText, title, altTitle)) {
+    return { score: -999, reason: 'junk media (trailer/teaser/sample/promo/ost/review)' };
   }
 
   // 2. Minimum file size sanity check
@@ -4390,6 +4405,17 @@ app.get(['/api/resolve', '/msm/api/resolve', '/api/prefetch', '/msm/api/prefetch
     }
   }
 
+  // Validate that cached entry is not junk media (e.g. previously cached review/recap)
+  if (cached && isJunkMedia(cached.filename || cached.queryKey, title, altTitle)) {
+    console.log(`[${logPrefix}] Stale/junk media detected in cache for "${cacheKey}" ("${cached.filename}"), evicting...`);
+    db.delete(cacheKey);
+    cached = null;
+  }
+  if (fallbackCached && isJunkMedia(fallbackCached.filename || fallbackCached.queryKey, title, altTitle)) {
+    console.log(`[${logPrefix}] Stale/junk media detected in fallback cache ("${fallbackCached.filename}"), ignoring...`);
+    fallbackCached = null;
+  }
+
   if (cached) {
     console.log(`[${logPrefix}] Central DB Cache HIT for "${cacheKey}" -> Doc ID: ${cached.docId} (${cached.filename})`);
     if (!isPrefetch) req.off('close', onClientClose);
@@ -4545,8 +4571,8 @@ app.get(['/api/resolve', '/msm/api/resolve', '/api/prefetch', '/msm/api/prefetch
         const filename = fnAttr ? fnAttr.fileName : msg.message;
         const normFn = normalizeTitle(filename);
 
-        // 1. Instantly reject junk media (trailers, teasers, samples, promos, ost)
-        if (isJunkMedia(filename) || isJunkMedia(msg.message)) {
+        // 1. Instantly reject junk media (trailers, teasers, samples, promos, ost, reviews)
+        if (isJunkMedia(filename, title, altTitle) || isJunkMedia(msg.message, title, altTitle)) {
           continue;
         }
 
@@ -6725,4 +6751,6 @@ export {
   isPrivateIp,
   checkGeoAccess,
   savedSettings,
+  isJunkMedia,
+  JUNK_MEDIA_REGEX,
 };
