@@ -3314,6 +3314,7 @@ app.get(['/msm/streams', '/msm/cache'], (req, res) => {
               qualityBadge +
               '<span class="px-2 py-0.5 rounded bg-sky-500/10 text-sky-400 border border-sky-500/20 font-bold">' + escapeHtml(item.sizeFormatted) + '</span>' +
               '<span class="px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700/70">Key: ' + escapeHtml(item.queryKey || '--') + '</span>' +
+              (item.requestedQuality ? '<span class="px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">Req: ' + escapeHtml(item.requestedQuality) + '</span>' : '') +
               '<span class="px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700/70">DC ' + escapeHtml(item.dcId || 4) + '</span>' +
               (item.videoCodec ? '<span class="px-2 py-0.5 rounded bg-purple-500/10 text-purple-400 border border-purple-500/20 uppercase">' + escapeHtml(item.videoCodec) + '</span>' : '') +
               '<span class="text-slate-500 text-[10px]">' + escapeHtml(dateStr) + '</span>' +
@@ -4253,6 +4254,9 @@ app.get(['/api/cache', '/msm/api/cache'], (req, res) => {
       size: !isNaN(bytes) ? bytes : 0,
       sizeFormatted,
       qualityTier,
+      actualQuality: item.actualQuality || qualityTier,
+      requestedQuality: item.requestedQuality,
+      requestedQualities: item.requestedQualities || (item.requestedQuality ? [item.requestedQuality] : []),
       videoCodec: item.videoCodec,
       width: item.width,
       height: item.height,
@@ -4372,7 +4376,24 @@ app.get(['/api/resolve', '/msm/api/resolve', '/api/prefetch', '/msm/api/prefetch
   const checkAborted = () => !isPrefetch && (isAborted || Boolean(req.destroyed));
 
   // 1. Check Central Database first (Instant < 1ms response, 0 bot queries)
+  const requestedTier = (targetQuality >= 2160 ? '4k' : targetQuality >= 1080 ? '1080p' : targetQuality <= 480 ? 'sd' : '720p');
   let cached = shouldBypassCache ? null : db.get(cacheKey);
+
+  // If exact cacheKey was not found, check if an existing record matches actualQuality or requestedQuality
+  if (!cached && !shouldBypassCache) {
+    const matchedRecord = db.findByTitleAndQuality(baseCacheKey, requestedTier);
+    if (matchedRecord) {
+      cached = matchedRecord;
+      console.log(`[${logPrefix}] Central DB Cache HIT (matched tier: act=${cached.actualQuality || 'unknown'}, req=${cached.requestedQuality || 'unknown'}) for "${cacheKey}" -> Doc ID: ${cached.docId} (${cached.filename})`);
+      db.byQuery.set(cacheKey, cached);
+      if (!Array.isArray(cached.requestedKeys)) cached.requestedKeys = [];
+      if (!cached.requestedKeys.includes(cacheKey)) {
+        cached.requestedKeys.push(cacheKey);
+        db.save();
+      }
+    }
+  }
+
   let fallbackCached = null;
 
   let preferredFallbacks = [];
@@ -4529,7 +4550,7 @@ app.get(['/api/resolve', '/msm/api/resolve', '/api/prefetch', '/msm/api/prefetch
 
     // Re-check Central DB after waiting in queue
     if (!shouldBypassCache) {
-      const cachedAfterQueue = db.get(cacheKey);
+      const cachedAfterQueue = db.get(cacheKey) || db.findByTitleAndQuality(baseCacheKey, requestedTier);
       if (cachedAfterQueue) {
         return cachedAfterQueue;
       }
@@ -4745,6 +4766,9 @@ app.get(['/api/resolve', '/msm/api/resolve', '/api/prefetch', '/msm/api/prefetch
           date: chosen.doc.date,
           width: vAttr?.w ? Number(vAttr.w) : null,
           height: vAttr?.h ? Number(vAttr.h) : null,
+          actualQuality: chosenTier,
+          requestedQuality: requestedTier,
+          requestedKey: cacheKey,
         });
         return streamItem;
       } else {
@@ -5360,8 +5384,11 @@ app.get(['/api/resolve', '/msm/api/resolve', '/api/prefetch', '/msm/api/prefetch
       date: deliveredDoc.date,
       width: vAttr?.w ? Number(vAttr.w) : null,
       height: vAttr?.h ? Number(vAttr.h) : null,
+      actualQuality: actualTier,
+      requestedQuality: requestedTier,
+      requestedKey: cacheKey,
     });
-    console.log(`[${logPrefix}] Successfully resolved "${queryTitle}" -> Doc ID: ${docIdStr} (${filename}) as ${actualCacheKey} (tier: ${actualTier})`);
+    console.log(`[${logPrefix}] Successfully resolved "${queryTitle}" -> Doc ID: ${docIdStr} (${filename}) as ${actualCacheKey} (tier: ${actualTier}, req: ${requestedTier})`);
     return resolvedItem;
   });
 
