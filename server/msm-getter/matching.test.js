@@ -934,6 +934,69 @@ it('falls back to filename quality tag only when document dimension metadata is 
   assert.strictEqual(detectVideoQualityTier('Show.S01E01.480p.mp4', '', null), 'sd');
 });
 
+it('ignores 320x180 poster DocumentAttributeImageSize attribute on 1.59 GB MKV and classifies as 720p (#218)', () => {
+  const doc = {
+    size: 1705792572, // 1.59 GB
+    attributes: [
+      { className: 'DocumentAttributeFilename', fileName: 'Imam.Instant.Ustazah.Scammer.2023.S1EP01.720p.WEB-DL.x264.mkv' },
+      { className: 'DocumentAttributeImageSize', w: 320, h: 180 } // Poster/thumbnail preview
+    ]
+  };
+  const tier = detectVideoQualityTier(
+    'Imam.Instant.Ustazah.Scammer.2023.S1EP01.720p.WEB-DL.x264.mkv',
+    'imam instant ustazah scammer s01e01_480p',
+    doc
+  );
+  assert.strictEqual(tier, '720p', 'Poster image size 320x180 must not demote 1.59 GB 720p MKV to SD');
+});
+
+it('ignores 320x180 poster DocumentAttributeImageSize attribute on 2.44 GB MKV and classifies as 1080p (#218)', () => {
+  const doc = {
+    size: 2616489316, // 2.44 GB
+    attributes: [
+      { className: 'DocumentAttributeFilename', fileName: 'Imam.Instant.Ustazah.Scammer.EP03.1080p.WEB-DL.x264.AAC-KIKI.mkv' },
+      { className: 'DocumentAttributeImageSize', w: 320, h: 180 } // Poster/thumbnail preview
+    ]
+  };
+  const tier = detectVideoQualityTier(
+    'Imam.Instant.Ustazah.Scammer.EP03.1080p.WEB-DL.x264.AAC-KIKI.mkv',
+    'imam instant ustazah scammer s01e03_480p',
+    doc
+  );
+  assert.strictEqual(tier, '1080p', 'Poster image size 320x180 must not demote 2.44 GB 1080p MKV to SD');
+});
+
+it('treats sub-HD video dimensions (< 960x530) on large files (> 600MB) as preview anomaly and falls back to filename (#218)', () => {
+  const doc = {
+    size: 1500000000, // 1.5 GB
+    attributes: [
+      { className: 'DocumentAttributeVideo', w: 480, h: 270 }
+    ]
+  };
+  const tier = detectVideoQualityTier('Series.S01E01.720p.mkv', '', doc);
+  assert.strictEqual(tier, '720p', 'Sub-HD dimensions on 1.5 GB file must not override explicit 720p filename tag');
+});
+
+it('detects 1080p for multi-gigabyte file (> 2GB) when filename lacks explicit quality tag and metadata is absent (#218)', () => {
+  const doc = {
+    size: 2500000000, // 2.5 GB
+    attributes: []
+  };
+  const tier = detectVideoQualityTier('UnknownMovie.2024.mkv', '', doc);
+  assert.strictEqual(tier, '1080p', 'Multi-gigabyte video (> 2GB) without tags defaults to 1080p');
+});
+
+it('preserves genuine SD detection for small files (< 500MB) with SD dimensions (#218)', () => {
+  const doc = {
+    size: 200000000, // 200 MB
+    attributes: [
+      { className: 'DocumentAttributeVideo', w: 640, h: 360 }
+    ]
+  };
+  const tier = detectVideoQualityTier('ClassicShow.S01E01.mp4', '', doc);
+  assert.strictEqual(tier, 'sd', 'Small file with 640x360 dimensions must be detected as SD');
+});
+
 // Clean up temporary test files
 try {
   if (fs.existsSync(TEST_DB_FILE)) fs.unlinkSync(TEST_DB_FILE);
