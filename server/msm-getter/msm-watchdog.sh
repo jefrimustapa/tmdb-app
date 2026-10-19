@@ -2,11 +2,23 @@
 # MSM Getter Microservice Watchdog
 # Runs periodically via cru cron to ensure HTTP endpoint is responding
 
-URL="http://127.0.0.1:3033/msm/health/"
+# Check internal loopback HTTP port 3034 first (no TLS overhead), then HTTPS 3033
+check_health() {
+    # 1. Internal loopback HTTP port 3034
+    if curl -s -m 5 "http://127.0.0.1:3034/msm/health/" 2>/dev/null | grep -q '"status":"ok"'; then
+        return 0
+    fi
+    # 2. Main HTTPS port 3033 (-k for self-signed / router certificate)
+    if curl -k -s -m 5 "https://127.0.0.1:3033/msm/health/" 2>/dev/null | grep -q '"status":"ok"'; then
+        return 0
+    fi
+    return 1
+}
+
 FAIL_FILE="/tmp/msm_watchdog.fails"
 
 # 1. Quick check if service is healthy
-if curl -s -m 5 "$URL" 2>/dev/null | grep -q '"status":"ok"'; then
+if check_health; then
     rm -f "$FAIL_FILE"
     exit 0
 fi
@@ -16,8 +28,8 @@ FAILS=$(cat "$FAIL_FILE" 2>/dev/null || echo 0)
 FAILS=$((FAILS + 1))
 echo "$FAILS" > "$FAIL_FILE"
 
-# 3. If failed 2 consecutive times, attempt heal & restart
-if [ "$FAILS" -ge 2 ]; then
+# 3. If failed 3 consecutive times (9 minutes), attempt heal & restart
+if [ "$FAILS" -ge 3 ]; then
     logger -t "msm-watchdog" "MSM service unhealthy (failures: $FAILS). Initiating auto-recovery..."
     
     # Check if node binary is broken
