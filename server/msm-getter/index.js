@@ -4353,21 +4353,18 @@ app.get(['/api/resolve', '/msm/api/resolve', '/api/prefetch', '/msm/api/prefetch
 
   const queryTitle = isTv ? `${title} ${tvTag}` : `${title} ${year || ''}`.trim();
   const baseCacheKey = normalizeTitle(isTv ? `${title} ${tvTag}` : `${title} ${year || ''}`);
-  let qualitySuffix = '_720p';
-  if (targetQuality >= 2160) qualitySuffix = '_4k';
-  else if (targetQuality >= 1080) qualitySuffix = '_1080p';
-  else if (targetQuality <= 480) qualitySuffix = '_480p';
-  else qualitySuffix = '_720p';
-  const cacheKey = `${baseCacheKey}${qualitySuffix}`;
+  const cacheKey = baseCacheKey;
+  const requestedTier = (targetQuality >= 2160 ? '4k' : targetQuality >= 1080 ? '1080p' : targetQuality <= 480 ? 'sd' : '720p');
+  const inFlightKey = `${baseCacheKey}_${requestedTier}`;
 
-  console.log(`[${logPrefix}] Request: "${queryTitle}" (isTv: ${isTv}, maxQuality: ${targetQuality}, maxPages: ${effectiveMaxPages}, bypassCache: ${shouldBypassCache}, cacheKey: "${cacheKey}"${altTitle ? `, altTitle: "${altTitle}"` : ''})`);
+  console.log(`[${logPrefix}] Request: "${queryTitle}" (isTv: ${isTv}, maxQuality: ${targetQuality}, maxPages: ${effectiveMaxPages}, bypassCache: ${shouldBypassCache}, cacheKey: "${cacheKey}", tier: ${requestedTier}${altTitle ? `, altTitle: "${altTitle}"` : ''})`);
 
   let isAborted = false;
   const onClientClose = () => {
     if (!res.writableEnded) {
       isAborted = true;
       console.log(`[${logPrefix}] Client disconnected / aborted for "${queryTitle}"`);
-      inFlightResolutions.delete(cacheKey);
+      inFlightResolutions.delete(inFlightKey);
     }
   };
   if (!isPrefetch) {
@@ -4376,79 +4373,17 @@ app.get(['/api/resolve', '/msm/api/resolve', '/api/prefetch', '/msm/api/prefetch
   const checkAborted = () => !isPrefetch && (isAborted || Boolean(req.destroyed));
 
   // 1. Check Central Database first (Instant < 1ms response, 0 bot queries)
-  const requestedTier = (targetQuality >= 2160 ? '4k' : targetQuality >= 1080 ? '1080p' : targetQuality <= 480 ? 'sd' : '720p');
-  let cached = shouldBypassCache ? null : db.get(cacheKey);
-
-  // If exact cacheKey was not found, check if an existing record matches actualQuality or requestedQuality
-  if (!cached && !shouldBypassCache) {
-    const matchedRecord = db.findByTitleAndQuality(baseCacheKey, requestedTier);
-    if (matchedRecord) {
-      cached = matchedRecord;
-      console.log(`[${logPrefix}] Central DB Cache HIT (matched tier: act=${cached.actualQuality || 'unknown'}, req=${cached.requestedQuality || 'unknown'}) for "${cacheKey}" -> Doc ID: ${cached.docId} (${cached.filename})`);
-      db.byQuery.set(cacheKey, cached);
-      if (!Array.isArray(cached.requestedKeys)) cached.requestedKeys = [];
-      if (!cached.requestedKeys.includes(cacheKey)) {
-        cached.requestedKeys.push(cacheKey);
-        db.save();
-      }
-    }
-  }
-
+  let cached = shouldBypassCache ? null : db.get(baseCacheKey, requestedTier);
   let fallbackCached = null;
 
-  let preferredFallbacks = [];
-  if (targetQuality >= 2160) {
-    preferredFallbacks = ['_1080p', '_720p', '_480p'];
-  } else if (targetQuality >= 1080) {
-    preferredFallbacks = ['_720p', '_4k', '_480p'];
-  } else if (targetQuality <= 480) {
-    preferredFallbacks = ['_720p', '_1080p', '_4k'];
-  } else {
-    // 720p target
-    preferredFallbacks = ['_1080p', '_480p', '_4k'];
-  }
-
   if (!cached && !shouldBypassCache) {
-    // Check other quality tiers for the same title as fallback candidates
-    for (const qSuffix of preferredFallbacks) {
-      const cand = db.get(`${baseCacheKey}${qSuffix}`);
-      if (cand) {
-        fallbackCached = cand;
-        break;
-      }
-    }
-
-    // Also check legacy baseCacheKey without quality suffix
-    if (!fallbackCached) {
-      const legacyCached = db.get(baseCacheKey);
-      if (legacyCached && legacyCached.filename) {
-        const fnLower = legacyCached.filename.toLowerCase();
-        const is4k = fnLower.includes('2160p') || fnLower.includes('4k') || fnLower.includes('uhd');
-        const is1080 = fnLower.includes('1080p') || fnLower.includes('1080');
-        const is720 = fnLower.includes('720p') || fnLower.includes('720');
-        const isLowerRes = fnLower.includes('480p') || fnLower.includes('540p') || fnLower.includes('360p');
-
-        if (targetQuality >= 2160) {
-          if (is4k) cached = legacyCached;
-          else if (is1080) fallbackCached = legacyCached;
-        } else if (targetQuality <= 480) {
-          if (isLowerRes) cached = legacyCached;
-          else if (is720) fallbackCached = legacyCached;
-        } else if (targetQuality <= 720) {
-          if (is720 || isLowerRes) cached = legacyCached;
-          else if (is1080) fallbackCached = legacyCached;
-        } else {
-          if (is1080) cached = legacyCached;
-          else if (is720) fallbackCached = legacyCached;
-        }
-      }
-    }
+    fallbackCached = db.getFallback(baseCacheKey, requestedTier);
   }
 
   // Validate that cached entry is not junk media (e.g. previously cached review/recap)
   if (cached && isJunkMedia(cached.filename || cached.queryKey, title, altTitle)) {
     console.log(`[${logPrefix}] Stale/junk media detected in cache for "${cacheKey}" ("${cached.filename}"), evicting...`);
-    db.delete(cacheKey);
+    db.deleteByDocId(cached.docId);
     cached = null;
   }
   if (fallbackCached && isJunkMedia(fallbackCached.filename || fallbackCached.queryKey, title, altTitle)) {
@@ -4457,7 +4392,7 @@ app.get(['/api/resolve', '/msm/api/resolve', '/api/prefetch', '/msm/api/prefetch
   }
 
   if (cached) {
-    console.log(`[${logPrefix}] Central DB Cache HIT for "${cacheKey}" -> Doc ID: ${cached.docId} (${cached.filename})`);
+    console.log(`[${logPrefix}] Central DB Cache HIT for "${cacheKey}" (tier: ${requestedTier}) -> Doc ID: ${cached.docId} (${cached.filename})`);
     if (!isPrefetch) req.off('close', onClientClose);
     if (isPrefetch) {
       return res.json({
@@ -4550,7 +4485,7 @@ app.get(['/api/resolve', '/msm/api/resolve', '/api/prefetch', '/msm/api/prefetch
 
     // Re-check Central DB after waiting in queue
     if (!shouldBypassCache) {
-      const cachedAfterQueue = db.get(cacheKey) || db.findByTitleAndQuality(baseCacheKey, requestedTier);
+      const cachedAfterQueue = db.get(baseCacheKey, requestedTier);
       if (cachedAfterQueue) {
         return cachedAfterQueue;
       }
@@ -4742,19 +4677,11 @@ app.get(['/api/resolve', '/msm/api/resolve', '/api/prefetch', '/msm/api/prefetch
         isTargetQualityMet = chosenTier === '720p' || chosenTier === '1080p' || chosenTier === '4k';
       }
 
-      let chosenQualitySuffix = '_720p';
-      if (chosenTier === '4k') chosenQualitySuffix = '_4k';
-      else if (chosenTier === '1080p') chosenQualitySuffix = '_1080p';
-      else if (chosenTier === 'sd') chosenQualitySuffix = '_480p';
-      else chosenQualitySuffix = '_720p';
-
-      const actualCacheKey = `${baseCacheKey}${chosenQualitySuffix}`;
-
       if (isTargetQualityMet && chosen.qualityScore >= 30) {
         const docIdStr = chosen.doc.id.toString();
         console.log(`[RESOLVE] Found matching recent document in chat: ${chosen.filename} (ID: ${docIdStr}, score: ${chosen.qualityScore}, tier: ${chosenTier})`);
         const vAttr = chosen.doc.attributes?.find(a => a.className === 'DocumentAttributeVideo');
-        const streamItem = db.set(actualCacheKey, {
+        const streamItem = db.set(baseCacheKey, {
           docId: docIdStr,
           msgId: chosen.msgId,
           accessHash: chosen.doc.accessHash?.toString() || '',
@@ -4767,8 +4694,7 @@ app.get(['/api/resolve', '/msm/api/resolve', '/api/prefetch', '/msm/api/prefetch
           width: vAttr?.w ? Number(vAttr.w) : null,
           height: vAttr?.h ? Number(vAttr.h) : null,
           actualQuality: chosenTier,
-          requestedQuality: requestedTier,
-          requestedKey: cacheKey,
+          requestedQualities: [requestedTier],
         });
         return streamItem;
       } else {
@@ -4776,7 +4702,7 @@ app.get(['/api/resolve', '/msm/api/resolve', '/api/prefetch', '/msm/api/prefetch
         if (!fallbackCached) {
           const docIdStr = chosen.doc.id.toString();
           const vAttr = chosen.doc.attributes?.find(a => a.className === 'DocumentAttributeVideo');
-          fallbackCached = db.set(actualCacheKey, {
+          fallbackCached = db.set(baseCacheKey, {
             docId: docIdStr,
             msgId: chosen.msgId,
             accessHash: chosen.doc.accessHash?.toString() || '',
@@ -4788,8 +4714,9 @@ app.get(['/api/resolve', '/msm/api/resolve', '/api/prefetch', '/msm/api/prefetch
             date: chosen.doc.date,
             width: vAttr?.w ? Number(vAttr.w) : null,
             height: vAttr?.h ? Number(vAttr.h) : null,
+            actualQuality: chosenTier,
           });
-          console.log(`[RESOLVE] Chat document ${chosen.filename} is ${chosenTier} (requested ${targetQuality}p). Preserving as fallback "${actualCacheKey}" while querying bot.`);
+          console.log(`[RESOLVE] Chat document ${chosen.filename} is ${chosenTier} (requested ${targetQuality}p). Preserving as fallback "${baseCacheKey}" while querying bot.`);
         }
       }
     }
@@ -5352,6 +5279,7 @@ app.get(['/api/resolve', '/msm/api/resolve', '/api/prefetch', '/msm/api/prefetch
     if (!deliveredDoc) {
       if (fallbackCached) {
         console.log(`[RESOLVE] Requested quality ${targetQuality}p not found from bot, falling back to cached "${fallbackCached.queryKey || fallbackCached.filename}" for "${baseCacheKey}"`);
+        db.addRequestedQuality(fallbackCached.docId, requestedTier);
         return fallbackCached;
       }
       const err = new Error(`No downloadable media found for "${queryTitle}" on @${BOT_USERNAME}`);
@@ -5365,14 +5293,8 @@ app.get(['/api/resolve', '/msm/api/resolve', '/api/prefetch', '/msm/api/prefetch
     
     // Detect ACTUAL video quality tier from delivered document attributes and filename
     const actualTier = detectVideoQualityTier(filename, '', deliveredDoc, deliveredDoc.size);
-    let actualQualitySuffix = '_720p';
-    if (actualTier === '4k') actualQualitySuffix = '_4k';
-    else if (actualTier === '1080p') actualQualitySuffix = '_1080p';
-    else if (actualTier === 'sd') actualQualitySuffix = '_480p';
-    else actualQualitySuffix = '_720p';
 
-    const actualCacheKey = `${baseCacheKey}${actualQualitySuffix}`;
-    const resolvedItem = db.set(actualCacheKey, {
+    const resolvedItem = db.set(baseCacheKey, {
       docId: docIdStr,
       msgId: deliveredMsgId,
       accessHash: deliveredDoc.accessHash?.toString() || '',
@@ -5385,18 +5307,17 @@ app.get(['/api/resolve', '/msm/api/resolve', '/api/prefetch', '/msm/api/prefetch
       width: vAttr?.w ? Number(vAttr.w) : null,
       height: vAttr?.h ? Number(vAttr.h) : null,
       actualQuality: actualTier,
-      requestedQuality: requestedTier,
-      requestedKey: cacheKey,
+      requestedQualities: [requestedTier],
     });
-    console.log(`[${logPrefix}] Successfully resolved "${queryTitle}" -> Doc ID: ${docIdStr} (${filename}) as ${actualCacheKey} (tier: ${actualTier}, req: ${requestedTier})`);
+    console.log(`[${logPrefix}] Successfully resolved "${queryTitle}" -> Doc ID: ${docIdStr} (${filename}) as "${baseCacheKey}" (tier: ${actualTier}, req: ${requestedTier})`);
     return resolvedItem;
   });
 
-  inFlightResolutions.set(cacheKey, resolvePromise);
+  inFlightResolutions.set(inFlightKey, resolvePromise);
 
   try {
     const result = await resolvePromise;
-    inFlightResolutions.delete(cacheKey);
+    inFlightResolutions.delete(inFlightKey);
     if (!isPrefetch) {
       req.off('close', onClientClose);
     }

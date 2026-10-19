@@ -17,12 +17,27 @@ try {
 export class CentralDatabase {
   constructor(dbFile = DB_FILE) {
     this.dbFile = dbFile;
-    this.byQuery = new Map(); // queryKey -> record
+    this.byQuery = new Map(); // cleanKey -> Array<record>
     this.byDocId = new Map(); // docId -> record
     this.saveTimer = null;
     this.isSaving = false;
     this.needsSaveAgain = false;
     this.load();
+  }
+
+  _stripQualitySuffix(key) {
+    if (!key || typeof key !== 'string') return '';
+    return key.replace(/_(4k|2160p|1080p|720p|480p|sd)$/i, '').trim();
+  }
+
+  _normQuality(q) {
+    if (!q) return '';
+    const s = String(q).toLowerCase().replace(/[^a-z0-9]/g, '');
+    if (s === '4k' || s === '2160p' || s === '2160') return '4k';
+    if (s === '1080p' || s === '1080' || s === 'fhd') return '1080p';
+    if (s === '720p' || s === '720' || s === 'hd') return '720p';
+    if (s === '480p' || s === '480' || s === 'sd' || s === '360p' || s === '540p') return 'sd';
+    return s;
   }
 
   load() {
@@ -31,14 +46,33 @@ export class CentralDatabase {
         const raw = fs.readFileSync(this.dbFile, 'utf-8');
         const records = JSON.parse(raw);
         for (const r of records) {
-          if (!r || typeof r !== 'object') continue;
-          if (r.queryKey) this.byQuery.set(r.queryKey, r);
-          if (Array.isArray(r.requestedKeys)) {
-            for (const qk of r.requestedKeys) {
-              if (qk) this.byQuery.set(qk, r);
-            }
+          if (!r || typeof r !== 'object' || !r.docId) continue;
+          const cleanKey = this._stripQualitySuffix(r.queryKey);
+          r.queryKey = cleanKey;
+
+          // Normalize requestedQualities
+          const rawRequested = [
+            ...(Array.isArray(r.requestedQualities) ? r.requestedQualities : []),
+            ...(r.requestedQuality ? [r.requestedQuality] : []),
+          ];
+          const normRequested = Array.from(new Set(rawRequested.map(q => this._normQuality(q)))).filter(Boolean);
+          r.requestedQualities = normRequested.length > 0 ? normRequested : undefined;
+          if (r.requestedQuality) {
+            r.requestedQuality = this._normQuality(r.requestedQuality);
+          } else if (normRequested.length > 0) {
+            r.requestedQuality = normRequested[0];
           }
-          if (r.docId) this.byDocId.set(String(r.docId), r);
+
+          const docIdStr = String(r.docId);
+          this.byDocId.set(docIdStr, r);
+
+          if (cleanKey) {
+            const list = this.byQuery.get(cleanKey) || [];
+            if (!list.some(doc => String(doc.docId) === docIdStr)) {
+              list.push(r);
+            }
+            this.byQuery.set(cleanKey, list);
+          }
         }
         console.log(`[DB] Successfully loaded ${this.byQuery.size} queries (${this.byDocId.size} unique docs) from ${this.dbFile}`);
       }
@@ -48,20 +82,7 @@ export class CentralDatabase {
   }
 
   _getSerializableRecords() {
-    const recordsMap = new Map();
-    // 1. All records indexed by queryKey (e.g. title_720p, title_1080p)
-    for (const r of this.byQuery.values()) {
-      const key = r.queryKey || `doc_${r.docId}`;
-      recordsMap.set(key, r);
-    }
-    // 2. Standalone docId records without queryKey (or not yet included)
-    for (const r of this.byDocId.values()) {
-      const key = r.queryKey || `doc_${r.docId}`;
-      if (!recordsMap.has(key)) {
-        recordsMap.set(key, r);
-      }
-    }
-    return Array.from(recordsMap.values());
+    return Array.from(this.byDocId.values());
   }
 
   save() {
@@ -110,8 +131,82 @@ export class CentralDatabase {
     }
   }
 
-  get(queryKey) {
-    return this.byQuery.get(queryKey);
+  get(queryKey, targetQuality) {
+    if (!queryKey) return undefined;
+    const cleanKey = this._stripQualitySuffix(queryKey);
+    let target = targetQuality;
+    if (!target) {
+      const match = String(queryKey).match(/_(4k|2160p|1080p|720p|480p|sd)$/i);
+      if (match) target = match[1];
+    }
+
+    let docs = this.byQuery.get(cleanKey);
+    if (!docs || docs.length === 0) {
+      // Check partial/prefix match
+      for (const [qk, list] of this.byQuery.entries()) {
+        if (qk.startsWith(cleanKey) || cleanKey.startsWith(qk)) {
+          docs = list;
+          break;
+        }
+      }
+    }
+    if (!docs || docs.length === 0) {
+      const docRecord = this.byDocId.get(String(queryKey));
+      return docRecord || undefined;
+    }
+
+    if (!target) {
+      return docs[0] || undefined;
+    }
+
+    const targetNorm = this._normQuality(target);
+
+    // 1. Exact match on actualQuality
+    for (const doc of docs) {
+      if (this._normQuality(doc.actualQuality) === targetNorm) {
+        return doc;
+      }
+    }
+
+    // 2. Match on requestedQualities (Scenario B / previous request fallback)
+    for (const doc of docs) {
+      const reqList = Array.isArray(doc.requestedQualities)
+        ? doc.requestedQualities.map(q => this._normQuality(q))
+        : (doc.requestedQuality ? [this._normQuality(doc.requestedQuality)] : []);
+      if (reqList.includes(targetNorm)) {
+        return doc;
+      }
+    }
+
+    return undefined;
+  }
+
+  getFallback(queryKey, requestedTier) {
+    if (!queryKey) return undefined;
+    const cleanKey = this._stripQualitySuffix(queryKey);
+    let docs = this.byQuery.get(cleanKey);
+    if (!docs || docs.length === 0) {
+      for (const [qk, list] of this.byQuery.entries()) {
+        if (qk.startsWith(cleanKey) || cleanKey.startsWith(qk)) {
+          docs = list;
+          break;
+        }
+      }
+    }
+    if (!docs || docs.length === 0) return undefined;
+
+    let preferred = [];
+    const reqNorm = this._normQuality(requestedTier);
+    if (reqNorm === '4k') preferred = ['1080p', '720p', 'sd'];
+    else if (reqNorm === '1080p') preferred = ['720p', '4k', 'sd'];
+    else if (reqNorm === 'sd') preferred = ['720p', '1080p', '4k'];
+    else preferred = ['1080p', 'sd', '4k'];
+
+    for (const pref of preferred) {
+      const match = docs.find(d => this._normQuality(d.actualQuality) === pref);
+      if (match) return match;
+    }
+    return docs[0] || undefined;
   }
 
   getByDocId(docId) {
@@ -120,54 +215,57 @@ export class CentralDatabase {
 
   findByTitleAndQuality(baseCacheKey, targetQuality) {
     if (!baseCacheKey) return null;
-    const norm = (q) => {
-      if (!q) return '';
-      const s = String(q).toLowerCase().replace(/[^a-z0-9]/g, '');
-      if (s === '4k' || s === '2160p' || s === '2160') return '4k';
-      if (s === '1080p' || s === '1080' || s === 'fhd') return '1080p';
-      if (s === '720p' || s === '720' || s === 'hd') return '720p';
-      if (s === '480p' || s === '480' || s === 'sd' || s === '360p' || s === '540p') return 'sd';
-      return s;
-    };
+    return this.get(baseCacheKey, targetQuality);
+  }
 
-    const targetNorm = norm(targetQuality);
+  addRequestedQuality(docId, quality) {
+    if (!docId || !quality) return false;
+    const docIdStr = String(docId);
+    const record = this.byDocId.get(docIdStr);
+    if (!record) return false;
 
-    for (const [qk, r] of this.byQuery.entries()) {
-      if (qk.startsWith(baseCacheKey)) {
-        if (!targetNorm) return r;
-        const actNorm = norm(r.actualQuality);
-        const reqNorm = norm(r.requestedQuality);
-        const reqListNorm = Array.isArray(r.requestedQualities) ? r.requestedQualities.map(norm) : [];
-        if (actNorm === targetNorm || reqNorm === targetNorm || reqListNorm.includes(targetNorm)) {
-          return r;
-        }
-      }
+    const norm = this._normQuality(quality);
+    if (!norm) return false;
+
+    if (!Array.isArray(record.requestedQualities)) {
+      record.requestedQualities = [];
     }
-    return null;
+    if (record.requestedQuality && !record.requestedQualities.includes(record.requestedQuality)) {
+      record.requestedQualities.push(this._normQuality(record.requestedQuality));
+    }
+
+    const alreadyPresent = record.requestedQualities.some(q => this._normQuality(q) === norm);
+    if (!alreadyPresent) {
+      record.requestedQualities.push(norm);
+      if (!record.requestedQuality) record.requestedQuality = norm;
+      this.save();
+      console.log(`[DB] Added requestedQuality "${norm}" to Doc ID: ${docIdStr} (${record.filename}) -> [${record.requestedQualities.join(', ')}]`);
+      return true;
+    }
+    return false;
   }
 
   set(queryKey, data) {
     const docIdStr = String(data.docId);
     const existing = this.byDocId.get(docIdStr);
 
-    const existingRequestedQualities = Array.isArray(existing?.requestedQualities) ? existing.requestedQualities : [];
-    const incomingRequestedQualities = Array.isArray(data.requestedQualities) ? data.requestedQualities : [];
-    const combinedRequestedQualities = Array.from(new Set([
-      ...existingRequestedQualities,
-      ...incomingRequestedQualities,
+    const cleanKey = this._stripQualitySuffix(queryKey || data.queryKey || existing?.queryKey);
+
+    const existingRequested = Array.isArray(existing?.requestedQualities) ? existing.requestedQualities : [];
+    const incomingRequested = Array.isArray(data.requestedQualities) ? data.requestedQualities : [];
+    const rawList = [
+      ...existingRequested,
+      ...incomingRequested,
       ...(data.requestedQuality ? [data.requestedQuality] : []),
       ...(existing?.requestedQuality ? [existing.requestedQuality] : []),
-    ])).filter(Boolean);
+    ];
+    const match = String(queryKey).match(/_(4k|2160p|1080p|720p|480p|sd)$/i);
+    if (match) rawList.push(match[1]);
 
-    const existingRequestedKeys = Array.isArray(existing?.requestedKeys) ? existing.requestedKeys : [];
-    const incomingRequestedKeys = Array.isArray(data.requestedKeys) ? data.requestedKeys : (data.requestedKey ? [data.requestedKey] : []);
-    const combinedRequestedKeys = Array.from(new Set([
-      ...existingRequestedKeys,
-      ...incomingRequestedKeys,
-    ])).filter(Boolean);
+    const combinedRequestedQualities = Array.from(new Set(rawList.map(q => this._normQuality(q)))).filter(Boolean);
 
     const record = {
-      queryKey: queryKey || existing?.queryKey,
+      queryKey: cleanKey || existing?.queryKey,
       docId: docIdStr,
       accessHash: String(data.accessHash || existing?.accessHash || ''),
       fileReference: String(data.fileReference || existing?.fileReference || ''),
@@ -181,99 +279,85 @@ export class CentralDatabase {
       width: data.width !== undefined ? data.width : existing?.width,
       height: data.height !== undefined ? data.height : existing?.height,
       actualQuality: data.actualQuality || existing?.actualQuality || undefined,
-      requestedQuality: data.requestedQuality || existing?.requestedQuality || undefined,
+      requestedQuality: data.requestedQuality || existing?.requestedQuality || (combinedRequestedQualities[0] || undefined),
       requestedQualities: combinedRequestedQualities.length > 0 ? combinedRequestedQualities : undefined,
-      requestedKeys: combinedRequestedKeys.length > 0 ? combinedRequestedKeys : undefined,
     };
 
-    // Prevent unbounded memory/disk growth by evicting oldest query record if cap is reached
-    if (this.byQuery.size >= 3000) {
-      const oldestKey = this.byQuery.keys().next().value;
-      const oldestRecord = this.byQuery.get(oldestKey);
-      this.byQuery.delete(oldestKey);
-      if (oldestRecord?.docId) {
-        let hasOther = false;
-        for (const r of this.byQuery.values()) {
-          if (r.docId === oldestRecord.docId) {
-            hasOther = true;
-            break;
-          }
-        }
-        if (!hasOther) this.byDocId.delete(oldestRecord.docId);
-      }
+    // Capacity eviction if >= 3000
+    if (this.byDocId.size >= 3000 && !this.byDocId.has(docIdStr)) {
+      const oldestKey = this.byDocId.keys().next().value;
+      this.deleteByDocId(oldestKey);
     }
 
-    if (queryKey) this.byQuery.set(queryKey, record);
-    if (record.requestedKeys) {
-      for (const rk of record.requestedKeys) {
-        if (rk) this.byQuery.set(rk, record);
-      }
-    }
     this.byDocId.set(docIdStr, record);
+
+    if (cleanKey) {
+      const list = this.byQuery.get(cleanKey) || [];
+      const filtered = list.filter(r => String(r.docId) !== docIdStr);
+      filtered.push(record);
+      this.byQuery.set(cleanKey, filtered);
+    }
+
     this.save();
-    console.log(`[DB] Persisted to central DB: "${queryKey || docIdStr}" -> Doc ID: ${docIdStr} (${record.filename})`);
+    console.log(`[DB] Persisted to central DB: "${cleanKey}" -> Doc ID: ${docIdStr} (${record.filename}) [act: ${record.actualQuality || '-'}, req: ${record.requestedQualities ? record.requestedQualities.join(',') : '-'}]`);
     return record;
   }
 
   delete(queryKey) {
-    const existing = this.byQuery.get(queryKey);
-    if (existing) {
-      this.byQuery.delete(queryKey);
-      if (existing.docId) {
-        let hasOther = false;
-        for (const r of this.byQuery.values()) {
-          if (r.docId === existing.docId) {
-            hasOther = true;
-            break;
-          }
-        }
-        if (!hasOther) {
-          this.byDocId.delete(String(existing.docId));
-        }
+    if (!queryKey) return false;
+    const cleanKey = this._stripQualitySuffix(queryKey);
+    let list = this.byQuery.get(cleanKey);
+    if (!list || list.length === 0) {
+      if (this.byDocId.has(String(queryKey))) {
+        return this.deleteByDocId(queryKey);
       }
-      this.save();
-      console.log(`[DB] Evicted cache entry: "${queryKey}" (Doc ID: ${existing.docId})`);
-      return true;
+      return false;
     }
-    return false;
+
+    const match = String(queryKey).match(/_(4k|2160p|1080p|720p|480p|sd)$/i);
+    if (match) {
+      const targetNorm = this._normQuality(match[1]);
+      const docToDelete = list.find(d => this._normQuality(d.actualQuality) === targetNorm || (Array.isArray(d.requestedQualities) && d.requestedQualities.map(q => this._normQuality(q)).includes(targetNorm)));
+      if (docToDelete) {
+        return this.deleteByDocId(docToDelete.docId);
+      }
+    }
+
+    for (const doc of [...list]) {
+      this.byDocId.delete(String(doc.docId));
+    }
+    this.byQuery.delete(cleanKey);
+    this.save();
+    console.log(`[DB] Evicted cache entry for: "${cleanKey}" (${list.length} docs)`);
+    return true;
   }
 
   deleteByDocId(docId) {
     const docIdStr = String(docId);
-    let evicted = false;
-    if (this.byDocId.has(docIdStr)) {
-      this.byDocId.delete(docIdStr);
-      evicted = true;
-    }
-    for (const [qk, r] of Array.from(this.byQuery.entries())) {
-      if (r.docId === docIdStr) {
-        this.byQuery.delete(qk);
-        evicted = true;
-        console.log(`[DB] Evicted record by Doc ID: ${docIdStr} ("${qk}")`);
+    const record = this.byDocId.get(docIdStr);
+    if (!record) return false;
+    this.byDocId.delete(docIdStr);
+    if (record.queryKey) {
+      const list = this.byQuery.get(record.queryKey);
+      if (list) {
+        const filtered = list.filter(r => String(r.docId) !== docIdStr);
+        if (filtered.length > 0) {
+          this.byQuery.set(record.queryKey, filtered);
+        } else {
+          this.byQuery.delete(record.queryKey);
+        }
       }
     }
-    if (evicted) {
-      this.save();
-      return true;
-    }
-    return false;
+    this.save();
+    console.log(`[DB] Evicted record by Doc ID: ${docIdStr} ("${record.queryKey}")`);
+    return true;
   }
 
   updateVideoCodec(docId, videoCodec) {
     const docIdStr = String(docId);
-    let updated = false;
     const existing = this.byDocId.get(docIdStr);
     if (existing && existing.videoCodec !== videoCodec) {
       existing.videoCodec = videoCodec;
-      updated = true;
-    }
-    for (const r of this.byQuery.values()) {
-      if (r.docId === docIdStr && r.videoCodec !== videoCodec) {
-        r.videoCodec = videoCodec;
-        updated = true;
-      }
-    }
-    if (updated) {
       this.save();
       console.log(`[DB] Updated videoCodec for doc ${docIdStr}: ${videoCodec}`);
       return true;
@@ -283,21 +367,10 @@ export class CentralDatabase {
 
   updateVideoDimensions(docId, width, height) {
     const docIdStr = String(docId);
-    let updated = false;
     const existing = this.byDocId.get(docIdStr);
     if (existing && (existing.width !== width || existing.height !== height)) {
       existing.width = width;
       existing.height = height;
-      updated = true;
-    }
-    for (const r of this.byQuery.values()) {
-      if (r.docId === docIdStr && (r.width !== width || r.height !== height)) {
-        r.width = width;
-        r.height = height;
-        updated = true;
-      }
-    }
-    if (updated) {
       this.save();
       console.log(`[DB] Updated dimensions for doc ${docIdStr}: ${width}x${height}`);
       return true;
@@ -313,7 +386,7 @@ export class CentralDatabase {
   }
 
   size() {
-    return this.byQuery.size || this.byDocId.size;
+    return this.byDocId.size;
   }
 
   getAll(search = '') {
@@ -326,24 +399,14 @@ export class CentralDatabase {
         (r.docId && r.docId.includes(q))
       );
     }
-    // Sort newest first
     return items.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
   }
 
   getTotalSizeBytes() {
     let total = 0;
-    const seenDocIds = new Set();
     for (const r of this.byDocId.values()) {
-      seenDocIds.add(String(r.docId));
       const bytes = parseInt(r.size, 10);
       if (!isNaN(bytes) && bytes > 0) total += bytes;
-    }
-    for (const r of this.byQuery.values()) {
-      if (r.docId && !seenDocIds.has(String(r.docId))) {
-        seenDocIds.add(String(r.docId));
-        const bytes = parseInt(r.size, 10);
-        if (!isNaN(bytes) && bytes > 0) total += bytes;
-      }
     }
     return total;
   }
