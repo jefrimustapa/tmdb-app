@@ -997,81 +997,130 @@ it('preserves genuine SD detection for small files (< 500MB) with SD dimensions 
   assert.strictEqual(tier, 'sd', 'Small file with 640x360 dimensions must be detected as SD');
 });
 
-console.log('\n17. Dual-Quality Matching & Previous Request Quality Caching (#229)');
+console.log('\n17. Clean Cache Keys, Scenario A & Scenario B Quality Matching (#229)');
 
-it('stores both actualQuality and requestedQuality, creating alias key in byQuery (#229)', () => {
+it('Scenario A: Coexistence of 1080p and 4K documents under the exact same clean queryKey (#229)', () => {
   const testDb = new CentralDatabase(TEST_DB_FILE);
   testDb.clear();
 
-  // User requested 720p on phone, but delivered file is 1080p
-  const item = testDb.set('abang_imam_s01e05_1080p', {
+  const cleanKey = 'abang imam minah skuter s01e04';
+
+  // 1. Initial 1080p file cached from a 720p request (phone client)
+  const doc1080 = testDb.set(cleanKey, {
     docId: '6199269105426503425',
-    filename: 'Abang.Imam.S01E05.1080p.mkv',
+    filename: 'Abang.Imam.Minah.Skuter.S01E04.1080p.mkv',
     actualQuality: '1080p',
-    requestedQuality: '720p',
-    requestedKey: 'abang_imam_s01e05_720p',
+    requestedQualities: ['720p'],
   });
 
-  assert.strictEqual(item.actualQuality, '1080p');
-  assert.strictEqual(item.requestedQuality, '720p');
-  assert.ok(item.requestedQualities.includes('720p'));
-  assert.ok(item.requestedKeys.includes('abang_imam_s01e05_720p'));
+  assert.strictEqual(doc1080.queryKey, cleanKey, 'queryKey must have no quality suffix');
+  assert.strictEqual(doc1080.actualQuality, '1080p');
+  assert.deepStrictEqual(doc1080.requestedQualities, ['720p']);
 
-  // Both direct keys must hit immediately in byQuery Map
-  assert.strictEqual(testDb.get('abang_imam_s01e05_1080p')?.docId, '6199269105426503425');
-  assert.strictEqual(testDb.get('abang_imam_s01e05_720p')?.docId, '6199269105426503425');
+  // 2. Next, 4K is requested and bot successfully delivers 4K file (Scenario A)
+  const doc4k = testDb.set(cleanKey, {
+    docId: '6199269105426509999',
+    filename: 'Abang.Imam.Minah.Skuter.S01E04.2160p.UHD.mkv',
+    actualQuality: '4k',
+    requestedQualities: ['4k'],
+  });
+
+  assert.strictEqual(doc4k.queryKey, cleanKey, '4K queryKey must also have no quality suffix');
+  assert.strictEqual(doc4k.actualQuality, '4k');
+  assert.deepStrictEqual(doc4k.requestedQualities, ['4k']);
+
+  // Both documents must coexist in DB
+  assert.strictEqual(testDb.size(), 2, 'Both 1080p and 4K documents must coexist');
+
+  // Verify lookups for each quality tier:
+  // - 720p request: hits 1080p doc because requestedQualities includes '720p'
+  const hit720 = testDb.get(cleanKey, '720p');
+  assert.ok(hit720, '720p request must hit');
+  assert.strictEqual(hit720.docId, '6199269105426503425');
+
+  // - 1080p request: hits 1080p doc because actualQuality is '1080p'
+  const hit1080 = testDb.get(cleanKey, '1080p');
+  assert.ok(hit1080, '1080p request must hit');
+  assert.strictEqual(hit1080.docId, '6199269105426503425');
+
+  // - 4K request: hits 4K doc because actualQuality is '4k'
+  const hit4k = testDb.get(cleanKey, '4k');
+  assert.ok(hit4k, '4K request must hit');
+  assert.strictEqual(hit4k.docId, '6199269105426509999');
+
+  // Also verify legacy calls with suffix are cleanly parsed
+  assert.strictEqual(testDb.get(`${cleanKey}_720p`)?.docId, '6199269105426503425');
+  assert.strictEqual(testDb.get(`${cleanKey}_1080p`)?.docId, '6199269105426503425');
+  assert.strictEqual(testDb.get(`${cleanKey}_4k`)?.docId, '6199269105426509999');
 });
 
-it('findByTitleAndQuality satisfies future 720p request when previous requested quality was 720p (#229)', () => {
+it('Scenario B: 4K requested, not found, fallback to 1080p updates requestedQualities to ["720p", "4k"] (#229)', () => {
   const testDb = new CentralDatabase(TEST_DB_FILE);
   testDb.clear();
 
-  testDb.set('show_s01e01_1080p', {
-    docId: '777001',
-    filename: 'Show.S01E01.1080p.mkv',
+  const cleanKey = 'abang imam minah skuter s01e04';
+
+  // 1. Initial 1080p file cached with requestedQualities: ['720p']
+  testDb.set(cleanKey, {
+    docId: '6199269105426503425',
+    filename: 'Abang.Imam.Minah.Skuter.S01E04.1080p.mkv',
     actualQuality: '1080p',
-    requestedQuality: '720p',
+    requestedQualities: ['720p'],
   });
 
-  // Future 720p request matches because requestedQuality was 720p
-  const match720 = testDb.findByTitleAndQuality('show_s01e01', '720p');
-  assert.ok(match720, 'Must match existing record because previous request was 720p');
-  assert.strictEqual(match720.docId, '777001');
+  // 2. Next client requests 4K: cache lookup must miss initially so bot is queried
+  const initial4kCheck = testDb.get(cleanKey, '4k');
+  assert.strictEqual(initial4kCheck, undefined, 'Initial 4K check must be cache miss');
 
-  // Future 1080p request matches because actualQuality is 1080p
-  const match1080 = testDb.findByTitleAndQuality('show_s01e01', '1080p');
-  assert.ok(match1080, 'Must match existing record because actual quality is 1080p');
-  assert.strictEqual(match1080.docId, '777001');
+  // 3. Fallback candidate is found
+  const fallback = testDb.getFallback(cleanKey, '4k');
+  assert.ok(fallback, 'Fallback must find 1080p file');
+  assert.strictEqual(fallback.docId, '6199269105426503425');
 
-  // Unrelated quality (e.g. 4k) does not match
-  const match4k = testDb.findByTitleAndQuality('show_s01e01', '4k');
-  assert.strictEqual(match4k, null, '4k should not match a 1080p/720p file');
+  // 4. Bot does not find 4K -> resolver uses fallback and stamps requestedQualities
+  const added = testDb.addRequestedQuality(fallback.docId, '4k');
+  assert.strictEqual(added, true, 'addRequestedQuality should return true on new quality');
+  assert.deepStrictEqual(fallback.requestedQualities, ['720p', '4k'], 'requestedQualities must now contain both 720p and 4k');
+
+  // Calling again should be idempotent
+  assert.strictEqual(testDb.addRequestedQuality(fallback.docId, '4k'), false, 'Should be idempotent');
+
+  // 5. Subsequent 4K request now HITS directly without bot query (<1ms)!
+  const next4kCheck = testDb.get(cleanKey, '4k');
+  assert.ok(next4kCheck, 'Subsequent 4K request must hit cache directly');
+  assert.strictEqual(next4kCheck.docId, '6199269105426503425');
+
+  // 720p and 1080p requests also still hit
+  assert.strictEqual(testDb.get(cleanKey, '720p')?.docId, '6199269105426503425');
+  assert.strictEqual(testDb.get(cleanKey, '1080p')?.docId, '6199269105426503425');
 });
 
-it('persists requestedKeys and requestedQualities across CentralDatabase reloads (#229)', () => {
+it('persists clean queryKeys and requestedQualities array across disk reloads (#229)', () => {
   const testDb = new CentralDatabase(TEST_DB_FILE);
   testDb.clear();
 
-  testDb.set('drama_s01e02_1080p', {
-    docId: '888002',
-    filename: 'Drama.S01E02.1080p.mkv',
+  const cleanKey = 'sehangat cinta s01e01';
+
+  testDb.set(cleanKey, {
+    docId: '999001',
+    filename: 'Sehangat.Cinta.S01E01.1080p.mkv',
     actualQuality: '1080p',
-    requestedQuality: '720p',
-    requestedKey: 'drama_s01e02_720p',
+    requestedQualities: ['720p', '4k'],
   });
   testDb.saveSync();
 
-  // Reload database from disk
-  const reloadedDb = new CentralDatabase(TEST_DB_FILE);
-  const rec1080 = reloadedDb.get('drama_s01e02_1080p');
-  const rec720 = reloadedDb.get('drama_s01e02_720p');
+  // Inspect raw JSON file on disk to confirm queryKey is clean without suffix
+  const rawDisk = JSON.parse(fs.readFileSync(TEST_DB_FILE, 'utf-8'));
+  assert.strictEqual(rawDisk.length, 1);
+  assert.strictEqual(rawDisk[0].queryKey, cleanKey, 'queryKey in streams.json must be clean');
+  assert.deepStrictEqual(rawDisk[0].requestedQualities, ['720p', '4k']);
 
-  assert.ok(rec1080, 'Primary key 1080p must be loaded');
-  assert.ok(rec720, 'Alias key 720p must be loaded from requestedKeys');
-  assert.strictEqual(rec1080.docId, '888002');
-  assert.strictEqual(rec720.docId, '888002');
-  assert.strictEqual(rec1080.actualQuality, '1080p');
-  assert.strictEqual(rec1080.requestedQuality, '720p');
+  // Reload CentralDatabase from disk
+  const reloadedDb = new CentralDatabase(TEST_DB_FILE);
+  assert.strictEqual(reloadedDb.get(cleanKey, '720p')?.docId, '999001');
+  assert.strictEqual(reloadedDb.get(cleanKey, '1080p')?.docId, '999001');
+  assert.strictEqual(reloadedDb.get(cleanKey, '4k')?.docId, '999001');
+  assert.strictEqual(reloadedDb.get(cleanKey, 'sd'), undefined);
 });
 
 // Clean up temporary test files
