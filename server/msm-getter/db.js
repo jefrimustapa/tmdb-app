@@ -33,6 +33,11 @@ export class CentralDatabase {
         for (const r of records) {
           if (!r || typeof r !== 'object') continue;
           if (r.queryKey) this.byQuery.set(r.queryKey, r);
+          if (Array.isArray(r.requestedKeys)) {
+            for (const qk of r.requestedKeys) {
+              if (qk) this.byQuery.set(qk, r);
+            }
+          }
           if (r.docId) this.byDocId.set(String(r.docId), r);
         }
         console.log(`[DB] Successfully loaded ${this.byQuery.size} queries (${this.byDocId.size} unique docs) from ${this.dbFile}`);
@@ -113,9 +118,54 @@ export class CentralDatabase {
     return this.byDocId.get(String(docId));
   }
 
+  findByTitleAndQuality(baseCacheKey, targetQuality) {
+    if (!baseCacheKey) return null;
+    const norm = (q) => {
+      if (!q) return '';
+      const s = String(q).toLowerCase().replace(/[^a-z0-9]/g, '');
+      if (s === '4k' || s === '2160p' || s === '2160') return '4k';
+      if (s === '1080p' || s === '1080' || s === 'fhd') return '1080p';
+      if (s === '720p' || s === '720' || s === 'hd') return '720p';
+      if (s === '480p' || s === '480' || s === 'sd' || s === '360p' || s === '540p') return 'sd';
+      return s;
+    };
+
+    const targetNorm = norm(targetQuality);
+
+    for (const [qk, r] of this.byQuery.entries()) {
+      if (qk.startsWith(baseCacheKey)) {
+        if (!targetNorm) return r;
+        const actNorm = norm(r.actualQuality);
+        const reqNorm = norm(r.requestedQuality);
+        const reqListNorm = Array.isArray(r.requestedQualities) ? r.requestedQualities.map(norm) : [];
+        if (actNorm === targetNorm || reqNorm === targetNorm || reqListNorm.includes(targetNorm)) {
+          return r;
+        }
+      }
+    }
+    return null;
+  }
+
   set(queryKey, data) {
     const docIdStr = String(data.docId);
     const existing = this.byDocId.get(docIdStr);
+
+    const existingRequestedQualities = Array.isArray(existing?.requestedQualities) ? existing.requestedQualities : [];
+    const incomingRequestedQualities = Array.isArray(data.requestedQualities) ? data.requestedQualities : [];
+    const combinedRequestedQualities = Array.from(new Set([
+      ...existingRequestedQualities,
+      ...incomingRequestedQualities,
+      ...(data.requestedQuality ? [data.requestedQuality] : []),
+      ...(existing?.requestedQuality ? [existing.requestedQuality] : []),
+    ])).filter(Boolean);
+
+    const existingRequestedKeys = Array.isArray(existing?.requestedKeys) ? existing.requestedKeys : [];
+    const incomingRequestedKeys = Array.isArray(data.requestedKeys) ? data.requestedKeys : (data.requestedKey ? [data.requestedKey] : []);
+    const combinedRequestedKeys = Array.from(new Set([
+      ...existingRequestedKeys,
+      ...incomingRequestedKeys,
+    ])).filter(Boolean);
+
     const record = {
       queryKey: queryKey || existing?.queryKey,
       docId: docIdStr,
@@ -130,6 +180,10 @@ export class CentralDatabase {
       videoCodec: data.videoCodec || existing?.videoCodec || undefined,
       width: data.width !== undefined ? data.width : existing?.width,
       height: data.height !== undefined ? data.height : existing?.height,
+      actualQuality: data.actualQuality || existing?.actualQuality || undefined,
+      requestedQuality: data.requestedQuality || existing?.requestedQuality || undefined,
+      requestedQualities: combinedRequestedQualities.length > 0 ? combinedRequestedQualities : undefined,
+      requestedKeys: combinedRequestedKeys.length > 0 ? combinedRequestedKeys : undefined,
     };
 
     // Prevent unbounded memory/disk growth by evicting oldest query record if cap is reached
@@ -150,6 +204,11 @@ export class CentralDatabase {
     }
 
     if (queryKey) this.byQuery.set(queryKey, record);
+    if (record.requestedKeys) {
+      for (const rk of record.requestedKeys) {
+        if (rk) this.byQuery.set(rk, record);
+      }
+    }
     this.byDocId.set(docIdStr, record);
     this.save();
     console.log(`[DB] Persisted to central DB: "${queryKey || docIdStr}" -> Doc ID: ${docIdStr} (${record.filename})`);
