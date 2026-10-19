@@ -1166,7 +1166,7 @@ app.get('/msm/auth', (req, res) => {
   </style>
 </head>
 <body class="min-h-screen p-4 sm:p-8 flex flex-col items-center bg-[#0B0F17] text-[#E2E8F0]">
-  <div class="max-w-6xl w-full space-y-6 flex flex-col items-center">
+  <div class="max-w-6xl w-full space-y-6 flex flex-col items-center pb-28 sm:pb-12">
     <!-- Top Navigation & Header -->
     <header class="flex flex-col sm:flex-row items-center justify-between bg-slate-900 border border-slate-800 rounded-2xl px-6 py-4 glow-box gap-4 w-full">
       <div class="flex items-center gap-3">
@@ -1418,7 +1418,7 @@ app.get('/msm/auth', (req, res) => {
   </script>
   </div>
   <!-- Floating Back to Top Button -->
-  <button id="backToTopBtn" onclick="window.scrollTo({top: 0, behavior: 'smooth'})" title="Scroll to top" aria-label="Scroll to top" class="fixed bottom-6 right-6 z-50 p-3 rounded-full bg-slate-800/90 hover:bg-sky-500 text-slate-300 hover:text-slate-950 border border-slate-700/80 hover:border-sky-400 shadow-xl backdrop-blur transition-all duration-300 opacity-0 translate-y-4 pointer-events-none focus:outline-none glow-box cursor-pointer">
+  <button id="backToTopBtn" onclick="window.scrollTo({top: 0, behavior: 'smooth'})" title="Scroll to top" aria-label="Scroll to top" class="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-40 p-2.5 sm:p-3 rounded-full bg-slate-800/90 hover:bg-sky-500 text-slate-300 hover:text-slate-950 border border-slate-700/80 hover:border-sky-400 shadow-xl backdrop-blur transition-all duration-300 opacity-0 translate-y-4 pointer-events-none focus:outline-none glow-box cursor-pointer">
     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 10l7-7m0 0l7 7m-7-7v18"></path>
     </svg>
@@ -2069,7 +2069,7 @@ app.get('/msm/logs', (req, res) => {
   </style>
 </head>
 <body class="min-h-screen p-4 sm:p-8 flex flex-col items-center bg-[#0B0F17] text-[#E2E8F0]">
-  <div class="max-w-6xl w-full space-y-4 flex flex-col flex-1">
+  <div class="max-w-6xl w-full space-y-4 flex flex-col flex-1 pb-28 sm:pb-12">
     <!-- Top Navigation & Header -->
     <header class="flex flex-col sm:flex-row items-center justify-between bg-slate-900 border border-slate-800 rounded-2xl px-6 py-4 glow-box gap-4 w-full">
       <div class="flex items-center gap-3">
@@ -2302,7 +2302,7 @@ app.get('/msm/logs', (req, res) => {
     }, { passive: true });
   </script>
   <!-- Floating Back to Top Button -->
-  <button id="backToTopBtn" onclick="window.scrollTo({top: 0, behavior: 'smooth'})" title="Scroll to top" aria-label="Scroll to top" class="fixed bottom-6 right-6 z-50 p-3 rounded-full bg-slate-800/90 hover:bg-sky-500 text-slate-300 hover:text-slate-950 border border-slate-700/80 hover:border-sky-400 shadow-xl backdrop-blur transition-all duration-300 opacity-0 translate-y-4 pointer-events-none focus:outline-none glow-box cursor-pointer">
+  <button id="backToTopBtn" onclick="window.scrollTo({top: 0, behavior: 'smooth'})" title="Scroll to top" aria-label="Scroll to top" class="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-40 p-2.5 sm:p-3 rounded-full bg-slate-800/90 hover:bg-sky-500 text-slate-300 hover:text-slate-950 border border-slate-700/80 hover:border-sky-400 shadow-xl backdrop-blur transition-all duration-300 opacity-0 translate-y-4 pointer-events-none focus:outline-none glow-box cursor-pointer">
     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 10l7-7m0 0l7 7m-7-7v18"></path>
     </svg>
@@ -2527,7 +2527,7 @@ app.get(['/msm', '/msm/dashboard'], (req, res) => {
   </style>
 </head>
 <body class="min-h-screen p-4 sm:p-8 flex flex-col items-center bg-[#0B0F17] text-[#E2E8F0]">
-  <div class="max-w-6xl w-full space-y-6">
+  <div class="max-w-6xl w-full space-y-6 pb-28 sm:pb-12">
     <!-- Top Navigation & Header -->
     <header class="flex flex-col sm:flex-row items-center justify-between bg-slate-900 border border-slate-800 rounded-2xl px-6 py-4 glow-box gap-4 w-full">
       <div class="flex items-center gap-3">
@@ -2712,9 +2712,9 @@ app.get(['/msm', '/msm/dashboard'], (req, res) => {
         <span class="text-xs text-slate-400">Targeting @${BOT_USERNAME}</span>
       </div>
       <p class="text-xs text-slate-400">Test live query extraction and view raw candidate buttons directly from the active Telegram bot.</p>
-      <div class="flex gap-2">
-        <input id="diagInput" type="text" value="Kudrat 1968" placeholder="Title (e.g. Spider-Man, Carrie)..." class="flex-1 px-3.5 py-2 bg-slate-950 border border-slate-800 rounded-xl text-sm text-white focus:outline-none focus:border-sky-500/50" />
-        <button id="diagBtn" onclick="runDiagnostic()" class="px-5 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs rounded-xl transition">
+      <div class="flex flex-col sm:flex-row gap-2">
+        <input id="diagInput" type="text" value="Kudrat 1968" placeholder="Title (e.g. Spider-Man, Carrie)..." class="flex-1 px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm text-white focus:outline-none focus:border-sky-500/50" />
+        <button id="diagBtn" onclick="runDiagnostic()" class="w-full sm:w-auto px-5 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs rounded-xl transition flex items-center justify-center gap-1.5 shrink-0">
           Test Query
         </button>
       </div>
@@ -2935,7 +2935,7 @@ app.get(['/msm', '/msm/dashboard'], (req, res) => {
     }, { passive: true });
   </script>
   <!-- Floating Back to Top Button -->
-  <button id="backToTopBtn" onclick="window.scrollTo({top: 0, behavior: 'smooth'})" title="Scroll to top" aria-label="Scroll to top" class="fixed bottom-6 right-6 z-50 p-3 rounded-full bg-slate-800/90 hover:bg-sky-500 text-slate-300 hover:text-slate-950 border border-slate-700/80 hover:border-sky-400 shadow-xl backdrop-blur transition-all duration-300 opacity-0 translate-y-4 pointer-events-none focus:outline-none glow-box cursor-pointer">
+  <button id="backToTopBtn" onclick="window.scrollTo({top: 0, behavior: 'smooth'})" title="Scroll to top" aria-label="Scroll to top" class="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-40 p-2.5 sm:p-3 rounded-full bg-slate-800/90 hover:bg-sky-500 text-slate-300 hover:text-slate-950 border border-slate-700/80 hover:border-sky-400 shadow-xl backdrop-blur transition-all duration-300 opacity-0 translate-y-4 pointer-events-none focus:outline-none glow-box cursor-pointer">
     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 10l7-7m0 0l7 7m-7-7v18"></path>
     </svg>
@@ -2970,7 +2970,7 @@ app.get(['/msm/streams', '/msm/cache'], (req, res) => {
   </style>
 </head>
 <body class="min-h-screen p-4 sm:p-8 flex flex-col items-center bg-[#0B0F17] text-[#E2E8F0]">
-  <div class="max-w-6xl w-full space-y-6">
+  <div class="max-w-6xl w-full space-y-6 pb-28 sm:pb-12">
     <!-- Top Navigation & Header -->
     <header class="flex flex-col sm:flex-row items-center justify-between bg-slate-900 border border-slate-800 rounded-2xl px-6 py-4 glow-box gap-4 w-full">
       <div class="flex items-center gap-3">
@@ -3376,7 +3376,7 @@ app.get(['/msm/streams', '/msm/cache'], (req, res) => {
     }, { passive: true });
   </script>
   <!-- Floating Back to Top Button -->
-  <button id="backToTopBtn" onclick="window.scrollTo({top: 0, behavior: 'smooth'})" title="Scroll to top" aria-label="Scroll to top" class="fixed bottom-6 right-6 z-50 p-3 rounded-full bg-slate-800/90 hover:bg-sky-500 text-slate-300 hover:text-slate-950 border border-slate-700/80 hover:border-sky-400 shadow-xl backdrop-blur transition-all duration-300 opacity-0 translate-y-4 pointer-events-none focus:outline-none glow-box cursor-pointer">
+  <button id="backToTopBtn" onclick="window.scrollTo({top: 0, behavior: 'smooth'})" title="Scroll to top" aria-label="Scroll to top" class="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-40 p-2.5 sm:p-3 rounded-full bg-slate-800/90 hover:bg-sky-500 text-slate-300 hover:text-slate-950 border border-slate-700/80 hover:border-sky-400 shadow-xl backdrop-blur transition-all duration-300 opacity-0 translate-y-4 pointer-events-none focus:outline-none glow-box cursor-pointer">
     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 10l7-7m0 0l7 7m-7-7v18"></path>
     </svg>
@@ -3411,7 +3411,7 @@ app.get(['/msm/setting', '/msm/settings'], (req, res) => {
   </style>
 </head>
 <body class="min-h-screen p-4 sm:p-8 flex flex-col items-center bg-[#0B0F17] text-[#E2E8F0]">
-  <div class="max-w-6xl w-full space-y-6">
+  <div class="max-w-6xl w-full space-y-6 pb-28 sm:pb-12">
     <!-- Top Navigation & Header -->
     <header class="flex flex-col sm:flex-row items-center justify-between bg-slate-900 border border-slate-800 rounded-2xl px-6 py-4 glow-box gap-4 w-full">
       <div class="flex items-center gap-3">
@@ -4178,7 +4178,7 @@ app.get(['/msm/setting', '/msm/settings'], (req, res) => {
     }, { passive: true });
   </script>
   <!-- Floating Back to Top Button -->
-  <button id="backToTopBtn" onclick="window.scrollTo({top: 0, behavior: 'smooth'})" title="Scroll to top" aria-label="Scroll to top" class="fixed bottom-6 right-6 z-50 p-3 rounded-full bg-slate-800/90 hover:bg-sky-500 text-slate-300 hover:text-slate-950 border border-slate-700/80 hover:border-sky-400 shadow-xl backdrop-blur transition-all duration-300 opacity-0 translate-y-4 pointer-events-none focus:outline-none glow-box cursor-pointer">
+  <button id="backToTopBtn" onclick="window.scrollTo({top: 0, behavior: 'smooth'})" title="Scroll to top" aria-label="Scroll to top" class="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-40 p-2.5 sm:p-3 rounded-full bg-slate-800/90 hover:bg-sky-500 text-slate-300 hover:text-slate-950 border border-slate-700/80 hover:border-sky-400 shadow-xl backdrop-blur transition-all duration-300 opacity-0 translate-y-4 pointer-events-none focus:outline-none glow-box cursor-pointer">
     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 10l7-7m0 0l7 7m-7-7v18"></path>
     </svg>
