@@ -91,35 +91,51 @@ if (savedSettings.geoBlockWhitelistedIps === undefined) savedSettings.geoBlockWh
 
 export let BOT_USERNAME = (savedSettings.targetBotUsername || process.env.TG_BOT_USERNAME || 'msm34bot').replace(/^@/, '');
 
-export function detectVideoQualityTier(filename = '', queryKey = '', targetDoc = null) {
-  // 1. Direct Telegram Video Dimensions (Highest authority: real pixel metadata of the stream)
+export function detectVideoQualityTier(filename = '', queryKey = '', targetDoc = null, customSize = null) {
+  // 1. Genuine Telegram Video Dimensions (Highest authority: real pixel metadata of the stream)
+  // Strictly check DocumentAttributeVideo only - NEVER use DocumentAttributeImageSize or generic (w && h) poster thumbnails!
   if (targetDoc && Array.isArray(targetDoc.attributes)) {
-    const videoAttr = targetDoc.attributes.find(a => a.className === 'DocumentAttributeVideo' || (a.w && a.h));
+    const videoAttr = targetDoc.attributes.find(a => a.className === 'DocumentAttributeVideo');
     if (videoAttr) {
       const w = Number(videoAttr.w) || 0;
       const h = Number(videoAttr.h) || 0;
       if (w >= 3200 || h >= 1800) return '4k';
       if (w >= 1600 || h >= 900) return '1080p';
       if (w >= 960 || h >= 530) return '720p';
-      if (w > 0 || h > 0) return 'sd';
+
+      // For sub-HD video dimensions (< 960x530 e.g. 480p/360p):
+      // Check if file size is substantial (>= 600 MB for TV or >= 1.2 GB general)
+      const docBytes = Number(customSize || targetDoc.size || 0);
+      const isLargeFile = docBytes >= 600 * 1024 * 1024;
+      if (!isLargeFile && (w > 0 || h > 0)) {
+        return 'sd';
+      }
+      // If large file, videoAttr sub-HD dimension is an unreliable preview placeholder - proceed to fallbacks
     }
   }
 
-  // 2. Fallback: Check the video filename only if document dimension metadata is absent
+  // 2. Fallback on file size heuristics (large multi-gigabyte files) when metadata is absent
+  const docBytes = Number(customSize || (targetDoc && targetDoc.size) || 0);
   const fn = String(filename || '').toLowerCase().replace(/[_\.\-\+\[\]\(\)]/g, ' ');
+  const qk = String(queryKey || '').toLowerCase().replace(/[_\.\-\+\[\]\(\)]/g, ' ');
+
+  // 3. Fallback (Last resort): Check the video filename
   if (/\b(4k|2160p|uhd)\b/i.test(fn)) return '4k';
   if (/\b(1080p|1080|fhd)\b/i.test(fn)) return '1080p';
   if (/\b(720p|720|hd)\b/i.test(fn)) return '720p';
   if (/\b(480p|360p|540p|sd)\b/i.test(fn)) return 'sd';
 
-  // 3. Fallback: Secondary check on queryKey only if neither attributes nor filename has quality tags
-  const qk = String(queryKey || '').toLowerCase().replace(/[_\.\-\+\[\]\(\)]/g, ' ');
+  // 4. File size fallback when filename has no quality tags
+  if (docBytes >= 2 * 1024 * 1024 * 1024) return '1080p';
+  if (docBytes >= 600 * 1024 * 1024) return '720p';
+
+  // 5. Fallback: Secondary check on queryKey only if neither attributes, filename, nor size has quality tags
   if (/\b(4k|2160p|uhd)\b/i.test(qk)) return '4k';
   if (/\b(1080p|1080|fhd)\b/i.test(qk)) return '1080p';
   if (/\b(720p|720|hd)\b/i.test(qk)) return '720p';
   if (/\b(480p|360p|540p|sd)\b/i.test(qk)) return 'sd';
 
-  // 4. Default to standard 720p HD pipeline
+  // 6. Default to standard 720p HD pipeline
   return '720p';
 }
 
@@ -4227,8 +4243,8 @@ app.get(['/api/cache', '/msm/api/cache'], (req, res) => {
         sizeFormatted = `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
       }
     }
-    const fakeDoc = (item.width || item.height) ? { attributes: [{ className: 'DocumentAttributeVideo', w: item.width, h: item.height }] } : null;
-    const qualityTier = detectVideoQualityTier(item.filename || '', item.queryKey || '', fakeDoc);
+    const fakeDoc = (item.width || item.height) ? { size: bytes, attributes: [{ className: 'DocumentAttributeVideo', w: item.width, h: item.height }] } : (bytes > 0 ? { size: bytes } : null);
+    const qualityTier = detectVideoQualityTier(item.filename || '', item.queryKey || '', fakeDoc, bytes);
 
     return {
       queryKey: item.queryKey,
@@ -4311,14 +4327,16 @@ app.get(['/api/resolve', '/msm/api/resolve', '/api/prefetch', '/msm/api/prefetch
   const shouldBypassCache = !isPrefetch && (force === 'true' || refresh === 'true');
   let targetQuality = 720;
   const rawQ = String(maxQuality || '').toLowerCase().trim();
-  if (rawQ === '4k' || parseInt(rawQ, 10) >= 2160) {
-    targetQuality = 2160;
-  } else if (parseInt(rawQ, 10) >= 1080) {
-    targetQuality = 1080;
-  } else if (parseInt(rawQ, 10) >= 720) {
-    targetQuality = 720;
-  } else {
-    targetQuality = 480;
+  if (rawQ) {
+    if (rawQ === '4k' || parseInt(rawQ, 10) >= 2160) {
+      targetQuality = 2160;
+    } else if (parseInt(rawQ, 10) >= 1080) {
+      targetQuality = 1080;
+    } else if (parseInt(rawQ, 10) >= 720) {
+      targetQuality = 720;
+    } else {
+      targetQuality = 480;
+    }
   }
 
   const sNum = season ? parseInt(season, 10) : NaN;
@@ -4714,7 +4732,7 @@ app.get(['/api/resolve', '/msm/api/resolve', '/api/prefetch', '/msm/api/prefetch
       if (isTargetQualityMet && chosen.qualityScore >= 30) {
         const docIdStr = chosen.doc.id.toString();
         console.log(`[RESOLVE] Found matching recent document in chat: ${chosen.filename} (ID: ${docIdStr}, score: ${chosen.qualityScore}, tier: ${chosenTier})`);
-        const vAttr = chosen.doc.attributes?.find(a => a.className === 'DocumentAttributeVideo' || (a.w && a.h));
+        const vAttr = chosen.doc.attributes?.find(a => a.className === 'DocumentAttributeVideo');
         const streamItem = db.set(actualCacheKey, {
           docId: docIdStr,
           msgId: chosen.msgId,
@@ -4733,7 +4751,7 @@ app.get(['/api/resolve', '/msm/api/resolve', '/api/prefetch', '/msm/api/prefetch
         // Chat doc has lower/different quality than requested. Store as fallback without overriding target quality key
         if (!fallbackCached) {
           const docIdStr = chosen.doc.id.toString();
-          const vAttr = chosen.doc.attributes?.find(a => a.className === 'DocumentAttributeVideo' || (a.w && a.h));
+          const vAttr = chosen.doc.attributes?.find(a => a.className === 'DocumentAttributeVideo');
           fallbackCached = db.set(actualCacheKey, {
             docId: docIdStr,
             msgId: chosen.msgId,
@@ -5319,10 +5337,10 @@ app.get(['/api/resolve', '/msm/api/resolve', '/api/prefetch', '/msm/api/prefetch
 
     const docIdStr = deliveredDoc.id.toString();
     const filename = resolvedFilename || chosenFilename || queryTitle;
-    const vAttr = deliveredDoc.attributes?.find(a => a.className === 'DocumentAttributeVideo' || (a.w && a.h));
+    const vAttr = deliveredDoc.attributes?.find(a => a.className === 'DocumentAttributeVideo');
     
     // Detect ACTUAL video quality tier from delivered document attributes and filename
-    const actualTier = detectVideoQualityTier(filename, '', deliveredDoc);
+    const actualTier = detectVideoQualityTier(filename, '', deliveredDoc, deliveredDoc.size);
     let actualQualitySuffix = '_720p';
     if (actualTier === '4k') actualQualitySuffix = '_4k';
     else if (actualTier === '1080p') actualQualitySuffix = '_1080p';
