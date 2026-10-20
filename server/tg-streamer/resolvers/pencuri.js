@@ -74,6 +74,161 @@ async function fetchPencariLinkDetails(linkUrl) {
   }
 }
 
+// Complete Mini App delivery flow: RequestMainWebView -> telegram_login -> save_write_access -> sendtgfile
+async function triggerMiniAppDelivery(client, { deliveryBot, shortCode, miniAppBot, startParam, checkAborted }) {
+  try {
+    const finalMiniAppBot = miniAppBot || deliveryBot || 'UnOfficialsBot';
+    const finalStartParam = startParam || `${shortCode}-8665550029`;
+
+    console.log(`[PENCURI MINI-APP] Preparing Mini App delivery via @${finalMiniAppBot} (param: "${finalStartParam}")...`);
+
+    // Ensure bot is unblocked and started
+    try {
+      await client.invoke(new Api.contacts.Unblock({ id: finalMiniAppBot }));
+    } catch (_) {}
+    try {
+      await client.sendMessage(finalMiniAppBot, { message: '/start' });
+    } catch (_) {}
+
+    const botEntity = await client.getInputEntity(finalMiniAppBot);
+
+    // 1. Invoke RequestMainWebView to obtain tgWebAppData
+    const webViewRes = await client.invoke(new Api.messages.RequestMainWebView({
+      peer: new Api.InputPeerSelf(),
+      bot: botEntity,
+      startParam: finalStartParam,
+      platform: 'android',
+    }));
+
+    if (!webViewRes || !webViewRes.url) {
+      console.warn(`[PENCURI MINI-APP] RequestMainWebView did not return URL`);
+      return false;
+    }
+
+    const urlObj = new URL(webViewRes.url);
+    const domain = urlObj.origin;
+    const hashPart = urlObj.hash.slice(1);
+    const hashParams = new URLSearchParams(hashPart);
+    const tgWebAppData = hashParams.get('tgWebAppData') || '';
+
+    if (!tgWebAppData) {
+      console.warn(`[PENCURI MINI-APP] No tgWebAppData found in WebApp URL`);
+      return false;
+    }
+
+    if (checkAborted && checkAborted()) return false;
+
+    // 2. Fetch /webapp HTML to extract redirectUrl and actualBotId
+    const webappRes = await fetch(`${domain}/webapp?tgWebAppStartParam=${finalStartParam}`, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36' },
+    });
+    const webappHtml = await webappRes.text();
+    const rawRedirectMatch = webappHtml.match(/var\s+redirectUrl\s*=\s*["']([^"']+)["']/i);
+    const redirectUrl = rawRedirectMatch ? JSON.parse(`"${rawRedirectMatch[1]}"`) : '';
+
+    const botIdMatch = webappHtml.match(/botIdParam\s*=\s*["']?(\d+)["']?/i) ||
+                       webappHtml.match(/bot_id["']?\s*:\s*["']?(\d+)["']?/i);
+    const actualBotId = botIdMatch ? botIdMatch[1] : '8652691150';
+
+    if (checkAborted && checkAborted()) return false;
+
+    // 3. Perform telegram_login
+    const loginFd = new URLSearchParams({
+      action: 'telegram_login',
+      initData: tgWebAppData,
+      bot_id: actualBotId,
+      redirect_to: redirectUrl,
+      version: '8.0',
+      platform: 'android',
+    });
+
+    const loginRes = await fetch(`${domain}/wp-admin/admin-ajax.php`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'User-Agent': 'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36',
+      },
+      body: loginFd.toString(),
+    });
+
+    const loginData = await loginRes.json().catch(() => null);
+    if (!loginData || !loginData.success) {
+      console.warn(`[PENCURI MINI-APP] telegram_login failed:`, loginData?.data || 'Unknown error');
+      return false;
+    }
+
+    let rawCookies = '';
+    if (typeof loginRes.headers.getSetCookie === 'function') {
+      rawCookies = loginRes.headers.getSetCookie().map(c => c.split(';')[0]).join('; ');
+    } else {
+      rawCookies = loginRes.headers.get('set-cookie') || '';
+    }
+    const userId = loginData.data?.user_id || '';
+
+    // 4. Call save_write_access
+    await fetch(`${domain}/wp-admin/admin-ajax.php`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'User-Agent': 'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36',
+        'Cookie': rawCookies,
+      },
+      body: new URLSearchParams({
+        action: 'save_write_access',
+        bot_id: actualBotId,
+        user_id: String(userId),
+        granted: '1',
+      }).toString(),
+    }).catch(() => {});
+
+    if (checkAborted && checkAborted()) return false;
+
+    // 5. Fetch link page with cookies to obtain fresh wp_nonce
+    const linkFullUrl = `${domain}${redirectUrl}`;
+    const pageRes = await fetch(linkFullUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36',
+        'Cookie': rawCookies,
+      },
+    });
+    const pageHtml = await pageRes.text();
+
+    const nonceMatch = pageHtml.match(/formData\.append\('wp_nonce',\s*["']([^"']+)["']\)/i) ||
+                       pageHtml.match(/wp_nonce["']?\s*:\s*["']([^"']+)["']/i) ||
+                       pageHtml.match(/nonce["']?\s*:\s*["']([a-f0-9]{10})["']/i);
+    const nonce = nonceMatch ? nonceMatch[1] : '686bac635e';
+
+    if (checkAborted && checkAborted()) return false;
+
+    // 6. Trigger sendtgfile
+    const sendFd = new URLSearchParams({
+      action: 'sendtgfile',
+      requestfile: shortCode,
+      wp_nonce: nonce,
+      ref: 'AJAX-BUTTON',
+      bot_id: actualBotId,
+    });
+
+    const sendRes = await fetch(`${domain}/wp-admin/admin-ajax.php`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'User-Agent': 'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36',
+        'Referer': linkFullUrl,
+        'Cookie': rawCookies,
+      },
+      body: sendFd.toString(),
+    });
+
+    const sendData = await sendRes.json().catch(() => null);
+    console.log(`[PENCURI MINI-APP] sendtgfile response:`, JSON.stringify(sendData));
+    return Boolean(sendData && sendData.success);
+  } catch (err) {
+    console.error(`[PENCURI MINI-APP] Delivery error:`, err.message);
+    return false;
+  }
+}
+
 export class PencuriResolver extends BaseResolver {
   constructor(client, options = {}) {
     super(client, options);
@@ -306,25 +461,60 @@ export class PencuriResolver extends BaseResolver {
 
       const sentMsgId = sentMsg ? sentMsg.id : 0;
 
-      // Poll for document delivery in both deliveryBot and targetBot
+      // Poll for document delivery or Mini App button in deliveryBot, targetBot, and any detected Mini App bot
       let deliveredDoc = null;
       let deliveredMsgId = null;
       let resolvedFilename = file.title;
+      let miniAppTriggered = false;
+      let miniAppBotDetected = null;
 
-      for (let attempt = 0; attempt < 8; attempt++) {
+      for (let attempt = 0; attempt < 12; attempt++) {
         if (checkAborted()) break;
         await new Promise(r => setTimeout(r, 1500));
         if (checkAborted()) break;
 
-        for (const b of [deliveryBot, targetBot]) {
+        const checkBots = [deliveryBot, targetBot];
+        if (miniAppBotDetected && !checkBots.includes(miniAppBotDetected)) {
+          checkBots.push(miniAppBotDetected);
+        }
+
+        for (const b of checkBots) {
           const incoming = await this.client.getMessages(b, { limit: 5 }).catch(() => []);
           for (const im of incoming) {
-            if (im.id > sentMsgId && im.media?.document) {
-              deliveredDoc = im.media.document;
-              deliveredMsgId = im.id;
-              const fnAttr = deliveredDoc.attributes?.find(a => a.className === 'DocumentAttributeFilename');
-              if (fnAttr) resolvedFilename = fnAttr.fileName;
-              break;
+            if (im.id > sentMsgId) {
+              // 1. Direct document delivery check
+              if (im.media?.document && im.media.document.size > 10000000) {
+                deliveredDoc = im.media.document;
+                deliveredMsgId = im.id;
+                const fnAttr = deliveredDoc.attributes?.find(a => a.className === 'DocumentAttributeFilename');
+                if (fnAttr) resolvedFilename = fnAttr.fileName;
+                break;
+              }
+
+              // 2. Mini App button detection (e.g. t.me/freemovie69bot?startapp=...)
+              if (!miniAppTriggered && im.replyMarkup?.rows) {
+                for (const row of im.replyMarkup.rows) {
+                  for (const btn of row.buttons) {
+                    if (btn.url && (btn.url.includes('startapp=') || btn.url.includes('/link/'))) {
+                      const matchApp = btn.url.match(/t\.me\/([a-zA-Z0-9_]+)\?startapp=([a-zA-Z0-9_-]+)/i);
+                      const targetMiniAppBot = matchApp ? matchApp[1] : deliveryBot;
+                      const targetStartParam = matchApp ? matchApp[2] : startParam;
+                      miniAppBotDetected = targetMiniAppBot;
+                      miniAppTriggered = true;
+                      console.log(`[PENCURI RESOLVE] Detected Mini App button for @${targetMiniAppBot} (param: "${targetStartParam}"). Triggering delivery flow...`);
+                      await triggerMiniAppDelivery(this.client, {
+                        deliveryBot,
+                        shortCode: file.short_code,
+                        miniAppBot: targetMiniAppBot,
+                        startParam: targetStartParam,
+                        checkAborted,
+                      });
+                      break;
+                    }
+                  }
+                  if (miniAppTriggered) break;
+                }
+              }
             }
           }
           if (deliveredDoc) break;
