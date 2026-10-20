@@ -321,7 +321,26 @@ export class PencuriResolver extends BaseResolver {
 
             if (matches) {
               const tier = detectVideoQualityTier(filename, '', doc);
-              matchingRecentDocs.push({ doc, filename, msgId: msg.id, tier, bot: bName });
+              let qualityScore = 10;
+              if (targetQuality <= 480) {
+                if (tier === 'sd') qualityScore = 60;
+                else if (tier === '720p') qualityScore = 30;
+                else if (tier === '1080p') qualityScore = 5;
+              } else if (targetQuality <= 720) {
+                if (tier === '720p') qualityScore = 50;
+                else if (tier === 'sd') qualityScore = 30;
+                else if (tier === '1080p') qualityScore = 5;
+              } else if (targetQuality >= 2160) {
+                if (tier === '4k') qualityScore = 70;
+                else if (tier === '1080p') qualityScore = 40;
+                else if (tier === '720p') qualityScore = 20;
+              } else {
+                if (tier === '1080p') qualityScore = 50;
+                else if (tier === '720p') qualityScore = 30;
+              }
+              if (normFn.includes('.mp4') || normFn.includes('mp4')) qualityScore += 15;
+
+              matchingRecentDocs.push({ doc, filename, msgId: msg.id, tier, bot: bName, qualityScore });
             }
           }
         }
@@ -331,14 +350,28 @@ export class PencuriResolver extends BaseResolver {
     }
 
     if (matchingRecentDocs.length > 0) {
+      matchingRecentDocs.sort((a, b) => b.qualityScore - a.qualityScore);
       const chosen = matchingRecentDocs[0];
-      console.log(`[PENCURI RESOLVE] Found matching recent document in @${chosen.bot}: ${chosen.filename} (${chosen.tier})`);
-      return {
-        document: chosen.doc,
-        filename: chosen.filename,
-        msgId: chosen.msgId,
-        tier: chosen.tier,
-      };
+      let isTargetQualityMet = false;
+      if (targetQuality >= 2160) {
+        isTargetQualityMet = chosen.tier === '4k';
+      } else if (targetQuality >= 1080) {
+        isTargetQualityMet = chosen.tier === '1080p' || chosen.tier === '4k';
+      } else if (targetQuality <= 480) {
+        isTargetQualityMet = chosen.tier === 'sd';
+      } else {
+        isTargetQualityMet = chosen.tier === '720p';
+      }
+
+      if (isTargetQualityMet && chosen.qualityScore >= 30) {
+        console.log(`[PENCURI RESOLVE] Found matching recent document in @${chosen.bot}: ${chosen.filename} (${chosen.tier})`);
+        return {
+          document: chosen.doc,
+          filename: chosen.filename,
+          msgId: chosen.msgId,
+          tier: chosen.tier,
+        };
+      }
     }
 
     // 2. Prepare prioritized search queries (unified across resolvers)
@@ -361,24 +394,29 @@ export class PencuriResolver extends BaseResolver {
         }
       }
 
-      // Early break if we already gathered candidate files matching the episode / movie
-      const hasMatchingCandidate = candidateFiles.some(f => {
+      // Early break ONLY if we already gathered candidate files matching the episode / movie AND matching target quality
+      const hasTargetQualityCandidate = candidateFiles.some(f => {
         const fn = f.title || '';
         if (isTv) {
           const epInfo = extractEpisodeInfo(fn);
           if (!epInfo || (epInfo.isRange ? (eNum < epInfo.start || eNum > epInfo.end) : epInfo.episode !== eNum)) return false;
           const seasonFound = extractSeasonInfo(fn);
           if (seasonFound !== null && seasonFound !== sNum) return false;
-          return true;
         } else {
           const isTvDoc = /\b(s\d{1,2}e\d{1,2}|season\s*\d+|musim\s*\d+|episode\s*\d+|episod\s*\d+|ep\s*\d+)\b/i.test(fn);
           if (isTvDoc) return false;
-          return true;
+          const docSequel = extractSequelInfo(fn);
+          if (targetSequel ? docSequel !== targetSequel : Boolean(docSequel)) return false;
         }
+        const tier = detectVideoQualityTier(fn, '', null, f.file_size);
+        if (targetQuality >= 2160) return tier === '4k';
+        if (targetQuality >= 1080) return tier === '1080p' || tier === '4k';
+        if (targetQuality <= 480) return tier === 'sd';
+        return tier === '720p';
       });
 
-      if (hasMatchingCandidate) {
-        console.log(`[PENCURI RESOLVE] Found matching candidates from query "${sq}", proceeding to scoring.`);
+      if (hasTargetQualityCandidate) {
+        console.log(`[PENCURI RESOLVE] Found matching target-quality candidate (${requestedTier}) from query "${sq}", proceeding to scoring.`);
         break;
       }
     }
@@ -416,10 +454,31 @@ export class PencuriResolver extends BaseResolver {
       if (matches) {
         const tier = detectVideoQualityTier(fn, '', null, f.file_size);
         let score = 50;
-        if (targetQuality >= 2160 && tier === '4k') score += 50;
-        else if (targetQuality >= 1080 && tier === '1080p') score += 40;
-        else if (targetQuality >= 720 && tier === '720p') score += 30;
-        else if (targetQuality <= 480 && tier === 'sd') score += 30;
+
+        // Quality preference (strictly aligned with base.js / MSM)
+        if (targetQuality <= 480) {
+          if (tier === 'sd') score += 80;
+          else if (tier === '720p') score += 20;
+          else if (tier === '1080p') score -= 40;
+          else if (tier === '4k') score -= 100;
+        } else if (targetQuality <= 720) {
+          if (tier === '720p') score += 50;
+          else if (tier === 'sd') score += 30;
+          else if (tier === '1080p') score += 5;
+          else if (tier === '4k') score -= 50;
+        } else if (targetQuality >= 2160) {
+          if (tier === '4k') score += 100;
+          else if (tier === '1080p') score += 60;
+          else if (tier === '720p') score += 20;
+        } else {
+          // 1080p target
+          if (tier === '1080p') score += 80;
+          else if (tier === '720p') score += 30;
+          else if (tier === '4k') score -= 30;
+        }
+
+        if (fn.toLowerCase().includes('.mp4')) score += 15;
+        if (fn.toLowerCase().includes('malaysub') || fn.toLowerCase().includes('msm')) score += 5;
 
         validCandidates.push({
           file: f,
