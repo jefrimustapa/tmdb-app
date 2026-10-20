@@ -118,6 +118,24 @@ if (savedSettings.targetBotUsernames === undefined) savedSettings.targetBotUsern
 
 export let BOT_USERNAME = (savedSettings.targetBotUsername || process.env.TG_BOT_USERNAME || 'msm34bot').replace(/^@/, '');
 
+export function getActiveTargetBot() {
+  const activeResolverId = savedSettings.activeResolver || 'msm';
+  if (savedSettings.targetBotUsernames && savedSettings.targetBotUsernames[activeResolverId]) {
+    return savedSettings.targetBotUsernames[activeResolverId].replace(/^@/, '');
+  }
+  if (activeResolverId === 'pencuri') {
+    return 'Pencuri_Movie_Bot';
+  }
+  return BOT_USERNAME.replace(/^@/, '');
+}
+
+export function getGeoBadgeHtml(isGeoEnabled) {
+  if (isGeoEnabled) {
+    return '<span id="geoBadge" class="text-xs px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-mono hidden sm:inline-block">🛡️ MY Only</span>';
+  }
+  return '<span id="geoBadge" class="text-xs px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700 font-mono hidden sm:inline-block">🛡️ Disabled</span>';
+}
+
 
 function getLogFilePath() {
   if (fs.existsSync('/tmp/tg-streamer.log')) return '/tmp/tg-streamer.log';
@@ -490,7 +508,7 @@ app.get('/tg/auth', (req, res) => {
         <div>
           <h1 class="text-lg font-bold text-white flex items-center gap-2">
             MSM Auth Portal
-            <span class="text-xs px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-300 border border-sky-500/30 font-mono">@${BOT_USERNAME}</span>
+            <span class="text-xs px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-300 border border-sky-500/30 font-mono">@${getActiveTargetBot()}</span>
           </h1>
           <p class="text-xs text-slate-400">Telegram MTProto Session & Authentication Gateway</p>
         </div>
@@ -1197,6 +1215,9 @@ app.get(['/api/system/stats', '/tg/api/system/stats', '/msm/api/system/stats'], 
     blockCacheEntries: globalBlockCache.size,
     blockCacheMaxEntries: getBlockCacheMaxEntries(),
     logSizeKB,
+    geoBlockEnabled: savedSettings.geoBlockEnabled !== false,
+    activeResolver: savedSettings.activeResolver || 'msm',
+    targetBotUsername: getActiveTargetBot(),
   });
 });
 
@@ -1393,7 +1414,7 @@ app.get('/tg/logs', (req, res) => {
         <div>
           <h1 class="text-lg font-bold text-white flex items-center gap-2">
             MSM Logs
-            <span class="text-xs px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-300 border border-sky-500/30 font-mono">@${BOT_USERNAME}</span>
+            <span class="text-xs px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-300 border border-sky-500/30 font-mono">@${getActiveTargetBot()}</span>
           </h1>
           <p class="text-xs text-slate-400">Real-time MTProto microservice streaming & diagnostic console</p>
         </div>
@@ -1855,6 +1876,9 @@ app.get(['/', '/dashboard'], (req, res) => res.redirect(301, '/tg'));
 
 // Dedicated Web Dashboard (Served exclusively at /msm, /msm/dashboard)
 app.get(['/tg', '/msm/dashboard'], (req, res) => {
+  const isGeoEnabled = savedSettings.geoBlockEnabled !== false;
+  const activeBot = getActiveTargetBot();
+  const geoBadgeHtml = getGeoBadgeHtml(isGeoEnabled);
   res.set({
     'Cache-Control': 'no-cache, no-store, must-revalidate',
     'Pragma': 'no-cache',
@@ -1886,8 +1910,8 @@ app.get(['/tg', '/msm/dashboard'], (req, res) => {
         <div>
           <h1 class="text-lg font-bold text-white flex items-center gap-2">
             MSM Dashboard
-            <span id="botBadge" class="text-xs px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-300 border border-sky-500/30 font-mono">@${BOT_USERNAME}</span>
-            <span id="geoBadge" class="text-xs px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-mono hidden sm:inline-block">🛡️ MY Only</span>
+            <span id="botBadge" class="text-xs px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-300 border border-sky-500/30 font-mono">@${activeBot}</span>
+            ${geoBadgeHtml}
           </h1>
           <p class="text-xs text-slate-400">Telegram MTProto Cloud Streaming Gateway</p>
         </div>
@@ -2058,7 +2082,7 @@ app.get(['/tg', '/msm/dashboard'], (req, res) => {
         <h2 class="text-sm font-bold text-white flex items-center gap-2">
           🔍 Live Bot Query Diagnostic Sandbox
         </h2>
-        <span class="text-xs text-slate-400">Targeting @${BOT_USERNAME}</span>
+        <span class="text-xs text-slate-400">Targeting @${activeBot}</span>
       </div>
       <p class="text-xs text-slate-400">Test live query extraction and view raw candidate buttons directly from the active Telegram bot.</p>
       <div class="flex flex-col sm:flex-row gap-2">
@@ -2096,6 +2120,24 @@ app.get(['/tg', '/msm/dashboard'], (req, res) => {
           document.getElementById('metricDot').className = 'w-2.5 h-2.5 rounded-full bg-rose-400';
           document.getElementById('metricStatus').textContent = 'Offline';
           document.getElementById('metricStatus').className = 'text-xs font-bold text-rose-400';
+        }
+
+        // Badges: Geo-Block & Active Bot
+        if (d.geoBlockEnabled !== undefined) {
+          const geoEl = document.getElementById('geoBadge');
+          if (geoEl) {
+            if (d.geoBlockEnabled) {
+              geoEl.className = 'text-xs px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-mono hidden sm:inline-block';
+              geoEl.textContent = '🛡️ MY Only';
+            } else {
+              geoEl.className = 'text-xs px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700 font-mono hidden sm:inline-block';
+              geoEl.textContent = '🛡️ Disabled';
+            }
+          }
+        }
+        if (d.targetBotUsername) {
+          const botEl = document.getElementById('botBadge');
+          if (botEl) botEl.textContent = '@' + d.targetBotUsername.replace(/^@/, '');
         }
 
         // 2. CPU
@@ -2241,7 +2283,7 @@ app.get(['/tg', '/msm/dashboard'], (req, res) => {
       btn.disabled = true;
       btn.textContent = 'Querying...';
       box.classList.remove('hidden');
-      box.innerHTML = '<span class="text-slate-400">Querying @' + '${BOT_USERNAME}' + '...</span>';
+      box.innerHTML = '<span class="text-slate-400">Querying @' + '${activeBot}' + '...</span>';
 
       try {
         const res = await fetch('/msm/api/debug-search?q=' + encodeURIComponent(query));
@@ -2771,7 +2813,7 @@ app.get(['/msm/setting', '/tg/settings'], (req, res) => {
         <div>
           <h1 class="text-lg font-bold text-white flex items-center gap-2">
             MSM Settings
-            <span class="text-xs px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-300 border border-sky-500/30 font-mono">@${BOT_USERNAME}</span>
+            <span class="text-xs px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-300 border border-sky-500/30 font-mono">@${getActiveTargetBot()}</span>
           </h1>
           <p class="text-xs text-slate-400">Configure bot handle, buffer pipelines, RAM block cache, and system services</p>
         </div>
