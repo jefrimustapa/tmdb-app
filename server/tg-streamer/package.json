@@ -1,7 +1,7 @@
 {
-  "name": "msm-getter",
+  "name": "tg-streamer",
   "version": "1.0.0",
-  "description": "Telegram MovieSubMalay Bot Stream Resolver",
+  "description": "Telegram Video Stream Resolver and Streaming Proxy Microservice",
   "type": "module",
   "main": "index.js",
   "scripts": {

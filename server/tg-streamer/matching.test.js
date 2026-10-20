@@ -23,6 +23,13 @@ import {
   isJunkMedia,
   JUNK_MEDIA_REGEX,
 } from './index.js';
+import {
+  createResolver,
+  listResolvers,
+  MsmResolver,
+  PencuriResolver,
+  BaseResolver,
+} from './resolvers/index.js';
 
 let passed = 0;
 let total = 0;
@@ -1121,6 +1128,34 @@ it('persists clean queryKeys and requestedQualities array across disk reloads (#
   assert.strictEqual(reloadedDb.get(cleanKey, '1080p')?.docId, '999001');
   assert.strictEqual(reloadedDb.get(cleanKey, '4k')?.docId, '999001');
   assert.strictEqual(reloadedDb.get(cleanKey, 'sd'), undefined);
+});
+
+console.log('\n18. Telegram Stream Resolver Factory & Decoupling (#232)');
+it('lists all registered resolvers with metadata', () => {
+  const list = listResolvers();
+  assert.ok(Array.isArray(list));
+  assert.ok(list.some(r => r.id === 'msm'));
+  assert.ok(list.some(r => r.id === 'pencuri'));
+});
+
+it('instantiates MsmResolver and PencuriResolver correctly', () => {
+  const msm = createResolver('msm', null);
+  assert.ok(msm instanceof BaseResolver);
+  assert.ok(msm instanceof MsmResolver);
+  assert.strictEqual(msm.id, 'msm');
+  assert.strictEqual(msm.defaultBot, 'msm34bot');
+
+  const pencuri = createResolver('pencuri', null);
+  assert.ok(pencuri instanceof BaseResolver);
+  assert.ok(pencuri instanceof PencuriResolver);
+  assert.strictEqual(pencuri.id, 'pencuri');
+  assert.strictEqual(pencuri.defaultBot, 'Pencuri_Movie_Bot');
+});
+
+it('falls back to default resolver (msm) on unrecognized ID', () => {
+  const fallback = createResolver('unknown_resolver', null);
+  assert.ok(fallback instanceof MsmResolver);
+  assert.strictEqual(fallback.id, 'msm');
 });
 
 // Clean up temporary test files

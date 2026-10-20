@@ -627,7 +627,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
               return;
             }
             console.log(`[Resolver] Telegram Provider (${provider.name}) searching for "${searchTitle}" (year: ${queryYear || 'none'}, s: ${querySeason}, e: ${queryEpisode}, forceFresh: ${isForceFresh})...`);
-            setResolvingStatus(`Searching @msmbot for "${searchTitle}"...`);
+            setResolvingStatus(`Searching Telegram stream for "${searchTitle}"...`);
             const candidateAltTitle = (searchTitle.toLowerCase() === cleanTitle.toLowerCase())
               ? (hasDiffOriginal ? cleanOrig : undefined)
               : cleanTitle;
@@ -718,7 +718,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             setIsLoading(false);
             setIsProbing(false);
             isPlayingRef.current = true;
-            onActiveServerChange?.('Telegram (MSM)', 'telegram-msm');
+            onActiveServerChange?.('TG Streamer', 'telegram-msm');
             if (autoCycleTimeoutRef.current) {
               clearTimeout(autoCycleTimeoutRef.current);
               autoCycleTimeoutRef.current = null;

@@ -2,13 +2,13 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20261018-1555';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.fix-221-msm-exclude-.20261018-1555';
+export const APP_BUILD_NUMBER = '20261020-1619';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.refactor-tg-stream-r.20261020-1619';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
-export const APP_BRANCH = 'fix-221-msm-exclude-';
-export const APP_CHANGELOG = `* feat(rail): hide left arrow on first page and right arrow on last page (#213) (#220)
-* fix: resolve blank details page when returning from watch page (#217) (#219)
-* feat: show key crew and season-based cast on details (#211) (#214)
-* fix(update): robust version and run-number check for auto-update (#200) (#212)
-* fix(rail): discrete card-stride pagination and right-aligned final page (#209) (#210)`;
+export const APP_BRANCH = 'refactor-tg-stream-r';
+export const APP_CHANGELOG = `* feat(cache): clean queryKey without quality suffix and use requestedQualities array (#229)
+* feat(msm-getter): track requestedQuality in cache to prevent redundant re-resolutions (#229)
+* fix(msm): fix watchdog health check protocol mismatch on port 3033/3034 (#227) (#228)
+* fix(msm-getter): exclude poster attributes and prioritize real stream metadata over filename (#218) (#226)
+* fix(msm): prevent floating back-to-top button from blocking query test button on mobile (#215) (#225)`;

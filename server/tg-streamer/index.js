@@ -61,15 +61,40 @@ const INTERNAL_HTTP_PORT = parseInt(process.env.INTERNAL_PORT || '3034', 10);
 const apiId = parseInt(process.env.TG_API_ID, 10);
 const apiHash = process.env.TG_API_HASH;
 let session = process.env.TG_SESSION || '';
-const LOG_PATH = process.env.LOG_FILE || (process.platform === 'win32' ? path.join(__dirname, 'msm-getter.log') : '/tmp/msm-getter.log');
+const LOG_PATH = process.env.LOG_FILE || (process.platform === 'win32' ? path.join(__dirname, 'tg-streamer.log') : '/tmp/tg-streamer.log');
 
 const SETTINGS_FILE = path.join(__dirname, 'data', 'settings.json');
-export const DEFAULT_PIPELINE_BUFFERS = {
-  sd: 2,       // 2 x 512KB = 1.0 MB (<=480p / 360p)
-  '720p': 4,   // 4 x 512KB = 2.0 MB
-  '1080p': 6,  // 6 x 512KB = 3.0 MB
-  '4k': 8,     // 8 x 512KB = 4.0 MB
-};
+
+import {
+  BaseResolver,
+  MsmResolver,
+  PencuriResolver,
+  createResolver,
+  listResolvers,
+  getResolverClass,
+  detectVideoQualityTier,
+  normalizeTitle,
+  extractSequelInfo,
+  extractYear,
+  extractEpisodeInfo,
+  extractSeasonInfo,
+  cleanBotEchoHeader,
+  cleanSearchTitle,
+  isBareButton,
+  isAllowedTitleSuffix,
+  validateTitleBoundaries,
+  isJunkMedia,
+  calculateTitleCoverage,
+  extractSignificantTokens,
+  extractTitleTokens,
+  scoreCandidateButtonWithReason,
+  scoreCandidateButton,
+  parseSizeFromText,
+  generateSeriesSearchQueries,
+  DEFAULT_PIPELINE_BUFFERS,
+  JUNK_MEDIA_REGEX,
+} from './resolvers/index.js';
+
 
 let savedSettings = {};
 try {
@@ -88,61 +113,16 @@ if (savedSettings.resolverMaxPages === undefined) savedSettings.resolverMaxPages
 if (savedSettings.geoBlockEnabled === undefined) savedSettings.geoBlockEnabled = true;
 if (savedSettings.geoBlockAllowedCountries === undefined) savedSettings.geoBlockAllowedCountries = ['MY'];
 if (savedSettings.geoBlockWhitelistedIps === undefined) savedSettings.geoBlockWhitelistedIps = [];
+if (savedSettings.activeResolver === undefined) savedSettings.activeResolver = 'msm';
+if (savedSettings.targetBotUsernames === undefined) savedSettings.targetBotUsernames = { msm: 'msm34bot', pencuri: 'Pencuri_Movie_Bot' };
 
 export let BOT_USERNAME = (savedSettings.targetBotUsername || process.env.TG_BOT_USERNAME || 'msm34bot').replace(/^@/, '');
 
-export function detectVideoQualityTier(filename = '', queryKey = '', targetDoc = null, customSize = null) {
-  // 1. Genuine Telegram Video Dimensions (Highest authority: real pixel metadata of the stream)
-  // Strictly check DocumentAttributeVideo only - NEVER use DocumentAttributeImageSize or generic (w && h) poster thumbnails!
-  if (targetDoc && Array.isArray(targetDoc.attributes)) {
-    const videoAttr = targetDoc.attributes.find(a => a.className === 'DocumentAttributeVideo');
-    if (videoAttr) {
-      const w = Number(videoAttr.w) || 0;
-      const h = Number(videoAttr.h) || 0;
-      if (w >= 3200 || h >= 1800) return '4k';
-      if (w >= 1600 || h >= 900) return '1080p';
-      if (w >= 960 || h >= 530) return '720p';
-
-      // For sub-HD video dimensions (< 960x530 e.g. 480p/360p):
-      // Check if file size is substantial (>= 600 MB for TV or >= 1.2 GB general)
-      const docBytes = Number(customSize || targetDoc.size || 0);
-      const isLargeFile = docBytes >= 600 * 1024 * 1024;
-      if (!isLargeFile && (w > 0 || h > 0)) {
-        return 'sd';
-      }
-      // If large file, videoAttr sub-HD dimension is an unreliable preview placeholder - proceed to fallbacks
-    }
-  }
-
-  // 2. Fallback on file size heuristics (large multi-gigabyte files) when metadata is absent
-  const docBytes = Number(customSize || (targetDoc && targetDoc.size) || 0);
-  const fn = String(filename || '').toLowerCase().replace(/[_\.\-\+\[\]\(\)]/g, ' ');
-  const qk = String(queryKey || '').toLowerCase().replace(/[_\.\-\+\[\]\(\)]/g, ' ');
-
-  // 3. Fallback (Last resort): Check the video filename
-  if (/\b(4k|2160p|uhd)\b/i.test(fn)) return '4k';
-  if (/\b(1080p|1080|fhd)\b/i.test(fn)) return '1080p';
-  if (/\b(720p|720|hd)\b/i.test(fn)) return '720p';
-  if (/\b(480p|360p|540p|sd)\b/i.test(fn)) return 'sd';
-
-  // 4. File size fallback when filename has no quality tags
-  if (docBytes >= 2 * 1024 * 1024 * 1024) return '1080p';
-  if (docBytes >= 600 * 1024 * 1024) return '720p';
-
-  // 5. Fallback: Secondary check on queryKey only if neither attributes, filename, nor size has quality tags
-  if (/\b(4k|2160p|uhd)\b/i.test(qk)) return '4k';
-  if (/\b(1080p|1080|fhd)\b/i.test(qk)) return '1080p';
-  if (/\b(720p|720|hd)\b/i.test(qk)) return '720p';
-  if (/\b(480p|360p|540p|sd)\b/i.test(qk)) return 'sd';
-
-  // 6. Default to standard 720p HD pipeline
-  return '720p';
-}
 
 function getLogFilePath() {
-  if (fs.existsSync('/tmp/msm-getter.log')) return '/tmp/msm-getter.log';
+  if (fs.existsSync('/tmp/tg-streamer.log')) return '/tmp/tg-streamer.log';
   if (fs.existsSync(LOG_PATH)) return LOG_PATH;
-  return path.join(__dirname, 'msm-getter.log');
+  return path.join(__dirname, 'tg-streamer.log');
 }
 
 if (!apiId || !apiHash) {
@@ -247,7 +227,7 @@ async function initTelegram() {
 
   initPromise = (async () => {
     if (!session && !client?.session?.authKey) {
-      authError = 'No active session. Please authenticate via Web Portal at /msm/auth.';
+      authError = 'No active session. Please authenticate via Web Portal at /tg/auth.';
       throw new Error(authError);
     }
     console.log('[TG] Connecting MTProto...');
@@ -264,7 +244,7 @@ async function initTelegram() {
       isConnected = false;
       authError = err.message;
       if (err.message && err.message.includes('AUTH_KEY_DUPLICATED')) {
-        console.error('[TG ERROR] Auth key duplicated. Re-authentication required at /msm/auth.');
+        console.error('[TG ERROR] Auth key duplicated. Re-authentication required at /tg/auth.');
       }
       throw err;
     }
@@ -320,688 +300,6 @@ function queueTelegramTask(taskFn) {
 }
 
 // Helper: Normalize title
-function normalizeTitle(str) {
-  return (str || '')
-    .toLowerCase()
-    .replace(/['’‘`]/g, '')
-    .replace(/[^\w\s]/gi, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-// Helper: Extract sequel number / identifier from a title string (e.g. "Polis Evo 2" -> 2, "Polis Evo III" -> 3)
-function extractSequelInfo(str) {
-  if (!str) return null;
-  // Clean out common false positive patterns:
-  // 1. Bot search results headers: "8 results for..."
-  // 2. Audio channel descriptions: "AAC 2.0", "DD 5.1", "2.0", "5.1"
-  // 3. Pagination tags: "(1/1)", "(2/2)"
-  // 4. File sizes: "1.8 GB", "850 MB"
-  const cleaned = str
-    .replace(/\b\d+\s*results\b/gi, ' ')
-    .replace(/\b(aac|ac3|eac3|dts|ddp|flac|audio)?\s*[257]\.[01]\b/gi, ' ')
-    .replace(/\b\d+\/\d+\b/g, ' ')
-    .replace(/[\d,]+(?:\.\d+)?\s*(mb|gb|kb)\b/gi, ' ')
-    .replace(/\b(19\d\d|20[0-3]\d)\b/g, ' '); // Strip 4-digit years so "2025" isn't confused
-
-  const s = ` ${cleaned.toLowerCase()} `;
-  // Roman numerals: ii -> 2, iii -> 3, iv -> 4, v -> 5, vi -> 6
-  const romanMatch = s.match(/\b(?:part|chapter|musim|season)?\s*(ii|iii|iv|v|vi)\b/i);
-  if (romanMatch) {
-    const map = { ii: 2, iii: 3, iv: 4, v: 5, vi: 6 };
-    return map[romanMatch[1].toLowerCase()] || null;
-  }
-  // Explicit Arabic numbers: e.g. " 2 ", " 3 ", " 4 ", "part 2", "part 3"
-  const numMatch = s.match(/\b(?:part|chapter|musim|season)\s*([2-9])\b/i) ||
-                   s.match(/\b([2-9])\b/);
-  if (numMatch) {
-    return parseInt(numMatch[1], 10);
-  }
-  return null;
-}
-
-// Helper: Extract 4-digit release year from a string, protecting numbers that are part of title tokens
-function extractYear(str, titleTokens = []) {
-  if (!str) return null;
-  const titleTokenSet = new Set((titleTokens || []).map(t => String(t).toLowerCase()));
-
-  // 1. Prefer year in parentheses or brackets: "(2026)", "[2026]"
-  const parenMatch = str.match(/[\(\[]\s*((?:19|20)\d\d)\s*[\)\]]/);
-  if (parenMatch) {
-    const yr = parseInt(parenMatch[1], 10);
-    if (!titleTokenSet.has(String(yr))) return yr;
-  }
-
-  // 2. Year formatted as isolated dot/space/dash delimited release year: ".2026.", " 2026 ", "- 2026 -"
-  const allYears = Array.from(str.matchAll(/\b((?:19[7-9]\d|20[0-3]\d))\b/g))
-    .map(m => parseInt(m[1], 10))
-    .filter(yr => !titleTokenSet.has(String(yr)));
-  if (allYears.length > 0) {
-    return allYears[allYears.length - 1];
-  }
-
-  // 3. Fallback: any 4-digit year not matching title tokens
-  const fallbackMatch = str.match(/\b((?:19\d\d|20[0-3]\d))\b/);
-  if (fallbackMatch) {
-    const yr = parseInt(fallbackMatch[1], 10);
-    if (!titleTokenSet.has(String(yr))) return yr;
-  }
-
-  return null;
-}
-
-// Helper: Convert number to Roman numeral (for seasons, e.g. 2 -> II, 3 -> III)
-function toRoman(num) {
-  const map = { 1: 'I', 2: 'II', 3: 'III', 4: 'IV', 5: 'V', 6: 'VI', 7: 'VII', 8: 'VIII', 9: 'IX', 10: 'X' };
-  return map[num] || String(num);
-}
-
-// Generate TV series prioritized search queries (Adaptive 12 Queries without 'episode'/'episod')
-function generateSeriesSearchQueries(cleanT, sNum, eNum, totalSeasons, year) {
-  const s2 = String(sNum).padStart(2, '0');
-  const e2 = String(eNum).padStart(2, '0');
-  const e1 = String(eNum);
-
-  const queries = [];
-  const addQuery = (q) => {
-    const trimmed = (q || '').trim();
-    if (trimmed && !queries.includes(trimmed)) {
-      queries.push(trimmed);
-    }
-  };
-
-  if (sNum > 1) {
-    // Multi-Season (sNum > 1): Season tags are crucial to prevent picking wrong season
-    // 1. Scene standard
-    addQuery(`${cleanT} S${s2}E${e2}`);
-    // 2. Scene standard with year
-    if (year) addQuery(`${cleanT} ${year} S${s2}E${e2}`);
-    // 3. Single digit season + EP
-    addQuery(`${cleanT} S${sNum} EP${e2}`);
-    // 4. Double digit season + EP
-    addQuery(`${cleanT} S${s2} EP${e2}`);
-    // 5. Year + EP (uploader might use year to distinguish season)
-    if (year) addQuery(`${cleanT} ${year} EP${e2}`);
-    // 6. Year + E
-    if (year) addQuery(`${cleanT} ${year} E${e2}`);
-    // 7. Scene standard single digit episode
-    addQuery(`${cleanT} S${s2}E${e1}`);
-    // 8. Base EP double digit
-    addQuery(`${cleanT} EP${e2}`);
-    // 9. Base E double digit
-    addQuery(`${cleanT} E${e2}`);
-    // 10. Base EP single digit
-    addQuery(`${cleanT} EP${e1}`);
-    // 11. Year alone
-    if (year) addQuery(`${cleanT} ${year}`);
-    // 12. Title alone
-    addQuery(cleanT);
-  } else {
-    // Season 1 (sNum === 1): Asian / local dramas rarely tag S01; they use EPxx / Exx
-    // 1. Base EP double digit
-    addQuery(`${cleanT} EP${e2}`);
-    // 2. Base E double digit
-    addQuery(`${cleanT} E${e2}`);
-    // 3. S01 standard
-    addQuery(`${cleanT} S01E${e2}`);
-    // 4. Year + EP
-    if (year) addQuery(`${cleanT} ${year} EP${e2}`);
-    // 5. Year + E
-    if (year) addQuery(`${cleanT} ${year} E${e2}`);
-    // 6. Year + S01 standard
-    if (year) addQuery(`${cleanT} ${year} S01E${e2}`);
-    // 7. Base EP single digit
-    addQuery(`${cleanT} EP${e1}`);
-    // 8. Base E single digit
-    addQuery(`${cleanT} E${e1}`);
-    // 9. S1 standard single digit
-    addQuery(`${cleanT} S1E${e1}`);
-    // 10. Year alone
-    if (year) addQuery(`${cleanT} ${year}`);
-    // 11. Season 1 alone
-    addQuery(`${cleanT} S01`);
-    // 12. Title alone
-    addQuery(cleanT);
-  }
-
-  return queries;
-}
-
-// Helper: Extract significant search tokens from title (retaining digits, roman numerals, and words >= 2 chars)
-function extractTitleTokens(str) {
-  const norm = normalizeTitle(str);
-  return norm.split(' ').filter(t => {
-    if (!t) return false;
-    if (/^\d+$/.test(t)) return true; // keep digits: 2, 3, 4
-    if (/^(ii|iii|iv|v|vi)$/i.test(t)) return true; // keep roman numerals
-    return t.length >= 2;
-  });
-}
-
-// Junk blacklist: trailers, teasers, samples, promos, soundtracks, behind-the-scenes, reviews, recaps, reactions
-const JUNK_MEDIA_REGEX = /\b(trailer|teaser|sample|clip|promo|ost|soundtrack|behind\s*the\s*scenes|bts|interview|preview|pendek|short|review|reviews|recap|recaps|reaction|reactions|ulasan|sinopsis|synopsis|alur\s*cerita|bedah\s*film|bedah\s*filem|ringkasan)\b/i;
-
-// Split archives and non-streamable files: .zip, .rar, .7z, .tar, .001, .002, .part1, etc.
-const UNPLAYABLE_ARCHIVE_REGEX = /\.(zip|rar|7z|tar|gz|00[1-9]|part\d+)(\s|\.|$)/i;
-
-// Stopwords for title coverage calculations
-const STOPWORDS = new Set(['the', 'a', 'an', 'dan', 'di', 'ke', 'yang', 'si', 'pada', 'dari', 'of', 'in', 'on', 'at', 'to', 'for', 'with', 'by']);
-
-function isJunkMedia(text, contextTitle = '', altContextTitle = '') {
-  if (!text) return false;
-  if (UNPLAYABLE_ARCHIVE_REGEX.test(text)) return true;
-
-  const match = text.match(JUNK_MEDIA_REGEX);
-  if (!match) return false;
-
-  // Context-aware protection: if the matched term is part of the legitimate movie/show title, do not disqualify
-  const combinedContext = `${contextTitle || ''} ${altContextTitle || ''}`.trim();
-  if (combinedContext) {
-    const tokens = extractTitleTokens(combinedContext).map(t => t.toLowerCase());
-    const matchedTerm = match[0].toLowerCase().trim().replace(/\s+/g, ' ');
-    if (tokens.some(t => matchedTerm === t || matchedTerm.includes(t) || t.includes(matchedTerm))) {
-      return false;
-    }
-  }
-
-  return true;
-}
-
-function parseSizeFromText(text) {
-  if (!text) return null;
-  // Match file size with optional thousands commas, e.g. 1,018.52 MB or 741.31 MB
-  const m = text.match(/([\d,]+(?:\.\d+)?)\s*(mb|gb)\b/i);
-  if (!m) return null;
-  const val = parseFloat(m[1].replace(/,/g, ''));
-  if (isNaN(val)) return null;
-  return m[2].toLowerCase() === 'gb' ? val * 1024 : val;
-}
-
-// Clean title for bot searches (strips punctuation, colons, semicolons, quotes, dashes, parentheticals, and acronym dots)
-function cleanSearchTitle(str) {
-  if (!str) return '';
-  return str
-    .replace(/\s*\([^)]*\)/g, ' ') // remove (2024), (US), etc.
-    .replace(/\s*\[[^\]]*\]/g, ' ')
-    .replace(/['’‘`]/g, '') // strip apostrophes without whitespace (e.g. Isn't -> Isnt, Grey's -> Greys)
-    .replace(/[:;\-–—"!?&,._]/g, ' ') // cleanly replace remaining punctuation with space (including ;)
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-// Whitelist legitimate release metadata tokens that can directly follow a movie or TV title
-function isAllowedTitleSuffix(word) {
-  if (!word) return true;
-  const w = word.toLowerCase();
-  // Pure digits: 4-digit years (1990-2030), resolution heights, channel digits, part numbers, episode/season digits
-  if (/^\d+$/.test(w)) return true;
-  // Resolution patterns: 1080p, 720p, 4k, 2160p, etc.
-  if (/^\d+(p|k)$/.test(w)) return true;
-  // Disc/part patterns: cd1, cd2, pt1, part1, etc.
-  if (/^(?:cd|pt|part)\d+$/.test(w)) return true;
-  // Episode & Season patterns: s01, s1, e01, e1, s01e01, ep01, ep1, ep, etc.
-  if (/^(?:s\d{1,2}(?:e\d{1,3})?|e\d{1,3}|ep\d{1,3})$/.test(w)) return true;
-
-  const allowed = new Set([
-    // Resolutions & standards
-    'p', 'k', 'hd', 'fhd', 'uhd', 'sd', 'hdr', 'hdr10', 'sdr', 'dovi', 'dv',
-    // Media sources
-    'bluray', 'blu', 'ray', 'webdl', 'webrip', 'web', 'hdrip', 'hdtv', 'dvdrip', 'brrip', 'remux', 'dvd', 'tvrip',
-    // Video codecs
-    'x264', 'x265', 'h264', 'h265', 'hevc', 'avc', 'av1', '10bit', '8bit',
-    // Audio codecs & channels
-    'aac', 'ac3', 'eac3', 'dts', 'ddp', 'ddp5', 'mp3', 'flac', 'atmos', 'truehd', 'opus',
-    // Containers
-    'mkv', 'mp4', 'avi',
-    // Languages & subtitles
-    'malay', 'malaysub', 'sub', 'subs', 'subtitle', 'subtitles', 'eng', 'engsub', 'indo', 'indosub', 'tam', 'tamil', 'multi', 'dual', 'dub', 'dubbed',
-    // Release descriptors
-    'movie', 'film', 'part', 'pt', 'vol', 'volume', 'complete', 'repack', 'proper', 'extended', 'unrated', 'directors', 'cut', 'edition', 'version', 'remastered', 'imax', 'internal',
-    // Episode & Season keywords
-    'ep', 'eps', 'episod', 'episode', 'episodes', 's', 'e', 'season', 'seasons', 'musim', 'end', 'finale', 'batch',
-    // Country qualifiers for regional adaptations
-    'us', 'uk', 'au', 'my', 'id', 'kr', 'jp', 'cn'
-  ]);
-
-  return allowed.has(w);
-}
-
-function escapeRegex(str) {
-  return (str || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-// Check title boundaries to prevent short titles matching longer titles with different subtitles or prefixes
-function validateTitleBoundaries(textToInspect, targetTitle) {
-  if (!textToInspect || !targetTitle) return { matched: false };
-  const normTarget = normalizeTitle(targetTitle);
-  if (!normTarget) return { matched: false };
-
-  const targetHasArticle = /^(the|a|an)\b/i.test(normTarget);
-  const withoutArticle = normTarget.replace(/^(?:the|a|an)\s+/i, '');
-
-  const titlePattern = targetHasArticle
-    ? '(?:(?:the|a|an)\\s+)?' + escapeRegex(withoutArticle).replace(/\\s+/g, '\\s+')
-    : escapeRegex(normTarget).replace(/\\s+/g, '\\s+');
-
-  const regex = new RegExp('(?:^|\\s)(?:([a-z0-9]+)\\s+)?(' + titlePattern + ')(?:\\s+([a-z0-9]+))?(?:\\s+([a-z0-9]+))?(?:\\s|$)', 'i');
-  const match = textToInspect.match(regex);
-  if (!match) return { matched: false };
-
-  const prefixWord = match[1] ? match[1].toLowerCase() : null;
-  const suffix1 = match[3] ? match[3].toLowerCase() : null;
-  const suffix2 = match[4] ? match[4].toLowerCase() : null;
-
-  if (prefixWord) {
-    const ignorePrefixes = new Set([
-      'movie', 'film', 'series', 'tv', 'koleksi',
-      'msm', 'msm32', 'msm34', 'msmbot',
-      BOT_USERNAME.toLowerCase()
-    ]);
-    if (targetHasArticle) {
-      ignorePrefixes.add('the');
-      ignorePrefixes.add('a');
-      ignorePrefixes.add('an');
-    }
-    const isAllowedPrefix =
-      ignorePrefixes.has(prefixWord) ||
-      /^\d+$/.test(prefixWord) ||
-      /^msm\d*$/i.test(prefixWord);
-
-    if (!isAllowedPrefix) {
-      return {
-        matched: true,
-        ok: false,
-        reason: `conflicting title prefix "${prefixWord}" for title "${targetTitle}"`
-      };
-    }
-  }
-
-  if (suffix1) {
-    if (suffix1 === 'the' || suffix1 === 'a' || suffix1 === 'an') {
-      const allowedAfterArticle = new Set(['movie', 'film', 'series', 'final', 'end', 'complete', 'batch', 'animated']);
-      if (!suffix2 || !allowedAfterArticle.has(suffix2)) {
-        return {
-          matched: true,
-          ok: false,
-          reason: `conflicting title suffix "${suffix1}${suffix2 ? ' ' + suffix2 : ''}" for title "${targetTitle}"`
-        };
-      }
-    } else if (!isAllowedTitleSuffix(suffix1)) {
-      return {
-        matched: true,
-        ok: false,
-        reason: `conflicting title suffix "${suffix1}" for title "${targetTitle}"`
-      };
-    }
-  }
-
-  return { matched: true, ok: true };
-}
-
-// Extract primary keywords excluding common stopwords for strict coverage validation
-function extractSignificantTokens(str) {
-  const norm = normalizeTitle(str);
-  const rawTokens = norm.split(' ').filter(Boolean);
-  const hasLeadingArticle = rawTokens.length <= 2 && /^(the|a|an)$/i.test(rawTokens[0]);
-
-  return rawTokens.filter((t, idx) => {
-    if (!t) return false;
-    if (idx === 0 && hasLeadingArticle) return true; // Keep leading article for short 1-2 word titles like "The Runner"
-    if (STOPWORDS.has(t)) return false;
-    if (/^\d+$/.test(t)) return true; // keep digits: 2, 3, 4
-    if (/^(ii|iii|iv|v|vi)$/i.test(t)) return true; // keep roman numerals
-    return t.length >= 2;
-  });
-}
-
-// Calculate coverage ratio (0.0 to 1.0) of significant tokens found in candidate text using strict word boundaries
-function calculateTitleCoverage(significantTokens, text) {
-  if (!significantTokens || significantTokens.length === 0) return 1.0;
-  if (!text) return 0.0;
-  const norm = normalizeTitle(text);
-  const matched = significantTokens.filter(t => {
-    const escaped = t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    return new RegExp(`\\b${escaped}\\b`, 'i').test(norm);
-  });
-  return matched.length / significantTokens.length;
-}
-
-// Helper: Strip bot search query echo headers from message before evaluation
-function cleanBotEchoHeader(msgText) {
-  if (!msgText) return '';
-  return msgText
-    .replace(/^[\s\S]*?(?:hasil\s*carian|carian\s*:|results?\s*for|search\s*results?)[^\n\r]*[\n\r]+/i, '')
-    .trim();
-}
-
-// Helper: Extract structured episode information from text
-function extractEpisodeInfo(text) {
-  if (!text) return null;
-  const s = String(text);
-
-  // 1. Episode range: Ep 01-16, E01-E10, Episod 1 - 20
-  const rangeMatch = s.match(/\b(?:s\d{1,2}\s*)?(?:e|ep|episod|episode)\.?\s*0*(\d{1,4})\s*(?:-|–|—|~|to)\s*(?:e|ep|episod|episode)?\.?\s*0*(\d{1,4})(?!\d)\b/i);
-  if (rangeMatch) {
-    const start = parseInt(rangeMatch[1], 10);
-    const end = parseInt(rangeMatch[2], 10);
-    return { isRange: true, start, end, episode: start };
-  }
-
-  // 2. Standard episode tags: S01E16, E16, Ep 16, Episod 16, Episode 16, Ep. 16, S1 EP 16
-  const stdMatch = s.match(/\b(?:s\d{1,2}\s*)?(?:e|ep|episod|episode)\.?\s*0*(\d{1,4})(?!\d)\b/i);
-  if (stdMatch) {
-    return { isRange: false, episode: parseInt(stdMatch[1], 10) };
-  }
-
-  // 3. Isolated bracketed or parenthesized number: [ 01 ], [ 16 ], ( 01 ), ( 16 )
-  const bracketMatch = s.match(/[\[\(]\s*0*(\d{1,3})\s*[\]\)]/);
-  if (bracketMatch) {
-    const num = parseInt(bracketMatch[1], 10);
-    // Ignore resolution numbers like 360, 480, 540, 576, 720, 1080
-    if (![360, 480, 540, 576, 720, 1080, 2160].includes(num)) {
-      return { isRange: false, episode: num };
-    }
-  }
-
-  // 4. Dot, underscore or space delimited episode number in filename: Show.Name.01.720p or Show_01_1080p
-  const dotNumMatch = s.match(/[\.\_\s]0*(\d{1,3})[\.\_\s]+(?:720p|1080p|480p|540p|360p|2160p|4k|web|bluray|hdrip|hdtv|x264|x265|hevc|mkv|mp4)/i);
-  if (dotNumMatch) {
-    const num = parseInt(dotNumMatch[1], 10);
-    if (![360, 480, 540, 576, 720, 1080, 2160].includes(num)) {
-      return { isRange: false, episode: num };
-    }
-  }
-
-  return null;
-}
-
-// Helper: Extract structured season information from text
-function extractSeasonInfo(text) {
-  if (!text) return null;
-  const s = String(text);
-
-  // Standard season patterns: S01E01, S01, S1, Season 2, Musim 2, Season 10
-  const seasonMatch = s.match(/\b(?:s|season|musim)\s*0*(\d{1,2})(?=[e\s\.\_\-\]]|$|\b)/i);
-  if (seasonMatch) {
-    return parseInt(seasonMatch[1], 10);
-  }
-
-  // Roman numerals: Season II, Musim III, Part IV
-  const romanMatch = s.match(/\b(?:s|season|musim|part)\s*(ii|iii|iv|v|vi|vii|viii|ix|x)(?!\w)\b/i);
-  if (romanMatch) {
-    const map = { ii: 2, iii: 3, iv: 4, v: 5, vi: 6, vii: 7, viii: 8, ix: 9, x: 10 };
-    return map[romanMatch[1].toLowerCase()] || null;
-  }
-
-  return null;
-}
-
-// Helper: Check if a button text is bare (e.g. only resolution, episode tag, codecs, numbers, or action verbs)
-function isBareButton(text) {
-  if (!text) return true;
-  const clean = text
-    .toLowerCase()
-    .replace(/['’‘`]/g, '')
-    .replace(/[\[\]\(\)\{\}\-_:\|]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-  const tokens = clean.split(' ').filter(Boolean);
-  if (tokens.length === 0) return true;
-  const bareKeywords = new Set([
-    // Resolutions & standards
-    '720p', '1080p', '480p', '540p', '360p', '2160p', '4k', 'hd', 'fhd', 'uhd', 'sd',
-    // Media sources & codecs
-    'webrip', 'webdl', 'web', 'dl', 'hdrip', 'hdtv', 'bluray', 'dvdrip', 'tvrip',
-    'hevc', 'x264', 'x265', 'h264', 'h265', '10bit', '8bit', 'aac', 'ac3', 'dts',
-    // Episode & Season identifiers
-    'ep', 'eps', 'episodes', 'episode', 'episod', 'e', 's', 'season', 'musim', 'part', 'pt',
-    // Action verbs / links
-    'download', 'muat', 'turun', 'stream', 'play', 'server', 'fast', 'direct',
-    'link', 'watch', 'mb', 'gb', 'mp4', 'mkv', 'avi',
-    'klik', 'sini', 'tonton', 'salin', 'pautan', 'click', 'here', 'get', 'file', 'video', 'open', 'view', 'mirror', 'backup', 'vip'
-  ]);
-  return tokens.every(t => /^\d+$/.test(t) || bareKeywords.has(t));
-}
-
-// Score a candidate download button against search context with detailed reason
-function scoreCandidateButtonWithReason(btn, msg, context = {}) {
-  const {
-    isTv = false,
-    title = '',
-    altTitle = '',
-    year = null,
-    sNum = 1,
-    eNum = 1,
-    totalSeasons = 1,
-    targetQuality = 720,
-    significantTokens = extractSignificantTokens(title),
-    altSignificantTokens = altTitle ? extractSignificantTokens(altTitle) : [],
-    minTvSizeMb = savedSettings.minTvSizeMb ?? 80,
-    minMovieSizeMb = savedSettings.minMovieSizeMb ?? 180,
-  } = context;
-
-  if ((btn.className !== 'KeyboardButtonUrlAuth' && btn.className !== 'KeyboardButtonUrl') || !btn.url) {
-    return { score: -999, reason: 'missing url or unsupported button class' };
-  }
-  const btnText = (btn.text || '').toLowerCase();
-  const normBtnText = normalizeTitle(btnText);
-  const msgText = (msg.message || '').toLowerCase();
-  const normMsgText = normalizeTitle(msgText);
-
-  // 1. Immediately disqualify junk media (trailers, teasers, samples, promos, ost, reviews)
-  if (isJunkMedia(btnText, title, altTitle) || isJunkMedia(msgText, title, altTitle)) {
-    return { score: -999, reason: 'junk media (trailer/teaser/sample/promo/ost/review)' };
-  }
-
-  // 2. Minimum file size sanity check
-  const btnSizeMB = parseSizeFromText(btn.text) || parseSizeFromText(msg.message);
-  if (btnSizeMB !== null) {
-    const minThreshold = isTv ? minTvSizeMb : minMovieSizeMb;
-    if (btnSizeMB < minThreshold) {
-      return { score: -999, reason: `file size (${btnSizeMB.toFixed(1)} MB) below minimum (${minThreshold} MB)` };
-    }
-  }
-
-  // 3. Strict Title Token Coverage check (supports both primary title and English/alternative title)
-  const isBare = isBareButton(btnText);
-  const cleanMsgText = cleanBotEchoHeader(msgText);
-  let titleTargetText = normBtnText;
-
-  if (isBare) {
-    titleTargetText = normalizeTitle(cleanMsgText);
-  }
-
-  let bestCoverage = 0;
-  let primaryPassed = false;
-  let altPassed = false;
-  let covPrimary = 0;
-  let covAlt = 0;
-
-  if (significantTokens.length > 0) {
-    covPrimary = calculateTitleCoverage(significantTokens, titleTargetText);
-    const meetsPrimary = (significantTokens.length <= 2 ? covPrimary >= 1.0 : covPrimary >= 0.70);
-    if (meetsPrimary) {
-      primaryPassed = true;
-      bestCoverage = Math.max(bestCoverage, covPrimary);
-    }
-  }
-
-  if (altSignificantTokens && altSignificantTokens.length > 0) {
-    covAlt = calculateTitleCoverage(altSignificantTokens, titleTargetText);
-    const meetsAlt = (altSignificantTokens.length <= 2 ? covAlt >= 1.0 : covAlt >= 0.70);
-    if (meetsAlt) {
-      altPassed = true;
-      bestCoverage = Math.max(bestCoverage, covAlt);
-    }
-  }
-
-  if (significantTokens.length > 0 || (altSignificantTokens && altSignificantTokens.length > 0)) {
-    if (!primaryPassed && !altPassed) {
-      const reasonDetail = altSignificantTokens && altSignificantTokens.length > 0
-        ? `title coverage too low (primary: ${(covPrimary * 100).toFixed(0)}%, alt: ${(covAlt * 100).toFixed(0)}%)`
-        : `title coverage too low (${(covPrimary * 100).toFixed(0)}%)`;
-      return { score: -999, reason: reasonDetail };
-    }
-  }
-
-  let score = 0;
-
-  if (bestCoverage >= 1.0) {
-    score += 200;
-  } else if (bestCoverage > 0) {
-    score += Math.round(bestCoverage * 100);
-  }
-
-  // 4. Title boundary collision check (prevents short titles matching longer titles with different subtitles or prefixes)
-  const textToInspect = isBare ? titleTargetText : (normBtnText || titleTargetText);
-  let boundaryPassed = false;
-  let boundaryReason = '';
-  let boundaryMatched = false;
-
-  const checkPrimary = validateTitleBoundaries(textToInspect, title);
-  if (checkPrimary.matched) {
-    boundaryMatched = true;
-    if (checkPrimary.ok) {
-      boundaryPassed = true;
-    } else {
-      boundaryReason = checkPrimary.reason;
-    }
-  }
-
-  if (altTitle) {
-    const checkAlt = validateTitleBoundaries(textToInspect, altTitle);
-    if (checkAlt.matched) {
-      boundaryMatched = true;
-      if (checkAlt.ok) {
-        boundaryPassed = true;
-      } else if (!boundaryReason) {
-        boundaryReason = checkAlt.reason;
-      }
-    }
-  }
-
-  if (boundaryMatched && !boundaryPassed) {
-    return { score: -999, reason: boundaryReason || 'title boundary collision' };
-  }
-
-  if (isTv) {
-    // 1. Episode matching
-    let epInfo = extractEpisodeInfo(btnText);
-    if (!epInfo && (isBare || !extractEpisodeInfo(btnText))) {
-      epInfo = extractEpisodeInfo(cleanMsgText);
-    }
-
-    if (epInfo) {
-      if (epInfo.isRange) {
-        if (eNum >= epInfo.start && eNum <= epInfo.end) {
-          score += 90;
-        } else {
-          return { score: -999, reason: `episode range [${epInfo.start}-${epInfo.end}] does not include episode ${eNum}` };
-        }
-      } else if (epInfo.episode === eNum) {
-        score += 150;
-      } else {
-        return { score: -999, reason: `episode mismatch (found ep ${epInfo.episode}, expected ep ${eNum})` };
-      }
-    } else {
-      score -= 150;
-    }
-
-    // 2. Strict Season validation
-    const seasonFound = extractSeasonInfo(btnText) || extractSeasonInfo(cleanMsgText);
-    const explicitTargetYear = parseInt(year, 10);
-    const targetYear = !isNaN(explicitTargetYear) ? explicitTargetYear : extractYear(title, significantTokens);
-    const btnYear = extractYear(btnText, significantTokens) || extractYear(cleanMsgText, significantTokens);
-
-    if (seasonFound !== null) {
-      if (seasonFound === sNum) {
-        score += 80;
-      } else {
-        return { score: -999, reason: `season mismatch (found season ${seasonFound}, expected season ${sNum})` };
-      }
-    } else if (sNum > 1 && totalSeasons > 1) {
-      // Multi-season protection: when watching Season 2 or later, reject un-versioned candidates with no matching year
-      if (!btnYear || Math.abs(targetYear - btnYear) > 1) {
-        return { score: -999, reason: `un-versioned candidate without matching year for season ${sNum}` };
-      }
-    }
-
-    // 3. Release year validation
-    if (targetYear && btnYear) {
-      if (Math.abs(targetYear - btnYear) <= 1) {
-        score += 90;
-      } else if (!isNaN(explicitTargetYear)) {
-        return { score: -999, reason: `release year mismatch (found ${btnYear}, expected ${targetYear})` };
-      }
-    }
-  } else {
-    // Movie validation
-    const isTvCandidate = /\b(s\d{1,2}e\d{1,2}|s\d{1,2}\s*ep?\s*\d{1,2}|season\s*\d+|musim\s*\d+|episode\s*\d+|episod\s*\d+|ep\s*\d+|\.end\.)\b/i.test(btnText) ||
-                          /\b(s\d{1,2}e\d{1,2}|s\d{1,2}\s*ep?\s*\d{1,2}|season\s*\d+|musim\s*\d+|episode\s*\d+|episod\s*\d+|ep\s*\d+|\.end\.)\b/i.test(msgText);
-    if (isTvCandidate) {
-      return { score: -999, reason: 'TV series/episode indicator found in movie candidate' };
-    }
-
-    const targetSequel = extractSequelInfo(title) || (altTitle ? extractSequelInfo(altTitle) : null);
-    const btnSequel = extractSequelInfo(btnText);
-    if (targetSequel) {
-      if (btnSequel === targetSequel) {
-        score += 150;
-      } else if (btnSequel) {
-        score -= 600;
-      } else {
-        score -= 400;
-      }
-    } else {
-      if (btnSequel) {
-        score -= 600;
-      }
-    }
-
-    const explicitTargetYear = parseInt(year, 10);
-    const targetYear = !isNaN(explicitTargetYear) ? explicitTargetYear : extractYear(title, significantTokens);
-    const btnYear = extractYear(btnText, significantTokens) || extractYear(cleanMsgText, significantTokens);
-    if (targetYear && btnYear) {
-      if (Math.abs(targetYear - btnYear) <= 1) {
-        score += 120;
-      } else if (!isNaN(explicitTargetYear)) {
-        return { score: -999, reason: `release year mismatch (found ${btnYear}, expected ${targetYear})` };
-      }
-    }
-  }
-
-  // Quality preference
-  if (targetQuality <= 480) {
-    if (btnText.includes('480p') || btnText.includes('480') || btnText.includes('360p') || btnText.includes('540p')) score += 80;
-    else if (btnText.includes('720p') || btnText.includes('720')) score += 20;
-    else if (btnText.includes('1080p') || btnText.includes('1080')) score -= 40;
-    else if (btnText.includes('2160p') || btnText.includes('4k')) score -= 100;
-  } else if (targetQuality <= 720) {
-    if (btnText.includes('720p') || btnText.includes('720')) score += 50;
-    else if (btnText.includes('540p') || btnText.includes('480p') || btnText.includes('360p')) score += 30;
-    else if (btnText.includes('1080p') || btnText.includes('1080')) score += 5;
-    else if (btnText.includes('2160p') || btnText.includes('4k')) score -= 50;
-  } else if (targetQuality >= 2160) {
-    if (btnText.includes('2160p') || btnText.includes('4k') || btnText.includes('uhd')) score += 100;
-    else if (btnText.includes('1080p') || btnText.includes('1080')) score += 60;
-    else if (btnText.includes('720p') || btnText.includes('720')) score += 20;
-  } else {
-    // 1080p target
-    if (btnText.includes('1080p') || btnText.includes('1080')) score += 80;
-    else if (btnText.includes('720p') || btnText.includes('720')) score += 30;
-    else if (btnText.includes('2160p') || btnText.includes('4k')) score -= 30;
-  }
-  if (btnText.toLowerCase().includes('.mp4') || btnText.toLowerCase().includes('mp4')) score += 15;
-  if (btnText.includes('malaysub') || btnText.includes('msm')) score += 5;
-
-  return { score, reason: score >= 0 ? `accepted (score: ${score})` : `penalized (score: ${score})` };
-}
-
-// Score a candidate download button against search context
-function scoreCandidateButton(btn, msg, context = {}) {
-  return scoreCandidateButtonWithReason(btn, msg, context).score;
-}
-
 // Web Auth State in RAM
 let pendingAuth = {
   client: null,
@@ -1015,7 +313,7 @@ let pendingAuth = {
 // ==========================================
 
 // Auth Status Endpoint
-app.get(['/api/auth/status', '/msm/api/auth/status'], async (req, res) => {
+app.get(['/api/auth/status', '/tg/api/auth/status', '/msm/api/auth/status'], async (req, res) => {
   try {
     if (!isConnected || !client) {
       return res.json({
@@ -1045,7 +343,7 @@ app.get(['/api/auth/status', '/msm/api/auth/status'], async (req, res) => {
 });
 
 // Step 1: Send Login Code to Telegram App
-app.post(['/api/auth/send-code', '/msm/api/auth/send-code'], async (req, res) => {
+app.post(['/api/auth/send-code', '/tg/api/auth/send-code', '/msm/api/auth/send-code'], async (req, res) => {
   const { phoneNumber } = req.body;
   if (!phoneNumber || !phoneNumber.trim()) {
     return res.status(400).json({ success: false, error: 'Phone number is required (e.g. +60123456789)' });
@@ -1098,7 +396,7 @@ app.post(['/api/auth/send-code', '/msm/api/auth/send-code'], async (req, res) =>
 });
 
 // Step 2: Verify Code and Activate Session in Memory
-app.post(['/api/auth/verify-code', '/msm/api/auth/verify-code'], async (req, res) => {
+app.post(['/api/auth/verify-code', '/tg/api/auth/verify-code', '/msm/api/auth/verify-code'], async (req, res) => {
   const { phoneCode, password } = req.body;
   if (!phoneCode || !phoneCode.trim()) {
     return res.status(400).json({ success: false, error: 'Telegram login code is required' });
@@ -1164,11 +462,11 @@ app.post(['/api/auth/verify-code', '/msm/api/auth/verify-code'], async (req, res
   }
 });
 
-// Redirect legacy /auth to /msm/auth
-app.get('/auth', (req, res) => res.redirect(301, '/msm/auth'));
+// Redirect legacy /auth to /tg/auth
+app.get('/auth', (req, res) => res.redirect(301, '/tg/auth'));
 
-// Web Authentication Portal UI (Served exclusively at /msm/auth)
-app.get('/msm/auth', (req, res) => {
+// Web Authentication Portal UI (Served exclusively at /tg/auth)
+app.get('/tg/auth', (req, res) => {
   res.send(`<!DOCTYPE html>
 <html lang="en" class="dark">
 <head>
@@ -1198,19 +496,19 @@ app.get('/msm/auth', (req, res) => {
         </div>
       </div>
       <nav class="flex items-center gap-2 flex-wrap">
-        <a href="/msm" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800 transition flex items-center gap-1">
+        <a href="/tg" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800 transition flex items-center gap-1">
           🏠 Dashboard
         </a>
-        <a href="/msm/streams" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800 transition flex items-center gap-1">
+        <a href="/tg/streams" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800 transition flex items-center gap-1">
           💾 Streams
         </a>
-        <a href="/msm/settings" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800 transition flex items-center gap-1">
+        <a href="/tg/settings" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800 transition flex items-center gap-1">
           ⚙️ Settings
         </a>
-        <a href="/msm/logs" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800 transition flex items-center gap-1">
+        <a href="/tg/logs" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800 transition flex items-center gap-1">
           📜 Logs
         </a>
-        <a href="/msm/auth" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-sky-400 bg-sky-500/10 border border-sky-500/30 flex items-center gap-1">
+        <a href="/tg/auth" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-sky-400 bg-sky-500/10 border border-sky-500/30 flex items-center gap-1">
           🔑 Auth
         </a>
       </nav>
@@ -1743,7 +1041,7 @@ function isMobileClient(req) {
   return !isDesktopWebClient(req);
 }
 
-// CPU Usage Tracker (Router System CPU from /proc/stat, msm-getter Node process from process.cpuUsage, and FFmpeg workers from /proc/[pid]/stat)
+// CPU Usage Tracker (Router System CPU from /proc/stat, tg-streamer Node process from process.cpuUsage, and FFmpeg workers from /proc/[pid]/stat)
 let lastSystemCpu = null;
 let lastProcCpu = process.cpuUsage();
 let lastProcTime = process.hrtime.bigint();
@@ -1770,7 +1068,7 @@ function getCpuMetrics() {
     }
   } catch {}
 
-  // 2. msm-getter Node Process CPU (process.cpuUsage())
+  // 2. tg-streamer Node Process CPU (process.cpuUsage())
   let nodeCpuPct = 0;
   try {
     const now = process.hrtime.bigint();
@@ -1834,7 +1132,7 @@ function getCpuMetrics() {
 }
 
 // System Stats Endpoint (Uptime, Memory RSS, Active Streams, Active Clients, Log Size)
-app.get(['/api/system/stats', '/msm/api/system/stats'], (req, res) => {
+app.get(['/api/system/stats', '/tg/api/system/stats', '/msm/api/system/stats'], (req, res) => {
   let mem = { rss: 0, heapUsed: 0, heapTotal: 0, external: 0 };
   try {
     mem = process.memoryUsage();
@@ -1903,7 +1201,7 @@ app.get(['/api/system/stats', '/msm/api/system/stats'], (req, res) => {
 });
 
 // Manual Memory Purge API (Evicts chunk caches, clears client cache & runs GC)
-app.post(['/api/system/purge-memory', '/msm/api/system/purge-memory'], (req, res) => {
+app.post(['/api/system/purge-memory', '/tg/api/system/purge-memory', '/msm/api/system/purge-memory'], (req, res) => {
   purgeIdleMemory();
   const mem = process.memoryUsage();
   res.json({
@@ -1917,7 +1215,7 @@ app.post(['/api/system/purge-memory', '/msm/api/system/purge-memory'], (req, res
 });
 
 // Log Snapshot API (Last N lines from RAM disk)
-app.get(['/api/logs', '/msm/api/logs'], (req, res) => {
+app.get(['/api/logs', '/tg/api/logs', '/msm/api/logs'], (req, res) => {
   try {
     const linesCount = parseInt(req.query.lines, 10) || 200;
     const logPath = getLogFilePath();
@@ -1958,7 +1256,7 @@ app.get(['/api/logs', '/msm/api/logs'], (req, res) => {
 });
 
 // Server-Sent Events (SSE) Live Log Streaming
-app.get(['/api/logs/stream', '/msm/api/logs/stream'], (req, res) => {
+app.get(['/api/logs/stream', '/tg/api/logs/stream', '/msm/api/logs/stream'], (req, res) => {
   res.writeHead(200, {
     'Content-Type': 'text/event-stream',
     'Cache-Control': 'no-cache',
@@ -2027,13 +1325,13 @@ app.get(['/api/logs/stream', '/msm/api/logs/stream'], (req, res) => {
 });
 
 // Download Raw Log File
-app.get(['/api/logs/download', '/msm/api/logs/download'], (req, res) => {
+app.get(['/api/logs/download', '/tg/api/logs/download', '/msm/api/logs/download'], (req, res) => {
   try {
     const logPath = getLogFilePath();
     if (!fs.existsSync(logPath)) {
       return res.status(404).send('No log file found.');
     }
-    const filename = `msm-getter-${new Date().toISOString().slice(0, 10)}.log`;
+    const filename = `tg-streamer-${new Date().toISOString().slice(0, 10)}.log`;
     res.download(logPath, filename);
   } catch (err) {
     res.status(500).send(err.message);
@@ -2041,7 +1339,7 @@ app.get(['/api/logs/download', '/msm/api/logs/download'], (req, res) => {
 });
 
 // Clear / Truncate Physical Log File on Disk
-app.post(['/api/logs/clear', '/msm/api/logs/clear'], (req, res) => {
+app.post(['/api/logs/clear', '/tg/api/logs/clear', '/msm/api/logs/clear'], (req, res) => {
   try {
     const logPath = getLogFilePath();
     if (fs.existsSync(logPath)) {
@@ -2055,11 +1353,11 @@ app.post(['/api/logs/clear', '/msm/api/logs/clear'], (req, res) => {
   }
 });
 
-// Redirect legacy /logs to /msm/logs
-app.get('/logs', (req, res) => res.redirect(301, '/msm/logs'));
+// Redirect legacy /logs to /tg/logs
+app.get('/logs', (req, res) => res.redirect(301, '/tg/logs'));
 
-// Dedicated Web Log Viewer GUI (Served exclusively at /msm/logs)
-app.get('/msm/logs', (req, res) => {
+// Dedicated Web Log Viewer GUI (Served exclusively at /tg/logs)
+app.get('/tg/logs', (req, res) => {
   res.set({
     'Cache-Control': 'no-cache, no-store, must-revalidate',
     'Pragma': 'no-cache',
@@ -2101,19 +1399,19 @@ app.get('/msm/logs', (req, res) => {
         </div>
       </div>
       <nav class="flex items-center gap-2 flex-wrap">
-        <a href="/msm" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800 transition flex items-center gap-1">
+        <a href="/tg" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800 transition flex items-center gap-1">
           🏠 Dashboard
         </a>
-        <a href="/msm/streams" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800 transition flex items-center gap-1">
+        <a href="/tg/streams" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800 transition flex items-center gap-1">
           💾 Streams
         </a>
-        <a href="/msm/settings" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800 transition flex items-center gap-1">
+        <a href="/tg/settings" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800 transition flex items-center gap-1">
           ⚙️ Settings
         </a>
-        <a href="/msm/logs" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-sky-400 bg-sky-500/10 border border-sky-500/30 flex items-center gap-1">
+        <a href="/tg/logs" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-sky-400 bg-sky-500/10 border border-sky-500/30 flex items-center gap-1">
           📜 Logs
         </a>
-        <a href="/msm/auth" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800 transition flex items-center gap-1">
+        <a href="/tg/auth" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800 transition flex items-center gap-1">
           🔑 Auth
         </a>
         <a href="/msm/api/logs/download" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 bg-slate-800 hover:bg-slate-700 border border-slate-700 transition flex items-center gap-1.5 ml-1">
@@ -2158,7 +1456,7 @@ app.get('/msm/logs', (req, res) => {
             <span class="w-3 h-3 rounded-full bg-amber-500/70 inline-block"></span>
             <span class="w-3 h-3 rounded-full bg-emerald-500/70 inline-block"></span>
           </div>
-          <span class="text-[11px] font-mono text-slate-400 ml-2">/tmp/msm-getter.log</span>
+          <span class="text-[11px] font-mono text-slate-400 ml-2">/tmp/tg-streamer.log</span>
         </div>
         <div class="flex items-center gap-2 text-[11px] text-slate-400 font-mono">
           <span id="lineCount">0 lines</span>
@@ -2297,9 +1595,9 @@ app.get('/msm/logs', (req, res) => {
       };
     }
 
-    // Backward compatibility: redirect anchor /msm/logs#cachePanel to dedicated streams page
+    // Backward compatibility: redirect anchor /tg/logs#cachePanel to dedicated streams page
     if (window.location.hash === '#cachePanel') {
-      window.location.replace('/msm/streams');
+      window.location.replace('/tg/streams');
     }
 
     fetchInitialLogs();
@@ -2332,20 +1630,34 @@ app.get('/msm/logs', (req, res) => {
 // ==========================================
 
 // Health check endpoint (moved /health/ to /msm/health/)
-app.get(['/health', '/health/'], (req, res) => res.redirect(301, '/msm/health/'));
-app.get(['/msm/health', '/msm/health/', '/api/health', '/api/health/', '/msm/api/health', '/msm/api/health/'], (req, res) => {
+app.get(['/health', '/health/', '/msm/health', '/msm/health/'], (req, res) => res.redirect(301, '/tg/health/'));
+app.get(['/tg/health', '/tg/health/', '/msm/health', '/msm/health/', '/api/health', '/api/health/', '/tg/api/health', '/tg/api/health/', '/msm/api/health', '/msm/api/health/'], (req, res) => {
   res.json({
     status: 'ok',
     uptime: process.uptime(),
     isConnected,
     cachedStreams: db.size(),
     targetBotUsername: BOT_USERNAME,
+    activeResolver: savedSettings.activeResolver || 'msm',
+    availableResolvers: listResolvers(),
+    targetBotUsernames: savedSettings.targetBotUsernames || { msm: BOT_USERNAME, pencuri: 'Pencuri_Movie_Bot' },
     authError: authError || null,
   });
 });
 
 // Settings API endpoints
-app.get(['/api/settings', '/msm/api/settings'], (req, res) => {
+
+// Resolvers endpoint
+app.get(['/api/resolvers', '/tg/api/resolvers', '/msm/api/resolvers'], (req, res) => {
+  res.json({
+    success: true,
+    activeResolver: savedSettings.activeResolver || 'msm',
+    targetBotUsernames: savedSettings.targetBotUsernames || { msm: BOT_USERNAME, pencuri: 'Pencuri_Movie_Bot' },
+    resolvers: listResolvers(),
+  });
+});
+
+app.get(['/api/settings', '/tg/api/settings', '/msm/api/settings'], (req, res) => {
   res.json({
     success: true,
     targetBotUsername: BOT_USERNAME,
@@ -2369,10 +1681,12 @@ app.get(['/api/settings', '/msm/api/settings'], (req, res) => {
   });
 });
 
-app.post(['/api/settings', '/msm/api/settings'], (req, res) => {
+app.post(['/api/settings', '/tg/api/settings', '/msm/api/settings'], (req, res) => {
   try {
     const {
       targetBotUsername,
+      activeResolver,
+      targetBotUsernames,
       pipelineBuffers,
       overlapPrefetch,
       routerRamCacheMb,
@@ -2384,6 +1698,23 @@ app.post(['/api/settings', '/msm/api/settings'], (req, res) => {
       geoBlockWhitelistedIps,
     } = req.body || {};
     let changed = false;
+
+    if (activeResolver && typeof activeResolver === 'string') {
+      const normResolver = activeResolver.trim().toLowerCase();
+      if (['msm', 'pencuri'].includes(normResolver)) {
+        savedSettings.activeResolver = normResolver;
+        changed = true;
+        console.log(`[SETTINGS] Active Resolver updated to: ${normResolver}`);
+      }
+    }
+
+    if (targetBotUsernames && typeof targetBotUsernames === 'object') {
+      savedSettings.targetBotUsernames = savedSettings.targetBotUsernames || { msm: BOT_USERNAME, pencuri: 'Pencuri_Movie_Bot' };
+      if (targetBotUsernames.msm) savedSettings.targetBotUsernames.msm = targetBotUsernames.msm.trim().replace(/^@/, '');
+      if (targetBotUsernames.pencuri) savedSettings.targetBotUsernames.pencuri = targetBotUsernames.pencuri.trim().replace(/^@/, '');
+      changed = true;
+      console.log(`[SETTINGS] Resolver Bot Usernames updated to:`, JSON.stringify(savedSettings.targetBotUsernames));
+    }
 
     if (targetBotUsername && typeof targetBotUsername === 'string') {
       const sanitized = targetBotUsername.trim().replace(/^@/, '');
@@ -2509,7 +1840,7 @@ app.post(['/api/settings', '/msm/api/settings'], (req, res) => {
 });
 
 // System Service Restart Endpoint (Exits process; router supervisor auto-respawns in ~3s)
-app.post(['/api/system/restart', '/msm/api/system/restart'], (req, res) => {
+app.post(['/api/system/restart', '/tg/api/system/restart', '/msm/api/system/restart'], (req, res) => {
   console.log('[SYSTEM] Service restart requested via web settings.');
   res.json({ success: true, message: 'Restarting MSM Getter service...' });
   setTimeout(() => {
@@ -2518,10 +1849,10 @@ app.post(['/api/system/restart', '/msm/api/system/restart'], (req, res) => {
 });
 
 // Redirect legacy root / and /dashboard to /msm
-app.get(['/', '/dashboard'], (req, res) => res.redirect(301, '/msm'));
+app.get(['/', '/dashboard'], (req, res) => res.redirect(301, '/tg'));
 
 // Dedicated Web Dashboard (Served exclusively at /msm, /msm/dashboard)
-app.get(['/msm', '/msm/dashboard'], (req, res) => {
+app.get(['/tg', '/msm/dashboard'], (req, res) => {
   res.set({
     'Cache-Control': 'no-cache, no-store, must-revalidate',
     'Pragma': 'no-cache',
@@ -2560,19 +1891,19 @@ app.get(['/msm', '/msm/dashboard'], (req, res) => {
         </div>
       </div>
       <nav class="flex items-center gap-2 flex-wrap">
-        <a href="/msm" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-sky-400 bg-sky-500/10 border border-sky-500/30 flex items-center gap-1">
+        <a href="/tg" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-sky-400 bg-sky-500/10 border border-sky-500/30 flex items-center gap-1">
           🏠 Dashboard
         </a>
-        <a href="/msm/streams" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800 transition flex items-center gap-1">
+        <a href="/tg/streams" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800 transition flex items-center gap-1">
           💾 Streams
         </a>
-        <a href="/msm/settings" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800 transition flex items-center gap-1">
+        <a href="/tg/settings" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800 transition flex items-center gap-1">
           ⚙️ Settings
         </a>
-        <a href="/msm/logs" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800 transition flex items-center gap-1">
+        <a href="/tg/logs" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800 transition flex items-center gap-1">
           📜 Logs
         </a>
-        <a href="/msm/auth" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800 transition flex items-center gap-1">
+        <a href="/tg/auth" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800 transition flex items-center gap-1">
           🔑 Auth
         </a>
       </nav>
@@ -2623,7 +1954,7 @@ app.get(['/msm', '/msm/dashboard'], (req, res) => {
           <span class="text-base">⚡</span>
           <h2 class="text-xs font-bold text-white uppercase tracking-wider">Stream Buffering & Engine Performance</h2>
         </div>
-        <a href="/msm/settings" class="text-xs text-sky-400 hover:text-sky-300 font-semibold flex items-center gap-1 transition">
+        <a href="/tg/settings" class="text-xs text-sky-400 hover:text-sky-300 font-semibold flex items-center gap-1 transition">
           ⚙️ Configure in Settings →
         </a>
       </div>
@@ -2682,7 +2013,7 @@ app.get(['/msm', '/msm/dashboard'], (req, res) => {
 
     <!-- Quick Navigation Hub -->
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-      <a href="/msm/streams" class="bg-slate-900 hover:bg-slate-800/90 border border-slate-800 rounded-2xl p-5 space-y-2 transition group block glow-box">
+      <a href="/tg/streams" class="bg-slate-900 hover:bg-slate-800/90 border border-slate-800 rounded-2xl p-5 space-y-2 transition group block glow-box">
         <div class="w-9 h-9 rounded-xl bg-sky-500/10 text-sky-400 border border-sky-500/20 flex items-center justify-center text-lg">
           💾
         </div>
@@ -2691,7 +2022,7 @@ app.get(['/msm', '/msm/dashboard'], (req, res) => {
         <span class="text-xs text-sky-400 font-semibold inline-block pt-1">Open Streams →</span>
       </a>
 
-      <a href="/msm/settings" class="bg-slate-900 hover:bg-slate-800/90 border border-slate-800 rounded-2xl p-5 space-y-2 transition group block glow-box">
+      <a href="/tg/settings" class="bg-slate-900 hover:bg-slate-800/90 border border-slate-800 rounded-2xl p-5 space-y-2 transition group block glow-box">
         <div class="w-9 h-9 rounded-xl bg-purple-500/10 text-purple-400 border border-purple-500/20 flex items-center justify-center text-lg">
           ⚙️
         </div>
@@ -2700,7 +2031,7 @@ app.get(['/msm', '/msm/dashboard'], (req, res) => {
         <span class="text-xs text-sky-400 font-semibold inline-block pt-1">Open Settings →</span>
       </a>
 
-      <a href="/msm/logs" class="bg-slate-900 hover:bg-slate-800/90 border border-slate-800 rounded-2xl p-5 space-y-2 transition group block glow-box">
+      <a href="/tg/logs" class="bg-slate-900 hover:bg-slate-800/90 border border-slate-800 rounded-2xl p-5 space-y-2 transition group block glow-box">
         <div class="w-9 h-9 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center justify-center text-lg">
           📜
         </div>
@@ -2709,7 +2040,7 @@ app.get(['/msm', '/msm/dashboard'], (req, res) => {
         <span class="text-xs text-sky-400 font-semibold inline-block pt-1">View Logs →</span>
       </a>
 
-      <a href="/msm/auth" class="bg-slate-900 hover:bg-slate-800/90 border border-slate-800 rounded-2xl p-5 space-y-2 transition group block glow-box">
+      <a href="/tg/auth" class="bg-slate-900 hover:bg-slate-800/90 border border-slate-800 rounded-2xl p-5 space-y-2 transition group block glow-box">
         <div class="w-9 h-9 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20 flex items-center justify-center text-lg">
           🔑
         </div>
@@ -2960,11 +2291,11 @@ app.get(['/msm', '/msm/dashboard'], (req, res) => {
 </html>`);
 });
 
-// Redirect legacy /streams and /cache to /msm/streams
-app.get(['/streams', '/cache'], (req, res) => res.redirect(301, '/msm/streams'));
+// Redirect legacy /streams and /cache to /tg/streams
+app.get(['/streams', '/cache'], (req, res) => res.redirect(301, '/tg/streams'));
 
-// Dedicated Persistent Stream Cache Page (Served exclusively at /msm/streams, /msm/cache)
-app.get(['/msm/streams', '/msm/cache'], (req, res) => {
+// Dedicated Persistent Stream Cache Page (Served exclusively at /tg/streams, /msm/cache)
+app.get(['/tg/streams', '/msm/cache'], (req, res) => {
   res.set({
     'Cache-Control': 'no-cache, no-store, must-revalidate',
     'Pragma': 'no-cache',
@@ -3002,19 +2333,19 @@ app.get(['/msm/streams', '/msm/cache'], (req, res) => {
         </div>
       </div>
       <nav class="flex items-center gap-2 flex-wrap">
-        <a href="/msm" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800 transition flex items-center gap-1">
+        <a href="/tg" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800 transition flex items-center gap-1">
           🏠 Dashboard
         </a>
-        <a href="/msm/streams" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-sky-400 bg-sky-500/10 border border-sky-500/30 flex items-center gap-1">
+        <a href="/tg/streams" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-sky-400 bg-sky-500/10 border border-sky-500/30 flex items-center gap-1">
           💾 Streams
         </a>
-        <a href="/msm/settings" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800 transition flex items-center gap-1">
+        <a href="/tg/settings" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800 transition flex items-center gap-1">
           ⚙️ Settings
         </a>
-        <a href="/msm/logs" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800 transition flex items-center gap-1">
+        <a href="/tg/logs" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800 transition flex items-center gap-1">
           📜 Logs
         </a>
-        <a href="/msm/auth" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800 transition flex items-center gap-1">
+        <a href="/tg/auth" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800 transition flex items-center gap-1">
           🔑 Auth
         </a>
       </nav>
@@ -3127,7 +2458,7 @@ app.get(['/msm/streams', '/msm/cache'], (req, res) => {
     let searchTimer = null;
     let currentQuality = 'all';
 
-    // Parse initial quality parameter from URL if provided (e.g. /msm/streams?quality=1080p)
+    // Parse initial quality parameter from URL if provided (e.g. /tg/streams?quality=1080p)
     try {
       const urlParams = new URLSearchParams(window.location.search);
       const qParam = (urlParams.get('quality') || '').toLowerCase().trim();
@@ -3402,11 +2733,11 @@ app.get(['/msm/streams', '/msm/cache'], (req, res) => {
 </html>`);
 });
 
-// Redirect legacy /setting and /settings to /msm/settings
-app.get(['/setting', '/settings'], (req, res) => res.redirect(301, '/msm/settings'));
+// Redirect legacy /setting and /settings to /tg/settings
+app.get(['/setting', '/settings'], (req, res) => res.redirect(301, '/tg/settings'));
 
-// Dedicated Web Settings Page (Served exclusively at /msm/setting, /msm/settings)
-app.get(['/msm/setting', '/msm/settings'], (req, res) => {
+// Dedicated Web Settings Page (Served exclusively at /msm/setting, /tg/settings)
+app.get(['/msm/setting', '/tg/settings'], (req, res) => {
   res.set({
     'Cache-Control': 'no-cache, no-store, must-revalidate',
     'Pragma': 'no-cache',
@@ -3444,19 +2775,19 @@ app.get(['/msm/setting', '/msm/settings'], (req, res) => {
         </div>
       </div>
       <nav class="flex items-center gap-2 flex-wrap">
-        <a href="/msm" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800 transition flex items-center gap-1">
+        <a href="/tg" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800 transition flex items-center gap-1">
           🏠 Dashboard
         </a>
-        <a href="/msm/streams" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800 transition flex items-center gap-1">
+        <a href="/tg/streams" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800 transition flex items-center gap-1">
           💾 Streams
         </a>
-        <a href="/msm/settings" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-sky-400 bg-sky-500/10 border border-sky-500/30 flex items-center gap-1">
+        <a href="/tg/settings" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-sky-400 bg-sky-500/10 border border-sky-500/30 flex items-center gap-1">
           ⚙️ Settings
         </a>
-        <a href="/msm/logs" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800 transition flex items-center gap-1">
+        <a href="/tg/logs" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800 transition flex items-center gap-1">
           📜 Logs
         </a>
-        <a href="/msm/auth" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800 transition flex items-center gap-1">
+        <a href="/tg/auth" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800 transition flex items-center gap-1">
           🔑 Auth
         </a>
       </nav>
@@ -3465,36 +2796,46 @@ app.get(['/msm/setting', '/msm/settings'], (req, res) => {
     <!-- Main Settings Form Grid -->
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
       
-      <!-- Card 1: Target Bot Configuration -->
+      <!-- Card 1: Stream Resolver & Bot Configuration -->
       <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 glow-box space-y-4">
         <div class="flex items-center justify-between">
           <h2 class="text-sm font-semibold text-white flex items-center gap-2">
-            🤖 Target Telegram Bot
+            🤖 Stream Resolver & Target Bot
           </h2>
-          <span id="botStatusPill" class="text-xs px-2.5 py-0.5 rounded-full bg-sky-500/20 text-sky-300 border border-sky-500/30 font-mono">@${BOT_USERNAME}</span>
+          <span id="botStatusPill" class="text-xs px-2.5 py-0.5 rounded-full bg-sky-500/20 text-sky-300 border border-sky-500/30 font-mono">
+            ${savedSettings.activeResolver === 'pencuri' ? 'Pencuri: @' + (savedSettings.targetBotUsernames?.pencuri || 'Pencuri_Movie_Bot') : 'MSM: @' + (savedSettings.targetBotUsernames?.msm || BOT_USERNAME)}
+          </span>
         </div>
-        <p class="text-xs text-slate-400">Specify which MSM Telegram bot handle the resolver queries for streaming media.</p>
-        
-        <div class="space-y-2">
-          <label class="text-xs text-slate-300 font-medium">Bot Handle</label>
-          <div class="flex gap-2">
-            <div class="relative flex-1">
-              <span class="absolute left-3 top-2 text-slate-500 text-sm">@</span>
-              <input id="botInput" type="text" value="${BOT_USERNAME}" placeholder="msm34bot" class="w-full pl-7 pr-3 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-sm text-white focus:outline-none focus:border-sky-500/50" />
-            </div>
-            <button id="saveBotBtn" onclick="saveBot()" class="px-4 py-1.5 bg-sky-500 hover:bg-sky-400 text-slate-950 font-semibold text-xs rounded-xl transition">
-              Save
-            </button>
+        <p class="text-xs text-slate-400">Choose the active stream resolving engine and configure target Telegram bot handles.</p>
+
+        <div class="space-y-3">
+          <div>
+            <label class="text-xs text-slate-300 font-medium block mb-1">Active Resolver Engine</label>
+            <select id="resolverSelect" onchange="onResolverChange()" class="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-sky-500/50">
+              <option value="msm" ${savedSettings.activeResolver === 'msm' || !savedSettings.activeResolver ? 'selected' : ''}>MSM Bot (Inline Callbacks & Ad-Gate)</option>
+              <option value="pencuri" ${savedSettings.activeResolver === 'pencuri' ? 'selected' : ''}>Pencuri Movie Bot (Search API & Mini App)</option>
+            </select>
           </div>
-          <p id="saveMsg" class="text-xs text-emerald-400 hidden">✓ Saved and applied live!</p>
+
+          <div>
+            <label class="text-xs text-slate-300 font-medium block mb-1">Bot Username Handle</label>
+            <div class="flex gap-2">
+              <div class="relative flex-1">
+                <span class="absolute left-3 top-2 text-slate-500 text-sm">@</span>
+                <input id="botInput" type="text" value="${savedSettings.activeResolver === 'pencuri' ? (savedSettings.targetBotUsernames?.pencuri || 'Pencuri_Movie_Bot') : (savedSettings.targetBotUsernames?.msm || BOT_USERNAME)}" placeholder="bot_username" class="w-full pl-7 pr-3 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-sm text-white focus:outline-none focus:border-sky-500/50" />
+              </div>
+              <button id="saveBotBtn" onclick="saveBot()" class="px-4 py-1.5 bg-sky-500 hover:bg-sky-400 text-slate-950 font-semibold text-xs rounded-xl transition">
+                Save
+              </button>
+            </div>
+          </div>
+          <p id="saveMsg" class="text-xs text-emerald-400 hidden">✓ Resolver and bot settings saved and applied live!</p>
         </div>
 
         <div class="pt-2 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-400">
           <span>Quick presets:</span>
-          <div class="flex gap-2 font-mono">
-            <button onclick="setBotPreset('msm34bot')" class="hover:text-sky-400 text-slate-300">@msm34bot</button>
-            <span>•</span>
-            <button onclick="setBotPreset('msm32bot')" class="hover:text-sky-400 text-slate-300">@msm32bot</button>
+          <div id="quickPresets" class="flex gap-2 font-mono">
+            <!-- Dynamic presets populated by JS -->
           </div>
         </div>
       </div>
@@ -3704,7 +3045,7 @@ app.get(['/msm/setting', '/msm/settings'], (req, res) => {
         <p class="text-xs text-slate-400">Central database mapping cached video stream documents in <code class="text-slate-300">streams.json</code>.</p>
         <div class="space-y-3">
           <div class="flex gap-3">
-            <a href="/msm/streams" class="flex-1 text-center py-2 bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-white rounded-xl transition">
+            <a href="/tg/streams" class="flex-1 text-center py-2 bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-white rounded-xl transition">
               Browse Cached Videos
             </a>
             <button onclick="clearCache()" class="px-4 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 text-xs font-semibold rounded-xl transition">
@@ -3733,7 +3074,7 @@ app.get(['/msm/setting', '/msm/settings'], (req, res) => {
               Clear Log
             </button>
           </div>
-          <a href="/msm/auth" class="block text-center py-2 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 text-xs font-semibold rounded-xl transition">
+          <a href="/tg/auth" class="block text-center py-2 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 text-xs font-semibold rounded-xl transition">
             Open Telegram Phone Auth Portal →
           </a>
         </div>
@@ -4080,30 +3421,60 @@ app.get(['/msm/setting', '/msm/settings'], (req, res) => {
       }
     }
 
+    const resolverBotDefaults = {
+      msm: '${savedSettings.targetBotUsernames?.msm || BOT_USERNAME || "msm34bot"}',
+      pencuri: '${savedSettings.targetBotUsernames?.pencuri || "Pencuri_Movie_Bot"}',
+    };
+
+    function updatePresets() {
+      const resolver = document.getElementById('resolverSelect').value;
+      const container = document.getElementById('quickPresets');
+      if (resolver === 'pencuri') {
+        container.innerHTML = '<button onclick="setBotPreset(\'Pencuri_Movie_Bot\')" class="hover:text-sky-400 text-slate-300">@Pencuri_Movie_Bot</button><span>•</span><button onclick="setBotPreset(\'UnOfficialsBot\')" class="hover:text-sky-400 text-slate-300">@UnOfficialsBot</button>';
+      } else {
+        container.innerHTML = '<button onclick="setBotPreset(\'msm34bot\')" class="hover:text-sky-400 text-slate-300">@msm34bot</button><span>•</span><button onclick="setBotPreset(\'msm32bot\')" class="hover:text-sky-400 text-slate-300">@msm32bot</button>';
+      }
+    }
+
+    function onResolverChange() {
+      const resolver = document.getElementById('resolverSelect').value;
+      document.getElementById('botInput').value = resolverBotDefaults[resolver] || (resolver === 'pencuri' ? 'Pencuri_Movie_Bot' : 'msm34bot');
+      updatePresets();
+    }
+
     async function saveBot() {
+      const resolver = document.getElementById('resolverSelect').value;
       const input = document.getElementById('botInput');
       const val = input.value.trim().replace(/^@/, '');
       if (!val) return;
-      
+
       const btn = document.getElementById('saveBotBtn');
       btn.disabled = true;
       btn.textContent = 'Saving...';
-      
+
       try {
-        const res = await fetch('/msm/api/settings', {
+        const payload = {
+          activeResolver: resolver,
+          targetBotUsername: val,
+          targetBotUsernames: {
+            [resolver]: val,
+          },
+        };
+        const res = await fetch('/tg/api/settings', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ targetBotUsername: val })
+          body: JSON.stringify(payload)
         });
         const data = await res.json();
         if (data.success) {
-          document.getElementById('botStatusPill').textContent = '@' + data.targetBotUsername;
+          resolverBotDefaults[resolver] = val;
+          document.getElementById('botStatusPill').textContent = (resolver === 'pencuri' ? 'Pencuri: @' : 'MSM: @') + val;
           const msg = document.getElementById('saveMsg');
           msg.classList.remove('hidden');
           setTimeout(() => msg.classList.add('hidden'), 3000);
         }
       } catch (e) {
-        alert('Failed to save bot: ' + e.message);
+        alert('Failed to save resolver settings: ' + e.message);
       } finally {
         btn.disabled = false;
         btn.textContent = 'Save';
@@ -4114,6 +3485,9 @@ app.get(['/msm/setting', '/msm/settings'], (req, res) => {
       document.getElementById('botInput').value = name;
       saveBot();
     }
+    
+    // Initialize presets on load
+    updatePresets();
 
     function confirmRestartService() {
       document.getElementById('restartModal').classList.remove('hidden');
@@ -4205,7 +3579,7 @@ app.get(['/msm/setting', '/msm/settings'], (req, res) => {
 });
 
 // Diagnostic endpoint to inspect raw buttons returned by @${BOT_USERNAME}
-app.get(['/api/debug-search', '/msm/api/debug-search'], async (req, res) => {
+app.get(['/api/debug-search', '/tg/api/debug-search', '/msm/api/debug-search'], async (req, res) => {
   try {
     const query = req.query.q || 'Kelas Cikgu Hiragi';
     await initTelegram();
@@ -4229,7 +3603,7 @@ app.get(['/api/debug-search', '/msm/api/debug-search'], async (req, res) => {
 });
 
 // Cache management endpoints
-app.get(['/api/cache', '/msm/api/cache'], (req, res) => {
+app.get(['/api/cache', '/tg/api/cache', '/msm/api/cache'], (req, res) => {
   const { search = '', quality = '' } = req.query;
   const items = db.getAll(search);
   const totalSizeBytes = db.getTotalSizeBytes();
@@ -4285,7 +3659,7 @@ app.get(['/api/cache', '/msm/api/cache'], (req, res) => {
   });
 });
 
-app.delete(['/api/cache', '/msm/api/cache'], (req, res) => {
+app.delete(['/api/cache', '/tg/api/cache', '/msm/api/cache'], (req, res) => {
   const key = req.query.key || req.body?.key;
   const docId = req.query.docId || req.body?.docId;
   let evicted = false;
@@ -4294,12 +3668,12 @@ app.delete(['/api/cache', '/msm/api/cache'], (req, res) => {
   return res.json({ success: true, evicted, key, docId });
 });
 
-app.post(['/api/cache/clear', '/msm/api/cache/clear'], (req, res) => {
+app.post(['/api/cache/clear', '/tg/api/cache/clear', '/msm/api/cache/clear'], (req, res) => {
   db.clear();
   return res.json({ success: true, message: 'Central database cache cleared' });
 });
 
-app.get(['/api/cache/evict', '/msm/api/cache/evict'], (req, res) => {
+app.get(['/api/cache/evict', '/tg/api/cache/evict', '/msm/api/cache/evict'], (req, res) => {
   const { key, docId } = req.query;
   let evicted = false;
   if (key) evicted = db.delete(key) || evicted;
@@ -4308,7 +3682,7 @@ app.get(['/api/cache/evict', '/msm/api/cache/evict'], (req, res) => {
 });
 
 // Resolver endpoint: /api/resolve and Prefetch endpoint: /api/prefetch
-app.get(['/api/resolve', '/msm/api/resolve', '/api/prefetch', '/msm/api/prefetch'], async (req, res) => {
+app.get(['/api/resolve', '/tg/api/resolve', '/msm/api/resolve', '/api/prefetch', '/tg/api/prefetch', '/msm/api/prefetch'], async (req, res) => {
   const { title, year, season, episode, totalSeasons: totalSeasonsQuery, maxQuality = '720', force, refresh, minTvSize, minMovieSize, altTitle: altTitleQuery, englishTitle, maxPages: maxPagesQuery } = req.query;
   if (!title) {
     return res.status(400).json({ success: false, error: 'Missing title query parameter' });
@@ -4491,784 +3865,34 @@ app.get(['/api/resolve', '/msm/api/resolve', '/api/prefetch', '/msm/api/prefetch
       }
     }
 
-    // Check if matching document was delivered in chat (combining recent messages + Telegram server-side document search)
-    const recentMsgs = await client.getMessages(BOT_USERNAME, { limit: 30 });
-    const cleanTitle = cleanSearchTitle(title);
-    const candidateMsgs = [...recentMsgs];
-
-    // Search historical chat messages on Telegram servers for matching documents
-    try {
-      const serverDocs = await client.getMessages(BOT_USERNAME, {
-        search: isTv ? `${cleanTitle} ${epPadded}` : cleanTitle,
-        limit: 20,
-        filter: new Api.InputMessagesFilterDocument(),
-      });
-      if (serverDocs && serverDocs.length > 0) {
-        const seenIds = new Set(candidateMsgs.map(m => m.id));
-        for (const sm of serverDocs) {
-          if (!seenIds.has(sm.id)) {
-            candidateMsgs.push(sm);
-            seenIds.add(sm.id);
-          }
-        }
-      }
-      if (isTv) {
-        const epWordDocs = await client.getMessages(BOT_USERNAME, {
-          search: `${cleanTitle} Episod ${eNum}`,
-          limit: 15,
-          filter: new Api.InputMessagesFilterDocument(),
-        }).catch(() => []);
-        if (epWordDocs && epWordDocs.length > 0) {
-          const seenIds = new Set(candidateMsgs.map(m => m.id));
-          for (const sm of epWordDocs) {
-            if (!seenIds.has(sm.id)) {
-              candidateMsgs.push(sm);
-              seenIds.add(sm.id);
-            }
-          }
-        }
-      }
-    } catch (sErr) {
-      console.warn('[SEARCH SERVER] MTProto document search warning:', sErr.message);
-    }
-
-    const titleTokens = extractTitleTokens(title);
-    const significantTokens = extractSignificantTokens(title);
-    const targetSequel = extractSequelInfo(title);
-    const explicitTargetYear = parseInt(year, 10);
-    const targetYear = !isNaN(explicitTargetYear) ? explicitTargetYear : extractYear(title, significantTokens);
-    const matchingRecentDocs = [];
-
-    for (const msg of candidateMsgs) {
-      if (msg.media?.document) {
-        const doc = msg.media.document;
-        const fnAttr = doc.attributes?.find(a => a.className === 'DocumentAttributeFilename');
-        const filename = fnAttr ? fnAttr.fileName : msg.message;
-        const normFn = normalizeTitle(filename);
-
-        // 1. Instantly reject junk media (trailers, teasers, samples, promos, ost, reviews)
-        if (isJunkMedia(filename, title, altTitle) || isJunkMedia(msg.message, title, altTitle)) {
-          continue;
-        }
-
-        // 2. Minimum media file size check (reject clips and trailers under threshold)
-        const docSizeMB = Number(doc.size || 0) / (1024 * 1024);
-        if (isTv ? docSizeMB < effectiveMinTv : docSizeMB < effectiveMinMovie) {
-          continue;
-        }
-
-        // 3. Strict Title Token Coverage check
-        const coverage = calculateTitleCoverage(significantTokens, filename);
-        if (significantTokens.length <= 2 ? coverage < 1.0 : coverage < 0.70) {
-          continue;
-        }
-
-        // 4. Title boundary collision check (prevents short titles matching longer titles with different subtitles or prefixes)
-        const checkBoundary = validateTitleBoundaries(normFn, title);
-        if (checkBoundary.matched && !checkBoundary.ok) {
-          if (!altTitle || !validateTitleBoundaries(normFn, altTitle).ok) {
-            continue;
-          }
-        }
-
-        let matchesCandidate = true;
-
-        if (isTv) {
-          const epInfo = extractEpisodeInfo(filename);
-          if (!epInfo) {
-            matchesCandidate = false;
-          } else if (epInfo.isRange) {
-            if (eNum < epInfo.start || eNum > epInfo.end) {
-              matchesCandidate = false;
-            }
-          } else if (epInfo.episode !== eNum) {
-            matchesCandidate = false;
-          }
-
-          // Season validation
-          if (matchesCandidate) {
-            const seasonFound = extractSeasonInfo(filename);
-            if (seasonFound !== null && seasonFound !== sNum) {
-              matchesCandidate = false;
-            }
-          }
-
-          // Release year validation for TV episodes if target year is provided
-          if (matchesCandidate && targetYear) {
-            const docYear = extractYear(filename, significantTokens);
-            if (docYear && Math.abs(targetYear - docYear) > 1 && !isNaN(explicitTargetYear)) {
-              matchesCandidate = false;
-            }
-          }
-        } else {
-          // Movie validation: Instantly reject any TV series/episode candidates during movie searches
-          const isTvDoc = /\b(s\d{1,2}e\d{1,2}|s\d{1,2}\s*ep?\s*\d{1,2}|season\s*\d+|musim\s*\d+|episode\s*\d+|episod\s*\d+|ep\s*\d+|\.end\.)\b/i.test(filename) ||
-                          /\b(s\d{1,2}e\d{1,2}|s\d{1,2}\s*ep?\s*\d{1,2}|season\s*\d+|musim\s*\d+|episode\s*\d+|episod\s*\d+|ep\s*\d+|\.end\.)\b/i.test(msg.message || '');
-          if (isTvDoc) {
-            matchesCandidate = false;
-          }
-
-          // Movie validation: strictly enforce sequel number and release year alignment
-          const docSequel = extractSequelInfo(filename);
-          if (targetSequel) {
-            if (docSequel !== targetSequel) {
-              matchesCandidate = false;
-            }
-          } else {
-            // Target is original movie without sequel number -> reject docs that have a sequel number
-            if (docSequel) {
-              matchesCandidate = false;
-            }
-          }
-
-          // Release year validation: reject if filename has an explicit conflicting release year
-          const docYear = extractYear(filename, significantTokens);
-          if (targetYear && docYear && Math.abs(targetYear - docYear) > 1 && !isNaN(explicitTargetYear)) {
-            matchesCandidate = false;
-          }
-        }
-
-        if (matchesCandidate) {
-          const fnLower = (filename || '').toLowerCase();
-          const is4k = fnLower.includes('2160p') || fnLower.includes('4k') || fnLower.includes('uhd');
-          const is1080 = fnLower.includes('1080p') || fnLower.includes('1080');
-          const is720 = fnLower.includes('720p') || fnLower.includes('720');
-          const isLower = fnLower.includes('480p') || fnLower.includes('540p') || fnLower.includes('360p');
-
-          let qualityScore = 10;
-          if (targetQuality <= 480) {
-            if (isLower) qualityScore = 60;
-            else if (is720) qualityScore = 30;
-            else if (is1080) qualityScore = 5;
-          } else if (targetQuality <= 720) {
-            if (is720) qualityScore = 50;
-            else if (isLower) qualityScore = 30;
-            else if (is1080) qualityScore = 5;
-          } else if (targetQuality >= 2160) {
-            if (is4k) qualityScore = 70;
-            else if (is1080) qualityScore = 40;
-            else if (is720) qualityScore = 20;
-          } else {
-            if (is1080) qualityScore = 50;
-            else if (is720) qualityScore = 30;
-          }
-          if (fnLower.includes('.mp4') || fnLower.includes('mp4')) qualityScore += 15;
-
-          matchingRecentDocs.push({ doc, filename, qualityScore, msgId: msg.id });
-        }
-      }
-    }
-
-    if (matchingRecentDocs.length > 0) {
-      matchingRecentDocs.sort((a, b) => b.qualityScore - a.qualityScore);
-      const chosen = matchingRecentDocs[0];
-      const chosenTier = detectVideoQualityTier(chosen.filename, '', chosen.doc);
-
-      // Determine if chosen document actually matches the requested target quality
-      let isTargetQualityMet = false;
-      if (targetQuality >= 2160) {
-        isTargetQualityMet = chosenTier === '4k';
-      } else if (targetQuality >= 1080) {
-        isTargetQualityMet = chosenTier === '1080p' || chosenTier === '4k';
-      } else if (targetQuality <= 480) {
-        isTargetQualityMet = chosenTier === 'sd';
-      } else {
-        // 720p target
-        isTargetQualityMet = chosenTier === '720p' || chosenTier === '1080p' || chosenTier === '4k';
-      }
-
-      if (isTargetQualityMet && chosen.qualityScore >= 30) {
-        const docIdStr = chosen.doc.id.toString();
-        console.log(`[RESOLVE] Found matching recent document in chat: ${chosen.filename} (ID: ${docIdStr}, score: ${chosen.qualityScore}, tier: ${chosenTier})`);
-        const vAttr = chosen.doc.attributes?.find(a => a.className === 'DocumentAttributeVideo');
-        const streamItem = db.set(baseCacheKey, {
-          docId: docIdStr,
-          msgId: chosen.msgId,
-          accessHash: chosen.doc.accessHash?.toString() || '',
-          fileReference: chosen.doc.fileReference ? chosen.doc.fileReference.toString('hex') : '',
-          filename: chosen.filename,
-          size: chosen.doc.size?.toString() || '0',
-          mimeType: chosen.doc.mimeType || 'video/mp4',
-          dcId: chosen.doc.dcId || 4,
-          date: chosen.doc.date,
-          width: vAttr?.w ? Number(vAttr.w) : null,
-          height: vAttr?.h ? Number(vAttr.h) : null,
-          actualQuality: chosenTier,
-          requestedQualities: [requestedTier],
-        });
-        return streamItem;
-      } else {
-        // Chat doc has lower/different quality than requested. Store as fallback without overriding target quality key
-        if (!fallbackCached) {
-          const docIdStr = chosen.doc.id.toString();
-          const vAttr = chosen.doc.attributes?.find(a => a.className === 'DocumentAttributeVideo');
-          fallbackCached = db.set(baseCacheKey, {
-            docId: docIdStr,
-            msgId: chosen.msgId,
-            accessHash: chosen.doc.accessHash?.toString() || '',
-            fileReference: chosen.doc.fileReference ? chosen.doc.fileReference.toString('hex') : '',
-            filename: chosen.filename,
-            size: chosen.doc.size?.toString() || '0',
-            mimeType: chosen.doc.mimeType || 'video/mp4',
-            dcId: chosen.doc.dcId || 4,
-            date: chosen.doc.date,
-            width: vAttr?.w ? Number(vAttr.w) : null,
-            height: vAttr?.h ? Number(vAttr.h) : null,
-            actualQuality: chosenTier,
-          });
-          console.log(`[RESOLVE] Chat document ${chosen.filename} is ${chosenTier} (requested ${targetQuality}p). Preserving as fallback "${baseCacheKey}" while querying bot.`);
-        }
-      }
-    }
-
-    // Prepare prioritized search queries using clean, unpunctuated titles
-    const cleanT = cleanSearchTitle(title);
-    let effectiveAltTitle = altTitle ? cleanSearchTitle(altTitle) : '';
-    if (!effectiveAltTitle) {
-      if (/\bproject\b/i.test(cleanT)) {
-        effectiveAltTitle = cleanT.replace(/\bproject\b/gi, 'Projek');
-      } else if (/\bprojek\b/i.test(cleanT)) {
-        effectiveAltTitle = cleanT.replace(/\bprojek\b/gi, 'Project');
-      }
-    }
-
-    const searchQueries = [];
-    if (isTv) {
-      searchQueries.push(...generateSeriesSearchQueries(cleanT, sNum, eNum, totalSeasons, year));
-      if (cleanT !== title) {
-        searchQueries.push(...generateSeriesSearchQueries(title, sNum, eNum, totalSeasons, year));
-      }
-      if (effectiveAltTitle && effectiveAltTitle.toLowerCase() !== cleanT.toLowerCase()) {
-        searchQueries.push(...generateSeriesSearchQueries(effectiveAltTitle, sNum, eNum, totalSeasons, year));
-      }
-    } else {
-      if (year) searchQueries.push(`${cleanT} ${year}`);
-      searchQueries.push(cleanT);
-      if (cleanT !== title) {
-        if (year) searchQueries.push(`${title} ${year}`);
-        searchQueries.push(title);
-      }
-      if (effectiveAltTitle && effectiveAltTitle.toLowerCase() !== cleanT.toLowerCase()) {
-        if (year) searchQueries.push(`${effectiveAltTitle} ${year}`);
-        searchQueries.push(effectiveAltTitle);
-      }
-    }
-
-    const uniqueSearchQueries = Array.from(new Set(searchQueries));
-    const altTokens = effectiveAltTitle ? extractSignificantTokens(effectiveAltTitle) : [];
-
-    let targetMsgId = null;
-    let targetButtonId = null;
-    let fallbackShortcode = null;
-    let chosenFilename = null;
-    let sentMsgId = 0;
-    let deliveredDoc = null;
-    let deliveredMsgId = null;
-    let resolvedFilename = null;
-
-    // Helper: Score a candidate download button with detailed reason
-    function scoreButton(btn, msg) {
-      return scoreCandidateButtonWithReason(btn, msg, {
-        isTv,
-        title,
-        altTitle: effectiveAltTitle,
-        year,
-        sNum,
-        eNum,
-        totalSeasons,
-        targetQuality,
-        significantTokens,
-        altSignificantTokens: altTokens,
-        minTvSizeMb: effectiveMinTv,
-        minMovieSizeMb: effectiveMinMovie,
-      });
-    }
-
-    // Helper: Find pagination "Next" button in replyMarkup
-    function findNextPageButton(replyMarkup) {
-      if (!replyMarkup?.rows) return null;
-      for (const row of replyMarkup.rows) {
-        for (const btn of row.buttons) {
-          if (btn.className === 'KeyboardButtonCallback' && btn.data) {
-            const txt = (btn.text || '').toLowerCase();
-            if (
-              txt.includes('next') ||
-              txt.includes('➡️') ||
-              txt.includes('➡') ||
-              txt.includes('seterusnya') ||
-              txt.includes('>>') ||
-              txt.includes('>') ||
-              /page\s*\d+/i.test(txt)
-            ) {
-              return btn;
-            }
-          }
-        }
-      }
-      return null;
-    }
-
-    // Helper: Find pagination button to navigate towards targetPage (supports direct numbers, first page, and relative arrows)
-    function findPageButton(replyMarkup, targetPage, currentPage) {
-      if (!replyMarkup?.rows) return null;
-
-      // 1. Direct number button match (e.g. "1", "2", "3", or "【1】")
-      for (const row of replyMarkup.rows) {
-        for (const btn of row.buttons) {
-          if (btn.className === 'KeyboardButtonCallback' && btn.data) {
-            const txt = (btn.text || '').trim();
-            if (txt === String(targetPage) || txt === `【${targetPage}】`) {
-              return btn;
-            }
-          }
-        }
-      }
-
-      // 2. Direct first-page button if targeting page 1
-      if (targetPage === 1) {
-        for (const row of replyMarkup.rows) {
-          for (const btn of row.buttons) {
-            if (btn.className === 'KeyboardButtonCallback' && btn.data) {
-              const txt = (btn.text || '').trim();
-              if (txt === '⏮️' || txt === '1' || txt === '<<') {
-                return btn;
-              }
-            }
-          }
-        }
-      }
-
-      // 3. Relative arrow navigation: Previous (⬅️) or Next (➡️)
-      for (const row of replyMarkup.rows) {
-        for (const btn of row.buttons) {
-          if (btn.className === 'KeyboardButtonCallback' && btn.data) {
-            const txt = (btn.text || '').toLowerCase().trim();
-            if (targetPage < currentPage && (txt.includes('⬅️') || txt.includes('⬅') || txt.includes('prev') || txt.includes('kembali'))) {
-              return btn;
-            }
-            if (targetPage > currentPage && (txt.includes('➡️') || txt.includes('➡') || txt.includes('next') || txt.includes('seterusnya'))) {
-              return btn;
-            }
-          }
-        }
-      }
-
-      return null;
-    }
-
-    // Helper: Navigate message in-place to targetPage via bot callback answer
-    async function navigateToPage(client, msgId, targetPage, currentMsg, currentMsgPage) {
-      let activeMsg = currentMsg;
-      let activePage = currentMsgPage;
-      let steps = 0;
-      const MAX_STEPS = 6;
-
-      while (activeMsg && activePage !== targetPage && steps < MAX_STEPS) {
-        if (checkAborted()) break;
-        steps++;
-        const navBtn = findPageButton(activeMsg.replyMarkup, targetPage, activePage);
-        if (!navBtn) {
-          console.warn(`[RESOLVE] No navigation callback button found to reach page ${targetPage} from page ${activePage}`);
-          break;
-        }
-
-        console.log(`[RESOLVE] Navigating message ${msgId} from page ${activePage} towards page ${targetPage} via callback ("${navBtn.text}")...`);
-        try {
-          await client.invoke(new Api.messages.GetBotCallbackAnswer({
-            peer: BOT_USERNAME,
-            msgId: msgId,
-            data: navBtn.data,
-          }));
-          await new Promise(r => setTimeout(r, 1200));
-          const refreshed = await client.getMessages(BOT_USERNAME, { ids: [msgId] });
-          if (refreshed && refreshed[0]) {
-            activeMsg = refreshed[0];
-            const btnText = (navBtn.text || '').trim();
-            if (btnText === String(targetPage) || (targetPage === 1 && (btnText === '⏮️' || btnText === '1'))) {
-              activePage = targetPage;
-            } else if (btnText.includes('⬅️') || btnText.includes('⬅')) {
-              activePage = Math.max(1, activePage - 1);
-            } else if (btnText.includes('➡️') || btnText.includes('➡')) {
-              activePage = activePage + 1;
-            }
-          } else {
-            break;
-          }
-        } catch (err) {
-          console.warn(`[RESOLVE] Navigation callback error on page ${activePage}:`, err.message);
-          break;
-        }
-      }
-
-      return { msg: activeMsg, page: activePage };
-    }
-
-    // Execute Ad-Gate HTTP handshake with automatic retry for transient Cloudflare / network timeouts
-    async function axiosWithRetry(fn, desc, maxRetries = 2, delayMs = 1000) {
-      let lastErr;
-      for (let attempt = 1; attempt <= maxRetries + 1; attempt++) {
-        try {
-          return await fn();
-        } catch (err) {
-          lastErr = err;
-          const isNetworkOrTimeout = err.code === 'ECONNABORTED' ||
-                                     err.code === 'ETIMEDOUT' ||
-                                     err.code === 'ECONNRESET' ||
-                                     err.code === 'EAI_AGAIN' ||
-                                     err.code === 'ENOTFOUND' ||
-                                     (err.response && err.response.status >= 500);
-          if (attempt <= maxRetries && isNetworkOrTimeout) {
-            console.warn(`[RESOLVE RETRY] ${desc} attempt ${attempt} failed (${err.code || err.message}). Retrying in ${delayMs}ms...`);
-            await new Promise(r => setTimeout(r, delayMs));
-            delayMs = Math.round(delayMs * 1.5);
-          } else {
-            throw err;
-          }
-        }
-      }
-      throw lastErr;
-    }
-
-    for (const sq of uniqueSearchQueries) {
-      if (checkAborted()) {
-        console.log(`[RESOLVE] Aborting search query loop for "${queryTitle}" (client aborted)`);
-        break;
-      }
-      console.log(`[RESOLVE] Querying @${BOT_USERNAME} with: "${sq}"...`);
-      const sentMsg = await client.sendMessage(BOT_USERNAME, { message: sq });
-      sentMsgId = sentMsg.id;
-
-      let noResults = false;
-
-      for (let poll = 0; poll < 8; poll++) {
-        if (checkAborted()) break;
-        await new Promise(r => setTimeout(r, 400));
-        const msgs = await client.getMessages(BOT_USERNAME, { limit: 5 });
-        const candidates = [];
-
-        let activeBotMsg = null;
-        let activeBotPage = 1;
-
-        for (const m of msgs) {
-          if (m.id > sentMsgId) {
-            const textLower = (m.message || '').toLowerCase();
-            if (
-              (!m.replyMarkup || !m.replyMarkup.rows || m.replyMarkup.rows.length === 0) &&
-              (textLower.includes('tiada carian') || textLower.includes('tidak dijumpai') || textLower.includes('tiada hasil') || textLower.includes('no result'))
-            ) {
-              console.log(`[RESOLVE] Bot returned no results for "${sq}", advancing immediately.`);
-              noResults = true;
-              break;
-            }
-
-            if (m.replyMarkup?.rows) {
-              let currentMsg = m;
-              let pageCount = 0;
-              const MAX_PAGES = effectiveMaxPages;
-
-              while (currentMsg && pageCount < MAX_PAGES) {
-                if (checkAborted()) break;
-                pageCount++;
-                activeBotMsg = currentMsg;
-                activeBotPage = pageCount;
-                let pageBtnCount = 0;
-                let pageAcceptedCount = 0;
-                if (currentMsg.replyMarkup?.rows) {
-                  for (const row of currentMsg.replyMarkup.rows) {
-                    for (const btn of row.buttons) {
-                      pageBtnCount++;
-                      const evalRes = scoreButton(btn, currentMsg);
-                      const isAccepted = evalRes.score >= 0;
-                      if (isAccepted) {
-                        pageAcceptedCount++;
-                        console.log(`[RESOLVE EVAL] [Page ${pageCount}] "${btn.text}" -> score: ${evalRes.score} (ACCEPTED)`);
-                      } else {
-                        console.log(`[RESOLVE EVAL] [Page ${pageCount}] "${btn.text}" -> score: ${evalRes.score} (REJECTED: ${evalRes.reason})`);
-                      }
-                      if (evalRes.score > -999) {
-                        candidates.push({
-                          msgId: currentMsg.id,
-                          buttonId: btn.buttonId,
-                          url: btn.url,
-                          text: btn.text,
-                          className: btn.className,
-                          score: evalRes.score,
-                          page: pageCount,
-                        });
-                      }
-                    }
-                  }
-                }
-                console.log(`[RESOLVE EVAL] Page ${pageCount} evaluation summary for "${sq}": ${pageAcceptedCount} accepted, ${pageBtnCount - pageAcceptedCount} rejected out of ${pageBtnCount} button(s)`);
-
-                // Traverse all pages to accumulate all candidate buttons for this query
-                if (pageCount >= MAX_PAGES || checkAborted()) break;
-
-                // Otherwise, check for pagination button to traverse to next page
-                const nextBtn = findNextPageButton(currentMsg.replyMarkup);
-                if (nextBtn) {
-                  console.log(`[RESOLVE] Navigating to page ${pageCount + 1} for "${sq}" via callback...`);
-                  try {
-                    await client.invoke(new Api.messages.GetBotCallbackAnswer({
-                      peer: BOT_USERNAME,
-                      msgId: currentMsg.id,
-                      data: nextBtn.data,
-                    }));
-                    await new Promise(r => setTimeout(r, 1200));
-                    const refreshed = await client.getMessages(BOT_USERNAME, { ids: [currentMsg.id] });
-                    if (refreshed && refreshed[0]) {
-                      currentMsg = refreshed[0];
-                      activeBotMsg = currentMsg;
-                      activeBotPage = pageCount + 1;
-                    } else {
-                      break;
-                    }
-                  } catch (pErr) {
-                    console.warn('[RESOLVE] Pagination callback failed:', pErr.message);
-                    break;
-                  }
-                } else {
-                  break;
-                }
-              }
-            }
-          }
-        }
-
-        if (noResults || checkAborted()) break;
-
-        const valid = candidates.filter(c => c.score >= 0).sort((a, b) => b.score - a.score);
-        if (valid.length > 0) {
-          // Deduplicate candidate buttons by buttonId or url
-          const uniqueValid = [];
-          const seenButtons = new Set();
-          for (const c of valid) {
-            const btnKey = c.buttonId || c.url;
-            if (!seenButtons.has(btnKey)) {
-              seenButtons.add(btnKey);
-              uniqueValid.push(c);
-            }
-          }
-
-          // Exhaustively try all candidate buttons across all pages for this query
-          const candidatesToTry = uniqueValid;
-          for (let candIdx = 0; candIdx < candidatesToTry.length; candIdx++) {
-            if (checkAborted()) break;
-            const cand = candidatesToTry[candIdx];
-            console.log(`[RESOLVE] Trying candidate (${candIdx + 1}/${candidatesToTry.length}): "${cand.text}" (score: ${cand.score}, page: ${cand.page || 1})...`);
-
-            const targetMsgId = cand.msgId;
-            let targetButtonId = cand.buttonId;
-            const candidateFilename = cand.text.replace(/^[🔥🎞📎\s]+/, '').replace(/\s+\d+(\.\d+)?\s*(mb|gb).*$/i, '').trim();
-            const linkMatch = cand.url ? cand.url.match(/\/link\/([a-zA-Z0-9_-]+)/) : null;
-            const candShortcode = linkMatch ? linkMatch[1] : null;
-
-            if (candShortcode && deadShortcodes.has(candShortcode)) {
-              console.log(`[RESOLVE] Skipping candidate "${cand.text}" (shortcode ${candShortcode} is known dead forward_failed)`);
-              continue;
-            }
-
-            // Bidirectional Page Navigation: Ensure Telegram message displays candidate's origin page before auth
-            const candTargetPage = cand.page || 1;
-            if (activeBotMsg && activeBotPage !== candTargetPage) {
-              console.log(`[RESOLVE] Candidate "${cand.text}" belongs to page ${candTargetPage} (current view: page ${activeBotPage}). Navigating message ${targetMsgId} to page ${candTargetPage}...`);
-              const navResult = await navigateToPage(client, targetMsgId, candTargetPage, activeBotMsg, activeBotPage);
-              activeBotMsg = navResult.msg;
-              activeBotPage = navResult.page;
-            }
-
-            // Sync active buttonId from refreshed message markup
-            if (activeBotMsg?.replyMarkup?.rows) {
-              for (const row of activeBotMsg.replyMarkup.rows) {
-                for (const btn of row.buttons) {
-                  if ((cand.url && btn.url === cand.url) || (cand.text && btn.text === cand.text)) {
-                    targetButtonId = btn.buttonId;
-                    break;
-                  }
-                }
-              }
-            }
-
-            let authUrl = null;
-            if (cand.className === 'KeyboardButtonUrl') {
-              authUrl = cand.url;
-              console.log(`[RESOLVE] Candidate "${cand.text}" is a direct KeyboardButtonUrl. Using direct URL: ${authUrl}`);
-            } else {
-              let authRes;
-              try {
-                console.log(`[RESOLVE] Authorizing button (msgId: ${targetMsgId}, buttonId: ${targetButtonId}, page: ${activeBotPage})...`);
-                authRes = await client.invoke(new Api.messages.RequestUrlAuth({
-                  peer: BOT_USERNAME,
-                  msgId: targetMsgId,
-                  buttonId: targetButtonId,
-                }));
-
-                // If Telegram requests user confirmation (UrlAuthResultRequest), accept authorization
-                if (authRes?.className === 'UrlAuthResultRequest' || !authRes?.url) {
-                  console.log(`[RESOLVE] Telegram returned ${authRes?.className || 'UrlAuthResultRequest'}. Invoking AcceptUrlAuth...`);
-                  authRes = await client.invoke(new Api.messages.AcceptUrlAuth({
-                    peer: BOT_USERNAME,
-                    msgId: targetMsgId,
-                    buttonId: targetButtonId,
-                    writeAllowed: true,
-                  }));
-                }
-              } catch (authErr) {
-                console.warn(`[RESOLVE WARN] URL authorization failed for "${cand.text}": ${authErr.message}. Trying next candidate...`);
-                continue;
-              }
-
-              authUrl = authRes?.url || cand.url;
-              if (!authUrl) {
-                console.warn(`[RESOLVE WARN] No valid authorized URL obtained for "${cand.text}". Trying next candidate...`);
-                continue;
-              }
-              console.log('[RESOLVE] Authorized URL generated successfully:', authUrl);
-            }
-
-            const cookieMap = new Map();
-            function processSetCookies(header) {
-              if (!header) return;
-              const list = Array.isArray(header) ? header : [header];
-              for (const item of list) {
-                const pair = item.split(';')[0];
-                const [k, v] = pair.split('=');
-                if (k && v) cookieMap.set(k.trim(), v.trim());
-              }
-            }
-
-            let step1;
-            try {
-              console.log(`[RESOLVE] Stepping through ad-gate: ${authUrl}...`);
-              step1 = await axiosWithRetry(
-                () => axios.get(authUrl, {
-                  maxRedirects: 0,
-                  timeout: 25000,
-                  validateStatus: (s) => s >= 200 && s < 400,
-                  headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
-                }),
-                'Step 1 (ad-gate auth)',
-                2,
-                1000
-              );
-              processSetCookies(step1.headers['set-cookie']);
-            } catch (step1Err) {
-              console.warn(`[RESOLVE WARN] Step 1 ad-gate failed for "${cand.text}": ${step1Err.message}. Trying next candidate...`);
-              continue;
-            }
-
-            const redirectPath = step1.headers['location'] || (authUrl.match(/\/link\/[^\s&?]+/)?.[0] || '/');
-            const targetUrl = new URL(redirectPath, authUrl).toString();
-
-            let step2;
-            try {
-              step2 = await axiosWithRetry(
-                () => axios.get(targetUrl, {
-                  timeout: 25000,
-                  headers: {
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                    Cookie: Array.from(cookieMap.entries()).map(([k, v]) => `${k}=${v}`).join('; '),
-                    Referer: authUrl,
-                  },
-                }),
-                'Step 2 (target page)',
-                2,
-                1000
-              );
-              processSetCookies(step2.headers['set-cookie']);
-            } catch (step2Err) {
-              console.warn(`[RESOLVE WARN] Step 2 ad-gate failed for "${cand.text}": ${step2Err.message}. Trying next candidate...`);
-              continue;
-            }
-
-            const html = step2.data || '';
-            const nonceMatch = html.match(/var\s+msmbotGetFileNonce\s*=\s*["']([^"']+)["']/i);
-            const scMatch = html.match(/data-shortcode\s*=\s*["']([^"']+)["']/i) ||
-                            html.match(/messageSent_.*?"([^"]+)".*?"video"/i) ||
-                            html.match(/messageSent_.*?([a-zA-Z0-9_-]{5,20})/i);
-            const shortcode = scMatch ? scMatch[1] : candShortcode;
-
-            if (nonceMatch && shortcode) {
-              console.log(`[RESOLVE] Triggering msmbot_getfile (nonce: ${nonceMatch[1]}, shortcode: ${shortcode})...`);
-              const postData = new URLSearchParams({
-                action: 'msmbot_getfile',
-                _wpnonce: nonceMatch[1],
-                file_shortcode: shortcode,
-              });
-
-              let forwardFailed = false;
-              try {
-                const ajaxRes = await axiosWithRetry(
-                  () => axios.post(new URL('/wp-admin/admin-ajax.php', targetUrl).toString(), postData.toString(), {
-                    timeout: 25000,
-                    headers: {
-                      'Content-Type': 'application/x-www-form-urlencoded',
-                      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                      Cookie: Array.from(cookieMap.entries()).map(([k, v]) => `${k}=${v}`).join('; '),
-                      Referer: targetUrl,
-                    },
-                  }),
-                  'msmbot_getfile ajax',
-                  2,
-                  1000
-                );
-                console.log(`[RESOLVE] msmbot_getfile response: ${JSON.stringify(ajaxRes.data || 'ok')}`);
-                if (ajaxRes.data?.data?.description === 'forward_failed' || (ajaxRes.data?.data && ajaxRes.data.data.ok === false)) {
-                  console.warn(`[RESOLVE WARN] Media forward failed on @${BOT_USERNAME} for candidate "${cand.text}" (${ajaxRes.data?.data?.description || 'failed'}). Trying next candidate...`);
-                  forwardFailed = true;
-                  if (shortcode) deadShortcodes.add(shortcode);
-                  if (candShortcode) deadShortcodes.add(candShortcode);
-                  if (deadShortcodes.size > 2000) deadShortcodes.clear();
-                }
-              } catch (postErr) {
-                console.warn(`[RESOLVE WARN] msmbot_getfile request issue (${postErr.message}). Checking Telegram chat for delivery anyway...`);
-              }
-
-              if (forwardFailed) {
-                continue;
-              }
-            }
-
-            console.log(`[RESOLVE] Waiting for media delivery from @${BOT_USERNAME} (newer than msgId: ${sentMsgId})...`);
-            let candDeliveredDoc = null;
-            let candDeliveredMsgId = null;
-            let finalFilename = candidateFilename || queryTitle;
-
-            for (let attempt = 0; attempt < 8; attempt++) {
-              if (checkAborted()) break;
-              await new Promise(r => setTimeout(r, 1500));
-              if (checkAborted()) break;
-              const incoming = await client.getMessages(BOT_USERNAME, { limit: 10 });
-              for (const im of incoming) {
-                if (im.id > sentMsgId && im.media?.document) {
-                  candDeliveredDoc = im.media.document;
-                  candDeliveredMsgId = im.id;
-                  const fnAttr = candDeliveredDoc.attributes?.find(a => a.className === 'DocumentAttributeFilename');
-                  if (fnAttr) finalFilename = fnAttr.fileName;
-                  break;
-                }
-              }
-              if (candDeliveredDoc) break;
-            }
-
-            if (candDeliveredDoc) {
-              console.log(`[RESOLVE] Successfully received media document for candidate "${cand.text}"!`);
-              deliveredDoc = candDeliveredDoc;
-              deliveredMsgId = candDeliveredMsgId;
-              resolvedFilename = finalFilename;
-              break; // Candidate loop succeeded!
-            } else {
-              console.warn(`[RESOLVE WARN] Delivery timeout waiting for candidate "${cand.text}". Trying next candidate...`);
-            }
-          }
-
-          // Break out of the poll loop as all candidates for this query's bot response have been evaluated
-          break;
-        }
-      }
-
-      if (deliveredDoc || checkAborted()) break; // Exit searchQueries loop
-    }
+    const activeResolverId = String(req.query.resolver || savedSettings.activeResolver || 'msm').toLowerCase().trim();
+    const targetBotHandle = (req.query.bot || (savedSettings.targetBotUsernames && savedSettings.targetBotUsernames[activeResolverId]) || (activeResolverId === 'pencuri' ? 'Pencuri_Movie_Bot' : BOT_USERNAME)).replace(/^@/, '');
+
+    console.log(`[${logPrefix}] Delegating to resolver "${activeResolverId}" with target bot @${targetBotHandle}`);
+    const resolver = createResolver(activeResolverId, client, {
+      targetBot: targetBotHandle,
+      deadShortcodes,
+    });
+
+    const resolvedData = await resolver.resolve({
+      title,
+      year,
+      season,
+      episode,
+      totalSeasons,
+      altTitle,
+      englishTitle,
+      targetQuality,
+      requestedTier,
+      effectiveMinTv,
+      effectiveMinMovie,
+      effectiveMaxPages,
+      targetBot: targetBotHandle,
+      checkAborted,
+      fallbackCached,
+      db,
+      baseCacheKey,
+    });
 
     if (checkAborted()) {
       const err = new Error('Client aborted resolution');
@@ -5276,23 +3900,23 @@ app.get(['/api/resolve', '/msm/api/resolve', '/api/prefetch', '/msm/api/prefetch
       throw err;
     }
 
-    if (!deliveredDoc) {
+    if (!resolvedData) {
       if (fallbackCached) {
-        console.log(`[RESOLVE] Requested quality ${targetQuality}p not found from bot, falling back to cached "${fallbackCached.queryKey || fallbackCached.filename}" for "${baseCacheKey}"`);
+        console.log(`[${logPrefix}] Requested quality ${targetQuality}p not found, falling back to cached "${fallbackCached.queryKey || fallbackCached.filename}" for "${baseCacheKey}"`);
         db.addRequestedQuality(fallbackCached.docId, requestedTier);
         return fallbackCached;
       }
-      const err = new Error(`No downloadable media found for "${queryTitle}" on @${BOT_USERNAME}`);
+      const err = new Error(`No downloadable media found for "${queryTitle}" on @${targetBotHandle} (resolver: ${activeResolverId})`);
       err.status = 404;
       throw err;
     }
 
+    const deliveredDoc = resolvedData.document;
+    const deliveredMsgId = resolvedData.msgId;
+    const filename = resolvedData.filename || queryTitle;
+    const actualTier = resolvedData.tier || detectVideoQualityTier(filename, '', deliveredDoc, deliveredDoc.size);
     const docIdStr = deliveredDoc.id.toString();
-    const filename = resolvedFilename || chosenFilename || queryTitle;
     const vAttr = deliveredDoc.attributes?.find(a => a.className === 'DocumentAttributeVideo');
-    
-    // Detect ACTUAL video quality tier from delivered document attributes and filename
-    const actualTier = detectVideoQualityTier(filename, '', deliveredDoc, deliveredDoc.size);
 
     const resolvedItem = db.set(baseCacheKey, {
       docId: docIdStr,
@@ -5899,23 +4523,23 @@ app.post('/api/github-webhook', async (req, res) => {
       return res.json({ msg: `Ignored branch ${branch}` });
     }
 
-    // Check if files under server/msm-getter/ were modified
+    // Check if files under server/tg-streamer/ were modified
     const commits = payload.commits || [];
     let serverFilesChanged = false;
     for (const c of commits) {
       const allModified = [...(c.added || []), ...(c.modified || [])];
-      if (allModified.some(f => f.startsWith('server/msm-getter/'))) {
+      if (allModified.some(f => f.startsWith('server/tg-streamer/'))) {
         serverFilesChanged = true;
         break;
       }
     }
 
     if (!serverFilesChanged && commits.length > 0) {
-      console.log('[WEBHOOK] No changes in server/msm-getter/ detected in this push.');
+      console.log('[WEBHOOK] No changes in server/tg-streamer/ detected in this push.');
       return res.json({ msg: 'No server changes detected' });
     }
 
-    console.log('[WEBHOOK] Changes detected in server/msm-getter/! Triggering auto-deployment...');
+    console.log('[WEBHOOK] Changes detected in server/tg-streamer/! Triggering auto-deployment...');
     res.json({ msg: 'Deployment initiated' });
 
     // Download latest files from GitHub and restart service
@@ -5923,7 +4547,7 @@ app.post('/api/github-webhook', async (req, res) => {
       try {
         const fs = await import('fs');
         const repo = payload.repository?.full_name || 'jefrimustapa/tmdb-app';
-        const rawBase = `https://raw.githubusercontent.com/${repo}/main/server/msm-getter`;
+        const rawBase = `https://raw.githubusercontent.com/${repo}/main/server/tg-streamer`;
 
         console.log(`[AUTO-DEPLOY] Downloading latest index.js from ${rawBase}/index.js...`);
         const idxRes = await axios.get(`${rawBase}/index.js`, { responseType: 'text', timeout: 15000 });
@@ -6650,7 +5274,7 @@ if (isMain) {
         try {
           await initTelegram();
         } catch (err) {
-          console.warn(`[SERVER] Telegram not connected on startup (${err.message}). Web auth portal ready at /msm/auth.`);
+          console.warn(`[SERVER] Telegram not connected on startup (${err.message}). Web auth portal ready at /tg/auth.`);
         }
       });
     } catch (sslErr) {
@@ -6663,7 +5287,7 @@ if (isMain) {
         try {
           await initTelegram();
         } catch (err) {
-          console.warn(`[SERVER] Telegram not connected on startup (${err.message}). Web auth portal ready at /msm/auth.`);
+          console.warn(`[SERVER] Telegram not connected on startup (${err.message}). Web auth portal ready at /tg/auth.`);
         }
       });
     }
@@ -6676,7 +5300,7 @@ if (isMain) {
       try {
         await initTelegram();
       } catch (err) {
-        console.warn(`[SERVER] Telegram not connected on startup (${err.message}). Web auth portal ready at /msm/auth.`);
+        console.warn(`[SERVER] Telegram not connected on startup (${err.message}). Web auth portal ready at /tg/auth.`);
       }
     });
   }
@@ -6697,6 +5321,14 @@ if (isMain) {
 }
 
 export {
+  DEFAULT_PIPELINE_BUFFERS,
+  detectVideoQualityTier,
+  BaseResolver,
+  MsmResolver,
+  PencuriResolver,
+  createResolver,
+  listResolvers,
+  getResolverClass,
   extractEpisodeInfo,
   extractSeasonInfo,
   cleanBotEchoHeader,
