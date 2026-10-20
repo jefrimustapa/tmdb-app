@@ -18,7 +18,7 @@ import {
   isJunkMedia,
   calculateTitleCoverage,
   validateTitleBoundaries,
-  generateSeriesSearchQueries,
+  buildSearchQueries,
 } from './base.js';
 
 // Search files directly from PencariMovie public search API
@@ -27,7 +27,7 @@ async function searchPencariApi(query) {
     const encoded = encodeURIComponent(query);
     const url = `https://unofficialsbot.pencarimovie.com/wp-admin/admin-ajax.php?action=stream_search_files&search=${encoded}`;
     const res = await axios.get(url, {
-      timeout: 10000,
+      timeout: 20000,
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
       },
@@ -45,7 +45,8 @@ async function searchPencariApi(query) {
 async function fetchPencariLinkDetails(linkUrl) {
   try {
     const res = await axios.get(linkUrl, {
-      timeout: 12000,
+      timeout: 15000,
+      maxRedirects: 5,
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
       },
@@ -110,12 +111,7 @@ export class PencuriResolver extends BaseResolver {
     const altTitle = String(altTitleQuery || englishTitle || '').trim();
     const sNum = season ? parseInt(season, 10) : NaN;
     const eNum = episode ? parseInt(episode, 10) : NaN;
-    const totalSeasons = totalSeasonsQuery ? parseInt(totalSeasonsQuery, 10) : NaN;
     const isTv = !isNaN(sNum) && !isNaN(eNum);
-    const sPadded = isTv ? String(sNum).padStart(2, '0') : '';
-    const epPadded = isTv ? String(eNum).padStart(2, '0') : '';
-    const tvTag = isTv ? `S${sPadded}E${epPadded}` : '';
-    const queryTitle = isTv ? `${title} ${tvTag}` : `${title} ${year || ''}`.trim();
 
     const titleTokens = extractTitleTokens(title);
     const significantTokens = extractSignificantTokens(title);
@@ -190,43 +186,45 @@ export class PencuriResolver extends BaseResolver {
       };
     }
 
-    // 2. Prepare prioritized search queries
-    const cleanT = cleanSearchTitle(title);
-    let effectiveAltTitle = altTitle ? cleanSearchTitle(altTitle) : '';
-    const searchQueries = [];
-    if (isTv) {
-      searchQueries.push(...generateSeriesSearchQueries(cleanT, sNum, eNum, totalSeasons, year));
-      if (cleanT !== title) {
-        searchQueries.push(...generateSeriesSearchQueries(title, sNum, eNum, totalSeasons, year));
-      }
-      if (effectiveAltTitle && effectiveAltTitle.toLowerCase() !== cleanT.toLowerCase()) {
-        searchQueries.push(...generateSeriesSearchQueries(effectiveAltTitle, sNum, eNum, totalSeasons, year));
-      }
-    } else {
-      if (year) searchQueries.push(`${cleanT} ${year}`);
-      searchQueries.push(cleanT);
-      if (cleanT !== title) {
-        if (year) searchQueries.push(`${title} ${year}`);
-        searchQueries.push(title);
-      }
-      if (effectiveAltTitle && effectiveAltTitle.toLowerCase() !== cleanT.toLowerCase()) {
-        if (year) searchQueries.push(`${effectiveAltTitle} ${year}`);
-        searchQueries.push(effectiveAltTitle);
-      }
-    }
+    // 2. Prepare prioritized search queries (unified across resolvers)
+    const uniqueSearchQueries = buildSearchQueries(params);
 
-    const uniqueSearchQueries = Array.from(new Set(searchQueries));
-
-    // 3. Query API for candidate files
+    // 3. Query search API for candidate files
     const candidateFiles = [];
+    const seenFileIds = new Set();
+
     for (const sq of uniqueSearchQueries) {
       if (checkAborted()) break;
       console.log(`[PENCURI RESOLVE] Querying search API with "${sq}"...`);
       const files = await searchPencariApi(sq);
       if (files && files.length > 0) {
         for (const f of files) {
-          candidateFiles.push(f);
+          if (!seenFileIds.has(f.id)) {
+            seenFileIds.add(f.id);
+            candidateFiles.push(f);
+          }
         }
+      }
+
+      // Early break if we already gathered candidate files matching the episode / movie
+      const hasMatchingCandidate = candidateFiles.some(f => {
+        const fn = f.title || '';
+        if (isTv) {
+          const epInfo = extractEpisodeInfo(fn);
+          if (!epInfo || (epInfo.isRange ? (eNum < epInfo.start || eNum > epInfo.end) : epInfo.episode !== eNum)) return false;
+          const seasonFound = extractSeasonInfo(fn);
+          if (seasonFound !== null && seasonFound !== sNum) return false;
+          return true;
+        } else {
+          const isTvDoc = /\b(s\d{1,2}e\d{1,2}|season\s*\d+|musim\s*\d+|episode\s*\d+|episod\s*\d+|ep\s*\d+)\b/i.test(fn);
+          if (isTvDoc) return false;
+          return true;
+        }
+      });
+
+      if (hasMatchingCandidate) {
+        console.log(`[PENCURI RESOLVE] Found matching candidates from query "${sq}", proceeding to scoring.`);
+        break;
       }
     }
 
@@ -289,8 +287,24 @@ export class PencuriResolver extends BaseResolver {
       const startParam = linkDetails?.startParam || `${file.short_code}-${linkDetails?.botId || '8665550029'}-0`;
 
       console.log(`[PENCURI RESOLVE] Requesting delivery via @${deliveryBot} (start: "${startParam}")...`);
-      const sentMsg = await this.client.sendMessage(deliveryBot, { message: `/start ${startParam}` });
-      const sentMsgId = sentMsg.id;
+      let sentMsg = null;
+      try {
+        sentMsg = await this.client.sendMessage(deliveryBot, { message: `/start ${startParam}` });
+      } catch (sendErr) {
+        if (sendErr.errorMessage === 'YOU_BLOCKED_USER' || (sendErr.message && sendErr.message.includes('YOU_BLOCKED_USER'))) {
+          console.warn(`[PENCURI RESOLVE] Bot @${deliveryBot} is blocked. Auto-unblocking...`);
+          try {
+            await this.client.invoke(new Api.contacts.Unblock({ id: deliveryBot }));
+            sentMsg = await this.client.sendMessage(deliveryBot, { message: `/start ${startParam}` });
+          } catch (unblockErr) {
+            console.error(`[PENCURI RESOLVE] Failed to unblock @${deliveryBot}:`, unblockErr.message);
+          }
+        } else {
+          console.error(`[PENCURI RESOLVE] Error sending to @${deliveryBot}:`, sendErr.message);
+        }
+      }
+
+      const sentMsgId = sentMsg ? sentMsg.id : 0;
 
       // Poll for document delivery in both deliveryBot and targetBot
       let deliveredDoc = null;

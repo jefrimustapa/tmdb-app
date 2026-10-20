@@ -30,6 +30,10 @@ import {
   PencuriResolver,
   BaseResolver,
 } from './resolvers/index.js';
+import {
+  buildSearchQueries,
+  generateMovieSearchQueries,
+} from './resolvers/queries.js';
 
 let passed = 0;
 let total = 0;
@@ -1156,6 +1160,55 @@ it('falls back to default resolver (msm) on unrecognized ID', () => {
   const fallback = createResolver('unknown_resolver', null);
   assert.ok(fallback instanceof MsmResolver);
   assert.strictEqual(fallback.id, 'msm');
+});
+
+console.log('\n19. Shared Search Query Builder (#232)');
+it('builds prioritized, deduplicated movie search queries', () => {
+  const queries = buildSearchQueries({
+    title: 'Polis Evo 3',
+    year: '2023',
+  });
+  assert.deepStrictEqual(queries, [
+    'Polis Evo 3 2023',
+    'Polis Evo 3',
+  ]);
+});
+
+it('builds prioritized TV queries with auto-detected alternate title (Project <-> Projek)', () => {
+  const queries = buildSearchQueries({
+    title: 'Project: Exit',
+    year: '2024',
+    season: 1,
+    episode: 6,
+    totalSeasons: 1,
+  });
+
+  // Must include variants for 'Project Exit' as well as 'Projek Exit'
+  assert.ok(queries.includes('Project Exit EP06'));
+  assert.ok(queries.includes('Project Exit S01E06'));
+  assert.ok(queries.includes('Projek Exit EP06'));
+  assert.ok(queries.includes('Projek Exit S01E06'));
+  assert.ok(queries.includes('Project Exit'));
+  assert.ok(queries.includes('Projek Exit'));
+  // Ensure no duplicated entries
+  const unique = new Set(queries);
+  assert.strictEqual(queries.length, unique.size);
+});
+
+it('builds prioritized TV queries with explicit altTitle and englishTitle', () => {
+  const queries = buildSearchQueries({
+    title: 'Abang Imam Minah Skuter',
+    altTitle: 'Abang Imam',
+    year: '2025',
+    season: 1,
+    episode: 10,
+  });
+
+  assert.ok(queries.includes('Abang Imam Minah Skuter EP10'));
+  assert.ok(queries.includes('Abang Imam Minah Skuter S01E10'));
+  assert.ok(queries.includes('Abang Imam EP10'));
+  assert.ok(queries.includes('Abang Imam S01E10'));
+  assert.ok(queries.includes('Abang Imam Minah Skuter'));
 });
 
 // Clean up temporary test files

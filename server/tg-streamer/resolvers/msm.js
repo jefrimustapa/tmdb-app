@@ -19,6 +19,7 @@ import {
   calculateTitleCoverage,
   validateTitleBoundaries,
   generateSeriesSearchQueries,
+  buildSearchQueries,
   scoreCandidateButtonWithReason,
 } from './base.js';
 
@@ -404,7 +405,8 @@ export class MsmResolver extends BaseResolver {
       }
     }
 
-    // 2. Prepare prioritized search queries
+    // 2. Prepare prioritized search queries (unified across resolvers)
+    const uniqueSearchQueries = buildSearchQueries(params);
     const cleanT = cleanSearchTitle(title);
     let effectiveAltTitle = altTitle ? cleanSearchTitle(altTitle) : '';
     if (!effectiveAltTitle) {
@@ -414,30 +416,6 @@ export class MsmResolver extends BaseResolver {
         effectiveAltTitle = cleanT.replace(/\bprojek\b/gi, 'Project');
       }
     }
-
-    const searchQueries = [];
-    if (isTv) {
-      searchQueries.push(...generateSeriesSearchQueries(cleanT, sNum, eNum, totalSeasons, year));
-      if (cleanT !== title) {
-        searchQueries.push(...generateSeriesSearchQueries(title, sNum, eNum, totalSeasons, year));
-      }
-      if (effectiveAltTitle && effectiveAltTitle.toLowerCase() !== cleanT.toLowerCase()) {
-        searchQueries.push(...generateSeriesSearchQueries(effectiveAltTitle, sNum, eNum, totalSeasons, year));
-      }
-    } else {
-      if (year) searchQueries.push(`${cleanT} ${year}`);
-      searchQueries.push(cleanT);
-      if (cleanT !== title) {
-        if (year) searchQueries.push(`${title} ${year}`);
-        searchQueries.push(title);
-      }
-      if (effectiveAltTitle && effectiveAltTitle.toLowerCase() !== cleanT.toLowerCase()) {
-        if (year) searchQueries.push(`${effectiveAltTitle} ${year}`);
-        searchQueries.push(effectiveAltTitle);
-      }
-    }
-
-    const uniqueSearchQueries = Array.from(new Set(searchQueries));
     const altTokens = effectiveAltTitle ? extractSignificantTokens(effectiveAltTitle) : [];
 
     let deliveredDoc = null;

@@ -134,76 +134,8 @@ export function toRoman(num) {
   return map[num] || String(num);
 }
 
-// Generate TV series prioritized search queries (Adaptive 12 Queries without 'episode'/'episod')
-export function generateSeriesSearchQueries(cleanT, sNum, eNum, totalSeasons, year) {
-  const s2 = String(sNum).padStart(2, '0');
-  const e2 = String(eNum).padStart(2, '0');
-  const e1 = String(eNum);
-
-  const queries = [];
-  const addQuery = (q) => {
-    const trimmed = (q || '').trim();
-    if (trimmed && !queries.includes(trimmed)) {
-      queries.push(trimmed);
-    }
-  };
-
-  if (sNum > 1) {
-    // Multi-Season (sNum > 1): Season tags are crucial to prevent picking wrong season
-    // 1. Scene standard
-    addQuery(`${cleanT} S${s2}E${e2}`);
-    // 2. Scene standard with year
-    if (year) addQuery(`${cleanT} ${year} S${s2}E${e2}`);
-    // 3. Single digit season + EP
-    addQuery(`${cleanT} S${sNum} EP${e2}`);
-    // 4. Double digit season + EP
-    addQuery(`${cleanT} S${s2} EP${e2}`);
-    // 5. Year + EP (uploader might use year to distinguish season)
-    if (year) addQuery(`${cleanT} ${year} EP${e2}`);
-    // 6. Year + E
-    if (year) addQuery(`${cleanT} ${year} E${e2}`);
-    // 7. Scene standard single digit episode
-    addQuery(`${cleanT} S${s2}E${e1}`);
-    // 8. Base EP double digit
-    addQuery(`${cleanT} EP${e2}`);
-    // 9. Base E double digit
-    addQuery(`${cleanT} E${e2}`);
-    // 10. Base EP single digit
-    addQuery(`${cleanT} EP${e1}`);
-    // 11. Year alone
-    if (year) addQuery(`${cleanT} ${year}`);
-    // 12. Title alone
-    addQuery(cleanT);
-  } else {
-    // Season 1 (sNum === 1): Asian / local dramas rarely tag S01; they use EPxx / Exx
-    // 1. Base EP double digit
-    addQuery(`${cleanT} EP${e2}`);
-    // 2. Base E double digit
-    addQuery(`${cleanT} E${e2}`);
-    // 3. S01 standard
-    addQuery(`${cleanT} S01E${e2}`);
-    // 4. Year + EP
-    if (year) addQuery(`${cleanT} ${year} EP${e2}`);
-    // 5. Year + E
-    if (year) addQuery(`${cleanT} ${year} E${e2}`);
-    // 6. Year + S01 standard
-    if (year) addQuery(`${cleanT} ${year} S01E${e2}`);
-    // 7. Base EP single digit
-    addQuery(`${cleanT} EP${e1}`);
-    // 8. Base E single digit
-    addQuery(`${cleanT} E${e1}`);
-    // 9. S1 standard single digit
-    addQuery(`${cleanT} S1E${e1}`);
-    // 10. Year alone
-    if (year) addQuery(`${cleanT} ${year}`);
-    // 11. Season 1 alone
-    addQuery(`${cleanT} S01`);
-    // 12. Title alone
-    addQuery(cleanT);
-  }
-
-  return queries;
-}
+// Search query generation decoupled in queries.js
+export { buildSearchQueries, generateSeriesSearchQueries, generateMovieSearchQueries } from './queries.js';
 
 // Helper: Extract significant search tokens from title (retaining digits, roman numerals, and words >= 2 chars)
 export function extractTitleTokens(str) {
