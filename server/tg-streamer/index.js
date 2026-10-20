@@ -1660,7 +1660,9 @@ app.get(['/api/resolvers', '/tg/api/resolvers', '/msm/api/resolvers'], (req, res
 app.get(['/api/settings', '/tg/api/settings', '/msm/api/settings'], (req, res) => {
   res.json({
     success: true,
+    activeResolver: savedSettings.activeResolver || 'msm',
     targetBotUsername: BOT_USERNAME,
+    targetBotUsernames: savedSettings.targetBotUsernames || { msm: BOT_USERNAME, pencuri: 'Pencuri_Movie_Bot' },
     isConnected,
     uptime: process.uptime(),
     cachedStreams: db.size(),
@@ -2734,7 +2736,7 @@ app.get(['/tg/streams', '/msm/cache'], (req, res) => {
 });
 
 // Redirect legacy /setting and /settings to /tg/settings
-app.get(['/setting', '/settings'], (req, res) => res.redirect(301, '/tg/settings'));
+app.get(['/setting', '/settings', '/msm/settings', '/tg/setting'], (req, res) => res.redirect(301, '/tg/settings'));
 
 // Dedicated Web Settings Page (Served exclusively at /msm/setting, /tg/settings)
 app.get(['/msm/setting', '/tg/settings'], (req, res) => {
@@ -3165,11 +3167,25 @@ app.get(['/msm/setting', '/tg/settings'], (req, res) => {
   <script>
     async function loadSettingsData() {
       try {
-        const res = await fetch('/msm/api/settings').then(r => r.json());
+        const res = await fetch('/tg/api/settings').catch(() => fetch('/msm/api/settings')).then(r => r.json());
         if (res.cachedStreams !== undefined) {
           document.getElementById('cacheCount').textContent = res.cachedStreams + ' videos';
         }
-        if (res.targetBotUsername) {
+        if (res.activeResolver) {
+          const sel = document.getElementById('resolverSelect');
+          if (sel) sel.value = res.activeResolver;
+          if (res.targetBotUsernames && res.targetBotUsernames[res.activeResolver]) {
+            resolverBotDefaults[res.activeResolver] = res.targetBotUsernames[res.activeResolver];
+            const botIn = document.getElementById('botInput');
+            if (botIn) botIn.value = res.targetBotUsernames[res.activeResolver];
+          }
+          const pill = document.getElementById('botStatusPill');
+          if (pill) {
+            const currentBot = (res.targetBotUsernames && res.targetBotUsernames[res.activeResolver]) || res.targetBotUsername || '';
+            pill.textContent = (res.activeResolver === 'pencuri' ? 'Pencuri: @' : 'MSM: @') + currentBot;
+          }
+          updatePresets();
+        } else if (res.targetBotUsername) {
           document.getElementById('botStatusPill').textContent = '@' + res.targetBotUsername;
         }
         if (res.pipelineBuffers) {
@@ -3427,13 +3443,26 @@ app.get(['/msm/setting', '/tg/settings'], (req, res) => {
     };
 
     function updatePresets() {
-      const resolver = document.getElementById('resolverSelect').value;
+      const sel = document.getElementById('resolverSelect');
+      if (!sel) return;
+      const resolver = sel.value;
       const container = document.getElementById('quickPresets');
-      if (resolver === 'pencuri') {
-        container.innerHTML = '<button onclick="setBotPreset(\'Pencuri_Movie_Bot\')" class="hover:text-sky-400 text-slate-300">@Pencuri_Movie_Bot</button><span>•</span><button onclick="setBotPreset(\'UnOfficialsBot\')" class="hover:text-sky-400 text-slate-300">@UnOfficialsBot</button>';
-      } else {
-        container.innerHTML = '<button onclick="setBotPreset(\'msm34bot\')" class="hover:text-sky-400 text-slate-300">@msm34bot</button><span>•</span><button onclick="setBotPreset(\'msm32bot\')" class="hover:text-sky-400 text-slate-300">@msm32bot</button>';
-      }
+      if (!container) return;
+      container.innerHTML = '';
+      const list = resolver === 'pencuri' ? ['Pencuri_Movie_Bot', 'UnOfficialsBot'] : ['msm34bot', 'msm32bot'];
+      list.forEach((bot, idx) => {
+        if (idx > 0) {
+          const sep = document.createElement('span');
+          sep.textContent = ' • ';
+          container.appendChild(sep);
+        }
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'hover:text-sky-400 text-slate-300';
+        btn.textContent = '@' + bot;
+        btn.onclick = function() { setBotPreset(bot); };
+        container.appendChild(btn);
+      });
     }
 
     function onResolverChange() {
