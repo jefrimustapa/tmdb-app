@@ -82,6 +82,30 @@ export const WatchSettingsModal: React.FC<WatchSettingsModalProps> = ({
   isKorean = false
 }) => {
   const [activeTab, setActiveTab] = useState<WatchSettingsTab>(defaultTab === 'servers' ? 'server' : defaultTab);
+
+  // Dynamic portal target: when in HTML5 fullscreen on web, portal inside the fullscreen element so modal is visible in top-layer (#240)
+  const [fullscreenNode, setFullscreenNode] = useState<Element | null>(() => {
+    if (typeof document === 'undefined') return null;
+    return document.fullscreenElement || (document as any).webkitFullscreenElement || null;
+  });
+
+  useEffect(() => {
+    const handleFullscreenUpdate = () => {
+      const el = typeof document !== 'undefined'
+        ? (document.fullscreenElement || (document as any).webkitFullscreenElement || null)
+        : null;
+      setFullscreenNode(el);
+    };
+
+    document.addEventListener('fullscreenchange', handleFullscreenUpdate);
+    document.addEventListener('webkitfullscreenchange', handleFullscreenUpdate);
+    window.addEventListener('tmdb_fullscreen_changed', handleFullscreenUpdate);
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenUpdate);
+      document.removeEventListener('webkitfullscreenchange', handleFullscreenUpdate);
+      window.removeEventListener('tmdb_fullscreen_changed', handleFullscreenUpdate);
+    };
+  }, []);
   const [filterLang, setFilterLang] = useState<'all' | 'ms' | 'en'>('all');
   const [activeDrawer, setActiveDrawer] = useState<'none' | 'fontsize' | 'delay'>('none');
   const modalRef = useRef<HTMLDivElement>(null);
@@ -635,7 +659,7 @@ export const WatchSettingsModal: React.FC<WatchSettingsModalProps> = ({
 
   const modalContent = (
     <div
-      className="fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-6 bg-black/80 backdrop-blur-md animate-fadeIn select-none"
+      className="fixed inset-0 z-[9999999] flex items-center justify-center p-3 sm:p-6 bg-black/80 backdrop-blur-md animate-fadeIn select-none"
       onClick={onClose}
       role="dialog"
       aria-modal="true"
@@ -1490,5 +1514,13 @@ export const WatchSettingsModal: React.FC<WatchSettingsModalProps> = ({
     </div>
   );
 
-  return createPortal(modalContent, document.body);
+  const portalTarget = typeof document !== 'undefined'
+    ? ((document.fullscreenElement as HTMLElement) ||
+       ((document as any).webkitFullscreenElement as HTMLElement) ||
+       (fullscreenNode as HTMLElement) ||
+       document.body)
+    : null;
+
+  if (!portalTarget) return null;
+  return createPortal(modalContent, portalTarget);
 };
