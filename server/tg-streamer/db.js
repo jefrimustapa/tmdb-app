@@ -40,11 +40,46 @@ export class CentralDatabase {
     return s;
   }
 
+  _inferQuality(record, fallbackKey = '') {
+    if (!record) return '';
+    if (record.actualQuality) {
+      const q = this._normQuality(record.actualQuality);
+      if (q) return q;
+    }
+    const w = Number(record.width) || 0;
+    const h = Number(record.height) || 0;
+    if (w >= 3200 || h >= 1800) return '4k';
+    if (w >= 1600 || h >= 900) return '1080p';
+    if (w >= 960 || h >= 530) return '720p';
+    if (w > 0 && h > 0) return 'sd';
+
+    const fn = String(record.filename || '').toLowerCase();
+    if (/\b(4k|2160p|2160|uhd)\b/i.test(fn)) return '4k';
+    if (/\b(1080p|1080|fhd)\b/i.test(fn)) return '1080p';
+    if (/\b(720p|720|hd)\b/i.test(fn)) return '720p';
+    if (/\b(480p|480|360p|540p|sd)\b/i.test(fn)) return 'sd';
+
+    const match = String(fallbackKey || record.queryKey || '').match(/_(4k|2160p|1080p|720p|480p|sd)$/i);
+    if (match) return this._normQuality(match[1]);
+
+    if (record.requestedQuality) {
+      const q = this._normQuality(record.requestedQuality);
+      if (q) return q;
+    }
+    if (Array.isArray(record.requestedQualities) && record.requestedQualities.length > 0) {
+      const q = this._normQuality(record.requestedQualities[0]);
+      if (q) return q;
+    }
+    return '';
+  }
+
   load() {
     try {
       if (fs.existsSync(this.dbFile)) {
         const raw = fs.readFileSync(this.dbFile, 'utf-8');
         const records = JSON.parse(raw);
+        let diskNeedsSave = false;
+
         for (const r of records) {
           if (!r || typeof r !== 'object' || !r.docId) continue;
           const cleanKey = this._stripQualitySuffix(r.queryKey);
@@ -63,18 +98,71 @@ export class CentralDatabase {
             r.requestedQuality = normRequested[0];
           }
 
-          const docIdStr = String(r.docId);
-          this.byDocId.set(docIdStr, r);
+          // Ensure actualQuality is populated if possible
+          const inferredActual = this._inferQuality(r, r.queryKey);
+          if (inferredActual && (!r.actualQuality || this._normQuality(r.actualQuality) !== inferredActual)) {
+            r.actualQuality = inferredActual;
+          }
 
+          const docIdStr = String(r.docId);
+
+          // Deduplicate if cleanKey already has a record with the SAME actualQuality (#246)
           if (cleanKey) {
             const list = this.byQuery.get(cleanKey) || [];
+            const rQuality = this._normQuality(r.actualQuality);
+            const dupIndex = rQuality
+              ? list.findIndex(doc => String(doc.docId) !== docIdStr && this._normQuality(doc.actualQuality) === rQuality)
+              : -1;
+
+            if (dupIndex !== -1) {
+              const existingDoc = list[dupIndex];
+              const rTime = Number(r.createdAt || (r.date ? r.date * 1000 : 0) || 0);
+              const existingTime = Number(existingDoc.createdAt || (existingDoc.date ? existingDoc.date * 1000 : 0) || 0);
+
+              if (rTime >= existingTime) {
+                // Incoming record r is newer: supersede existingDoc
+                const mergedReq = Array.from(new Set([
+                  ...(Array.isArray(r.requestedQualities) ? r.requestedQualities : []),
+                  ...(Array.isArray(existingDoc.requestedQualities) ? existingDoc.requestedQualities : []),
+                  ...(r.requestedQuality ? [r.requestedQuality] : []),
+                  ...(existingDoc.requestedQuality ? [existingDoc.requestedQuality] : []),
+                ])).filter(Boolean);
+                r.requestedQualities = mergedReq.length > 0 ? mergedReq : undefined;
+                r.requestedQuality = r.requestedQuality || existingDoc.requestedQuality;
+
+                this.byDocId.delete(String(existingDoc.docId));
+                list[dupIndex] = r;
+                this.byDocId.set(docIdStr, r);
+                this.byQuery.set(cleanKey, list);
+                diskNeedsSave = true;
+                continue;
+              } else {
+                // existingDoc is newer: keep existingDoc, merge r's requested qualities
+                const mergedReq = Array.from(new Set([
+                  ...(Array.isArray(existingDoc.requestedQualities) ? existingDoc.requestedQualities : []),
+                  ...(Array.isArray(r.requestedQualities) ? r.requestedQualities : []),
+                  ...(existingDoc.requestedQuality ? [existingDoc.requestedQuality] : []),
+                  ...(r.requestedQuality ? [r.requestedQuality] : []),
+                ])).filter(Boolean);
+                existingDoc.requestedQualities = mergedReq.length > 0 ? mergedReq : undefined;
+                diskNeedsSave = true;
+                continue;
+              }
+            }
+
             if (!list.some(doc => String(doc.docId) === docIdStr)) {
               list.push(r);
             }
             this.byQuery.set(cleanKey, list);
           }
+
+          this.byDocId.set(docIdStr, r);
         }
         console.log(`[DB] Successfully loaded ${this.byQuery.size} queries (${this.byDocId.size} unique docs) from ${this.dbFile}`);
+        if (diskNeedsSave) {
+          console.log(`[DB] Deduplicated stream cache records on disk (#246).`);
+          this.save();
+        }
       }
     } catch (err) {
       console.error('[DB ERROR] Failed to load streams.json:', err.message);
@@ -251,6 +339,10 @@ export class CentralDatabase {
 
     const cleanKey = this._stripQualitySuffix(queryKey || data.queryKey || existing?.queryKey);
 
+    // Determine normalized actual quality
+    const inferredQuality = this._inferQuality(data, queryKey) || this._inferQuality(existing, queryKey);
+    const normActualQuality = inferredQuality || undefined;
+
     const existingRequested = Array.isArray(existing?.requestedQualities) ? existing.requestedQualities : [];
     const incomingRequested = Array.isArray(data.requestedQualities) ? data.requestedQualities : [];
     const rawList = [
@@ -261,6 +353,20 @@ export class CentralDatabase {
     ];
     const match = String(queryKey).match(/_(4k|2160p|1080p|720p|480p|sd)$/i);
     if (match) rawList.push(match[1]);
+
+    // If there is an existing record with the same cleanKey and same quality tier, merge its requestedQualities and evict it (#246)
+    if (cleanKey && normActualQuality) {
+      const currentList = this.byQuery.get(cleanKey) || [];
+      for (const oldDoc of currentList) {
+        if (String(oldDoc.docId) !== docIdStr && this._normQuality(oldDoc.actualQuality) === normActualQuality) {
+          if (Array.isArray(oldDoc.requestedQualities)) rawList.push(...oldDoc.requestedQualities);
+          if (oldDoc.requestedQuality) rawList.push(oldDoc.requestedQuality);
+          // Evict superseded duplicate docId from byDocId!
+          this.byDocId.delete(String(oldDoc.docId));
+          console.log(`[DB] Superseded older docId ${oldDoc.docId} (${oldDoc.filename}) for "${cleanKey}" tier ${normActualQuality} (#246)`);
+        }
+      }
+    }
 
     const combinedRequestedQualities = Array.from(new Set(rawList.map(q => this._normQuality(q)))).filter(Boolean);
 
@@ -278,7 +384,7 @@ export class CentralDatabase {
       videoCodec: data.videoCodec || existing?.videoCodec || undefined,
       width: data.width !== undefined ? data.width : existing?.width,
       height: data.height !== undefined ? data.height : existing?.height,
-      actualQuality: data.actualQuality || existing?.actualQuality || undefined,
+      actualQuality: normActualQuality,
       requestedQuality: data.requestedQuality || existing?.requestedQuality || (combinedRequestedQualities[0] || undefined),
       requestedQualities: combinedRequestedQualities.length > 0 ? combinedRequestedQualities : undefined,
     };
@@ -293,7 +399,12 @@ export class CentralDatabase {
 
     if (cleanKey) {
       const list = this.byQuery.get(cleanKey) || [];
-      const filtered = list.filter(r => String(r.docId) !== docIdStr);
+      // Filter out any doc that has the same docId OR the same normalized actual quality!
+      const filtered = list.filter(r => {
+        if (String(r.docId) === docIdStr) return false;
+        if (normActualQuality && this._normQuality(r.actualQuality) === normActualQuality) return false;
+        return true;
+      });
       filtered.push(record);
       this.byQuery.set(cleanKey, filtered);
     }

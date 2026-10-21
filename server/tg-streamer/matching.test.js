@@ -1336,6 +1336,105 @@ it('resolves active bot handle dynamically based on active resolver configuratio
   assert.strictEqual(getActiveTargetBot(), 'msm34bot');
 });
 
+// ==========================================
+// 21. Persistent Stream Cache Deduplication of Same Title/Episode & Quality (#246)
+// ==========================================
+console.log('\n21. Persistent Stream Cache Deduplication of Same Title/Episode & Quality (#246)');
+
+it('supersedes older docId and evicts duplicate when caching same title/episode and quality tier (#246)', () => {
+  const testDb = new CentralDatabase(TEST_DB_FILE);
+  testDb.clear();
+
+  const cleanKey = 'avatar seven havens s01e01';
+
+  // 1. Initial 1080p file cached (e.g. from 10 days ago)
+  testDb.set(cleanKey, {
+    docId: '6217714585508519773',
+    filename: 'Avatar.Seven.Havens.S01E01.On.The.Horizon.1080p.AMZN.WEB-DL..mkv',
+    actualQuality: '1080p',
+    requestedQualities: ['720p'],
+    createdAt: 1000,
+  });
+
+  assert.strictEqual(testDb.byDocId.size, 1);
+  assert.strictEqual(testDb.byQuery.get(cleanKey)?.length, 1);
+  assert.strictEqual(testDb.getByDocId('6217714585508519773')?.docId, '6217714585508519773');
+
+  // 2. Fresh resolution delivers a newer 1080p file for the exact same episode
+  testDb.set(cleanKey, {
+    docId: '5352762782603327747',
+    filename: 'Avatar_Seven_Havens_S01E01_On_The_Horizon_1080p_PMTP_WEB_DL_DDP5.mkv',
+    actualQuality: '1080p',
+    requestedQualities: ['720p'],
+    createdAt: 2000,
+  });
+
+  // Verify that the duplicate 1080p document was evicted and NOT retained
+  assert.strictEqual(testDb.byDocId.size, 1, 'byDocId must contain exactly 1 document after re-resolution');
+  assert.strictEqual(testDb.byQuery.get(cleanKey)?.length, 1, 'byQuery must contain exactly 1 document for this quality');
+  assert.strictEqual(testDb.getAll().length, 1, 'getAll() must not report duplicate records');
+
+  // Verify old docId was evicted and new docId is active
+  assert.strictEqual(testDb.getByDocId('6217714585508519773'), undefined, 'Old docId must be evicted from byDocId');
+  assert.strictEqual(testDb.getByDocId('5352762782603327747')?.docId, '5352762782603327747');
+  assert.strictEqual(testDb.get(cleanKey, '1080p')?.docId, '5352762782603327747');
+});
+
+it('automatically prunes pre-existing duplicate records on disk during load() (#246)', () => {
+  try { if (fs.existsSync(TEST_DB_FILE)) fs.unlinkSync(TEST_DB_FILE); } catch {}
+
+  // Create disk file containing pre-existing duplicates of the same episode & quality
+  const preExistingDuplicates = [
+    {
+      queryKey: 'avatar seven havens s01e01',
+      docId: '6217714585508519773',
+      filename: 'Avatar.Seven.Havens.S01E01.On.The.Horizon.1080p.AMZN.WEB-DL..mkv',
+      actualQuality: '1080p',
+      requestedQualities: ['720p'],
+      createdAt: 1000,
+    },
+    {
+      queryKey: 'avatar seven havens s01e01',
+      docId: '5352762782603327747',
+      filename: 'Avatar_Seven_Havens_S01E01_On_The_Horizon_1080p_PMTP_WEB_DL_DDP5.mkv',
+      actualQuality: '1080p',
+      requestedQualities: ['720p'],
+      createdAt: 2000,
+    }
+  ];
+
+  fs.writeFileSync(TEST_DB_FILE, JSON.stringify(preExistingDuplicates, null, 2), 'utf-8');
+
+  // Load from disk
+  const reloadedDb = new CentralDatabase(TEST_DB_FILE);
+
+  assert.strictEqual(reloadedDb.byDocId.size, 1, 'Startup load must prune duplicates to 1 doc');
+  assert.strictEqual(reloadedDb.byQuery.get('avatar seven havens s01e01')?.length, 1);
+  assert.strictEqual(reloadedDb.getAll().length, 1);
+
+  // The newer record (createdAt: 2000) must be retained
+  assert.strictEqual(reloadedDb.getByDocId('5352762782603327747')?.docId, '5352762782603327747');
+  assert.strictEqual(reloadedDb.getByDocId('6217714585508519773'), undefined);
+});
+
+it('strictly preserves distinct quality tiers (720p, 1080p, 4K) under the same cleanKey (#201 guardrail)', () => {
+  const testDb = new CentralDatabase(TEST_DB_FILE);
+  testDb.clear();
+
+  const cleanKey = 'avatar seven havens s01e01';
+
+  testDb.set(cleanKey, { docId: '101', filename: 'Show.S01E01.720p.mp4', actualQuality: '720p' });
+  testDb.set(cleanKey, { docId: '202', filename: 'Show.S01E01.1080p.mp4', actualQuality: '1080p' });
+  testDb.set(cleanKey, { docId: '303', filename: 'Show.S01E01.2160p.mp4', actualQuality: '4k' });
+
+  // All 3 distinct tiers must coexist
+  assert.strictEqual(testDb.byDocId.size, 3, 'Must retain all 3 distinct quality tiers');
+  assert.strictEqual(testDb.byQuery.get(cleanKey)?.length, 3, 'Must retain 3 tiers in byQuery');
+  assert.strictEqual(testDb.get(cleanKey, '720p')?.docId, '101');
+  assert.strictEqual(testDb.get(cleanKey, '1080p')?.docId, '202');
+  assert.strictEqual(testDb.get(cleanKey, '4k')?.docId, '303');
+});
+
 // Clean up temporary test files
 try {
   if (fs.existsSync(TEST_DB_FILE)) fs.unlinkSync(TEST_DB_FILE);
