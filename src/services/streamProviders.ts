@@ -300,7 +300,7 @@ export const STREAM_PROVIDERS: StreamProvider[] = [
   },
   {
     id: 'telegram-msm',
-    name: 'TGStrm (MSM / Pencuri)',
+    name: 'TGStrm',
     tagline: 'Direct Telegram stream resolver (MSM & Pencuri Movie Bot)',
     engine: 'telegram',
     countries: ['MY', 'ID', 'SG'],

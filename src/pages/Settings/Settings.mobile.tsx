@@ -41,7 +41,6 @@ import {
   Save,
   SlidersHorizontal,
   Send,
-  Bot,
   Trash2,
   Terminal,
   ExternalLink,
@@ -1631,10 +1630,10 @@ export const Settings: React.FC = () => {
                 <div className="space-y-0.5 min-w-0 pr-2">
                   <div className="flex items-center gap-1.5">
                     <Send className="w-3.5 h-3.5 text-sky-400 flex-shrink-0" />
-                    <span className="text-xs font-semibold text-white truncate">TGStrm (MSM / Pencuri)</span>
+                    <span className="text-xs font-semibold text-white truncate">TGStrm</span>
                   </div>
                   <span className="text-[11px] text-gray-400 block truncate">
-                    Engine: <span className="text-sky-300 font-semibold">{(settings.tgActiveResolver || 'msm') === 'pencuri' ? 'Pencuri Movie Bot' : 'MSM Bot'}</span> • <span className="font-mono text-gray-400">{displayUrl}</span>
+                    <span className="font-mono text-gray-400">{displayUrl}</span>
                   </span>
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0">
@@ -1778,29 +1777,6 @@ export const Settings: React.FC = () => {
                 Logs
               </span>
               <ChevronRight className="w-4 h-4 text-gray-400" />
-            </div>
-          </button>
-
-          {/* Active Resolver Engine Selection Button */}
-          <button
-            type="button"
-            onClick={() => {
-              const currentResolver = settings.tgActiveResolver || 'msm';
-              const nextResolver = currentResolver === 'msm' ? 'pencuri' : 'msm';
-              handleUpdate({ tgActiveResolver: nextResolver });
-            }}
-            className="w-full flex items-center justify-between p-3.5 rounded-xl bg-white/5 border border-white/10 hover:border-sky-400/50 hover:bg-white/10 transition-all text-left"
-          >
-            <div className="space-y-0.5">
-              <span className="text-xs font-semibold text-white block">Active Resolver Engine</span>
-              <span className="text-[10px] text-gray-400">Telegram search and stream resolving backend</span>
-            </div>
-            <div className="flex items-center gap-2 flex-shrink-0">
-              <span className="text-[10px] text-sky-400 font-mono font-bold bg-sky-500/10 px-2 py-0.5 rounded border border-sky-400/20 flex items-center gap-1">
-                <Bot className="w-3 h-3" />
-                {(settings.tgActiveResolver || 'msm') === 'pencuri' ? 'Pencuri Movie Bot' : 'MSM Bot (@msmbot)'}
-              </span>
-              <RefreshCw className="w-3.5 h-3.5 text-gray-400" />
             </div>
           </button>
 

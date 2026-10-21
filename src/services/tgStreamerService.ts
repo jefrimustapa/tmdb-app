@@ -179,7 +179,6 @@ class TgStreamerService {
 
     try {
       const maxQuality = settings?.tgMaxQuality || settings?.msmMaxQuality || settings?.msm32MaxQuality || '1080';
-      const activeResolver = resolver || settings?.tgActiveResolver || 'msm';
 
       const params = new URLSearchParams({ title });
       if (altTitle && altTitle.trim()) params.append('altTitle', altTitle.trim());
@@ -189,7 +188,7 @@ class TgStreamerService {
       if (typeof totalSeasons === 'number' && !isNaN(totalSeasons)) params.append('totalSeasons', String(totalSeasons));
       if (typeof maxPages === 'number' && !isNaN(maxPages) && maxPages >= 1) params.append('maxPages', String(maxPages));
       params.append('maxQuality', maxQuality);
-      params.append('resolver', activeResolver);
+      if (resolver) params.append('resolver', resolver);
       if (force) params.append('force', 'true');
 
       const res = await fetch(`${baseUrl}/api/resolve?${params.toString()}`, {
@@ -266,7 +265,6 @@ class TgStreamerService {
       const baseUrl = await this.getBaseUrl();
       const settings = await dbService.getSettings();
       const maxQuality = settings?.tgMaxQuality || settings?.msmMaxQuality || settings?.msm32MaxQuality || '1080';
-      const activeResolver = resolver || settings?.tgActiveResolver || 'msm';
 
       const params = new URLSearchParams({ title });
       if (year) params.append('year', String(year));
@@ -274,10 +272,10 @@ class TgStreamerService {
       if (typeof episode === 'number' && !isNaN(episode)) params.append('episode', String(episode));
       if (typeof totalSeasons === 'number' && !isNaN(totalSeasons)) params.append('totalSeasons', String(totalSeasons));
       params.append('maxQuality', maxQuality);
-      params.append('resolver', activeResolver);
+      if (resolver) params.append('resolver', resolver);
       params.append('prefetch', 'true');
 
-      console.log(`[TG-STREAMER Prefetch] Dispatching /api/prefetch for "${title}" S${season}E${episode} (resolver: ${activeResolver})...`);
+      console.log(`[TG-STREAMER Prefetch] Dispatching /api/prefetch for "${title}" S${season}E${episode} ${resolver ? ` (resolver: ${resolver})` : ""}...`);
       
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), 10000);

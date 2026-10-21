@@ -45,7 +45,6 @@ import {
   Sliders,
   Save,
   Send,
-  Bot,
   Trash2,
   Terminal,
   ExternalLink,
@@ -3704,10 +3703,10 @@ export const Settings: React.FC = () => {
                       <div className="min-w-0 pr-3">
                         <div className="font-bold text-sm text-white mb-0.5 flex items-center gap-2">
                           <Send className="w-4 h-4 text-sky-400 flex-shrink-0" />
-                          <span>TGStrm (MSM / Pencuri)</span>
+                          <span>TGStrm</span>
                         </div>
                         <p className="text-[11px] text-gray-400">
-                          Active: <span className="text-sky-300 font-semibold">{(settings.tgActiveResolver || 'msm') === 'pencuri' ? 'Pencuri Movie Bot' : 'MSM Bot'}</span> • Configure URL, resolver, and streaming.
+                          Configure endpoint URL, stream cache, and video playback settings.
                         </p>
                       </div>
                       <div className="flex items-center gap-2 flex-shrink-0">
@@ -4250,9 +4249,9 @@ export const Settings: React.FC = () => {
               <ChevronRight className="w-3.5 h-3.5 text-gray-500" />
               <span className="text-sky-400 font-semibold">TGStrm</span>
             </div>
-            <h1 className="text-3xl font-extrabold text-white tracking-tight mb-2">TGStrm (MSM / Pencuri)</h1>
+            <h1 className="text-3xl font-extrabold text-white tracking-tight mb-2">TGStrm</h1>
             <p className="text-sm text-gray-400 max-w-md leading-relaxed">
-              Configure TGStrm microservice endpoint, connection test, active resolver, and streaming settings.
+              Configure TGStrm microservice endpoint, connection test, and streaming settings.
             </p>
           </div>
 
@@ -4442,7 +4441,7 @@ export const Settings: React.FC = () => {
                       onKeyDown={(e) => {
                         if (e.key === 'ArrowDown') {
                           e.preventDefault();
-                          const target = document.getElementById('drawer-msm-sub-resolver');
+                          const target = document.getElementById('drawer-msm-sub-quality');
                           target?.focus();
                           target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
                         }
@@ -4460,45 +4459,6 @@ export const Settings: React.FC = () => {
                       <ExternalLink className="w-3.5 h-3.5 text-sky-400" />
                     </button>
 
-                    {/* Sub-Drawer Item: Active Resolver Engine */}
-                    <div className="bg-black/40 border border-hbo-border rounded-xl p-3.5 flex items-center justify-between">
-                      <div className="min-w-0 pr-2">
-                        <div className="font-bold text-xs text-white flex items-center gap-1.5 mb-0.5">
-                          <Bot className="w-3.5 h-3.5 text-sky-400" />
-                          <span>Active Resolver Engine</span>
-                        </div>
-                        <p className="text-[10px] text-gray-400">Telegram search &amp; stream resolving backend.</p>
-                      </div>
-                      <button
-                        id="drawer-msm-sub-resolver"
-                        data-telegram-msm-drawer-item="true"
-                        type="button"
-                        onKeyDown={(e) => {
-                          if (e.key === 'ArrowUp') {
-                            e.preventDefault();
-                            const target = document.getElementById('drawer-btn-msm-cache');
-                            target?.focus();
-                            target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-                          } else if (e.key === 'ArrowDown') {
-                            e.preventDefault();
-                            const target = document.getElementById('drawer-msm-sub-quality');
-                            target?.focus();
-                            target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-                          }
-                        }}
-                        onClick={() => {
-                          const current = settings.tgActiveResolver || 'msm';
-                          const next = current === 'msm' ? 'pencuri' : 'msm';
-                          handleUpdate({ tgActiveResolver: next });
-                        }}
-                        className="px-3 py-1.5 rounded-lg border text-xs font-bold transition-all tv-focus-target flex items-center gap-1.5 border-hbo-border bg-hbo-dark/80 hover:bg-hbo-hover text-white flex-shrink-0"
-                      >
-                        <span className="text-sky-400 font-mono">
-                          {(settings.tgActiveResolver || 'msm') === 'pencuri' ? 'Pencuri Movie' : 'MSM Bot'}
-                        </span>
-                      </button>
-                    </div>
-
                     {/* Sub-Drawer Item: Max Stream Resolution */}
                     <div className="bg-black/40 border border-hbo-border rounded-xl p-3.5 flex items-center justify-between">
                       <div className="min-w-0 pr-2">
@@ -4515,7 +4475,7 @@ export const Settings: React.FC = () => {
                         onKeyDown={(e) => {
                           if (e.key === 'ArrowUp') {
                             e.preventDefault();
-                            const target = document.getElementById('drawer-msm-sub-resolver');
+                            const target = document.getElementById('drawer-btn-msm-cache');
                             target?.focus();
                             target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
                           } else if (e.key === 'ArrowDown') {
