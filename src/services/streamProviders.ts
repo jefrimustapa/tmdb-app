@@ -300,8 +300,8 @@ export const STREAM_PROVIDERS: StreamProvider[] = [
   },
   {
     id: 'telegram-msm',
-    name: 'MovieSubMalay (MSM)',
-    tagline: 'Direct Telegram stream resolver for Malay & Southeast Asian cinema',
+    name: 'TG Streamer (MSM / Pencuri)',
+    tagline: 'Direct Telegram stream resolver (MSM & Pencuri Movie Bot)',
     engine: 'telegram',
     countries: ['MY', 'ID', 'SG'],
     categories: ['malaysian', 'asean'],

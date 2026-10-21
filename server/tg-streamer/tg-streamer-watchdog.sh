@@ -5,11 +5,11 @@
 # Check internal loopback HTTP port 3034 first (no TLS overhead), then HTTPS 3033
 check_health() {
     # 1. Internal loopback HTTP port 3034
-    if curl -s -m 5 "http://127.0.0.1:3034/msm/health/" 2>/dev/null | grep -q '"status":"ok"'; then
+    if curl -s -m 5 "http://127.0.0.1:3034/tg/health/" 2>/dev/null | grep -q '"status":"ok"'; then
         return 0
     fi
     # 2. Main HTTPS port 3033 (-k for self-signed / router certificate)
-    if curl -k -s -m 5 "https://127.0.0.1:3033/msm/health/" 2>/dev/null | grep -q '"status":"ok"'; then
+    if curl -k -s -m 5 "https://127.0.0.1:3033/tg/health/" 2>/dev/null | grep -q '"status":"ok"'; then
         return 0
     fi
     return 1
@@ -39,6 +39,6 @@ if [ "$FAILS" -ge 3 ]; then
     fi
 
     # Restart service
-    /opt/etc/init.d/S99msm-getter restart >/dev/null 2>&1
+    /opt/etc/init.d/S99tg-streamer restart >/dev/null 2>&1 || /opt/etc/init.d/S99msm-getter restart >/dev/null 2>&1
     rm -f "$FAIL_FILE"
 fi

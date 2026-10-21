@@ -1,11 +1,11 @@
 #!/bin/sh
 
 ENABLED=yes
-DESC="MSM Getter Microservice"
-APP_DIR=/opt/app/msm-getter
-PID_FILE=/opt/var/run/msm-getter.pid
-SUP_PID_FILE=/opt/var/run/msm-getter-sup.pid
-LOG_FILE=/tmp/msm-getter.log
+DESC="TG Streamer Microservice"
+APP_DIR=/opt/app/tg-streamer
+PID_FILE=/opt/var/run/tg-streamer.pid
+SUP_PID_FILE=/opt/var/run/tg-streamer-sup.pid
+LOG_FILE=/tmp/tg-streamer.log
 MAX_LOG_BYTES=5242880 # 5 MB cap
 
 rotate_log() {
