@@ -1,7 +1,7 @@
 #!/bin/sh
 
 ENABLED=yes
-DESC="TG Streamer Microservice"
+DESC="TGStrm Microservice"
 APP_DIR=/opt/app/tg-streamer
 PID_FILE=/opt/var/run/tg-streamer.pid
 SUP_PID_FILE=/opt/var/run/tg-streamer-sup.pid
