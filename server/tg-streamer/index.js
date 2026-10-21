@@ -2638,7 +2638,8 @@ app.get(['/tg/streams', '/msm/cache'], (req, res) => {
         const fn = (item.filename || '').toLowerCase();
         const key = (item.queryKey || '').toLowerCase();
         const doc = String(item.docId || '').toLowerCase();
-        return fn.includes(q) || key.includes(q) || doc.includes(q);
+        const reqStr = (Array.isArray(item.requestedQualities) ? item.requestedQualities.join(' ') : (item.requestedQuality || '')).toLowerCase();
+        return fn.includes(q) || key.includes(q) || doc.includes(q) || reqStr.includes(q);
       });
 
       filtered.sort((a, b) => {
@@ -2684,6 +2685,13 @@ app.get(['/tg/streams', '/msm/cache'], (req, res) => {
           qualityBadge = '<span class="px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700 font-bold">480p SD</span>';
         }
 
+        const reqList = (Array.isArray(item.requestedQualities) && item.requestedQualities.length > 0)
+          ? item.requestedQualities
+          : (item.requestedQuality ? [item.requestedQuality] : []);
+        const reqBadge = reqList.length > 0
+          ? '<span class="px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20 font-medium">Req: ' + escapeHtml(reqList.join(', ')) + '</span>'
+          : '';
+
         return '<div class="bg-slate-900 hover:bg-slate-900/90 border border-slate-800/90 hover:border-slate-700/80 rounded-2xl p-4 transition glow-box flex flex-col md:flex-row md:items-center justify-between gap-3.5">' +
           '<div class="min-w-0 flex-1 space-y-1.5">' +
             '<div class="flex items-center gap-2">' +
@@ -2694,7 +2702,7 @@ app.get(['/tg/streams', '/msm/cache'], (req, res) => {
               qualityBadge +
               '<span class="px-2 py-0.5 rounded bg-sky-500/10 text-sky-400 border border-sky-500/20 font-bold">' + escapeHtml(item.sizeFormatted) + '</span>' +
               '<span class="px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700/70">Key: ' + escapeHtml(item.queryKey || '--') + '</span>' +
-              (item.requestedQuality ? '<span class="px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">Req: ' + escapeHtml(item.requestedQuality) + '</span>' : '') +
+              reqBadge +
               '<span class="px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700/70">DC ' + escapeHtml(item.dcId || 4) + '</span>' +
               (item.videoCodec ? '<span class="px-2 py-0.5 rounded bg-purple-500/10 text-purple-400 border border-purple-500/20 uppercase">' + escapeHtml(item.videoCodec) + '</span>' : '') +
               '<span class="text-slate-500 text-[10px]">' + escapeHtml(dateStr) + '</span>' +

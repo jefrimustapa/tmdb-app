@@ -396,7 +396,9 @@ export class CentralDatabase {
       items = items.filter(r => 
         (r.queryKey && r.queryKey.toLowerCase().includes(q)) ||
         (r.filename && r.filename.toLowerCase().includes(q)) ||
-        (r.docId && r.docId.includes(q))
+        (r.docId && r.docId.includes(q)) ||
+        (Array.isArray(r.requestedQualities) && r.requestedQualities.some(rq => String(rq).toLowerCase().includes(q))) ||
+        (r.requestedQuality && String(r.requestedQuality).toLowerCase().includes(q))
       );
     }
     return items.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));

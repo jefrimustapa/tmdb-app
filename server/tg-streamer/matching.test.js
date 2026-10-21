@@ -1137,6 +1137,45 @@ it('persists clean queryKeys and requestedQualities array across disk reloads (#
   assert.strictEqual(reloadedDb.get(cleanKey, 'sd'), undefined);
 });
 
+it('searches and filters stream cache records by multiple requestedQualities (#231)', () => {
+  const testDb = new CentralDatabase(TEST_DB_FILE);
+  testDb.clear();
+
+  testDb.set('abang imam minah skuter s01e04', {
+    docId: '6199269105426503425',
+    filename: 'Abang.Imam.Minah.Skuter.S01E04.1080p.mkv',
+    actualQuality: '1080p',
+    requestedQualities: ['720p', '4k'],
+  });
+
+  testDb.set('kudrat 1968', {
+    docId: '6199269105426509999',
+    filename: 'Kudrat.1968.720p.mp4',
+    actualQuality: '720p',
+    requestedQualities: ['720p'],
+  });
+
+  // Search by requested quality '4k' finds the 1080p file that answered 4k
+  const res4k = testDb.getAll('4k');
+  assert.strictEqual(res4k.length, 1);
+  assert.strictEqual(res4k[0].docId, '6199269105426503425');
+
+  // Search by requested quality '720p' finds both items
+  const res720 = testDb.getAll('720p');
+  assert.strictEqual(res720.length, 2);
+
+  // Search by nonexistent quality 'sd' returns empty
+  const resSd = testDb.getAll('sd');
+  assert.strictEqual(resSd.length, 0);
+
+  // Formats all previous requested qualities into comma-separated list
+  const doc = res4k[0];
+  const reqList = Array.isArray(doc.requestedQualities) && doc.requestedQualities.length > 0
+    ? doc.requestedQualities
+    : (doc.requestedQuality ? [doc.requestedQuality] : []);
+  assert.strictEqual(reqList.join(', '), '720p, 4k');
+});
+
 console.log('\n18. Telegram Stream Resolver Factory & Decoupling (#232)');
 it('lists all registered resolvers with metadata', () => {
   const list = listResolvers();
