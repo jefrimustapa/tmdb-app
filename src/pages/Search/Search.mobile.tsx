@@ -161,6 +161,23 @@ export const Search: React.FC = () => {
         const sorted = titleItems.sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
         const unique = Array.from(new Map(sorted.map((item) => [item.id, item])).values());
 
+        if (selectedCountry) {
+          const movieIds = unique
+            .filter((i) => (i.media_type === 'movie' || Boolean(i.title && !i.name)) && !(i as any).origin_country)
+            .map((i) => i.id);
+          if (movieIds.length > 0) {
+            const countryMap = await tmdbApi.getMovieOriginCountries(movieIds);
+            for (const item of unique) {
+              if ((item.media_type === 'movie' || Boolean(item.title && !item.name)) && !(item as any).origin_country) {
+                const countries = countryMap.get(item.id);
+                if (countries && countries.length > 0) {
+                  (item as any).origin_country = countries;
+                }
+              }
+            }
+          }
+        }
+
         setTotalPages(maxPages);
         setResults((prev) => {
           if (!append) return unique;
@@ -176,6 +193,41 @@ export const Search: React.FC = () => {
       setIsLoadingMore(false);
     }
   };
+
+  // Enrich movie items with origin_country when country filter is active or changed
+  useEffect(() => {
+    if (!selectedCountry || results.length === 0) return;
+    const movieItemsNeedingCountry = results.filter(
+      (item) =>
+        (item.media_type === 'movie' || Boolean(item.title && !item.name)) &&
+        !(item as any).origin_country
+    );
+    if (movieItemsNeedingCountry.length === 0) return;
+
+    let isMounted = true;
+    const ids = movieItemsNeedingCountry.map((m) => m.id);
+    tmdbApi.getMovieOriginCountries(ids).then((countryMap) => {
+      if (!isMounted) return;
+      setResults((prev) =>
+        prev.map((item) => {
+          if (
+            (item.media_type === 'movie' || Boolean(item.title && !item.name)) &&
+            !(item as any).origin_country
+          ) {
+            const countries = countryMap.get(item.id);
+            if (countries && countries.length > 0) {
+              return { ...item, origin_country: countries };
+            }
+          }
+          return item;
+        })
+      );
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [results, selectedCountry]);
 
   // Handle URL changes
   useEffect(() => {
