@@ -22,6 +22,7 @@ import {
   savedSettings,
   isJunkMedia,
   JUNK_MEDIA_REGEX,
+  getActiveTargetBot,
 } from './index.js';
 import {
   createResolver,
@@ -29,6 +30,8 @@ import {
   MsmResolver,
   PencuriResolver,
   BaseResolver,
+  formatDiagnosticResults,
+  formatFileSize,
 } from './resolvers/index.js';
 import {
   buildSearchQueries,
@@ -1209,6 +1212,89 @@ it('builds prioritized TV queries with explicit altTitle and englishTitle', () =
   assert.ok(queries.includes('Abang Imam EP10'));
   assert.ok(queries.includes('Abang Imam S01E10'));
   assert.ok(queries.includes('Abang Imam Minah Skuter'));
+});
+
+// ==========================================
+// 20. Live Query Diagnostic Formatting & Resolver Support (#234)
+// ==========================================
+console.log('\n20. Live Query Diagnostic Formatting & Resolver Support (#234)');
+
+it('formats Pencuri search API file results into clean diagnostic items with human-readable sizes', () => {
+  const mockPencuriFiles = [
+    {
+      id: 101,
+      title: 'Isteri.Halal.2023.EP70.Akhir.mp4',
+      file_size: 382205952, // ~364.5 MB
+      short_code: '0qIJUN',
+      play_url: 'https://unofficialsbot.pencarimovie.com/link/0qIJUN',
+    },
+    {
+      id: 102,
+      title: 'Isteri.Halal.2023.EP69.mp4',
+      file_size: 375599923, // ~358.2 MB
+      short_code: '3BaDpd',
+    },
+    {
+      id: 103,
+      title: 'BigMovie.2024.1080p.mkv',
+      file_size: 2415919104, // ~2.25 GB
+      short_code: 'BIG108',
+    }
+  ];
+
+  const formatted = formatDiagnosticResults(mockPencuriFiles, 'pencuri');
+  assert.strictEqual(formatted.length, 3);
+  assert.strictEqual(formatted[0].text, 'Isteri.Halal.2023.EP70.Akhir.mp4 (364.5 MB)');
+  assert.strictEqual(formatted[0].url, 'https://unofficialsbot.pencarimovie.com/link/0qIJUN');
+  assert.strictEqual(formatted[0].className, 'PencariFileResult');
+  assert.strictEqual(formatted[0].shortCode, '0qIJUN');
+  assert.strictEqual(formatted[0].size, 382205952);
+
+  // Fallback URL generation from shortcode
+  assert.strictEqual(formatted[1].url, 'https://unofficialsbot.pencarimovie.com/link/3BaDpd');
+
+  // Gigabyte formatting
+  assert.strictEqual(formatted[2].text, 'BigMovie.2024.1080p.mkv (2.25 GB)');
+});
+
+it('formats MSM Telegram inline buttons into clean diagnostic items', () => {
+  const mockMsmButtons = [
+    {
+      text: '🎬 Isteri Halal S01E70 (767 MB)',
+      url: 'https://t.me/msmbot/link/valid',
+      className: 'KeyboardButtonUrlAuth',
+      buttonId: 10,
+    },
+    {
+      text: 'Next Page ➡️',
+      url: '',
+      className: 'KeyboardButtonCallback',
+      buttonId: 11,
+    }
+  ];
+
+  const formatted = formatDiagnosticResults(mockMsmButtons, 'msm');
+  assert.strictEqual(formatted.length, 2);
+  assert.strictEqual(formatted[0].text, '🎬 Isteri Halal S01E70 (767 MB)');
+  assert.strictEqual(formatted[0].url, 'https://t.me/msmbot/link/valid');
+  assert.strictEqual(formatted[0].className, 'KeyboardButtonUrlAuth');
+  assert.strictEqual(formatted[0].buttonId, 10);
+});
+
+it('handles empty and null results gracefully for diagnostic search', () => {
+  assert.deepStrictEqual(formatDiagnosticResults([], 'pencuri'), []);
+  assert.deepStrictEqual(formatDiagnosticResults([], 'msm'), []);
+  assert.deepStrictEqual(formatDiagnosticResults(null, 'pencuri'), []);
+  assert.deepStrictEqual(formatDiagnosticResults(undefined, 'msm'), []);
+});
+
+it('resolves active bot handle dynamically based on active resolver configuration', () => {
+  savedSettings.activeResolver = 'pencuri';
+  savedSettings.targetBotUsernames = { msm: 'msm34bot', pencuri: 'Pencuri_Movie_Bot' };
+  assert.strictEqual(getActiveTargetBot(), 'Pencuri_Movie_Bot');
+
+  savedSettings.activeResolver = 'msm';
+  assert.strictEqual(getActiveTargetBot(), 'msm34bot');
 });
 
 // Clean up temporary test files

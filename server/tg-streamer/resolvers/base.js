@@ -697,3 +697,42 @@ export class BaseResolver {
     throw new Error('Method resolve() must be implemented by subclass');
   }
 }
+
+/**
+ * Format bytes to human readable size
+ */
+export function formatFileSize(bytes) {
+  const b = Number(bytes || 0);
+  if (isNaN(b) || b <= 0) return '0 MB';
+  if (b >= 1024 * 1024 * 1024) return (b / (1024 * 1024 * 1024)).toFixed(2) + ' GB';
+  return (b / (1024 * 1024)).toFixed(1) + ' MB';
+}
+
+/**
+ * Format diagnostic search results for dashboard sandbox
+ */
+export function formatDiagnosticResults(items = [], resolver = 'msm') {
+  if (!Array.isArray(items)) return [];
+  if (resolver === 'pencuri') {
+    return items.map(f => {
+      const sizeStr = formatFileSize(f.file_size || f.size || 0);
+      const title = f.title || f.name || 'Unknown';
+      const code = f.short_code || f.code || '';
+      return {
+        text: `${title} (${sizeStr})`,
+        url: f.play_url || (code ? `https://unofficialsbot.pencarimovie.com/link/${code}` : ''),
+        className: 'PencariFileResult',
+        shortCode: code,
+        size: Number(f.file_size || f.size || 0),
+      };
+    });
+  }
+
+  // MSM resolver button format
+  return items.map(btn => ({
+    text: btn.text || '',
+    url: btn.url || '',
+    className: btn.className || 'KeyboardButtonUrl',
+    buttonId: btn.buttonId,
+  }));
+}
