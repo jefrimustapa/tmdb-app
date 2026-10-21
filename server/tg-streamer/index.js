@@ -157,7 +157,7 @@ let client = new TelegramClient(new StringSession(session), apiId, apiHash, {
   retryDelay: 1000,
   autoReconnect: true,
   timeout: 60,
-  deviceModel: 'TG Streamer Server',
+  deviceModel: 'TGStrm Server',
   appVersion: '1.0.0',
   systemVersion: 'Linux/ASUS',
   baseLogger: new QuietLogger('error'),
@@ -380,7 +380,7 @@ app.post(['/api/auth/send-code', '/tg/api/auth/send-code', '/msm/api/auth/send-c
     const tempClient = new TelegramClient(new StringSession(''), apiId, apiHash, {
       connection: ConnectionTCPObfuscated,
       connectionRetries: 5,
-      deviceModel: 'TG Streamer Server',
+      deviceModel: 'TGStrm Server',
       appVersion: '1.0.0',
       systemVersion: 'Linux/Docker',
       baseLogger: new QuietLogger('error'),
@@ -493,7 +493,7 @@ app.get('/tg/auth', (req, res) => {
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>TG Streamer — Authentication Portal</title>
+  <title>TGStrm — Authentication Portal</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     body { background-color: #0B0F17; color: #E2E8F0; font-family: ui-sans-serif, system-ui, sans-serif; }
@@ -510,7 +510,7 @@ app.get('/tg/auth', (req, res) => {
         </div>
         <div>
           <h1 class="text-lg font-bold text-white flex items-center gap-2">
-            TG Streamer Auth Portal
+            TGStrm Auth Portal
             <span class="text-xs px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-300 border border-sky-500/30 font-mono">@${getActiveTargetBot()}</span>
           </h1>
           <p class="text-xs text-slate-400">Telegram MTProto Session & Authentication Gateway</p>
@@ -1395,7 +1395,7 @@ app.get('/tg/logs', (req, res) => {
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
-  <title>TG Streamer — Live Log Console</title>
+  <title>TGStrm — Live Log Console</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     body { background-color: #0B0F17; color: #E2E8F0; font-family: ui-sans-serif, system-ui, sans-serif; }
@@ -1416,7 +1416,7 @@ app.get('/tg/logs', (req, res) => {
         </div>
         <div>
           <h1 class="text-lg font-bold text-white flex items-center gap-2">
-            TG Streamer Logs
+            TGStrm Logs
             <span class="text-xs px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-300 border border-sky-500/30 font-mono">@${getActiveTargetBot()}</span>
           </h1>
           <p class="text-xs text-slate-400">Real-time MTProto microservice streaming & diagnostic console</p>
@@ -1868,7 +1868,7 @@ app.post(['/api/settings', '/tg/api/settings', '/msm/api/settings'], (req, res) 
 // System Service Restart Endpoint (Exits process; router supervisor auto-respawns in ~3s)
 app.post(['/api/system/restart', '/tg/api/system/restart', '/msm/api/system/restart'], (req, res) => {
   console.log('[SYSTEM] Service restart requested via web settings.');
-  res.json({ success: true, message: 'Restarting TG Streamer service...' });
+  res.json({ success: true, message: 'Restarting TGStrm service...' });
   setTimeout(() => {
     process.exit(0);
   }, 1000);
@@ -1892,7 +1892,7 @@ app.get(['/tg', '/msm/dashboard'], (req, res) => {
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>TG Streamer — Dashboard</title>
+  <title>TGStrm — Dashboard</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     body { background-color: #0B0F17; color: #E2E8F0; font-family: ui-sans-serif, system-ui, sans-serif; }
@@ -1912,7 +1912,7 @@ app.get(['/tg', '/msm/dashboard'], (req, res) => {
         </div>
         <div>
           <h1 class="text-lg font-bold text-white flex items-center gap-2">
-            TG Streamer Dashboard
+            TGStrm Dashboard
             <span id="botBadge" class="text-xs px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-300 border border-sky-500/30 font-mono">@${activeBot}</span>
             ${geoBadgeHtml}
           </h1>
@@ -2355,7 +2355,7 @@ app.get(['/tg/streams', '/msm/cache'], (req, res) => {
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>TG Streamer — Persistent Stream Cache</title>
+  <title>TGStrm — Persistent Stream Cache</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     body { background-color: #0B0F17; color: #E2E8F0; font-family: ui-sans-serif, system-ui, sans-serif; }
@@ -2797,7 +2797,7 @@ app.get(['/msm/setting', '/tg/settings'], (req, res) => {
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>TG Streamer — Settings</title>
+  <title>TGStrm — Settings</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     body { background-color: #0B0F17; color: #E2E8F0; font-family: ui-sans-serif, system-ui, sans-serif; }
@@ -2817,7 +2817,7 @@ app.get(['/msm/setting', '/tg/settings'], (req, res) => {
         </div>
         <div>
           <h1 class="text-lg font-bold text-white flex items-center gap-2">
-            TG Streamer Settings
+            TGStrm Settings
             <span class="text-xs px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-300 border border-sky-500/30 font-mono">@${getActiveTargetBot()}</span>
           </h1>
           <p class="text-xs text-slate-400">Configure bot handle, buffer pipelines, RAM block cache, and system services</p>
@@ -3063,7 +3063,7 @@ app.get(['/msm/setting', '/tg/settings'], (req, res) => {
         </div>
       </div>
 
-      <!-- Card 4: Service Management (Reboot / Restart TG Streamer Server) -->
+      <!-- Card 4: Service Management (Reboot / Restart TGStrm Server) -->
       <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 glow-box space-y-4">
         <div class="flex items-center justify-between">
           <h2 class="text-sm font-semibold text-white flex items-center gap-2">
@@ -3071,7 +3071,7 @@ app.get(['/msm/setting', '/tg/settings'], (req, res) => {
           </h2>
           <span class="text-xs px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 font-mono">Supervisor</span>
         </div>
-        <p class="text-xs text-slate-400">Reboot the TG Streamer microservice. The router supervisor loop will automatically respawn the process with clean memory in ~3 seconds.</p>
+        <p class="text-xs text-slate-400">Reboot the TGStrm microservice. The router supervisor loop will automatically respawn the process with clean memory in ~3 seconds.</p>
 
         <div class="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl space-y-1">
           <span class="text-xs font-semibold text-amber-300 block">⚠️ Note on Active Streams</span>
@@ -3081,7 +3081,7 @@ app.get(['/msm/setting', '/tg/settings'], (req, res) => {
         <div class="pt-2 flex items-center justify-end">
           <button onclick="confirmRestartService()" class="px-4 py-2 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 hover:text-amber-300 border border-amber-500/30 rounded-xl text-xs font-semibold transition flex items-center gap-1.5">
             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
-            Restart TG Streamer Service
+            Restart TGStrm Service
           </button>
         </div>
       </div>
@@ -3187,12 +3187,12 @@ app.get(['/msm/setting', '/tg/settings'], (req, res) => {
           🔄
         </div>
         <div>
-          <h3 class="text-base font-bold text-white">Restart TG Streamer Service</h3>
+          <h3 class="text-base font-bold text-white">Restart TGStrm Service</h3>
           <p class="text-xs text-slate-400">Confirm microservice restart</p>
         </div>
       </div>
       <p class="text-xs text-slate-300 leading-relaxed">
-        Are you sure you want to reboot the TG Streamer server process? The router supervisor loop will respawn the service automatically within ~3 seconds.
+        Are you sure you want to reboot the TGStrm server process? The router supervisor loop will respawn the service automatically within ~3 seconds.
       </p>
       <div id="restartStatusBox" class="hidden p-3 rounded-xl bg-slate-950 border border-slate-800 text-xs font-mono text-center text-sky-400">
         <div class="flex items-center justify-center gap-2">
@@ -5368,9 +5368,9 @@ if (isMain) {
         cert: fs.readFileSync(sslCertFile),
       };
       serverInstance = https.createServer(sslOptions, app);
-      attachServerErrorHandler(serverInstance, 'TG Streamer HTTPS', port);
+      attachServerErrorHandler(serverInstance, 'TGStrm HTTPS', port);
       serverInstance.listen(port, async () => {
-        console.log(`[SERVER] TG Streamer microservice listening securely on HTTPS port ${port} (cert: ${sslCertFile})`);
+        console.log(`[SERVER] TGStrm microservice listening securely on HTTPS port ${port} (cert: ${sslCertFile})`);
         checkFfmpeg();
         try {
           await initTelegram();
@@ -5381,9 +5381,9 @@ if (isMain) {
     } catch (sslErr) {
       console.error('[SERVER SSL ERROR] Failed to initialize HTTPS server, falling back to HTTP:', sslErr);
       serverInstance = http.createServer(app);
-      attachServerErrorHandler(serverInstance, 'TG Streamer HTTP (Fallback)', port);
+      attachServerErrorHandler(serverInstance, 'TGStrm HTTP (Fallback)', port);
       serverInstance.listen(port, async () => {
-        console.log(`[SERVER] TG Streamer microservice listening on HTTP port ${port}`);
+        console.log(`[SERVER] TGStrm microservice listening on HTTP port ${port}`);
         checkFfmpeg();
         try {
           await initTelegram();
@@ -5394,9 +5394,9 @@ if (isMain) {
     }
   } else {
     serverInstance = http.createServer(app);
-    attachServerErrorHandler(serverInstance, 'TG Streamer HTTP', port);
+    attachServerErrorHandler(serverInstance, 'TGStrm HTTP', port);
     serverInstance.listen(port, async () => {
-      console.log(`[SERVER] TG Streamer microservice listening on HTTP port ${port}`);
+      console.log(`[SERVER] TGStrm microservice listening on HTTP port ${port}`);
       checkFfmpeg();
       try {
         await initTelegram();

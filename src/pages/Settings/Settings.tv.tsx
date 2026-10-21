@@ -3704,7 +3704,7 @@ export const Settings: React.FC = () => {
                       <div className="min-w-0 pr-3">
                         <div className="font-bold text-sm text-white mb-0.5 flex items-center gap-2">
                           <Send className="w-4 h-4 text-sky-400 flex-shrink-0" />
-                          <span>TG Streamer (MSM / Pencuri)</span>
+                          <span>TGStrm (MSM / Pencuri)</span>
                         </div>
                         <p className="text-[11px] text-gray-400">
                           Active: <span className="text-sky-300 font-semibold">{(settings.tgActiveResolver || 'msm') === 'pencuri' ? 'Pencuri Movie Bot' : 'MSM Bot'}</span> • Configure URL, resolver, and streaming.
@@ -4248,11 +4248,11 @@ export const Settings: React.FC = () => {
               <ChevronRight className="w-3.5 h-3.5 text-gray-500" />
               <span className="text-gray-400">Telegram</span>
               <ChevronRight className="w-3.5 h-3.5 text-gray-500" />
-              <span className="text-sky-400 font-semibold">TG Streamer</span>
+              <span className="text-sky-400 font-semibold">TGStrm</span>
             </div>
-            <h1 className="text-3xl font-extrabold text-white tracking-tight mb-2">TG Streamer (MSM / Pencuri)</h1>
+            <h1 className="text-3xl font-extrabold text-white tracking-tight mb-2">TGStrm (MSM / Pencuri)</h1>
             <p className="text-sm text-gray-400 max-w-md leading-relaxed">
-              Configure TG Streamer microservice endpoint, connection test, active resolver, and streaming settings.
+              Configure TGStrm microservice endpoint, connection test, active resolver, and streaming settings.
             </p>
           </div>
 

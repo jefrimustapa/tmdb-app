@@ -83,7 +83,7 @@ class TgStreamerService {
   }
 
   /**
-   * Test connectivity to the TG Streamer microservice (/health)
+   * Test connectivity to the TGStrm microservice (/health)
    */
   async testConnection(customUrl?: string): Promise<TgStreamerHealthResult> {
     let target = customUrl?.trim();
@@ -140,7 +140,7 @@ class TgStreamerService {
   }
 
   /**
-   * Resolve a title to a direct HTTP streaming URL via TG Streamer
+   * Resolve a title to a direct HTTP streaming URL via TGStrm
    */
   async resolveStream(
     title: string,
@@ -405,7 +405,7 @@ export const msmService = tgStreamerService;
 export const msm32Service = tgStreamerService;
 
 /**
- * Returns a human-friendly label for the TG Streamer server badge
+ * Returns a human-friendly label for the TGStrm server badge
  */
 export function getTgStreamerServerLabel(url?: string): string {
   if (!url) return 'Default (julietmike.net)';

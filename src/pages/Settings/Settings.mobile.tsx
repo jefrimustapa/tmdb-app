@@ -1631,7 +1631,7 @@ export const Settings: React.FC = () => {
                 <div className="space-y-0.5 min-w-0 pr-2">
                   <div className="flex items-center gap-1.5">
                     <Send className="w-3.5 h-3.5 text-sky-400 flex-shrink-0" />
-                    <span className="text-xs font-semibold text-white truncate">TG Streamer (MSM / Pencuri)</span>
+                    <span className="text-xs font-semibold text-white truncate">TGStrm (MSM / Pencuri)</span>
                   </div>
                   <span className="text-[11px] text-gray-400 block truncate">
                     Engine: <span className="text-sky-300 font-semibold">{(settings.tgActiveResolver || 'msm') === 'pencuri' ? 'Pencuri Movie Bot' : 'MSM Bot'}</span> • <span className="font-mono text-gray-400">{displayUrl}</span>
@@ -1654,9 +1654,9 @@ export const Settings: React.FC = () => {
         isOpen={activeDrawer === 'telegram-msm' || activeDrawer === 'telegram-msm32'}
         onClose={() => setActiveDrawer(null)}
         onBack={() => setActiveDrawer('engine-telegram')}
-        title="TG Streamer Provider"
-        subtitle="Configure TG Streamer microservice endpoint, active resolver, and streaming."
-        categoryLabel="Telegram > TG Streamer"
+        title="TGStrm Provider"
+        subtitle="Configure TGStrm microservice endpoint, active resolver, and streaming."
+        categoryLabel="Telegram > TGStrm"
       >
         <div className="space-y-4">
           {/* Provider Active Switch */}
