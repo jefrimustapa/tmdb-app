@@ -175,17 +175,17 @@ export const SubtitlePickerModal: React.FC<SubtitlePickerModalProps> = ({
               <button
                 type="button"
                 onClick={() => onAdjustSync(Math.round((syncOffset - 0.5) * 10) / 10)}
-                title="Delay subtitle by 0.5s"
+                title="Advance subtitle by 0.5s (appear earlier)"
                 className="px-2 py-1 rounded-lg bg-white/10 hover:bg-white/20 active:scale-95 text-white font-medium flex items-center gap-1 transition"
               >
                 <Minus className="w-3 h-3" />
-                <span>0.5s</span>
+                <span>Earlier 0.5s</span>
               </button>
               {syncOffset !== 0 && (
                 <button
                   type="button"
                   onClick={() => onAdjustSync(0)}
-                  title="Reset subtitle offset to 0"
+                  title="Reset subtitle offset to 0s"
                   className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 active:scale-95 text-hbo-cyan transition"
                 >
                   <RotateCcw className="w-3 h-3" />
@@ -194,11 +194,11 @@ export const SubtitlePickerModal: React.FC<SubtitlePickerModalProps> = ({
               <button
                 type="button"
                 onClick={() => onAdjustSync(Math.round((syncOffset + 0.5) * 10) / 10)}
-                title="Advance subtitle by 0.5s"
+                title="Delay subtitle by 0.5s (appear later)"
                 className="px-2 py-1 rounded-lg bg-white/10 hover:bg-white/20 active:scale-95 text-white font-medium flex items-center gap-1 transition"
               >
                 <Plus className="w-3 h-3" />
-                <span>0.5s</span>
+                <span>Later 0.5s</span>
               </button>
             </div>
           </div>
