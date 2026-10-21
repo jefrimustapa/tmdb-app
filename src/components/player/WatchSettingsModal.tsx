@@ -1387,18 +1387,26 @@ export const WatchSettingsModal: React.FC<WatchSettingsModalProps> = ({
                 {activeDrawer === 'delay' && (
                   <>
                     {/* Current Offset Display */}
-                    <div className="flex flex-col items-center justify-center p-3 rounded-xl bg-black/40 border border-white/10">
+                    <div className="flex flex-col items-center justify-center p-3 rounded-xl bg-black/40 border border-white/10 text-center">
                       <span className="text-xs text-gray-400">Current Delay / Offset</span>
                       <span className="text-2xl font-bold font-mono text-hbo-cyan mt-0.5">
                         {syncOffset > 0 ? `+${syncOffset.toFixed(1)}s` : `${syncOffset.toFixed(1)}s`}
                       </span>
-                      <p className="text-[11px] text-gray-500 mt-0.5">
-                        {syncOffset === 0
-                          ? 'In sync with video audio'
-                          : syncOffset > 0
-                          ? `Delayed by +${syncOffset.toFixed(1)}s`
-                          : `Advanced by ${syncOffset.toFixed(1)}s`}
-                      </p>
+                      <div className="text-[11px] mt-0.5">
+                        {syncOffset === 0 ? (
+                          <span className="text-gray-400">In sync with video audio</span>
+                        ) : syncOffset > 0 ? (
+                          <div>
+                            <span className="text-emerald-400 font-medium">Delayed by +{syncOffset.toFixed(1)}s</span>
+                            <span className="text-gray-500 block text-[10px] mt-0.5">Appears later • for subs showing too early</span>
+                          </div>
+                        ) : (
+                          <div>
+                            <span className="text-amber-400 font-medium">Advanced by {Math.abs(syncOffset).toFixed(1)}s</span>
+                            <span className="text-gray-500 block text-[10px] mt-0.5">Appears earlier • for subs showing too late</span>
+                          </div>
+                        )}
+                      </div>
                     </div>
 
                     {/* Stepper Controls (0.5s) */}
@@ -1413,9 +1421,10 @@ export const WatchSettingsModal: React.FC<WatchSettingsModalProps> = ({
                           data-subdrawer-item="true"
                           onClick={() => onAdjustSync(Math.round((syncOffset - 0.5) * 10) / 10)}
                           className="flex-1 py-2 px-3 rounded-xl bg-white/10 hover:bg-white/20 active:scale-95 text-white font-semibold flex items-center justify-center gap-1.5 text-xs transition tv-focus-target focus:outline-none focus:ring-2 focus:ring-hbo-cyan cursor-pointer"
+                          title="Advance subtitles by 0.5s (appear earlier)"
                         >
                           <Minus className="w-3.5 h-3.5" />
-                          <span>0.5s</span>
+                          <span>Earlier 0.5s</span>
                         </button>
                         {syncOffset !== 0 && (
                           <button
@@ -1441,9 +1450,10 @@ export const WatchSettingsModal: React.FC<WatchSettingsModalProps> = ({
                           data-subdrawer-item="true"
                           onClick={() => onAdjustSync(Math.round((syncOffset + 0.5) * 10) / 10)}
                           className="flex-1 py-2 px-3 rounded-xl bg-white/10 hover:bg-white/20 active:scale-95 text-white font-semibold flex items-center justify-center gap-1.5 text-xs transition tv-focus-target focus:outline-none focus:ring-2 focus:ring-hbo-cyan cursor-pointer"
+                          title="Delay subtitles by 0.5s (appear later)"
                         >
                           <Plus className="w-3.5 h-3.5" />
-                          <span>0.5s</span>
+                          <span>Later 0.5s</span>
                         </button>
                       </div>
                     </div>
@@ -1460,9 +1470,10 @@ export const WatchSettingsModal: React.FC<WatchSettingsModalProps> = ({
                           data-subdrawer-item="true"
                           onClick={() => onAdjustSync(Math.round((syncOffset - 0.1) * 10) / 10)}
                           className="flex-1 py-1.5 px-3 rounded-xl bg-white/5 hover:bg-white/15 active:scale-95 text-gray-300 font-medium flex items-center justify-center gap-1 text-xs transition tv-focus-target focus:outline-none focus:ring-2 focus:ring-hbo-cyan cursor-pointer"
+                          title="Advance subtitles by 0.1s (appear earlier)"
                         >
                           <Minus className="w-3 h-3" />
-                          <span>0.1s</span>
+                          <span>Earlier 0.1s</span>
                         </button>
                         <button
                           type="button"
@@ -1470,9 +1481,10 @@ export const WatchSettingsModal: React.FC<WatchSettingsModalProps> = ({
                           data-subdrawer-item="true"
                           onClick={() => onAdjustSync(Math.round((syncOffset + 0.1) * 10) / 10)}
                           className="flex-1 py-1.5 px-3 rounded-xl bg-white/5 hover:bg-white/15 active:scale-95 text-gray-300 font-medium flex items-center justify-center gap-1 text-xs transition tv-focus-target focus:outline-none focus:ring-2 focus:ring-hbo-cyan cursor-pointer"
+                          title="Delay subtitles by 0.1s (appear later)"
                         >
                           <Plus className="w-3 h-3" />
-                          <span>0.1s</span>
+                          <span>Later 0.1s</span>
                         </button>
                       </div>
                     </div>
