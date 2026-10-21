@@ -20,7 +20,8 @@ export const SubtitleOverlay: React.FC<SubtitleOverlayProps> = ({
     return null;
   }
 
-  const effectiveTime = Math.max(0, currentTime + offsetSeconds);
+  // Positive offset delays subtitles (shows later); negative offset advances subtitles (shows earlier)
+  const effectiveTime = Math.max(0, currentTime - offsetSeconds);
 
   // Find active cue matching current playback time
   const activeCue = useMemo(() => {
