@@ -10,6 +10,7 @@ import {
   cleanSearchTitle,
   isBareButton,
   normalizeTitle,
+  scoreCandidateWithReason,
   scoreCandidateButton,
   scoreCandidateButtonWithReason,
   parseSizeFromText,
@@ -1433,6 +1434,85 @@ it('strictly preserves distinct quality tiers (720p, 1080p, 4K) under the same c
   assert.strictEqual(testDb.get(cleanKey, '720p')?.docId, '101');
   assert.strictEqual(testDb.get(cleanKey, '1080p')?.docId, '202');
   assert.strictEqual(testDb.get(cleanKey, '4k')?.docId, '303');
+});
+
+console.log('\n22. Provider-Agnostic Candidate Scoring & Pencuri Series Episode Resolution (#248)');
+
+it('evaluates raw file candidates (Pencuri style) agnostically without requiring Telegram button objects (#248)', () => {
+  const context = {
+    isTv: true,
+    title: 'Bad Cop',
+    year: '2025',
+    sNum: 1,
+    eNum: 1,
+    targetQuality: 720,
+    minTvSizeMb: 80,
+  };
+
+  const fileCandidate = {
+    text: 'Bad.Cop.2025.EP1.MalaySub.kakifilem.mp4',
+    sizeMB: 543.8,
+  };
+
+  const result = scoreCandidateWithReason(fileCandidate, context);
+  assert.ok(result.score > 200, `Expected high score for matching candidate, got ${result.score}`);
+  assert.strictEqual(result.tier, '720p');
+  assert.ok(result.reason.startsWith('accepted'), `Expected accepted reason, got ${result.reason}`);
+});
+
+it('disqualifies conflicting release year for series when explicit year is provided (#248 Bad Cop 2024 vs 2025)', () => {
+  const context = {
+    isTv: true,
+    title: 'Bad Cop',
+    year: '2025',
+    sNum: 1,
+    eNum: 1,
+    targetQuality: 720,
+    minTvSizeMb: 80,
+  };
+
+  // Indian Bad Cop S01E01 from 2024 / different show
+  const candidate2024 = {
+    text: 'Bad.Cop.2024.S01E01.Karan.Ya.Arjun.720p.WEB.DL.x264.favoriteml2.mkv',
+    sizeMB: 375.6,
+  };
+
+  const res = scoreCandidateWithReason(candidate2024, context);
+  assert.strictEqual(res.score, -999, 'Must disqualify candidate with conflicting release year');
+  assert.ok(res.reason.includes('release year mismatch'), `Expected release year mismatch reason, got: ${res.reason}`);
+});
+
+it('correctly matches single-digit episode (EP1, EP8) and rejects mismatched single-digit episode (#248)', () => {
+  const contextEp1 = {
+    isTv: true,
+    title: 'Bad Cop',
+    year: '2025',
+    sNum: 1,
+    eNum: 1,
+    targetQuality: 720,
+  };
+
+  const ep1File = { text: 'Bad.Cop.2025.EP1.MalaySub.mp4', sizeMB: 491.1 };
+  const ep8File = { text: 'Bad.Cop.2025.EP8.MalaySub.Akhir.kakifilem.mp4', sizeMB: 543.8 };
+
+  const resEp1 = scoreCandidateWithReason(ep1File, contextEp1);
+  assert.ok(resEp1.score > 150, `EP1 file must match Episode 1 search (score: ${resEp1.score})`);
+
+  const resEp8AgainstEp1 = scoreCandidateWithReason(ep8File, contextEp1);
+  assert.strictEqual(resEp8AgainstEp1.score, -999, 'EP8 file must be disqualified when searching for Episode 1');
+  assert.ok(resEp8AgainstEp1.reason.includes('episode mismatch'), `Reason should indicate episode mismatch, got: ${resEp8AgainstEp1.reason}`);
+
+  // When searching for Ep 8, Ep 8 file must be accepted
+  const contextEp8 = {
+    isTv: true,
+    title: 'Bad Cop',
+    year: '2025',
+    sNum: 1,
+    eNum: 8,
+    targetQuality: 720,
+  };
+  const resEp8 = scoreCandidateWithReason(ep8File, contextEp8);
+  assert.ok(resEp8.score > 150, `EP8 file must match Episode 8 search (score: ${resEp8.score})`);
 });
 
 // Clean up temporary test files

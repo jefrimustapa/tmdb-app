@@ -433,8 +433,15 @@ export function isBareButton(text) {
   return tokens.every(t => /^\d+$/.test(t) || bareKeywords.has(t));
 }
 
-// Score a candidate download button against search context with detailed reason
-export function scoreCandidateButtonWithReason(btn, msg, context = {}) {
+// Score a provider-agnostic candidate item against search context with detailed reason
+export function scoreCandidateWithReason(candidate, context = {}) {
+  const {
+    text = '',
+    contextText = '',
+    sizeMB = null,
+    tier: explicitTier = null,
+  } = (typeof candidate === 'string' ? { text: candidate } : (candidate || {}));
+
   const {
     isTv = false,
     title = '',
@@ -450,34 +457,30 @@ export function scoreCandidateButtonWithReason(btn, msg, context = {}) {
     minMovieSizeMb = (typeof savedSettings !== "undefined" ? savedSettings.minMovieSizeMb : 180) ?? 180,
   } = context;
 
-  if ((btn.className !== 'KeyboardButtonUrlAuth' && btn.className !== 'KeyboardButtonUrl') || !btn.url) {
-    return { score: -999, reason: 'missing url or unsupported button class' };
-  }
-  const btnText = (btn.text || '').toLowerCase();
-  const normBtnText = normalizeTitle(btnText);
-  const msgText = (msg.message || '').toLowerCase();
-  const normMsgText = normalizeTitle(msgText);
+  const candText = (text || '').toLowerCase();
+  const normCandText = normalizeTitle(candText);
+  const ctxText = (contextText || '').toLowerCase();
 
   // 1. Immediately disqualify junk media (trailers, teasers, samples, promos, ost, reviews)
-  if (isJunkMedia(btnText, title, altTitle) || isJunkMedia(msgText, title, altTitle)) {
+  if (isJunkMedia(candText, title, altTitle) || (ctxText && isJunkMedia(ctxText, title, altTitle))) {
     return { score: -999, reason: 'junk media (trailer/teaser/sample/promo/ost/review)' };
   }
 
   // 2. Minimum file size sanity check
-  const btnSizeMB = parseSizeFromText(btn.text) || parseSizeFromText(msg.message);
-  if (btnSizeMB !== null) {
+  const candidateSizeMB = sizeMB !== null ? sizeMB : (parseSizeFromText(candText) || (ctxText ? parseSizeFromText(ctxText) : null));
+  if (candidateSizeMB !== null) {
     const minThreshold = isTv ? minTvSizeMb : minMovieSizeMb;
-    if (btnSizeMB < minThreshold) {
-      return { score: -999, reason: `file size (${btnSizeMB.toFixed(1)} MB) below minimum (${minThreshold} MB)` };
+    if (candidateSizeMB < minThreshold) {
+      return { score: -999, reason: `file size (${candidateSizeMB.toFixed(1)} MB) below minimum (${minThreshold} MB)` };
     }
   }
 
   // 3. Strict Title Token Coverage check (supports both primary title and English/alternative title)
-  const isBare = isBareButton(btnText);
-  const cleanMsgText = cleanBotEchoHeader(msgText);
-  let titleTargetText = normBtnText;
+  const isBare = isBareButton(candText);
+  const cleanMsgText = ctxText ? cleanBotEchoHeader(ctxText) : '';
+  let titleTargetText = normCandText;
 
-  if (isBare) {
+  if (isBare && cleanMsgText) {
     titleTargetText = normalizeTitle(cleanMsgText);
   }
 
@@ -508,8 +511,8 @@ export function scoreCandidateButtonWithReason(btn, msg, context = {}) {
   if (significantTokens.length > 0 || (altSignificantTokens && altSignificantTokens.length > 0)) {
     if (!primaryPassed && !altPassed) {
       const reasonDetail = altSignificantTokens && altSignificantTokens.length > 0
-        ? `title coverage too low (primary: ${(covPrimary * 100).toFixed(0)}%, alt: ${(covAlt * 100).toFixed(0)}%)`
-        : `title coverage too low (${(covPrimary * 100).toFixed(0)}%)`;
+        ? `title coverage too low (primary: ${Math.round(covPrimary * 100)}%, alt: ${Math.round(covAlt * 100)}%)`
+        : `title coverage too low (${Math.round(covPrimary * 100)}%)`;
       return { score: -999, reason: reasonDetail };
     }
   }
@@ -523,7 +526,7 @@ export function scoreCandidateButtonWithReason(btn, msg, context = {}) {
   }
 
   // 4. Title boundary collision check (prevents short titles matching longer titles with different subtitles or prefixes)
-  const textToInspect = isBare ? titleTargetText : (normBtnText || titleTargetText);
+  const textToInspect = (isBare && cleanMsgText) ? titleTargetText : (normCandText || titleTargetText);
   let boundaryPassed = false;
   let boundaryReason = '';
   let boundaryMatched = false;
@@ -556,8 +559,8 @@ export function scoreCandidateButtonWithReason(btn, msg, context = {}) {
 
   if (isTv) {
     // 1. Episode matching
-    let epInfo = extractEpisodeInfo(btnText);
-    if (!epInfo && (isBare || !extractEpisodeInfo(btnText))) {
+    let epInfo = extractEpisodeInfo(candText);
+    if (!epInfo && (isBare || !extractEpisodeInfo(candText)) && cleanMsgText) {
       epInfo = extractEpisodeInfo(cleanMsgText);
     }
 
@@ -578,10 +581,10 @@ export function scoreCandidateButtonWithReason(btn, msg, context = {}) {
     }
 
     // 2. Strict Season validation
-    const seasonFound = extractSeasonInfo(btnText) || extractSeasonInfo(cleanMsgText);
+    const seasonFound = extractSeasonInfo(candText) || (cleanMsgText ? extractSeasonInfo(cleanMsgText) : null);
     const explicitTargetYear = parseInt(year, 10);
     const targetYear = !isNaN(explicitTargetYear) ? explicitTargetYear : extractYear(title, significantTokens);
-    const btnYear = extractYear(btnText, significantTokens) || extractYear(cleanMsgText, significantTokens);
+    const candYear = extractYear(candText, significantTokens) || (cleanMsgText ? extractYear(cleanMsgText, significantTokens) : null);
 
     if (seasonFound !== null) {
       if (seasonFound === sNum) {
@@ -591,80 +594,98 @@ export function scoreCandidateButtonWithReason(btn, msg, context = {}) {
       }
     } else if (sNum > 1 && totalSeasons > 1) {
       // Multi-season protection: when watching Season 2 or later, reject un-versioned candidates with no matching year
-      if (!btnYear || Math.abs(targetYear - btnYear) > 1) {
+      if (!candYear || Math.abs(targetYear - candYear) > 1) {
         return { score: -999, reason: `un-versioned candidate without matching year for season ${sNum}` };
       }
     }
 
-    // 3. Release year validation
-    if (targetYear && btnYear) {
-      if (Math.abs(targetYear - btnYear) <= 1) {
+    // 3. Release year validation (strict year match for TV when explicitTargetYear is specified)
+    if (targetYear && candYear) {
+      if (candYear === targetYear) {
         score += 90;
       } else if (!isNaN(explicitTargetYear)) {
-        return { score: -999, reason: `release year mismatch (found ${btnYear}, expected ${targetYear})` };
+        return { score: -999, reason: `release year mismatch (found ${candYear}, expected ${targetYear})` };
       }
     }
   } else {
     // Movie validation
-    const isTvCandidate = /\b(s\d{1,2}e\d{1,2}|s\d{1,2}\s*ep?\s*\d{1,2}|season\s*\d+|musim\s*\d+|episode\s*\d+|episod\s*\d+|ep\s*\d+|\.end\.)\b/i.test(btnText) ||
-                          /\b(s\d{1,2}e\d{1,2}|s\d{1,2}\s*ep?\s*\d{1,2}|season\s*\d+|musim\s*\d+|episode\s*\d+|episod\s*\d+|ep\s*\d+|\.end\.)\b/i.test(msgText);
+    const isTvCandidate = /\b(s\d{1,2}e\d{1,2}|s\d{1,2}\s*ep?\s*\d{1,2}|season\s*\d+|musim\s*\d+|episode\s*\d+|episod\s*\d+|ep\s*\d+|\.end\.)\b/i.test(candText) ||
+                          (cleanMsgText && /\b(s\d{1,2}e\d{1,2}|s\d{1,2}\s*ep?\s*\d{1,2}|season\s*\d+|musim\s*\d+|episode\s*\d+|episod\s*\d+|ep\s*\d+|\.end\.)\b/i.test(cleanMsgText));
     if (isTvCandidate) {
       return { score: -999, reason: 'TV series/episode indicator found in movie candidate' };
     }
 
     const targetSequel = extractSequelInfo(title) || (altTitle ? extractSequelInfo(altTitle) : null);
-    const btnSequel = extractSequelInfo(btnText);
+    const candSequel = extractSequelInfo(candText);
     if (targetSequel) {
-      if (btnSequel === targetSequel) {
+      if (candSequel === targetSequel) {
         score += 150;
-      } else if (btnSequel) {
+      } else if (candSequel) {
         score -= 600;
       } else {
         score -= 400;
       }
     } else {
-      if (btnSequel) {
+      if (candSequel) {
         score -= 600;
       }
     }
 
     const explicitTargetYear = parseInt(year, 10);
     const targetYear = !isNaN(explicitTargetYear) ? explicitTargetYear : extractYear(title, significantTokens);
-    const btnYear = extractYear(btnText, significantTokens) || extractYear(cleanMsgText, significantTokens);
-    if (targetYear && btnYear) {
-      if (Math.abs(targetYear - btnYear) <= 1) {
+    const candYear = extractYear(candText, significantTokens) || (cleanMsgText ? extractYear(cleanMsgText, significantTokens) : null);
+    if (targetYear && candYear) {
+      if (candYear === targetYear) {
         score += 120;
+      } else if (Math.abs(targetYear - candYear) <= 1) {
+        score += 60;
       } else if (!isNaN(explicitTargetYear)) {
-        return { score: -999, reason: `release year mismatch (found ${btnYear}, expected ${targetYear})` };
+        return { score: -999, reason: `release year mismatch (found ${candYear}, expected ${targetYear})` };
       }
     }
   }
 
   // Quality preference
+  const candTier = explicitTier || detectVideoQualityTier(candText, cleanMsgText, null, candidateSizeMB ? candidateSizeMB * 1024 * 1024 : null);
   if (targetQuality <= 480) {
-    if (btnText.includes('480p') || btnText.includes('480') || btnText.includes('360p') || btnText.includes('540p')) score += 80;
-    else if (btnText.includes('720p') || btnText.includes('720')) score += 20;
-    else if (btnText.includes('1080p') || btnText.includes('1080')) score -= 40;
-    else if (btnText.includes('2160p') || btnText.includes('4k')) score -= 100;
+    if (candTier === 'sd') score += 80;
+    else if (candTier === '720p') score += 20;
+    else if (candTier === '1080p') score -= 40;
+    else if (candTier === '4k') score -= 100;
   } else if (targetQuality <= 720) {
-    if (btnText.includes('720p') || btnText.includes('720')) score += 50;
-    else if (btnText.includes('540p') || btnText.includes('480p') || btnText.includes('360p')) score += 30;
-    else if (btnText.includes('1080p') || btnText.includes('1080')) score += 5;
-    else if (btnText.includes('2160p') || btnText.includes('4k')) score -= 50;
+    if (candTier === '720p') score += 50;
+    else if (candTier === 'sd') score += 30;
+    else if (candTier === '1080p') score += 5;
+    else if (candTier === '4k') score -= 50;
   } else if (targetQuality >= 2160) {
-    if (btnText.includes('2160p') || btnText.includes('4k') || btnText.includes('uhd')) score += 100;
-    else if (btnText.includes('1080p') || btnText.includes('1080')) score += 60;
-    else if (btnText.includes('720p') || btnText.includes('720')) score += 20;
+    if (candTier === '4k') score += 100;
+    else if (candTier === '1080p') score += 60;
+    else if (candTier === '720p') score += 20;
   } else {
     // 1080p target
-    if (btnText.includes('1080p') || btnText.includes('1080')) score += 80;
-    else if (btnText.includes('720p') || btnText.includes('720')) score += 30;
-    else if (btnText.includes('2160p') || btnText.includes('4k')) score -= 30;
+    if (candTier === '1080p') score += 80;
+    else if (candTier === '720p') score += 30;
+    else if (candTier === '4k') score -= 30;
   }
-  if (btnText.toLowerCase().includes('.mp4') || btnText.toLowerCase().includes('mp4')) score += 15;
-  if (btnText.includes('malaysub') || btnText.includes('msm')) score += 5;
+  if (candText.includes('.mp4') || candText.includes('mp4')) score += 15;
+  if (candText.includes('malaysub') || candText.includes('msm')) score += 5;
 
-  return { score, reason: score >= 0 ? `accepted (score: ${score})` : `penalized (score: ${score})` };
+  return {
+    score,
+    reason: score >= 0 ? `accepted (score: ${score})` : `penalized (score: ${score})`,
+    tier: candTier,
+  };
+}
+
+// Score a candidate download button against search context with detailed reason (delegates to scoreCandidateWithReason)
+export function scoreCandidateButtonWithReason(btn, msg, context = {}) {
+  if (!btn || (btn.className !== 'KeyboardButtonUrlAuth' && btn.className !== 'KeyboardButtonUrl') || !btn.url) {
+    return { score: -999, reason: 'missing url or unsupported button class' };
+  }
+  const btnText = btn.text || '';
+  const msgText = msg?.message || '';
+  const btnSizeMB = parseSizeFromText(btnText) || parseSizeFromText(msgText);
+  return scoreCandidateWithReason({ text: btnText, contextText: msgText, sizeMB: btnSizeMB }, context);
 }
 
 // Score a candidate download button against search context

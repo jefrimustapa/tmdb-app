@@ -19,6 +19,7 @@ import {
   calculateTitleCoverage,
   validateTitleBoundaries,
   buildSearchQueries,
+  scoreCandidateWithReason,
 } from './base.js';
 
 // Search files directly from PencariMovie public search API
@@ -274,7 +275,22 @@ export class PencuriResolver extends BaseResolver {
     const explicitTargetYear = parseInt(year, 10);
     const targetYear = !isNaN(explicitTargetYear) ? explicitTargetYear : extractYear(title, significantTokens);
 
-    // 1. Check recent chat messages in both targetBot and UnOfficialsBot
+    const evalContext = {
+      isTv,
+      title,
+      altTitle,
+      year: explicitTargetYear || targetYear,
+      sNum,
+      eNum,
+      totalSeasons: totalSeasonsQuery ? parseInt(totalSeasonsQuery, 10) : 1,
+      targetQuality,
+      significantTokens,
+      altSignificantTokens: altTitle ? extractSignificantTokens(altTitle) : [],
+      minTvSizeMb: effectiveMinTv,
+      minMovieSizeMb: effectiveMinMovie,
+    };
+
+    // 1. Check recent chat messages in both targetBot and UnOfficialsBot using shared agnostic scoring
     const botsToCheck = [targetBot, 'UnOfficialsBot'];
     const matchingRecentDocs = [];
 
@@ -286,61 +302,23 @@ export class PencuriResolver extends BaseResolver {
             const doc = msg.media.document;
             const fnAttr = doc.attributes?.find(a => a.className === 'DocumentAttributeFilename');
             const filename = fnAttr ? fnAttr.fileName : msg.message;
-            const normFn = (filename || '').toLowerCase();
-
-            if (isJunkMedia(filename, title, altTitle) || isJunkMedia(msg.message, title, altTitle)) continue;
-
             const docSizeMB = Number(doc.size || 0) / (1024 * 1024);
-            if (isTv ? docSizeMB < effectiveMinTv : docSizeMB < effectiveMinMovie) continue;
 
-            const coverage = calculateTitleCoverage(significantTokens, filename);
-            if (significantTokens.length <= 2 ? coverage < 1.0 : coverage < 0.70) continue;
+            const evalRes = scoreCandidateWithReason({
+              text: filename,
+              contextText: msg.message,
+              sizeMB: docSizeMB,
+            }, evalContext);
 
-            const checkBoundary = validateTitleBoundaries(normFn, title);
-            if (checkBoundary.matched && !checkBoundary.ok) {
-              if (!altTitle || !validateTitleBoundaries(normFn, altTitle).ok) continue;
-            }
-
-            let matches = true;
-            if (isTv) {
-              const epInfo = extractEpisodeInfo(filename);
-              if (!epInfo || (epInfo.isRange ? (eNum < epInfo.start || eNum > epInfo.end) : epInfo.episode !== eNum)) {
-                matches = false;
-              }
-              if (matches) {
-                const seasonFound = extractSeasonInfo(filename);
-                if (seasonFound !== null && seasonFound !== sNum) matches = false;
-              }
-            } else {
-              const isTvDoc = /\b(s\d{1,2}e\d{1,2}|season\s*\d+|musim\s*\d+|episode\s*\d+|episod\s*\d+|ep\s*\d+)\b/i.test(filename);
-              if (isTvDoc) matches = false;
-
-              const docSequel = extractSequelInfo(filename);
-              if (targetSequel ? docSequel !== targetSequel : Boolean(docSequel)) matches = false;
-            }
-
-            if (matches) {
-              const tier = detectVideoQualityTier(filename, '', doc);
-              let qualityScore = 10;
-              if (targetQuality <= 480) {
-                if (tier === 'sd') qualityScore = 60;
-                else if (tier === '720p') qualityScore = 30;
-                else if (tier === '1080p') qualityScore = 5;
-              } else if (targetQuality <= 720) {
-                if (tier === '720p') qualityScore = 50;
-                else if (tier === 'sd') qualityScore = 30;
-                else if (tier === '1080p') qualityScore = 5;
-              } else if (targetQuality >= 2160) {
-                if (tier === '4k') qualityScore = 70;
-                else if (tier === '1080p') qualityScore = 40;
-                else if (tier === '720p') qualityScore = 20;
-              } else {
-                if (tier === '1080p') qualityScore = 50;
-                else if (tier === '720p') qualityScore = 30;
-              }
-              if (normFn.includes('.mp4') || normFn.includes('mp4')) qualityScore += 15;
-
-              matchingRecentDocs.push({ doc, filename, msgId: msg.id, tier, bot: bName, qualityScore });
+            if (evalRes.score > 0) {
+              matchingRecentDocs.push({
+                doc,
+                filename,
+                msgId: msg.id,
+                tier: evalRes.tier,
+                bot: bName,
+                qualityScore: evalRes.score,
+              });
             }
           }
         }
@@ -363,8 +341,8 @@ export class PencuriResolver extends BaseResolver {
         isTargetQualityMet = chosen.tier === '720p';
       }
 
-      if (isTargetQualityMet && chosen.qualityScore >= 30) {
-        console.log(`[PENCURI RESOLVE] Found matching recent document in @${chosen.bot}: ${chosen.filename} (${chosen.tier})`);
+      if (isTargetQualityMet && chosen.qualityScore >= 150) {
+        console.log(`[PENCURI RESOLVE] Found matching recent document in @${chosen.bot}: ${chosen.filename} (${chosen.tier}, score: ${chosen.qualityScore})`);
         return {
           document: chosen.doc,
           filename: chosen.filename,
@@ -385,6 +363,7 @@ export class PencuriResolver extends BaseResolver {
       if (checkAborted()) break;
       console.log(`[PENCURI RESOLVE] Querying search API with "${sq}"...`);
       const files = await searchPencariApi(sq);
+      console.log(`[PENCURI API] Received ${files ? files.length : 0} file(s) for query "${sq}"`);
       if (files && files.length > 0) {
         for (const f of files) {
           if (!seenFileIds.has(f.id)) {
@@ -394,25 +373,16 @@ export class PencuriResolver extends BaseResolver {
         }
       }
 
-      // Early break ONLY if we already gathered candidate files matching the episode / movie AND matching target quality
+      // Early break ONLY if we already gathered candidate files with a high score (>= 150) AND matching target quality
       const hasTargetQualityCandidate = candidateFiles.some(f => {
         const fn = f.title || '';
-        if (isTv) {
-          const epInfo = extractEpisodeInfo(fn);
-          if (!epInfo || (epInfo.isRange ? (eNum < epInfo.start || eNum > epInfo.end) : epInfo.episode !== eNum)) return false;
-          const seasonFound = extractSeasonInfo(fn);
-          if (seasonFound !== null && seasonFound !== sNum) return false;
-        } else {
-          const isTvDoc = /\b(s\d{1,2}e\d{1,2}|season\s*\d+|musim\s*\d+|episode\s*\d+|episod\s*\d+|ep\s*\d+)\b/i.test(fn);
-          if (isTvDoc) return false;
-          const docSequel = extractSequelInfo(fn);
-          if (targetSequel ? docSequel !== targetSequel : Boolean(docSequel)) return false;
-        }
-        const tier = detectVideoQualityTier(fn, '', null, f.file_size);
-        if (targetQuality >= 2160) return tier === '4k';
-        if (targetQuality >= 1080) return tier === '1080p' || tier === '4k';
-        if (targetQuality <= 480) return tier === 'sd';
-        return tier === '720p';
+        const sizeMB = Number(f.file_size || 0) / (1024 * 1024);
+        const evalRes = scoreCandidateWithReason({ text: fn, sizeMB }, evalContext);
+        if (evalRes.score < 150) return false;
+        if (targetQuality >= 2160) return evalRes.tier === '4k';
+        if (targetQuality >= 1080) return evalRes.tier === '1080p' || evalRes.tier === '4k';
+        if (targetQuality <= 480) return evalRes.tier === 'sd';
+        return evalRes.tier === '720p';
       });
 
       if (hasTargetQualityCandidate) {
@@ -421,69 +391,21 @@ export class PencuriResolver extends BaseResolver {
       }
     }
 
-    // 4. Score API candidates
+    // 4. Score API candidates using shared agnostic scoring
     const validCandidates = [];
     for (const f of candidateFiles) {
       const fn = f.title || '';
-      if (isJunkMedia(fn, title, altTitle)) continue;
-
       const sizeMB = Number(f.file_size || 0) / (1024 * 1024);
-      if (isTv ? sizeMB < effectiveMinTv : sizeMB < effectiveMinMovie) continue;
+      const evalRes = scoreCandidateWithReason({ text: fn, sizeMB }, evalContext);
 
-      const coverage = calculateTitleCoverage(significantTokens, fn);
-      if (significantTokens.length <= 2 ? coverage < 1.0 : coverage < 0.70) continue;
+      console.log(`[PENCURI SCORE] Candidate: "${fn}" (${sizeMB.toFixed(1)} MB) | Tier: ${evalRes.tier} | Score: ${evalRes.score} | Decision: ${evalRes.reason}`);
 
-      let matches = true;
-      if (isTv) {
-        const epInfo = extractEpisodeInfo(fn);
-        if (!epInfo || (epInfo.isRange ? (eNum < epInfo.start || eNum > epInfo.end) : epInfo.episode !== eNum)) {
-          matches = false;
-        }
-        if (matches) {
-          const seasonFound = extractSeasonInfo(fn);
-          if (seasonFound !== null && seasonFound !== sNum) matches = false;
-        }
-      } else {
-        const isTvDoc = /\b(s\d{1,2}e\d{1,2}|season\s*\d+|musim\s*\d+|episode\s*\d+|episod\s*\d+|ep\s*\d+)\b/i.test(fn);
-        if (isTvDoc) matches = false;
-
-        const docSequel = extractSequelInfo(fn);
-        if (targetSequel ? docSequel !== targetSequel : Boolean(docSequel)) matches = false;
-      }
-
-      if (matches) {
-        const tier = detectVideoQualityTier(fn, '', null, f.file_size);
-        let score = 50;
-
-        // Quality preference (strictly aligned with base.js / MSM)
-        if (targetQuality <= 480) {
-          if (tier === 'sd') score += 80;
-          else if (tier === '720p') score += 20;
-          else if (tier === '1080p') score -= 40;
-          else if (tier === '4k') score -= 100;
-        } else if (targetQuality <= 720) {
-          if (tier === '720p') score += 50;
-          else if (tier === 'sd') score += 30;
-          else if (tier === '1080p') score += 5;
-          else if (tier === '4k') score -= 50;
-        } else if (targetQuality >= 2160) {
-          if (tier === '4k') score += 100;
-          else if (tier === '1080p') score += 60;
-          else if (tier === '720p') score += 20;
-        } else {
-          // 1080p target
-          if (tier === '1080p') score += 80;
-          else if (tier === '720p') score += 30;
-          else if (tier === '4k') score -= 30;
-        }
-
-        if (fn.toLowerCase().includes('.mp4')) score += 15;
-        if (fn.toLowerCase().includes('malaysub') || fn.toLowerCase().includes('msm')) score += 5;
-
+      if (evalRes.score > 0) {
         validCandidates.push({
           file: f,
-          score,
-          tier,
+          score: evalRes.score,
+          tier: evalRes.tier,
+          reason: evalRes.reason,
         });
       }
     }
