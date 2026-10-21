@@ -38,8 +38,8 @@ export const TMDB_READ_TOKEN = 'eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiIxYzdiOTdkZDhiMTE
 
 const IMAGE_BASE_URL = 'https://image.tmdb.org/t/p';
 
-export const TMDB_FALLBACK_POSTER = `${import.meta.env.BASE_URL}favicon.svg`;
-export const TMDB_FALLBACK_BACKDROP = `${import.meta.env.BASE_URL}favicon.svg`;
+export const TMDB_FALLBACK_POSTER = `${import.meta.env?.BASE_URL || '/'}favicon.svg`;
+export const TMDB_FALLBACK_BACKDROP = `${import.meta.env?.BASE_URL || '/'}favicon.svg`;
 
 export const tmdbImages = {
   poster: (path: string | null, size: 'w92' | 'w154' | 'w185' | 'w342' | 'w500' | 'w780' | 'original' = 'w500') =>
@@ -405,7 +405,7 @@ export const COUNTRY_OPTIONS: CountryOption[] = [
 export const COUNTRY_TO_LANGUAGES: Record<string, string[]> = {
   US: ['en'],
   GB: ['en'],
-  MY: ['ms', 'en', 'zh', 'ta'],
+  MY: ['ms', 'zlm'],
   KR: ['ko'],
   JP: ['ja'],
   IN: ['hi', 'ta', 'te', 'ml', 'kn', 'bn', 'mr', 'pa'],
@@ -421,7 +421,36 @@ export const COUNTRY_TO_LANGUAGES: Record<string, string[]> = {
   IT: ['it'],
 };
 
+const movieCountryCache = new Map<number, string[]>();
+
 export const tmdbApi = {
+  // Movie Origin & Production Country Resolver
+  getMovieOriginCountries: async (movieIds: number[]): Promise<Map<number, string[]>> => {
+    const unCachedIds = Array.from(new Set(movieIds)).filter((id) => id && !movieCountryCache.has(id));
+    if (unCachedIds.length > 0) {
+      await Promise.all(
+        unCachedIds.map(async (id) => {
+          try {
+            const data = await tmdbFetch<{
+              origin_country?: string[];
+              production_countries?: { iso_3166_1: string }[];
+            }>(`/movie/${id}`);
+            const countries = new Set<string>();
+            if (Array.isArray(data.origin_country)) {
+              data.origin_country.forEach((c) => c && countries.add(c.toUpperCase()));
+            }
+            if (Array.isArray(data.production_countries)) {
+              data.production_countries.forEach((c) => c?.iso_3166_1 && countries.add(c.iso_3166_1.toUpperCase()));
+            }
+            movieCountryCache.set(id, Array.from(countries));
+          } catch {
+            movieCountryCache.set(id, []);
+          }
+        })
+      );
+    }
+    return movieCountryCache;
+  },
   // Trending
   getTrending: (mediaType: 'all' | 'movie' | 'tv' = 'all', timeWindow: 'day' | 'week' = 'week') =>
     tmdbFetch<TMDBResponse<TMDBMediaItem>>(`/trending/${mediaType}/${timeWindow}`),
