@@ -56,7 +56,7 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
   episode,
   episodeTitle,
   mediaType,
-  providerLabel = 'Telegram (MSM)',
+  providerLabel = 'TGStrm',
   initialTimestamp = 0,
   totalDurationSec,
   onProgress,
