@@ -718,7 +718,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             setIsLoading(false);
             setIsProbing(false);
             isPlayingRef.current = true;
-            onActiveServerChange?.('TG Streamer', 'telegram-msm');
+            onActiveServerChange?.('TGStrm', 'telegram-msm');
             if (autoCycleTimeoutRef.current) {
               clearTimeout(autoCycleTimeoutRef.current);
               autoCycleTimeoutRef.current = null;
