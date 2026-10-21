@@ -22,7 +22,7 @@ import {
 } from './base.js';
 
 // Search files directly from PencariMovie public search API
-async function searchPencariApi(query) {
+export async function searchPencariApi(query) {
   try {
     const encoded = encodeURIComponent(query);
     const url = `https://unofficialsbot.pencarimovie.com/wp-admin/admin-ajax.php?action=stream_search_files&search=${encoded}`;

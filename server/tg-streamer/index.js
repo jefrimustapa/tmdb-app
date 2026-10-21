@@ -93,6 +93,9 @@ import {
   generateSeriesSearchQueries,
   DEFAULT_PIPELINE_BUFFERS,
   JUNK_MEDIA_REGEX,
+  searchPencariApi,
+  formatDiagnosticResults,
+  formatFileSize,
 } from './resolvers/index.js';
 
 
@@ -154,7 +157,7 @@ let client = new TelegramClient(new StringSession(session), apiId, apiHash, {
   retryDelay: 1000,
   autoReconnect: true,
   timeout: 60,
-  deviceModel: 'MSM Getter Server',
+  deviceModel: 'TG Streamer Server',
   appVersion: '1.0.0',
   systemVersion: 'Linux/ASUS',
   baseLogger: new QuietLogger('error'),
@@ -377,7 +380,7 @@ app.post(['/api/auth/send-code', '/tg/api/auth/send-code', '/msm/api/auth/send-c
     const tempClient = new TelegramClient(new StringSession(''), apiId, apiHash, {
       connection: ConnectionTCPObfuscated,
       connectionRetries: 5,
-      deviceModel: 'MSM Getter Server',
+      deviceModel: 'TG Streamer Server',
       appVersion: '1.0.0',
       systemVersion: 'Linux/Docker',
       baseLogger: new QuietLogger('error'),
@@ -490,7 +493,7 @@ app.get('/tg/auth', (req, res) => {
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>MSM Getter — Server Authentication Portal</title>
+  <title>TG Streamer — Authentication Portal</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     body { background-color: #0B0F17; color: #E2E8F0; font-family: ui-sans-serif, system-ui, sans-serif; }
@@ -507,7 +510,7 @@ app.get('/tg/auth', (req, res) => {
         </div>
         <div>
           <h1 class="text-lg font-bold text-white flex items-center gap-2">
-            MSM Auth Portal
+            TG Streamer Auth Portal
             <span class="text-xs px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-300 border border-sky-500/30 font-mono">@${getActiveTargetBot()}</span>
           </h1>
           <p class="text-xs text-slate-400">Telegram MTProto Session & Authentication Gateway</p>
@@ -613,7 +616,7 @@ app.get('/tg/auth', (req, res) => {
   <script>
     async function checkStatus() {
       try {
-        const res = await fetch('/msm/api/auth/status');
+        const res = await fetch('/tg/api/auth/status');
         const data = await res.json();
         const dot = document.getElementById('statusDot');
         const text = document.getElementById('statusText');
@@ -665,7 +668,7 @@ app.get('/tg/auth', (req, res) => {
       btn.textContent = 'Sending code...';
 
       try {
-        const res = await fetch('/msm/api/auth/send-code', {
+        const res = await fetch('/tg/api/auth/send-code', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ phoneNumber: phone })
@@ -697,7 +700,7 @@ app.get('/tg/auth', (req, res) => {
       btn.textContent = 'Verifying with Telegram...';
 
       try {
-        const res = await fetch('/msm/api/auth/verify-code', {
+        const res = await fetch('/tg/api/auth/verify-code', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ phoneCode: code, password })
@@ -1392,7 +1395,7 @@ app.get('/tg/logs', (req, res) => {
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
-  <title>MSM Getter — Live Log Console</title>
+  <title>TG Streamer — Live Log Console</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     body { background-color: #0B0F17; color: #E2E8F0; font-family: ui-sans-serif, system-ui, sans-serif; }
@@ -1413,7 +1416,7 @@ app.get('/tg/logs', (req, res) => {
         </div>
         <div>
           <h1 class="text-lg font-bold text-white flex items-center gap-2">
-            MSM Logs
+            TG Streamer Logs
             <span class="text-xs px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-300 border border-sky-500/30 font-mono">@${getActiveTargetBot()}</span>
           </h1>
           <p class="text-xs text-slate-400">Real-time MTProto microservice streaming & diagnostic console</p>
@@ -1435,7 +1438,7 @@ app.get('/tg/logs', (req, res) => {
         <a href="/tg/auth" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800 transition flex items-center gap-1">
           🔑 Auth
         </a>
-        <a href="/msm/api/logs/download" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 bg-slate-800 hover:bg-slate-700 border border-slate-700 transition flex items-center gap-1.5 ml-1">
+        <a href="/tg/api/logs/download" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 bg-slate-800 hover:bg-slate-700 border border-slate-700 transition flex items-center gap-1.5 ml-1">
           <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
           Download .log
         </a>
@@ -1565,7 +1568,7 @@ app.get('/tg/logs', (req, res) => {
     async function clearServerLog() {
       if (!confirm('Are you sure you want to physically clear and truncate the log file on the router?')) return;
       try {
-        const res = await fetch('/msm/api/logs/clear', { method: 'POST' });
+        const res = await fetch('/tg/api/logs/clear', { method: 'POST' });
         const data = await res.json();
         if (data.success) {
           rawLines = [];
@@ -1583,7 +1586,7 @@ app.get('/tg/logs', (req, res) => {
     // Initial log fetch
     async function fetchInitialLogs() {
       try {
-        const res = await fetch('/msm/api/logs?lines=300');
+        const res = await fetch('/tg/api/logs?lines=300');
         const data = await res.json();
         if (data.success && data.logs) {
           rawLines = data.logs;
@@ -1597,7 +1600,7 @@ app.get('/tg/logs', (req, res) => {
     // Connect Server-Sent Events (SSE)
     function connectSSE() {
       const badge = document.getElementById('streamStatusBadge');
-      const es = new EventSource('/msm/api/logs/stream');
+      const es = new EventSource('/tg/api/logs/stream');
       es.onopen = () => {
         badge.className = 'inline-flex items-center gap-1 text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20';
         badge.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span> Live Stream';
@@ -1865,7 +1868,7 @@ app.post(['/api/settings', '/tg/api/settings', '/msm/api/settings'], (req, res) 
 // System Service Restart Endpoint (Exits process; router supervisor auto-respawns in ~3s)
 app.post(['/api/system/restart', '/tg/api/system/restart', '/msm/api/system/restart'], (req, res) => {
   console.log('[SYSTEM] Service restart requested via web settings.');
-  res.json({ success: true, message: 'Restarting MSM Getter service...' });
+  res.json({ success: true, message: 'Restarting TG Streamer service...' });
   setTimeout(() => {
     process.exit(0);
   }, 1000);
@@ -1889,7 +1892,7 @@ app.get(['/tg', '/msm/dashboard'], (req, res) => {
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>MSM Getter — Dashboard</title>
+  <title>TG Streamer — Dashboard</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     body { background-color: #0B0F17; color: #E2E8F0; font-family: ui-sans-serif, system-ui, sans-serif; }
@@ -1909,7 +1912,7 @@ app.get(['/tg', '/msm/dashboard'], (req, res) => {
         </div>
         <div>
           <h1 class="text-lg font-bold text-white flex items-center gap-2">
-            MSM Dashboard
+            TG Streamer Dashboard
             <span id="botBadge" class="text-xs px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-300 border border-sky-500/30 font-mono">@${activeBot}</span>
             ${geoBadgeHtml}
           </h1>
@@ -2108,7 +2111,7 @@ app.get(['/tg', '/msm/dashboard'], (req, res) => {
 
     async function loadStats() {
       try {
-        const res = await fetch('/msm/api/system/stats');
+        const res = await fetch('/tg/api/system/stats');
         const d = await res.json();
 
         // 1. Status
@@ -2286,24 +2289,26 @@ app.get(['/tg', '/msm/dashboard'], (req, res) => {
       box.innerHTML = '<span class="text-slate-400">Querying @' + '${activeBot}' + '...</span>';
 
       try {
-        const res = await fetch('/msm/api/debug-search?q=' + encodeURIComponent(query));
+        const res = await fetch('/tg/api/debug-search?q=' + encodeURIComponent(query));
         const data = await res.json();
         if (data.success && data.buttons) {
-          box.innerHTML = '<div class="text-slate-300 font-semibold mb-2">Found ' + data.buttons.length + ' buttons for "' + query + '":</div>' +
+          const count = data.buttons.length;
+          box.innerHTML = '<div class="text-slate-300 font-semibold mb-2">Found ' + count + ' ' + (count === 1 ? 'result' : 'results') + ' for "' + escapeHtml(query) + '":</div>' +
+            (count === 0 ? '<div class="text-slate-500 italic py-2">No results found for this query.</div>' :
             data.buttons.map(b => 
               '<div class="p-2.5 rounded-xl bg-slate-900 border border-slate-800">' +
-                '<div class="text-white font-medium truncate">' + b.text + '</div>' +
-                '<div class="text-[10px] text-slate-500 flex gap-2 mt-1">' +
-                  '<span class="text-sky-400 font-mono">' + b.className + '</span>' +
-                  (b.url ? '<span class="truncate max-w-sm text-slate-400">' + b.url + '</span>' : '') +
+                '<div class="text-white font-medium truncate">' + escapeHtml(b.text) + '</div>' +
+                '<div class="text-[10px] text-slate-500 flex gap-2 mt-1 items-center justify-between">' +
+                  '<span class="text-sky-400 font-mono">' + escapeHtml(b.className) + '</span>' +
+                  (b.url ? '<a href="' + escapeHtml(b.url) + '" target="_blank" rel="noopener" class="text-sky-400 hover:text-sky-300 hover:underline truncate max-w-sm">' + escapeHtml(b.url) + ' ↗</a>' : '') +
                 '</div>' +
               '</div>'
-            ).join('');
+            ).join(''));
         } else {
-          box.innerHTML = '<span class="text-rose-400">No buttons found or error: ' + (data.error || 'Empty') + '</span>';
+          box.innerHTML = '<span class="text-rose-400">Query failed: ' + escapeHtml(data.error || 'Empty results') + '</span>';
         }
       } catch (e) {
-        box.innerHTML = '<span class="text-rose-400">Query failed: ' + e.message + '</span>';
+        box.innerHTML = '<span class="text-rose-400">Query failed: ' + escapeHtml(e.message) + '</span>';
       } finally {
         btn.disabled = false;
         btn.textContent = 'Test Query';
@@ -2350,7 +2355,7 @@ app.get(['/tg/streams', '/msm/cache'], (req, res) => {
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>MSM Getter — Persistent Stream Cache</title>
+  <title>TG Streamer — Persistent Stream Cache</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     body { background-color: #0B0F17; color: #E2E8F0; font-family: ui-sans-serif, system-ui, sans-serif; }
@@ -2589,7 +2594,7 @@ app.get(['/tg/streams', '/msm/cache'], (req, res) => {
 
     async function loadStreams() {
       try {
-        const res = await fetch('/msm/api/cache');
+        const res = await fetch('/tg/api/cache');
         const data = await res.json();
         allStreams = data.items || [];
 
@@ -2728,7 +2733,7 @@ app.get(['/tg/streams', '/msm/cache'], (req, res) => {
       const docId = decodeURIComponent(docIdEnc || '');
       if (!confirm('Evict from persistent cache?\\n\\n' + (title || key))) return;
       try {
-        const res = await fetch('/msm/api/cache?key=' + encodeURIComponent(key) + '&docId=' + encodeURIComponent(docId), { method: 'DELETE' });
+        const res = await fetch('/tg/api/cache?key=' + encodeURIComponent(key) + '&docId=' + encodeURIComponent(docId), { method: 'DELETE' });
         const d = await res.json();
         if (d.success) {
           showToast('Evicted: ' + (title || key));
@@ -2744,7 +2749,7 @@ app.get(['/tg/streams', '/msm/cache'], (req, res) => {
     async function clearAllCache() {
       if (!confirm('DANGER: Clear ALL cached stream records from central database?\\n\\nThis will remove all ' + allStreams.length + ' video records.')) return;
       try {
-        const res = await fetch('/msm/api/cache/clear', { method: 'POST' });
+        const res = await fetch('/tg/api/cache/clear', { method: 'POST' });
         const d = await res.json();
         showToast(d.message || 'Cache cleared');
         loadStreams();
@@ -2792,7 +2797,7 @@ app.get(['/msm/setting', '/tg/settings'], (req, res) => {
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>MSM Getter — Settings</title>
+  <title>TG Streamer — Settings</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     body { background-color: #0B0F17; color: #E2E8F0; font-family: ui-sans-serif, system-ui, sans-serif; }
@@ -2812,7 +2817,7 @@ app.get(['/msm/setting', '/tg/settings'], (req, res) => {
         </div>
         <div>
           <h1 class="text-lg font-bold text-white flex items-center gap-2">
-            MSM Settings
+            TG Streamer Settings
             <span class="text-xs px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-300 border border-sky-500/30 font-mono">@${getActiveTargetBot()}</span>
           </h1>
           <p class="text-xs text-slate-400">Configure bot handle, buffer pipelines, RAM block cache, and system services</p>
@@ -3058,7 +3063,7 @@ app.get(['/msm/setting', '/tg/settings'], (req, res) => {
         </div>
       </div>
 
-      <!-- Card 4: Service Management (Reboot / Restart MSM Server) -->
+      <!-- Card 4: Service Management (Reboot / Restart TG Streamer Server) -->
       <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 glow-box space-y-4">
         <div class="flex items-center justify-between">
           <h2 class="text-sm font-semibold text-white flex items-center gap-2">
@@ -3066,7 +3071,7 @@ app.get(['/msm/setting', '/tg/settings'], (req, res) => {
           </h2>
           <span class="text-xs px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 font-mono">Supervisor</span>
         </div>
-        <p class="text-xs text-slate-400">Reboot the MSM Getter microservice. The router supervisor loop will automatically respawn the process with clean memory in ~3 seconds.</p>
+        <p class="text-xs text-slate-400">Reboot the TG Streamer microservice. The router supervisor loop will automatically respawn the process with clean memory in ~3 seconds.</p>
 
         <div class="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl space-y-1">
           <span class="text-xs font-semibold text-amber-300 block">⚠️ Note on Active Streams</span>
@@ -3076,7 +3081,7 @@ app.get(['/msm/setting', '/tg/settings'], (req, res) => {
         <div class="pt-2 flex items-center justify-end">
           <button onclick="confirmRestartService()" class="px-4 py-2 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 hover:text-amber-300 border border-amber-500/30 rounded-xl text-xs font-semibold transition flex items-center gap-1.5">
             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
-            Restart MSM Service
+            Restart TG Streamer Service
           </button>
         </div>
       </div>
@@ -3182,12 +3187,12 @@ app.get(['/msm/setting', '/tg/settings'], (req, res) => {
           🔄
         </div>
         <div>
-          <h3 class="text-base font-bold text-white">Restart MSM Service</h3>
+          <h3 class="text-base font-bold text-white">Restart TG Streamer Service</h3>
           <p class="text-xs text-slate-400">Confirm microservice restart</p>
         </div>
       </div>
       <p class="text-xs text-slate-300 leading-relaxed">
-        Are you sure you want to reboot the MSM Getter server process? The router supervisor loop will respawn the service automatically within ~3 seconds.
+        Are you sure you want to reboot the TG Streamer server process? The router supervisor loop will respawn the service automatically within ~3 seconds.
       </p>
       <div id="restartStatusBox" class="hidden p-3 rounded-xl bg-slate-950 border border-slate-800 text-xs font-mono text-center text-sky-400">
         <div class="flex items-center justify-center gap-2">
@@ -3209,7 +3214,7 @@ app.get(['/msm/setting', '/tg/settings'], (req, res) => {
   <script>
     async function loadSettingsData() {
       try {
-        const res = await fetch('/tg/api/settings').catch(() => fetch('/msm/api/settings')).then(r => r.json());
+        const res = await fetch('/tg/api/settings').catch(() => fetch('/tg/api/settings')).then(r => r.json());
         if (res.cachedStreams !== undefined) {
           document.getElementById('cacheCount').textContent = res.cachedStreams + ' videos';
         }
@@ -3298,7 +3303,7 @@ app.get(['/msm/setting', '/tg/settings'], (req, res) => {
       }
 
       try {
-        const res = await fetch('/msm/api/settings', {
+        const res = await fetch('/tg/api/settings', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -3419,7 +3424,7 @@ app.get(['/msm/setting', '/tg/settings'], (req, res) => {
       btn.textContent = 'Saving...';
 
       try {
-        const res = await fetch('/msm/api/settings', {
+        const res = await fetch('/tg/api/settings', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -3453,7 +3458,7 @@ app.get(['/msm/setting', '/tg/settings'], (req, res) => {
       btn.textContent = 'Saving...';
 
       try {
-        const res = await fetch('/msm/api/settings', {
+        const res = await fetch('/tg/api/settings', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -3580,7 +3585,7 @@ app.get(['/msm/setting', '/tg/settings'], (req, res) => {
       countdownEl.textContent = 'Initiating service reboot...';
 
       try {
-        await fetch('/msm/api/system/restart', { method: 'POST' });
+        await fetch('/tg/api/system/restart', { method: 'POST' });
       } catch (e) {}
 
       let remaining = 4;
@@ -3591,7 +3596,7 @@ app.get(['/msm/setting', '/tg/settings'], (req, res) => {
         } else {
           countdownEl.textContent = 'Checking server connection...';
           try {
-            const res = await fetch('/msm/api/settings', { cache: 'no-store' });
+            const res = await fetch('/tg/api/settings', { cache: 'no-store' });
             if (res.ok) {
               clearInterval(interval);
               countdownEl.textContent = '✓ Service back online! Reloading...';
@@ -3605,7 +3610,7 @@ app.get(['/msm/setting', '/tg/settings'], (req, res) => {
     async function clearCache() {
       if (!confirm('Are you sure you want to clear the entire stream cache?')) return;
       try {
-        const res = await fetch('/msm/api/cache/clear', { method: 'POST' });
+        const res = await fetch('/tg/api/cache/clear', { method: 'POST' });
         const d = await res.json();
         alert(d.message || 'Cache cleared');
         loadSettingsData();
@@ -3617,7 +3622,7 @@ app.get(['/msm/setting', '/tg/settings'], (req, res) => {
     async function clearLogs() {
       if (!confirm('Are you sure you want to truncate the log file?')) return;
       try {
-        const res = await fetch('/msm/api/logs/clear', { method: 'POST' });
+        const res = await fetch('/tg/api/logs/clear', { method: 'POST' });
         const d = await res.json();
         alert(d.message || 'Log cleared');
       } catch (e) {
@@ -3649,25 +3654,50 @@ app.get(['/msm/setting', '/tg/settings'], (req, res) => {
 </html>`);
 });
 
-// Diagnostic endpoint to inspect raw buttons returned by @${BOT_USERNAME}
+// Diagnostic endpoint to inspect raw candidates/buttons from active resolver
 app.get(['/api/debug-search', '/tg/api/debug-search', '/msm/api/debug-search'], async (req, res) => {
   try {
     const query = req.query.q || 'Kelas Cikgu Hiragi';
+    const resolverId = String(req.query.resolver || savedSettings.activeResolver || 'msm').toLowerCase().trim();
+    const targetBot = getActiveTargetBot();
+
+    if (resolverId === 'pencuri') {
+      const files = await searchPencariApi(query);
+      const items = formatDiagnosticResults(files, 'pencuri');
+      return res.json({
+        success: true,
+        query,
+        resolver: 'pencuri',
+        targetBot,
+        count: items.length,
+        buttons: items,
+      });
+    }
+
+    // Default: MSM resolver via Telegram MTProto
     await initTelegram();
-    const sentMsg = await client.sendMessage(BOT_USERNAME, { message: query });
+    const sentMsg = await client.sendMessage(targetBot, { message: query });
     await new Promise(r => setTimeout(r, 2000));
-    const msgs = await client.getMessages(BOT_USERNAME, { limit: 5 });
-    const buttons = [];
+    const msgs = await client.getMessages(targetBot, { limit: 5 });
+    const rawButtons = [];
     for (const m of msgs) {
       if (m.id > sentMsg.id && m.replyMarkup?.rows) {
         for (const row of m.replyMarkup.rows) {
           for (const btn of row.buttons) {
-            buttons.push({ text: btn.text, url: btn.url, className: btn.className });
+            rawButtons.push({ text: btn.text, url: btn.url, className: btn.className, buttonId: btn.buttonId });
           }
         }
       }
     }
-    res.json({ success: true, query, count: buttons.length, buttons });
+    const buttons = formatDiagnosticResults(rawButtons, 'msm');
+    res.json({
+      success: true,
+      query,
+      resolver: 'msm',
+      targetBot,
+      count: buttons.length,
+      buttons,
+    });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -5338,9 +5368,9 @@ if (isMain) {
         cert: fs.readFileSync(sslCertFile),
       };
       serverInstance = https.createServer(sslOptions, app);
-      attachServerErrorHandler(serverInstance, 'MSM Getter HTTPS', port);
+      attachServerErrorHandler(serverInstance, 'TG Streamer HTTPS', port);
       serverInstance.listen(port, async () => {
-        console.log(`[SERVER] MSM Getter microservice listening securely on HTTPS port ${port} (cert: ${sslCertFile})`);
+        console.log(`[SERVER] TG Streamer microservice listening securely on HTTPS port ${port} (cert: ${sslCertFile})`);
         checkFfmpeg();
         try {
           await initTelegram();
@@ -5351,9 +5381,9 @@ if (isMain) {
     } catch (sslErr) {
       console.error('[SERVER SSL ERROR] Failed to initialize HTTPS server, falling back to HTTP:', sslErr);
       serverInstance = http.createServer(app);
-      attachServerErrorHandler(serverInstance, 'MSM Getter HTTP (Fallback)', port);
+      attachServerErrorHandler(serverInstance, 'TG Streamer HTTP (Fallback)', port);
       serverInstance.listen(port, async () => {
-        console.log(`[SERVER] MSM Getter microservice listening on HTTP port ${port}`);
+        console.log(`[SERVER] TG Streamer microservice listening on HTTP port ${port}`);
         checkFfmpeg();
         try {
           await initTelegram();
@@ -5364,9 +5394,9 @@ if (isMain) {
     }
   } else {
     serverInstance = http.createServer(app);
-    attachServerErrorHandler(serverInstance, 'MSM Getter HTTP', port);
+    attachServerErrorHandler(serverInstance, 'TG Streamer HTTP', port);
     serverInstance.listen(port, async () => {
-      console.log(`[SERVER] MSM Getter microservice listening on HTTP port ${port}`);
+      console.log(`[SERVER] TG Streamer microservice listening on HTTP port ${port}`);
       checkFfmpeg();
       try {
         await initTelegram();
@@ -5423,4 +5453,7 @@ export {
   savedSettings,
   isJunkMedia,
   JUNK_MEDIA_REGEX,
+  searchPencariApi,
+  formatDiagnosticResults,
+  formatFileSize,
 };

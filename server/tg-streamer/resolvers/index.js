@@ -10,7 +10,7 @@ import { PencuriResolver } from './pencuri.js';
 export * from './base.js';
 export { BaseResolver } from './base.js';
 export { MsmResolver } from './msm.js';
-export { PencuriResolver } from './pencuri.js';
+export { PencuriResolver, searchPencariApi } from './pencuri.js';
 
 const resolverRegistry = new Map();
 
