@@ -79,6 +79,12 @@ export const DEFAULT_SETTINGS: UserSettings = {
   enginePriority: ['telegram', 'embed'],
   enabledTelegramProviders: ['telegram-msm'],
   telegramProviderCountries: { 'telegram-msm': ['MY', 'ID', 'SG'] },
+  tgStreamerUrl: 'https://www.julietmike.net:3033',
+  tgChunkSize: 524288,
+  tgMaxQuality: '1080',
+  tgTimeout: 90,
+  tgBufferTimeout: 60,
+  tgActiveResolver: 'msm',
   msmGetterUrl: 'https://www.julietmike.net:3033',
   msmChunkSize: 524288,
   msmMaxQuality: '1080',
@@ -375,6 +381,36 @@ export const dbService = {
       settings.msmTimeout = settings.msm32Timeout || 90;
       await db.settings.put(settings);
     }
+    if (settings.tgStreamerUrl === undefined) {
+      settings.tgStreamerUrl = settings.msmGetterUrl || settings.msm32GetterUrl || 'https://www.julietmike.net:3033';
+      await db.settings.put(settings);
+    }
+    if (settings.tgChunkSize === undefined) {
+      settings.tgChunkSize = settings.msmChunkSize || settings.msm32ChunkSize || 524288;
+      await db.settings.put(settings);
+    }
+    if (settings.tgMaxQuality === undefined) {
+      settings.tgMaxQuality = settings.msmMaxQuality || settings.msm32MaxQuality || '1080';
+      await db.settings.put(settings);
+    }
+    if (settings.tgTimeout === undefined) {
+      settings.tgTimeout = settings.msmTimeout || settings.msm32Timeout || 90;
+      await db.settings.put(settings);
+    }
+    if (settings.tgBufferTimeout === undefined) {
+      settings.tgBufferTimeout = settings.msmBufferTimeout || settings.msm32BufferTimeout || 60;
+      await db.settings.put(settings);
+    }
+    if (settings.tgActiveResolver === undefined) {
+      settings.tgActiveResolver = 'msm';
+      await db.settings.put(settings);
+    }
+    settings.msmGetterUrl = settings.tgStreamerUrl;
+    settings.msmChunkSize = settings.tgChunkSize;
+    settings.msmMaxQuality = settings.tgMaxQuality;
+    settings.msmTimeout = settings.tgTimeout;
+    settings.msmBufferTimeout = settings.tgBufferTimeout;
+    await db.settings.put(settings);
     if (settings.enabledTelegramProviders) {
       const idx = settings.enabledTelegramProviders.indexOf('telegram-msm32');
       if (idx !== -1) {
@@ -439,9 +475,35 @@ export const dbService = {
 
   async updateSettings(partial: Partial<UserSettings>): Promise<UserSettings> {
     const current = await this.getSettings();
+    const syncedPartial: Partial<UserSettings> = { ...partial };
+    if (syncedPartial.tgStreamerUrl !== undefined && syncedPartial.msmGetterUrl === undefined) {
+      syncedPartial.msmGetterUrl = syncedPartial.tgStreamerUrl;
+    } else if (syncedPartial.msmGetterUrl !== undefined && syncedPartial.tgStreamerUrl === undefined) {
+      syncedPartial.tgStreamerUrl = syncedPartial.msmGetterUrl;
+    }
+    if (syncedPartial.tgChunkSize !== undefined && syncedPartial.msmChunkSize === undefined) {
+      syncedPartial.msmChunkSize = syncedPartial.tgChunkSize;
+    } else if (syncedPartial.msmChunkSize !== undefined && syncedPartial.tgChunkSize === undefined) {
+      syncedPartial.tgChunkSize = syncedPartial.msmChunkSize;
+    }
+    if (syncedPartial.tgMaxQuality !== undefined && syncedPartial.msmMaxQuality === undefined) {
+      syncedPartial.msmMaxQuality = syncedPartial.tgMaxQuality;
+    } else if (syncedPartial.msmMaxQuality !== undefined && syncedPartial.tgMaxQuality === undefined) {
+      syncedPartial.tgMaxQuality = syncedPartial.msmMaxQuality;
+    }
+    if (syncedPartial.tgTimeout !== undefined && syncedPartial.msmTimeout === undefined) {
+      syncedPartial.msmTimeout = syncedPartial.tgTimeout;
+    } else if (syncedPartial.msmTimeout !== undefined && syncedPartial.tgTimeout === undefined) {
+      syncedPartial.tgTimeout = syncedPartial.msmTimeout;
+    }
+    if (syncedPartial.tgBufferTimeout !== undefined && syncedPartial.msmBufferTimeout === undefined) {
+      syncedPartial.msmBufferTimeout = syncedPartial.tgBufferTimeout;
+    } else if (syncedPartial.msmBufferTimeout !== undefined && syncedPartial.tgBufferTimeout === undefined) {
+      syncedPartial.tgBufferTimeout = syncedPartial.msmBufferTimeout;
+    }
     const updated: UserSettings = {
       ...current,
-      ...partial,
+      ...syncedPartial,
       updatedAt: Date.now()
     };
     cachedSettings = updated;

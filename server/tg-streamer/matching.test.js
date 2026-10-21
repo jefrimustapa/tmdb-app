@@ -23,6 +23,17 @@ import {
   isJunkMedia,
   JUNK_MEDIA_REGEX,
 } from './index.js';
+import {
+  createResolver,
+  listResolvers,
+  MsmResolver,
+  PencuriResolver,
+  BaseResolver,
+} from './resolvers/index.js';
+import {
+  buildSearchQueries,
+  generateMovieSearchQueries,
+} from './resolvers/queries.js';
 
 let passed = 0;
 let total = 0;
@@ -1121,6 +1132,83 @@ it('persists clean queryKeys and requestedQualities array across disk reloads (#
   assert.strictEqual(reloadedDb.get(cleanKey, '1080p')?.docId, '999001');
   assert.strictEqual(reloadedDb.get(cleanKey, '4k')?.docId, '999001');
   assert.strictEqual(reloadedDb.get(cleanKey, 'sd'), undefined);
+});
+
+console.log('\n18. Telegram Stream Resolver Factory & Decoupling (#232)');
+it('lists all registered resolvers with metadata', () => {
+  const list = listResolvers();
+  assert.ok(Array.isArray(list));
+  assert.ok(list.some(r => r.id === 'msm'));
+  assert.ok(list.some(r => r.id === 'pencuri'));
+});
+
+it('instantiates MsmResolver and PencuriResolver correctly', () => {
+  const msm = createResolver('msm', null);
+  assert.ok(msm instanceof BaseResolver);
+  assert.ok(msm instanceof MsmResolver);
+  assert.strictEqual(msm.id, 'msm');
+  assert.strictEqual(msm.defaultBot, 'msm34bot');
+
+  const pencuri = createResolver('pencuri', null);
+  assert.ok(pencuri instanceof BaseResolver);
+  assert.ok(pencuri instanceof PencuriResolver);
+  assert.strictEqual(pencuri.id, 'pencuri');
+  assert.strictEqual(pencuri.defaultBot, 'Pencuri_Movie_Bot');
+});
+
+it('falls back to default resolver (msm) on unrecognized ID', () => {
+  const fallback = createResolver('unknown_resolver', null);
+  assert.ok(fallback instanceof MsmResolver);
+  assert.strictEqual(fallback.id, 'msm');
+});
+
+console.log('\n19. Shared Search Query Builder (#232)');
+it('builds prioritized, deduplicated movie search queries', () => {
+  const queries = buildSearchQueries({
+    title: 'Polis Evo 3',
+    year: '2023',
+  });
+  assert.deepStrictEqual(queries, [
+    'Polis Evo 3 2023',
+    'Polis Evo 3',
+  ]);
+});
+
+it('builds prioritized TV queries with auto-detected alternate title (Project <-> Projek)', () => {
+  const queries = buildSearchQueries({
+    title: 'Project: Exit',
+    year: '2024',
+    season: 1,
+    episode: 6,
+    totalSeasons: 1,
+  });
+
+  // Must include variants for 'Project Exit' as well as 'Projek Exit'
+  assert.ok(queries.includes('Project Exit EP06'));
+  assert.ok(queries.includes('Project Exit S01E06'));
+  assert.ok(queries.includes('Projek Exit EP06'));
+  assert.ok(queries.includes('Projek Exit S01E06'));
+  assert.ok(queries.includes('Project Exit'));
+  assert.ok(queries.includes('Projek Exit'));
+  // Ensure no duplicated entries
+  const unique = new Set(queries);
+  assert.strictEqual(queries.length, unique.size);
+});
+
+it('builds prioritized TV queries with explicit altTitle and englishTitle', () => {
+  const queries = buildSearchQueries({
+    title: 'Abang Imam Minah Skuter',
+    altTitle: 'Abang Imam',
+    year: '2025',
+    season: 1,
+    episode: 10,
+  });
+
+  assert.ok(queries.includes('Abang Imam Minah Skuter EP10'));
+  assert.ok(queries.includes('Abang Imam Minah Skuter S01E10'));
+  assert.ok(queries.includes('Abang Imam EP10'));
+  assert.ok(queries.includes('Abang Imam S01E10'));
+  assert.ok(queries.includes('Abang Imam Minah Skuter'));
 });
 
 // Clean up temporary test files

@@ -97,6 +97,12 @@ export interface UserSettings {
   enginePriority?: StreamResolverType[]; // Priority order of engines (e.g. ['telegram', 'embed'])
   enabledTelegramProviders?: string[]; // e.g. ['telegram-msm']
   telegramProviderCountries?: Record<string, OriginCountryCode[]>; // e.g. { 'telegram-msm': ['MY', 'ID', 'SG'] }
+  tgStreamerUrl?: string; // e.g. 'https://www.julietmike.net:3033'
+  tgChunkSize?: number; // Stream Buffer Pipeline in bytes: 262144 (Eco 1.0MB), 524288 (Standard 2.0MB), 1048576 (Turbo 3.0MB), 2097152 (Ultra 4.0MB)
+  tgMaxQuality?: '480' | '720' | '1080' | '4k'; // Resolution preference: '480', '720', '1080', or '4k' (default: '1080')
+  tgTimeout?: 60 | 90 | 120 | 150 | 180; // Telegram bot resolver request timeout in seconds (default: 90)
+  tgBufferTimeout?: 30 | 60 | 90 | 120; // Telegram direct stream buffering timeout in seconds (default: 60)
+  tgActiveResolver?: 'msm' | 'pencuri' | string; // Active Telegram resolver engine ('msm', 'pencuri', etc.)
   msmGetterUrl?: string; // e.g. 'https://www.julietmike.net:3033'
   msmChunkSize?: number; // Stream Buffer Pipeline in bytes: 262144 (Eco 1.0MB), 524288 (Standard 2.0MB), 1048576 (Turbo 3.0MB), 2097152 (Ultra 4.0MB)
   msmMaxQuality?: '480' | '720' | '1080' | '4k'; // Resolution preference: '480', '720', '1080', or '4k' (default: '1080')

@@ -41,6 +41,7 @@ import {
   Save,
   SlidersHorizontal,
   Send,
+  Bot,
   Trash2,
   Terminal,
   ExternalLink,
@@ -1424,7 +1425,7 @@ export const Settings: React.FC = () => {
 
           {/* Engine Cards — each has toggle + Configure sub-drawer */}
           {[
-            { id: 'telegram' as const, title: 'Telegram Provider', tag: 'Direct MTProto', desc: 'Direct in-app video streaming from Telegram bots (MovieSubMalay / @msmbot).', subDrawer: 'engine-telegram' as const },
+            { id: 'telegram' as const, title: 'Telegram Provider', tag: 'Direct MTProto', desc: 'Direct in-app video streaming from Telegram bots (MovieSubMalay / Pencuri Movie Bot).', subDrawer: 'engine-telegram' as const },
             { id: 'embed' as const, title: 'Embed Resolver', tag: 'Multi-Mirror', desc: 'Standard multi-server iframe embeds (VidLink, MoviesAPI) with ad sandboxing.', subDrawer: 'engine-embed' as const },
           ].map((resOption) => {
             const currentEnabled = settings.enabledResolvers && settings.enabledResolvers.length > 0
@@ -1501,7 +1502,7 @@ export const Settings: React.FC = () => {
               telegram: {
                 title: 'Telegram Provider',
                 tag: 'Direct MTProto',
-                desc: 'Direct in-app video streaming from Telegram bots (MovieSubMalay / @msmbot).',
+                desc: 'Direct in-app video streaming from Telegram bots (MovieSubMalay / Pencuri Movie Bot).',
                 tagClass: 'bg-sky-500/20 text-sky-300 border-sky-500/40',
               },
               embed: {
@@ -1630,10 +1631,10 @@ export const Settings: React.FC = () => {
                 <div className="space-y-0.5 min-w-0 pr-2">
                   <div className="flex items-center gap-1.5">
                     <Send className="w-3.5 h-3.5 text-sky-400 flex-shrink-0" />
-                    <span className="text-xs font-semibold text-white truncate">MovieSubMalay (@msmbot)</span>
+                    <span className="text-xs font-semibold text-white truncate">TG Streamer (MSM / Pencuri)</span>
                   </div>
                   <span className="text-[11px] text-gray-400 block truncate">
-                    Microservice: <span className="font-mono text-sky-300">{displayUrl}</span>
+                    Engine: <span className="text-sky-300 font-semibold">{(settings.tgActiveResolver || 'msm') === 'pencuri' ? 'Pencuri Movie Bot' : 'MSM Bot'}</span> • <span className="font-mono text-gray-400">{displayUrl}</span>
                   </span>
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0">
@@ -1653,9 +1654,9 @@ export const Settings: React.FC = () => {
         isOpen={activeDrawer === 'telegram-msm' || activeDrawer === 'telegram-msm32'}
         onClose={() => setActiveDrawer(null)}
         onBack={() => setActiveDrawer('engine-telegram')}
-        title="MSM Bot Provider"
-        subtitle="Configure MSM Getter microservice endpoint, connection, and streaming."
-        categoryLabel="Telegram > MSM Bot"
+        title="TG Streamer Provider"
+        subtitle="Configure TG Streamer microservice endpoint, active resolver, and streaming."
+        categoryLabel="Telegram > TG Streamer"
       >
         <div className="space-y-4">
           {/* Provider Active Switch */}
@@ -1777,6 +1778,29 @@ export const Settings: React.FC = () => {
                 Logs
               </span>
               <ChevronRight className="w-4 h-4 text-gray-400" />
+            </div>
+          </button>
+
+          {/* Active Resolver Engine Selection Button */}
+          <button
+            type="button"
+            onClick={() => {
+              const currentResolver = settings.tgActiveResolver || 'msm';
+              const nextResolver = currentResolver === 'msm' ? 'pencuri' : 'msm';
+              handleUpdate({ tgActiveResolver: nextResolver });
+            }}
+            className="w-full flex items-center justify-between p-3.5 rounded-xl bg-white/5 border border-white/10 hover:border-sky-400/50 hover:bg-white/10 transition-all text-left"
+          >
+            <div className="space-y-0.5">
+              <span className="text-xs font-semibold text-white block">Active Resolver Engine</span>
+              <span className="text-[10px] text-gray-400">Telegram search and stream resolving backend</span>
+            </div>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <span className="text-[10px] text-sky-400 font-mono font-bold bg-sky-500/10 px-2 py-0.5 rounded border border-sky-400/20 flex items-center gap-1">
+                <Bot className="w-3 h-3" />
+                {(settings.tgActiveResolver || 'msm') === 'pencuri' ? 'Pencuri Movie Bot' : 'MSM Bot (@msmbot)'}
+              </span>
+              <RefreshCw className="w-3.5 h-3.5 text-gray-400" />
             </div>
           </button>
 
