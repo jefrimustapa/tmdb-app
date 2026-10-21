@@ -12,6 +12,7 @@ import { isAnimeMedia } from '../../services/animeMappingService';
 import { isAseanMedia, isKoreanMedia } from '../../services/lariMappingService';
 import { msmService } from '../../services/msmMappingService';
 import { isEpisodeAired } from '../../services/episodeAirStatus';
+import { getWatchHeaderYear } from '../../utils/watchHeader';
 import { ArrowLeft, SkipForward, SkipBack, Settings, FastForward, Rewind } from 'lucide-react';
 
 import type { VirtualCursorStyle, StreamResolverType } from '../../types/db';
@@ -792,6 +793,7 @@ export const Watch: React.FC = () => {
 
   const title = details.title || details.name;
   const releaseYear = (details.release_date || details.first_air_date || '').split('-')[0];
+  const headerYear = getWatchHeaderYear({ mediaType, details, seasonParam, seasonDetails });
   const episodeLabel = mediaType === 'tv' ? `S${seasonParam}:E${episodeParam}` : null;
 
   return (
@@ -837,7 +839,10 @@ export const Watch: React.FC = () => {
               </button>
 
               <h1 className="text-sm sm:text-base md:text-lg font-black font-display text-white tracking-tight drop-shadow-md truncate flex-1 leading-normal">
-                {title}
+                <span>{title}</span>
+                {headerYear && (
+                  <span className="text-white/70 font-normal ml-2">• {headerYear}</span>
+                )}
               </h1>
             </div>
 

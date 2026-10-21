@@ -151,6 +151,7 @@ export interface TMDBSeasonDetails {
   overview: string;
   poster_path: string | null;
   season_number: number;
+  air_date?: string;
   episodes: TMDBEpisode[];
   credits?: {
     cast: TMDBCast[];
