@@ -222,7 +222,7 @@ export const Settings: React.FC = () => {
     }
   }, [settings?.msmGetterUrl, settings?.msm32GetterUrl]);
 
-  // Auto-ping MSM Getter microservice whenever the user enters the Telegram or MSM drawer
+  // Auto-ping TGStrm microservice whenever the user enters the Telegram or TGStrm drawer
   useEffect(() => {
     if (activeDrawer === 'engine-telegram' || activeDrawer === 'telegram-msm' || activeDrawer === 'telegram-msm32') {
       setTestingMsm(true);
@@ -1424,7 +1424,7 @@ export const Settings: React.FC = () => {
 
           {/* Engine Cards — each has toggle + Configure sub-drawer */}
           {[
-            { id: 'telegram' as const, title: 'Telegram Provider', tag: 'Direct MTProto', desc: 'Direct in-app video streaming from Telegram bots (MovieSubMalay / Pencuri Movie Bot).', subDrawer: 'engine-telegram' as const },
+            { id: 'telegram' as const, title: 'Telegram Provider', tag: 'TGStrm', desc: 'Direct in-app video streaming from Telegram resolver bots (TGStrm).', subDrawer: 'engine-telegram' as const },
             { id: 'embed' as const, title: 'Embed Resolver', tag: 'Multi-Mirror', desc: 'Standard multi-server iframe embeds (VidLink, MoviesAPI) with ad sandboxing.', subDrawer: 'engine-embed' as const },
           ].map((resOption) => {
             const currentEnabled = settings.enabledResolvers && settings.enabledResolvers.length > 0
@@ -1500,8 +1500,8 @@ export const Settings: React.FC = () => {
             const engineMeta: Record<StreamResolverType, { title: string; tag: string; desc: string; tagClass: string }> = {
               telegram: {
                 title: 'Telegram Provider',
-                tag: 'Direct MTProto',
-                desc: 'Direct in-app video streaming from Telegram bots (MovieSubMalay / Pencuri Movie Bot).',
+                tag: 'TGStrm',
+                desc: 'Direct in-app video streaming from Telegram resolver bots (TGStrm).',
                 tagClass: 'bg-sky-500/20 text-sky-300 border-sky-500/40',
               },
               embed: {
@@ -1612,11 +1612,11 @@ export const Settings: React.FC = () => {
         onClose={() => setActiveDrawer(null)}
         onBack={() => setActiveDrawer('resolvers')}
         title="Telegram Provider"
-        subtitle="Configure MSM Getter microservice and sub-provider settings."
+        subtitle="Configure TGStrm microservice and sub-provider settings."
         categoryLabel="Stream Engines > Telegram"
       >
         <div className="space-y-4">
-          {/* Sub-Drawer Navigation: MovieSubMalay (@msm32bot) */}
+          {/* Sub-Drawer Navigation: TGStrm */}
           {(() => {
             const enabledTg = settings.enabledTelegramProviders || ['telegram-msm'];
             const isMsmEnabled = enabledTg.includes('telegram-msm') || enabledTg.includes('telegram-msm32');
@@ -1668,8 +1668,8 @@ export const Settings: React.FC = () => {
                   <div className="flex items-center gap-2">
                     <Send className="w-4 h-4 text-sky-400" />
                     <div>
-                      <span className="font-bold text-white block text-xs">Enable @msmbot</span>
-                      <span className="text-[10px] text-gray-400">Probe and stream releases from MovieSubMalay bot</span>
+                      <span className="font-bold text-white block text-xs">Enable TGStrm</span>
+                      <span className="text-[10px] text-gray-400">Probe and stream releases from Telegram bots</span>
                     </div>
                   </div>
                   <button
@@ -1698,7 +1698,7 @@ export const Settings: React.FC = () => {
           >
             <div className="space-y-0.5">
               <span className="text-xs font-semibold text-white block">Microservice Endpoint URL</span>
-              <span className="text-[10px] text-gray-400">Backend server running Telegram MTProto client</span>
+              <span className="text-[10px] text-gray-400">Backend server running TGStrm microservice</span>
             </div>
             <div className="flex items-center gap-1.5 flex-shrink-0">
               <span className="text-[10px] text-sky-400 font-mono font-bold bg-sky-500/10 px-2 py-0.5 rounded border border-sky-400/20">
@@ -1713,7 +1713,7 @@ export const Settings: React.FC = () => {
             <div className="flex items-center justify-between">
               <div>
                 <span className="text-xs font-semibold text-white block">Microservice Connectivity</span>
-                <span className="text-[10px] text-gray-400">Test health endpoint and Telegram MTProto status</span>
+                <span className="text-[10px] text-gray-400">Test health endpoint and TGStrm status</span>
               </div>
             </div>
 
@@ -1745,7 +1745,7 @@ export const Settings: React.FC = () => {
                 {msmTestResult.ok ? <Check className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" /> : <AlertCircle className="w-3.5 h-3.5 text-rose-400 flex-shrink-0" />}
                 <span className="truncate">
                   {msmTestResult.ok
-                    ? `Connected! Status: ${msmTestResult.status || 'online'} • MTProto: ${msmTestResult.isConnected ? 'Ready' : 'Standby'}`
+                    ? `Connected! Status: ${msmTestResult.status || 'online'} • TGStrm: ${msmTestResult.isConnected ? 'Ready' : 'Standby'}`
                     : `Error / Waking Up: ${msmTestResult.error}`}
                 </span>
               </div>
@@ -1769,7 +1769,7 @@ export const Settings: React.FC = () => {
               </div>
               <div className="space-y-0.5">
                 <span className="text-xs font-semibold text-white block">Live Server Logs &amp; Diagnostics</span>
-                <span className="text-[10px] text-gray-400">View real-time MTProto logs, memory &amp; active streams</span>
+                <span className="text-[10px] text-gray-400">View real-time TGStrm logs, memory &amp; active streams</span>
               </div>
             </div>
             <div className="flex items-center gap-1.5 flex-shrink-0">
@@ -1891,7 +1891,7 @@ export const Settings: React.FC = () => {
 
 
           <p className="text-[11px] text-gray-400 leading-relaxed">
-            The MSM Getter microservice executes queries against the Telegram bot <span className="text-sky-300 font-mono">@msmbot</span>, resolving file documents and generating chunked HTTP byte-range streams directly into the custom player.
+            The TGStrm microservice executes queries against Telegram resolver bots, resolving file documents and generating chunked HTTP byte-range streams directly into the custom player.
           </p>
         </div>
       </SettingsDrawer>
@@ -1903,7 +1903,7 @@ export const Settings: React.FC = () => {
         onBack={() => setActiveDrawer('telegram-msm')}
         title="Server Logs & Console"
         subtitle={`Live diagnostic logs from ${settings.msmGetterUrl || 'https://www.julietmike.net:3033'}`}
-        categoryLabel="Telegram > MSMbot > Server Logs"
+        categoryLabel="Telegram > TGStrm > Server Logs"
       >
         <div className="space-y-3">
           {/* Live Metrics Chips */}
@@ -2039,7 +2039,7 @@ export const Settings: React.FC = () => {
         onBack={() => setActiveDrawer('telegram-msm')}
         title="Persistent Stream Cache"
         subtitle={`Central DB video cache on ${settings.msmGetterUrl || 'https://www.julietmike.net:3033'}`}
-        categoryLabel="Telegram > MSMbot > Stream Cache"
+        categoryLabel="Telegram > TGStrm > Stream Cache"
       >
         <div className="space-y-3">
           {/* Summary Metric Chips */}
@@ -2186,14 +2186,14 @@ export const Settings: React.FC = () => {
         </div>
       </SettingsDrawer>
 
-      {/* 3a-TG-URL. Sub-Drawer: MSMbot Endpoint URL */}
+      {/* 3a-TG-URL. Sub-Drawer: TGStrm Endpoint URL */}
       <SettingsDrawer
         isOpen={activeDrawer === 'telegram-url'}
         onClose={() => setActiveDrawer(null)}
         onBack={() => setActiveDrawer('telegram-msm')}
         title="Microservice Endpoint URL"
-        subtitle="Configure backend server running Telegram MTProto client."
-        categoryLabel="Telegram > MSMbot > Endpoint URL"
+        subtitle="Configure backend server running TGStrm microservice."
+        categoryLabel="Telegram > TGStrm > Endpoint URL"
       >
         <div className="space-y-4">
           <div className="p-3.5 rounded-xl bg-white/5 border border-white/10 space-y-3">
@@ -2290,7 +2290,7 @@ export const Settings: React.FC = () => {
         onBack={() => setActiveDrawer('telegram-msm')}
         title="Country Origin Filters"
         subtitle="Select which origin countries trigger Telegram provider resolution."
-        categoryLabel="Telegram > MSMbot > Origin Filters"
+        categoryLabel="Telegram > TGStrm > Origin Filters"
       >
         <div className="space-y-4">
           <p className="text-[11px] text-gray-400 leading-relaxed">
@@ -2355,7 +2355,7 @@ export const Settings: React.FC = () => {
         onBack={() => setActiveDrawer('telegram-msm')}
         title="Resolver Request Timeout"
         subtitle="Maximum wait time for Telegram title searching and resolution."
-        categoryLabel="Telegram > MSMbot > Request Timeout"
+        categoryLabel="Telegram > TGStrm > Request Timeout"
       >
         <div className="space-y-4">
           <div className="flex items-center justify-between">
@@ -2414,7 +2414,7 @@ export const Settings: React.FC = () => {
         onBack={() => setActiveDrawer('telegram-msm')}
         title="Buffering Timeout"
         subtitle="Maximum wait time for Telegram video stream buffering before warning/failover."
-        categoryLabel="Telegram > MSMbot > Buffering Timeout"
+        categoryLabel="Telegram > TGStrm > Buffering Timeout"
       >
         <div className="space-y-4">
           <div className="flex items-center justify-between">

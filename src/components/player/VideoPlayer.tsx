@@ -531,7 +531,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       const isUnlimited = rawTimeout === 0;
       const activeTimeoutMs = isUnlimited ? 0 : rawTimeout * 1000;
 
-      // 0. TELEGRAM PROVIDER (MovieSubMalay MSM)
+      // 0. TELEGRAM PROVIDER (TGStrm)
       if (providerId === 'telegram-msm' || providerId === 'telegram-msm32' || provider.engine === 'telegram') {
         if (!isTelegramOriginMatching && !isUserSelected) {
           console.log(`[Resolver] Title origin (${effectiveOriginCountries.join(',') || 'unknown'}) is not within telegram-msm filter, auto-cycling to next provider...`);
@@ -709,7 +709,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             setResolvingStatus('Connected to Telegram Stream');
             setResolvedMsmUrl(finalUrl);
             setDirectStreamUrl(finalUrl);
-            setDirectStreamLabel('Telegram (MSM)');
+            setDirectStreamLabel('TGStrm');
             setPlayerMode('direct');
             setHasError(false);
             setProviderErrorDetail(null);
@@ -1092,7 +1092,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
   const provider = getProviderById(providerId);
   const baseStreamUrl = useMemo(() => {
-    // For MovieSubMalay Telegram provider
+    // For Telegram provider (TGStrm)
     if (provider.id === 'telegram-msm' || provider.id === 'telegram-msm32' || provider.engine === 'telegram') {
       if (resolvedMsmUrl) {
         return resolvedMsmUrl;
@@ -2622,7 +2622,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
               </p>
             ) : (
               <p className="text-xs text-gray-400 mt-1">
-                Checking: {enabledResolvers.map(r => r === 'telegram' ? 'Telegram (MSM)' : 'Embed Resolver').join(' → ')}
+                Checking: {enabledResolvers.map(r => r === 'telegram' ? 'TGStrm' : 'Embed Resolver').join(' → ')}
               </p>
             )}
           </div>
@@ -2699,7 +2699,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           }}
           onError={() => {
             // 1. If playing Telegram direct stream and it errors out, auto-retry once with fresh resolution (bypasses stale DB cache or expired fileReference)
-            if (directStreamLabel === 'Telegram (MSM)' && !hasRetriedTelegramForceRef.current) {
+            if ((directStreamLabel === 'TGStrm' || directStreamLabel === 'Telegram (MSM)') && !hasRetriedTelegramForceRef.current) {
               hasRetriedTelegramForceRef.current = true;
               forceFreshTelegramRef.current = true;
               console.log('[DirectStream] Telegram playback error. Auto-re-resolving with bypassCache=true...');
@@ -2784,7 +2784,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             Could Not Resolve Direct Stream
           </h3>
           <p className="text-xs sm:text-sm text-gray-400 max-w-md mb-6 leading-relaxed">
-            The active direct stream engines (<span className="text-white font-semibold">{enabledResolvers.map(r => r === 'telegram' ? 'Telegram (MSM)' : 'Embed Resolver').join(', ')}</span>) did not return a working direct video stream for "<span className="text-white">{originalTitle && originalTitle !== title ? `${title} (${originalTitle})` : title}</span>".
+            The active direct stream engines (<span className="text-white font-semibold">{enabledResolvers.map(r => r === 'telegram' ? 'TGStrm' : 'Embed Resolver').join(', ')}</span>) did not return a working direct video stream for "<span className="text-white">{originalTitle && originalTitle !== title ? `${title} (${originalTitle})` : title}</span>".
             <br /><br />
             <span className="text-gray-300">Embed Resolver is currently disabled in your Settings.</span>
           </p>
@@ -2823,13 +2823,13 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                 onClick={() => {
                   setPlayerMode('direct');
                   setDirectStreamUrl(resolvedMsmUrl);
-                  setDirectStreamLabel('Telegram (MSM)');
+                  setDirectStreamLabel('TGStrm');
                   setHasError(false);
                   setProviderErrorDetail(null);
                 }}
                 className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 text-white font-bold text-xs sm:text-sm shadow-[0_0_20px_rgba(6,182,212,0.4)] hover:scale-105 transition tv-focus-target"
               >
-                Play via Telegram (MSM)
+                Play via TGStrm
               </button>
             )}
             {provider.id === 'dramacool-kdrama' && dramacoolServers.length > 1 && (
