@@ -1,3 +1,5 @@
+import http from 'http';
+import { EventEmitter } from 'events';
 import assert from 'assert';
 import fs from 'fs';
 import path from 'path';
@@ -25,6 +27,8 @@ import {
   JUNK_MEDIA_REGEX,
   getActiveTargetBot,
   getTranscodeContainerConfig,
+  app,
+  attachServerErrorHandler,
 } from './index.js';
 import {
   createResolver,
@@ -47,6 +51,19 @@ function it(desc, fn) {
   total++;
   try {
     fn();
+    console.log(`  ✓ ${desc}`);
+    passed++;
+  } catch (err) {
+    console.error(`  ✗ ${desc}`);
+    console.error(`    ${err.message}`);
+    process.exitCode = 1;
+  }
+}
+
+async function itAsync(desc, fn) {
+  total++;
+  try {
+    await fn();
     console.log(`  ✓ ${desc}`);
     passed++;
   } catch (err) {
@@ -1540,6 +1557,77 @@ it('configures universal Fragmented MP4 container for MP4 and video re-encoded s
   const aviConfig = getTranscodeContainerConfig('Legacy.avi', { needsVideoTranscode: true });
   assert.strictEqual(aviConfig.outputMime, 'video/mp4');
   assert.strictEqual(aviConfig.useMp4Muxer, true);
+});
+
+
+console.log('\n24. Server Startup Health & Crash-Loop Prevention (#250)');
+
+it('intercepts EADDRINUSE port collision fatal errors to prevent unmanaged crash loops (#250)', () => {
+  const mockServer = new EventEmitter();
+  let fatalError = null;
+
+  attachServerErrorHandler(mockServer, 'Test Service', 3033, (err) => {
+    fatalError = err;
+  });
+
+  // Simulate an EADDRINUSE error
+  const inUseErr = new Error('bind EADDRINUSE 0.0.0.0:3033');
+  inUseErr.code = 'EADDRINUSE';
+  mockServer.emit('error', inUseErr);
+
+  assert.ok(fatalError, 'Must invoke onFatal callback when port collision occurs');
+  assert.strictEqual(fatalError.code, 'EADDRINUSE');
+});
+
+it('handles standard non-collision server errors without fatal termination (#250)', () => {
+  const mockServer = new EventEmitter();
+  let fatalTriggered = false;
+
+  attachServerErrorHandler(mockServer, 'Test Service', 3033, () => {
+    fatalTriggered = true;
+  });
+
+  const normalErr = new Error('read ECONNRESET');
+  normalErr.code = 'ECONNRESET';
+  mockServer.emit('error', normalErr);
+
+  assert.strictEqual(fatalTriggered, false, 'Non-collision error must not trigger fatal exit');
+});
+
+await itAsync('boots express server instance, serves /api/system/stats health check, and cleans up without crash (#250)', async () => {
+  assert.ok(app, 'Express app instance must be defined');
+
+  // Launch test HTTP server on ephemeral port (OS picks a free port)
+  const testServer = http.createServer(app);
+  await new Promise((resolve, reject) => {
+    testServer.listen(0, '127.0.0.1', () => resolve());
+    testServer.on('error', reject);
+  });
+
+  const port = testServer.address().port;
+  assert.ok(port > 0, 'Test server must bind to a valid ephemeral port');
+
+  // Query health check endpoint
+  const statsRes = await new Promise((resolve, reject) => {
+    http.get(`http://127.0.0.1:${port}/api/system/stats`, (res) => {
+      let data = '';
+      res.on('data', chunk => data += chunk);
+      res.on('end', () => {
+        try {
+          resolve(JSON.parse(data));
+        } catch (e) {
+          reject(e);
+        }
+      });
+    }).on('error', reject);
+  });
+
+  assert.strictEqual(statsRes.status, 'ok', 'Health check must return status: ok');
+  assert.strictEqual(typeof statsRes.uptime, 'number', 'Uptime must be a valid number');
+  assert.ok(statsRes.uptime >= 0, 'Uptime must be non-negative');
+
+  // Clean close
+  await new Promise(resolve => testServer.close(resolve));
 });
 
 // Clean up temporary test files
