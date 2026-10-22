@@ -2,13 +2,13 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20261020-1619';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.refactor-tg-stream-r.20261020-1619';
+export const APP_BUILD_NUMBER = '20261022-0335';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.fix-250-car-unit-aud.20261022-0335';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
-export const APP_BRANCH = 'refactor-tg-stream-r';
-export const APP_CHANGELOG = `* feat(cache): clean queryKey without quality suffix and use requestedQualities array (#229)
-* feat(msm-getter): track requestedQuality in cache to prevent redundant re-resolutions (#229)
-* fix(msm): fix watchdog health check protocol mismatch on port 3033/3034 (#227) (#228)
-* fix(msm-getter): exclude poster attributes and prioritize real stream metadata over filename (#218) (#226)
-* fix(msm): prevent floating back-to-top button from blocking query test button on mobile (#215) (#225)`;
+export const APP_BRANCH = 'fix-250-car-unit-aud';
+export const APP_CHANGELOG = `* fix(player): close watch header year issue (closes #249)
+* fix(player): move year to second row before season and episode (#249)
+* feat(player): add release/season year next to title in watch header (#249)
+* fix(tg-streamer): decouple scoring and fix series episode resolution (#248)
+* refactor(client): cleanup hardcoded MSM and MTProto strings to TGStrm (#247)`;

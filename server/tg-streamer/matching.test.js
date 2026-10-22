@@ -24,6 +24,7 @@ import {
   isJunkMedia,
   JUNK_MEDIA_REGEX,
   getActiveTargetBot,
+  getTranscodeContainerConfig,
 } from './index.js';
 import {
   createResolver,
@@ -1513,6 +1514,32 @@ it('correctly matches single-digit episode (EP1, EP8) and rejects mismatched sin
   };
   const resEp8 = scoreCandidateWithReason(ep8File, contextEp8);
   assert.ok(resEp8.score > 150, `EP8 file must match Episode 8 search (score: ${resEp8.score})`);
+});
+
+
+console.log('\n23. Transcode Container Configuration & Universal Fragmented MP4 (#250)');
+
+it('configures universal Fragmented MP4 container for MKV transcode stream (#250)', () => {
+  const mkvFile = 'Imam_Instant_Ustazah_Scammer_EP02_1080p_WEB_DL_x264_DD5_1_KIKI.mkv';
+  const config = getTranscodeContainerConfig(mkvFile, { needsVideoTranscode: false });
+
+  assert.strictEqual(config.useMp4Muxer, true, 'Must use MP4 muxer for live MKV transcode pipe');
+  assert.strictEqual(config.outputMime, 'video/mp4', 'MIME type must be video/mp4 for Android car head unit compatibility');
+  assert.strictEqual(config.outputExt, 'mp4', 'Extension must be mp4');
+  assert.ok(config.muxerArgs.includes('mp4'), 'Muxer args must specify -f mp4');
+  assert.ok(config.muxerArgs.some(a => a.includes('frag_keyframe')), 'Muxer args must include frag_keyframe');
+  assert.ok(config.muxerArgs.some(a => a.includes('empty_moov')), 'Muxer args must include empty_moov');
+  assert.ok(config.muxerArgs.some(a => a.includes('default_base_moof')), 'Muxer args must include default_base_moof');
+});
+
+it('configures universal Fragmented MP4 container for MP4 and video re-encoded streams (#250)', () => {
+  const mp4Config = getTranscodeContainerConfig('Sample.mp4', { needsVideoTranscode: false });
+  assert.strictEqual(mp4Config.outputMime, 'video/mp4');
+  assert.strictEqual(mp4Config.useMp4Muxer, true);
+
+  const aviConfig = getTranscodeContainerConfig('Legacy.avi', { needsVideoTranscode: true });
+  assert.strictEqual(aviConfig.outputMime, 'video/mp4');
+  assert.strictEqual(aviConfig.useMp4Muxer, true);
 });
 
 // Clean up temporary test files
