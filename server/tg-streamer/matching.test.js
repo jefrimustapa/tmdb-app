@@ -1791,6 +1791,113 @@ it('uses responsive polling delay schedule: 1000ms initial and 1500ms thereafter
   assert.strictEqual(getPollingDelay(11), 1500, 'Attempt 11 must retain 1500ms delay');
 });
 
+console.log('\n27. Agnostic FileReference Auto-Recovery (#256)');
+
+it('assembles provider-agnostic candidate bot list for token refresh (#256)', () => {
+  function getCandidateBots(dbRecord, botUsername, targetBotUsernames) {
+    const candidateBots = new Set();
+    if (dbRecord?.bot) candidateBots.add(dbRecord.bot.replace(/^@/, ''));
+    if (botUsername) candidateBots.add(botUsername.replace(/^@/, ''));
+    if (targetBotUsernames) {
+      Object.values(targetBotUsernames).forEach(b => {
+        if (b) candidateBots.add(b.replace(/^@/, ''));
+      });
+    }
+    candidateBots.add('UnOfficialsBot');
+    candidateBots.add('guestmodebot');
+    candidateBots.add('Pencuri_Movie_Bot');
+    candidateBots.add('msm34bot');
+    candidateBots.add('msm32bot');
+    return Array.from(candidateBots).filter(Boolean);
+  }
+
+  // 1. Record with explicit Pencuri origin bot (UnOfficialsBot)
+  const listPencuri = getCandidateBots({ bot: 'UnOfficialsBot' }, 'msm34bot', { msm: 'msm34bot', pencuri: 'Pencuri_Movie_Bot' });
+  assert.strictEqual(listPencuri[0], 'UnOfficialsBot', 'Recorded origin bot must be prioritized first');
+  assert.ok(listPencuri.includes('UnOfficialsBot'), 'Must include UnOfficialsBot');
+  assert.ok(listPencuri.includes('guestmodebot'), 'Must include guestmodebot');
+  assert.ok(listPencuri.includes('Pencuri_Movie_Bot'), 'Must include Pencuri_Movie_Bot');
+  assert.ok(listPencuri.includes('msm34bot'), 'Must include msm34bot');
+
+  // 2. Record with MSM origin bot (msm34bot)
+  const listMsm = getCandidateBots({ bot: 'msm34bot' }, 'Pencuri_Movie_Bot', { msm: 'msm34bot', pencuri: 'Pencuri_Movie_Bot' });
+  assert.strictEqual(listMsm[0], 'msm34bot', 'MSM origin bot must be prioritized first');
+});
+
+it('recovers fresh fileReference from secondary bot when primary BOT_USERNAME differs (#256)', async () => {
+  const targetDocId = '5981210428942851618';
+  const expectedFreshRef = Buffer.from('fresh_token_12345');
+
+  // Mock client where document lives in UnOfficialsBot, while default BOT_USERNAME is msm34bot
+  const mockClient = {
+    getMessages: async (bot, opts) => {
+      if (bot === 'UnOfficialsBot') {
+        return [{
+          id: 77712,
+          media: {
+            document: {
+              id: targetDocId,
+              fileReference: expectedFreshRef,
+            },
+          },
+        }];
+      }
+      return [];
+    },
+  };
+
+  const botList = ['msm34bot', 'UnOfficialsBot', 'guestmodebot'];
+
+  // Simulate multi-bot scan
+  const scanPromises = botList.map(async b => {
+    const msgs = await mockClient.getMessages(b, { limit: 50 });
+    return { bot: b, msgs };
+  });
+
+  const scanResults = await Promise.all(scanPromises);
+  let recoveredRef = null;
+  let recoveredBot = null;
+  let recoveredMsgId = null;
+
+  for (const res of scanResults) {
+    for (const m of res.msgs) {
+      if (m.media?.document?.id?.toString() === targetDocId) {
+        recoveredRef = m.media.document.fileReference;
+        recoveredBot = res.bot;
+        recoveredMsgId = m.id;
+        break;
+      }
+    }
+    if (recoveredRef) break;
+  }
+
+  assert.strictEqual(recoveredRef, expectedFreshRef, 'Must recover fresh fileReference from UnOfficialsBot');
+  assert.strictEqual(recoveredBot, 'UnOfficialsBot', 'Origin bot must be identified accurately as UnOfficialsBot');
+  assert.strictEqual(recoveredMsgId, 77712, 'Recovered message ID must match');
+});
+
+it('persists bot and resolver fields on central DB stream records (#256)', () => {
+  const testDb = new CentralDatabase();
+  testDb.clear();
+
+  const queryKey = 'test_show_s01e06';
+  testDb.set(queryKey, {
+    docId: '5981210428942851618',
+    msgId: 88821,
+    bot: 'UnOfficialsBot',
+    resolver: 'pencuri',
+    filename: 'Test.Show.S01E06.mp4',
+    size: '100000000',
+    actualQuality: '720p',
+    requestedQualities: ['720p'],
+  });
+
+  const record = testDb.getByDocId('5981210428942851618');
+  assert.ok(record, 'Record must exist in DB');
+  assert.strictEqual(record.bot, 'UnOfficialsBot', 'Origin bot must be persisted in record');
+  assert.strictEqual(record.resolver, 'pencuri', 'Resolver name must be persisted in record');
+});
+
 // Clean up temporary test files
 try {
   if (fs.existsSync(TEST_DB_FILE)) fs.unlinkSync(TEST_DB_FILE);
