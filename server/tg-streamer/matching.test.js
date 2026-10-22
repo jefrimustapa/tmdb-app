@@ -1547,6 +1547,9 @@ it('configures universal Fragmented MP4 container for MKV transcode stream (#250
   assert.ok(config.muxerArgs.some(a => a.includes('frag_keyframe')), 'Muxer args must include frag_keyframe');
   assert.ok(config.muxerArgs.some(a => a.includes('empty_moov')), 'Muxer args must include empty_moov');
   assert.ok(config.muxerArgs.some(a => a.includes('default_base_moof')), 'Muxer args must include default_base_moof');
+  assert.ok(config.muxerArgs.some(a => a.includes('separate_moof')), 'Muxer args must include separate_moof to flush audio independently');
+  assert.ok(config.muxerArgs.includes('-frag_duration'), 'Muxer args must include -frag_duration for 1s intervals');
+  assert.ok(config.muxerArgs.includes('-flush_packets'), 'Muxer args must include -flush_packets for zero-stall streaming');
 });
 
 it('configures universal Fragmented MP4 container for MP4 and video re-encoded streams (#250)', () => {
