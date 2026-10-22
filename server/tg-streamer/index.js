@@ -133,7 +133,7 @@ export function getActiveTargetBot() {
   return BOT_USERNAME.replace(/^@/, '');
 }
 
-export function getTranscodeContainerConfig(filename = '', options = {}) {
+function getTranscodeContainerConfig(filename = '', options = {}) {
   // Live streaming transcode pipes ALWAYS output Fragmented MP4 (video/mp4) with
   // frag_keyframe+empty_moov+default_base_moof flags.
   // Matroska over a live HTTP chunked pipe (Accept-Ranges: none) cannot be parsed by
@@ -5367,10 +5367,15 @@ const keyCandidates = [
 const sslCertFile = certCandidates.find(p => fs.existsSync(p));
 const sslKeyFile = keyCandidates.find(p => fs.existsSync(p));
 
-function attachServerErrorHandler(server, name, sPort) {
+function attachServerErrorHandler(server, name, sPort, onFatal) {
   server.on('error', (err) => {
     if (err.code === 'EADDRINUSE') {
       console.error(`[SERVER FATAL] ${name} port ${sPort} is already in use (EADDRINUSE). Another instance may be running.`);
+      if (typeof onFatal === 'function') {
+        onFatal(err);
+      } else if (process.env.NODE_ENV !== 'test') {
+        process.exit(1);
+      }
     } else {
       console.error(`[SERVER ERROR] ${name} listener error:`, err);
     }
@@ -5443,6 +5448,9 @@ if (isMain) {
 }
 
 export {
+  app,
+  attachServerErrorHandler,
+  getTranscodeContainerConfig,
   DEFAULT_PIPELINE_BUFFERS,
   detectVideoQualityTier,
   BaseResolver,
