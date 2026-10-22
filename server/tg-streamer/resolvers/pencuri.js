@@ -43,12 +43,13 @@ export async function searchPencariApi(query) {
 }
 
 // Extract bot parameters from PencariMovie link page
-async function fetchPencariLinkDetails(linkUrl) {
+export async function fetchPencariLinkDetails(linkUrl) {
   try {
     const res = await axios.get(linkUrl, {
       timeout: 15000,
       maxRedirects: 5,
       headers: {
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
       },
     });
@@ -62,33 +63,38 @@ async function fetchPencariLinkDetails(linkUrl) {
                        html.match(/formData\.append\('wp_nonce',\s*["']([^"']+)["']\)/i);
 
     const botIdMatch = html.match(/bot_id["']?\s*:\s*["']?(\d+)["']?/i);
+    const isMiniApp = html.includes('sendtgfile') || !botLinkMatch;
 
     return {
-      botUsername: botLinkMatch ? botLinkMatch[1] : 'UnOfficialsBot',
+      botUsername: botLinkMatch ? botLinkMatch[1] : (isMiniApp ? 'guestmodebot' : 'UnOfficialsBot'),
       startParam: botLinkMatch ? botLinkMatch[2] : null,
       nonce: nonceMatch ? nonceMatch[1] : null,
-      botId: botIdMatch ? botIdMatch[1] : '8665550029',
+      botId: botIdMatch ? botIdMatch[1] : '8788369318',
+      isMiniApp,
+      notFound: false,
     };
   } catch (err) {
+    const is404 = err.response?.status === 404 || (err.message && err.message.includes('404'));
+    if (is404) {
+      console.warn(`[PENCURI LINK] Link returned 404 Not Found (${linkUrl}). Candidate file is dead/deleted.`);
+      return { notFound: true, isMiniApp: false };
+    }
     console.warn(`[PENCURI LINK] Warning fetching link details (${linkUrl}):`, err.message);
     return null;
   }
 }
 
 // Complete Mini App delivery flow: RequestMainWebView -> telegram_login -> save_write_access -> sendtgfile
-async function triggerMiniAppDelivery(client, { deliveryBot, shortCode, miniAppBot, startParam, checkAborted }) {
+export async function triggerMiniAppDelivery(client, { deliveryBot, shortCode, miniAppBot, startParam, checkAborted }) {
   try {
-    const finalMiniAppBot = miniAppBot || deliveryBot || 'UnOfficialsBot';
+    const finalMiniAppBot = miniAppBot || deliveryBot || 'guestmodebot';
     const finalStartParam = startParam || `${shortCode}-8665550029`;
 
     console.log(`[PENCURI MINI-APP] Preparing Mini App delivery via @${finalMiniAppBot} (param: "${finalStartParam}")...`);
 
-    // Ensure bot is unblocked and started
+    // Ensure bot is unblocked (do NOT send /start as that triggers FSub replies)
     try {
       await client.invoke(new Api.contacts.Unblock({ id: finalMiniAppBot }));
-    } catch (_) {}
-    try {
-      await client.sendMessage(finalMiniAppBot, { message: '/start' });
     } catch (_) {}
 
     const botEntity = await client.getInputEntity(finalMiniAppBot);
@@ -119,17 +125,28 @@ async function triggerMiniAppDelivery(client, { deliveryBot, shortCode, miniAppB
 
     if (checkAborted && checkAborted()) return false;
 
-    // 2. Fetch /webapp HTML to extract redirectUrl and actualBotId
-    const webappRes = await fetch(`${domain}/webapp?tgWebAppStartParam=${finalStartParam}`, {
-      headers: { 'User-Agent': 'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36' },
-    });
-    const webappHtml = await webappRes.text();
-    const rawRedirectMatch = webappHtml.match(/var\s+redirectUrl\s*=\s*["']([^"']+)["']/i);
-    const redirectUrl = rawRedirectMatch ? JSON.parse(`"${rawRedirectMatch[1]}"`) : '';
+    // 2. Fetch /webapp HTML to extract redirectUrl and actualBotId (using text/html Accept header to avoid WordPress 404)
+    let redirectUrl = `/link/${shortCode}`;
+    const defaultBotId = finalMiniAppBot.toLowerCase().includes('guest') ? '8788369318' : '8665550029';
+    let actualBotId = defaultBotId;
 
-    const botIdMatch = webappHtml.match(/botIdParam\s*=\s*["']?(\d+)["']?/i) ||
-                       webappHtml.match(/bot_id["']?\s*:\s*["']?(\d+)["']?/i);
-    const actualBotId = botIdMatch ? botIdMatch[1] : '8652691150';
+    try {
+      const webappRes = await axios.get(`${domain}/webapp?tgWebAppStartParam=${finalStartParam}`, {
+        headers: {
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'User-Agent': 'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36',
+        },
+        timeout: 15000,
+      });
+      const webappHtml = webappRes.data || '';
+      const rawRedirectMatch = webappHtml.match(/var\s+redirectUrl\s*=\s*["']([^"']+)["']/i);
+      if (rawRedirectMatch) redirectUrl = JSON.parse(`"${rawRedirectMatch[1]}"`);
+
+      const botIdMatch = webappHtml.match(/botIdParam\s*=\s*["']?(\d+)["']?/i);
+      if (botIdMatch) actualBotId = botIdMatch[1];
+    } catch (webappErr) {
+      console.warn(`[PENCURI MINI-APP] /webapp fetch note: ${webappErr.message}`);
+    }
 
     if (checkAborted && checkAborted()) return false;
 
@@ -143,61 +160,62 @@ async function triggerMiniAppDelivery(client, { deliveryBot, shortCode, miniAppB
       platform: 'android',
     });
 
-    const loginRes = await fetch(`${domain}/wp-admin/admin-ajax.php`, {
-      method: 'POST',
+    const loginRes = await axios.post(`${domain}/wp-admin/admin-ajax.php`, loginFd.toString(), {
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
         'User-Agent': 'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36',
       },
-      body: loginFd.toString(),
+      timeout: 15000,
     });
 
-    const loginData = await loginRes.json().catch(() => null);
+    const loginData = loginRes.data;
     if (!loginData || !loginData.success) {
       console.warn(`[PENCURI MINI-APP] telegram_login failed:`, loginData?.data || 'Unknown error');
       return false;
     }
 
-    let rawCookies = '';
-    if (typeof loginRes.headers.getSetCookie === 'function') {
-      rawCookies = loginRes.headers.getSetCookie().map(c => c.split(';')[0]).join('; ');
-    } else {
-      rawCookies = loginRes.headers.get('set-cookie') || '';
-    }
+    const rawCookies = loginRes.headers['set-cookie'] || [];
+    const cookies = rawCookies.map(c => c.split(';')[0]).join('; ');
     const userId = loginData.data?.user_id || '';
+    if (loginData.data?.redirect) redirectUrl = loginData.data.redirect;
 
     // 4. Call save_write_access
-    await fetch(`${domain}/wp-admin/admin-ajax.php`, {
-      method: 'POST',
+    await axios.post(`${domain}/wp-admin/admin-ajax.php`, new URLSearchParams({
+      action: 'save_write_access',
+      bot_id: actualBotId,
+      user_id: String(userId),
+      granted: '1',
+    }).toString(), {
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
         'User-Agent': 'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36',
-        'Cookie': rawCookies,
+        'Cookie': cookies,
       },
-      body: new URLSearchParams({
-        action: 'save_write_access',
-        bot_id: actualBotId,
-        user_id: String(userId),
-        granted: '1',
-      }).toString(),
+      timeout: 10000,
     }).catch(() => {});
 
     if (checkAborted && checkAborted()) return false;
 
     // 5. Fetch link page with cookies to obtain fresh wp_nonce
     const linkFullUrl = `${domain}${redirectUrl}`;
-    const pageRes = await fetch(linkFullUrl, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36',
-        'Cookie': rawCookies,
-      },
-    });
-    const pageHtml = await pageRes.text();
-
-    const nonceMatch = pageHtml.match(/formData\.append\('wp_nonce',\s*["']([^"']+)["']\)/i) ||
-                       pageHtml.match(/wp_nonce["']?\s*:\s*["']([^"']+)["']/i) ||
-                       pageHtml.match(/nonce["']?\s*:\s*["']([a-f0-9]{10})["']/i);
-    const nonce = nonceMatch ? nonceMatch[1] : '686bac635e';
+    let nonce = '686bac635e';
+    try {
+      const pageRes = await axios.get(linkFullUrl, {
+        headers: {
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'User-Agent': 'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36',
+          'Cookie': cookies,
+        },
+        timeout: 15000,
+      });
+      const pageHtml = pageRes.data || '';
+      const nonceMatch = pageHtml.match(/formData\.append\('wp_nonce',\s*["']([^"']+)["']\)/i) ||
+                         pageHtml.match(/wp_nonce["']?\s*:\s*["']([^"']+)["']/i) ||
+                         pageHtml.match(/nonce["']?\s*:\s*["']([a-f0-9]{10})["']/i);
+      if (nonceMatch) nonce = nonceMatch[1];
+    } catch (pageErr) {
+      console.warn(`[PENCURI MINI-APP] Link page fetch note: ${pageErr.message}`);
+    }
 
     if (checkAborted && checkAborted()) return false;
 
@@ -210,18 +228,17 @@ async function triggerMiniAppDelivery(client, { deliveryBot, shortCode, miniAppB
       bot_id: actualBotId,
     });
 
-    const sendRes = await fetch(`${domain}/wp-admin/admin-ajax.php`, {
-      method: 'POST',
+    const sendRes = await axios.post(`${domain}/wp-admin/admin-ajax.php`, sendFd.toString(), {
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
         'User-Agent': 'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36',
         'Referer': linkFullUrl,
-        'Cookie': rawCookies,
+        'Cookie': cookies,
       },
-      body: sendFd.toString(),
+      timeout: 15000,
     });
 
-    const sendData = await sendRes.json().catch(() => null);
+    const sendData = sendRes.data;
     console.log(`[PENCURI MINI-APP] sendtgfile response:`, JSON.stringify(sendData));
     return Boolean(sendData && sendData.success);
   } catch (err) {
@@ -419,50 +436,77 @@ export class PencuriResolver extends BaseResolver {
       console.log(`[PENCURI RESOLVE] Selected candidate "${file.title}" (tier: ${cand.tier}, score: ${cand.score}, shortcode: ${file.short_code})`);
 
       const linkDetails = await fetchPencariLinkDetails(file.play_url || `https://unofficialsbot.pencarimovie.com/link/${file.short_code}`);
-      const deliveryBot = linkDetails?.botUsername || 'UnOfficialsBot';
+
+      // Fast-fail dead/404 candidates immediately with 0 delay (#253)
+      if (linkDetails?.notFound) {
+        console.warn(`[PENCURI RESOLVE] Candidate "${file.title}" (${file.short_code}) returned 404 Not Found on PencariMovie. Skipping dead candidate.`);
+        continue;
+      }
+
+      const deliveryBot = linkDetails?.botUsername || (linkDetails?.isMiniApp ? 'guestmodebot' : 'UnOfficialsBot');
       const startParam = linkDetails?.startParam || `${file.short_code}-${linkDetails?.botId || '8665550029'}-0`;
 
-      console.log(`[PENCURI RESOLVE] Requesting delivery via @${deliveryBot} (start: "${startParam}")...`);
-      let sentMsg = null;
-      try {
-        sentMsg = await this.client.sendMessage(deliveryBot, { message: `/start ${startParam}` });
-      } catch (sendErr) {
-        if (sendErr.errorMessage === 'YOU_BLOCKED_USER' || (sendErr.message && sendErr.message.includes('YOU_BLOCKED_USER'))) {
-          console.warn(`[PENCURI RESOLVE] Bot @${deliveryBot} is blocked. Auto-unblocking...`);
-          try {
-            await this.client.invoke(new Api.contacts.Unblock({ id: deliveryBot }));
-            sentMsg = await this.client.sendMessage(deliveryBot, { message: `/start ${startParam}` });
-          } catch (unblockErr) {
-            console.error(`[PENCURI RESOLVE] Failed to unblock @${deliveryBot}:`, unblockErr.message);
-          }
-        } else {
-          console.error(`[PENCURI RESOLVE] Error sending to @${deliveryBot}:`, sendErr.message);
+      // Pre-capture baseline message IDs across all potential delivery bots
+      const checkBots = Array.from(new Set([deliveryBot, 'guestmodebot', 'UnOfficialsBot', targetBot].filter(Boolean)));
+      const baselineMsgIds = {};
+      for (const b of checkBots) {
+        try {
+          const recent = await this.client.getMessages(b, { limit: 1 });
+          baselineMsgIds[b] = recent[0]?.id || 0;
+        } catch (_) {
+          baselineMsgIds[b] = 0;
         }
       }
 
-      const sentMsgId = sentMsg ? sentMsg.id : 0;
+      let miniAppTriggered = false;
 
-      // Poll for document delivery or Mini App button in deliveryBot, targetBot, and any detected Mini App bot
+      // If link uses direct Mini App delivery, trigger it directly without hitting UnOfficialsBot FSub (#253)
+      if (linkDetails?.isMiniApp) {
+        console.log(`[PENCURI RESOLVE] Candidate "${file.short_code}" uses Mini App / AJAX delivery. Triggering direct delivery via @${deliveryBot}...`);
+        miniAppTriggered = true;
+        await triggerMiniAppDelivery(this.client, {
+          deliveryBot,
+          shortCode: file.short_code,
+          miniAppBot: deliveryBot,
+          startParam: `${file.short_code}-8665550029`,
+          checkAborted,
+        });
+      } else {
+        console.log(`[PENCURI RESOLVE] Requesting delivery via @${deliveryBot} (start: "${startParam}")...`);
+        try {
+          await this.client.sendMessage(deliveryBot, { message: `/start ${startParam}` });
+        } catch (sendErr) {
+          if (sendErr.errorMessage === 'YOU_BLOCKED_USER' || (sendErr.message && sendErr.message.includes('YOU_BLOCKED_USER'))) {
+            console.warn(`[PENCURI RESOLVE] Bot @${deliveryBot} is blocked. Auto-unblocking...`);
+            try {
+              await this.client.invoke(new Api.contacts.Unblock({ id: deliveryBot }));
+              await this.client.sendMessage(deliveryBot, { message: `/start ${startParam}` });
+            } catch (unblockErr) {
+              console.error(`[PENCURI RESOLVE] Failed to unblock @${deliveryBot}:`, unblockErr.message);
+            }
+          } else {
+            console.error(`[PENCURI RESOLVE] Error sending to @${deliveryBot}:`, sendErr.message);
+          }
+        }
+      }
+
+      // Poll for document delivery or Mini App button
       let deliveredDoc = null;
       let deliveredMsgId = null;
       let resolvedFilename = file.title;
-      let miniAppTriggered = false;
-      let miniAppBotDetected = null;
+      let fsubDetected = false;
 
       for (let attempt = 0; attempt < 12; attempt++) {
         if (checkAborted()) break;
         await new Promise(r => setTimeout(r, 1500));
         if (checkAborted()) break;
 
-        const checkBots = [deliveryBot, targetBot];
-        if (miniAppBotDetected && !checkBots.includes(miniAppBotDetected)) {
-          checkBots.push(miniAppBotDetected);
-        }
-
         for (const b of checkBots) {
           const incoming = await this.client.getMessages(b, { limit: 5 }).catch(() => []);
+          const baseId = baselineMsgIds[b] || 0;
+
           for (const im of incoming) {
-            if (im.id > sentMsgId) {
+            if (im.id > baseId) {
               // 1. Direct document delivery check
               if (im.media?.document && im.media.document.size > 10000000) {
                 deliveredDoc = im.media.document;
@@ -472,7 +516,28 @@ export class PencuriResolver extends BaseResolver {
                 break;
               }
 
-              // 2. Mini App button detection (e.g. t.me/freemovie69bot?startapp=...)
+              // 2. Force-Subscription (FSub) gate detection (#253)
+              const isFSub = im.message && /sertai saluran|saluran tajaan|join channel|sila sertai/i.test(im.message);
+              if (isFSub && !fsubDetected) {
+                fsubDetected = true;
+                if (!miniAppTriggered) {
+                  console.warn(`[PENCURI RESOLVE] Detected Force-Subscription gate on @${b}. Bypassing via @guestmodebot Mini App...`);
+                  miniAppTriggered = true;
+                  await triggerMiniAppDelivery(this.client, {
+                    deliveryBot: 'guestmodebot',
+                    shortCode: file.short_code,
+                    miniAppBot: 'guestmodebot',
+                    startParam: `${file.short_code}-8665550029`,
+                    checkAborted,
+                  });
+                  break;
+                } else {
+                  console.warn(`[PENCURI RESOLVE] FSub gate persisted on candidate "${file.short_code}". Skipping candidate.`);
+                  break;
+                }
+              }
+
+              // 3. Mini App button detection (e.g. t.me/guestmodebot?startapp=... or t.me/freemovie69bot?startapp=...)
               if (!miniAppTriggered && im.replyMarkup?.rows) {
                 for (const row of im.replyMarkup.rows) {
                   for (const btn of row.buttons) {
@@ -480,7 +545,7 @@ export class PencuriResolver extends BaseResolver {
                       const matchApp = btn.url.match(/t\.me\/([a-zA-Z0-9_]+)\?startapp=([a-zA-Z0-9_-]+)/i);
                       const targetMiniAppBot = matchApp ? matchApp[1] : deliveryBot;
                       const targetStartParam = matchApp ? matchApp[2] : startParam;
-                      miniAppBotDetected = targetMiniAppBot;
+                      if (!checkBots.includes(targetMiniAppBot)) checkBots.push(targetMiniAppBot);
                       miniAppTriggered = true;
                       console.log(`[PENCURI RESOLVE] Detected Mini App button for @${targetMiniAppBot} (param: "${targetStartParam}"). Triggering delivery flow...`);
                       await triggerMiniAppDelivery(this.client, {
@@ -501,6 +566,10 @@ export class PencuriResolver extends BaseResolver {
           if (deliveredDoc) break;
         }
         if (deliveredDoc) break;
+        if (fsubDetected && miniAppTriggered && attempt >= 5) {
+          console.warn(`[PENCURI RESOLVE] Candidate "${file.short_code}" delivery wait exceeded after Mini App trigger. Trying next candidate.`);
+          break;
+        }
       }
 
       if (deliveredDoc) {
