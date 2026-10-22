@@ -144,7 +144,12 @@ function getTranscodeContainerConfig(filename = '', options = {}) {
     useMp4Muxer: true,
     outputMime: 'video/mp4',
     outputExt: 'mp4',
-    muxerArgs: ['-f', 'mp4', '-movflags', 'frag_keyframe+empty_moov+default_base_moof'],
+    muxerArgs: [
+      '-f', 'mp4',
+      '-movflags', 'frag_keyframe+empty_moov+default_base_moof+separate_moof',
+      '-frag_duration', '1000000',
+      '-flush_packets', '1',
+    ],
   };
 }
 
@@ -5083,7 +5088,7 @@ app.get('/stream/:docId', async (req, res) => {
         '-c:a', 'aac',
         '-ac', '2',
         '-b:a', '128k',
-        '-af', 'aresample=async=1:first_pts=0',
+        '-af', 'aresample=async=1',
         '-avoid_negative_ts', 'make_zero',
         ...muxerArgs,
         'pipe:1',
