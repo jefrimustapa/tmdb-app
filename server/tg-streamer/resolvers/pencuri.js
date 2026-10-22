@@ -4,6 +4,7 @@
  */
 
 import { Api } from 'telegram';
+import https from 'https';
 import axios from 'axios';
 import {
   BaseResolver,
@@ -22,12 +23,26 @@ import {
   scoreCandidateWithReason,
 } from './base.js';
 
+// Singleton HTTPS Agent with bounded keepalive pooling for zero memory leaks (#252)
+const pencuriHttpsAgent = new https.Agent({
+  keepAlive: true,
+  keepAliveMsecs: 15000,
+  maxSockets: 10,
+  maxFreeSockets: 5,
+  timeout: 30000,
+});
+
+export const pencuriHttp = axios.create({
+  httpsAgent: pencuriHttpsAgent,
+  timeout: 15000,
+});
+
 // Search files directly from PencariMovie public search API
 export async function searchPencariApi(query) {
   try {
     const encoded = encodeURIComponent(query);
     const url = `https://unofficialsbot.pencarimovie.com/wp-admin/admin-ajax.php?action=stream_search_files&search=${encoded}`;
-    const res = await axios.get(url, {
+    const res = await pencuriHttp.get(url, {
       timeout: 20000,
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -45,7 +60,7 @@ export async function searchPencariApi(query) {
 // Extract bot parameters from PencariMovie link page
 export async function fetchPencariLinkDetails(linkUrl) {
   try {
-    const res = await axios.get(linkUrl, {
+    const res = await pencuriHttp.get(linkUrl, {
       timeout: 5000,
       maxRedirects: 5,
       headers: {
@@ -131,7 +146,7 @@ export async function triggerMiniAppDelivery(client, { deliveryBot, shortCode, m
     let actualBotId = defaultBotId;
 
     try {
-      const webappRes = await axios.get(`${domain}/webapp?tgWebAppStartParam=${finalStartParam}`, {
+      const webappRes = await pencuriHttp.get(`${domain}/webapp?tgWebAppStartParam=${finalStartParam}`, {
         headers: {
           'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
           'User-Agent': 'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36',
@@ -160,7 +175,7 @@ export async function triggerMiniAppDelivery(client, { deliveryBot, shortCode, m
       platform: 'android',
     });
 
-    const loginRes = await axios.post(`${domain}/wp-admin/admin-ajax.php`, loginFd.toString(), {
+    const loginRes = await pencuriHttp.post(`${domain}/wp-admin/admin-ajax.php`, loginFd.toString(), {
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
         'User-Agent': 'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36',
@@ -180,7 +195,7 @@ export async function triggerMiniAppDelivery(client, { deliveryBot, shortCode, m
     if (loginData.data?.redirect) redirectUrl = loginData.data.redirect;
 
     // 4. Call save_write_access
-    await axios.post(`${domain}/wp-admin/admin-ajax.php`, new URLSearchParams({
+    await pencuriHttp.post(`${domain}/wp-admin/admin-ajax.php`, new URLSearchParams({
       action: 'save_write_access',
       bot_id: actualBotId,
       user_id: String(userId),
@@ -200,7 +215,7 @@ export async function triggerMiniAppDelivery(client, { deliveryBot, shortCode, m
     const linkFullUrl = `${domain}${redirectUrl}`;
     let nonce = '686bac635e';
     try {
-      const pageRes = await axios.get(linkFullUrl, {
+      const pageRes = await pencuriHttp.get(linkFullUrl, {
         headers: {
           'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
           'User-Agent': 'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36',
@@ -228,7 +243,7 @@ export async function triggerMiniAppDelivery(client, { deliveryBot, shortCode, m
       bot_id: actualBotId,
     });
 
-    const sendRes = await axios.post(`${domain}/wp-admin/admin-ajax.php`, sendFd.toString(), {
+    const sendRes = await pencuriHttp.post(`${domain}/wp-admin/admin-ajax.php`, sendFd.toString(), {
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
         'User-Agent': 'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36',
@@ -307,14 +322,19 @@ export class PencuriResolver extends BaseResolver {
       minMovieSizeMb: effectiveMinMovie,
     };
 
-    // 1. Check recent chat messages in both targetBot and UnOfficialsBot using shared agnostic scoring
+    // 1. Check recent chat messages in both targetBot and UnOfficialsBot concurrently (#252)
     const botsToCheck = [targetBot, 'UnOfficialsBot'];
     const matchingRecentDocs = [];
 
-    for (const bName of botsToCheck) {
-      try {
-        const recentMsgs = await this.client.getMessages(bName, { limit: 25 });
-        for (const msg of recentMsgs) {
+    const recentResults = await Promise.allSettled(
+      botsToCheck.map(bName => this.client.getMessages(bName, { limit: 25 }))
+    );
+
+    for (let i = 0; i < botsToCheck.length; i++) {
+      const bName = botsToCheck[i];
+      const res = recentResults[i];
+      if (res.status === 'fulfilled' && Array.isArray(res.value)) {
+        for (const msg of res.value) {
           if (msg.media?.document) {
             const doc = msg.media.document;
             const fnAttr = doc.attributes?.find(a => a.className === 'DocumentAttributeFilename');
@@ -339,8 +359,8 @@ export class PencuriResolver extends BaseResolver {
             }
           }
         }
-      } catch (err) {
-        console.warn(`[PENCURI CHAT] Error checking messages for @${bName}:`, err.message);
+      } else if (res.status === 'rejected') {
+        console.warn(`[PENCURI CHAT] Error checking messages for @${bName}:`, res.reason?.message);
       }
     }
 
@@ -372,20 +392,33 @@ export class PencuriResolver extends BaseResolver {
     // 2. Prepare prioritized search queries (unified across resolvers)
     const uniqueSearchQueries = buildSearchQueries(params);
 
-    // 3. Query search API for candidate files
+    // 3. Query search API for candidate files in concurrent batches (#252)
     const candidateFiles = [];
     const seenFileIds = new Set();
+    const BATCH_SIZE = 3;
 
-    for (const sq of uniqueSearchQueries) {
+    for (let i = 0; i < uniqueSearchQueries.length; i += BATCH_SIZE) {
       if (checkAborted()) break;
-      console.log(`[PENCURI RESOLVE] Querying search API with "${sq}"...`);
-      const files = await searchPencariApi(sq);
-      console.log(`[PENCURI API] Received ${files ? files.length : 0} file(s) for query "${sq}"`);
-      if (files && files.length > 0) {
-        for (const f of files) {
-          if (!seenFileIds.has(f.id)) {
-            seenFileIds.add(f.id);
-            candidateFiles.push(f);
+      const batch = uniqueSearchQueries.slice(i, i + BATCH_SIZE);
+      console.log(`[PENCURI RESOLVE] Querying search API with batch [${batch.map(q => `"${q}"`).join(', ')}]...`);
+
+      const batchResults = await Promise.all(
+        batch.map(sq => searchPencariApi(sq).catch(err => {
+          console.warn(`[PENCURI API] Batch item error for "${sq}":`, err.message);
+          return [];
+        }))
+      );
+
+      for (let j = 0; j < batch.length; j++) {
+        const sq = batch[j];
+        const files = batchResults[j];
+        console.log(`[PENCURI API] Received ${files ? files.length : 0} file(s) for query "${sq}"`);
+        if (files && files.length > 0) {
+          for (const f of files) {
+            if (!seenFileIds.has(f.id)) {
+              seenFileIds.add(f.id);
+              candidateFiles.push(f);
+            }
           }
         }
       }
@@ -403,7 +436,7 @@ export class PencuriResolver extends BaseResolver {
       });
 
       if (hasTargetQualityCandidate) {
-        console.log(`[PENCURI RESOLVE] Found matching target-quality candidate (${requestedTier}) from query "${sq}", proceeding to scoring.`);
+        console.log(`[PENCURI RESOLVE] Found matching target-quality candidate (${requestedTier}) from batch, proceeding to scoring.`);
         break;
       }
     }
@@ -446,17 +479,20 @@ export class PencuriResolver extends BaseResolver {
       const deliveryBot = linkDetails?.botUsername || (linkDetails?.isMiniApp ? 'guestmodebot' : 'UnOfficialsBot');
       const startParam = linkDetails?.startParam || `${file.short_code}-${linkDetails?.botId || '8665550029'}-0`;
 
-      // Pre-capture baseline message IDs across all potential delivery bots
-      const checkBots = Array.from(new Set([deliveryBot, 'guestmodebot', 'UnOfficialsBot', targetBot].filter(Boolean)));
+      // Pre-capture baseline message IDs concurrently across delivery bots (#252)
+      // When candidate uses Mini App / AJAX delivery, scope polling directly to the delivery bot
+      const checkBots = linkDetails?.isMiniApp
+        ? Array.from(new Set([deliveryBot, 'guestmodebot'].filter(Boolean)))
+        : Array.from(new Set([deliveryBot, 'guestmodebot', 'UnOfficialsBot', targetBot].filter(Boolean)));
+
       const baselineMsgIds = {};
-      for (const b of checkBots) {
-        try {
-          const recent = await this.client.getMessages(b, { limit: 1 });
-          baselineMsgIds[b] = recent[0]?.id || 0;
-        } catch (_) {
-          baselineMsgIds[b] = 0;
-        }
-      }
+      const baselineResults = await Promise.allSettled(
+        checkBots.map(b => this.client.getMessages(b, { limit: 1 }))
+      );
+      checkBots.forEach((b, idx) => {
+        const res = baselineResults[idx];
+        baselineMsgIds[b] = (res.status === 'fulfilled' && res.value?.[0]?.id) || 0;
+      });
 
       let miniAppTriggered = false;
 
@@ -490,7 +526,7 @@ export class PencuriResolver extends BaseResolver {
         }
       }
 
-      // Poll for document delivery or Mini App button
+      // Poll for document delivery or Mini App button concurrently (#252)
       let deliveredDoc = null;
       let deliveredMsgId = null;
       let resolvedFilename = file.title;
@@ -498,11 +534,19 @@ export class PencuriResolver extends BaseResolver {
 
       for (let attempt = 0; attempt < 12; attempt++) {
         if (checkAborted()) break;
-        await new Promise(r => setTimeout(r, 1500));
+        // Responsive initial polling: 1000ms for first 3 attempts, 1500ms thereafter
+        const delayMs = attempt < 3 ? 1000 : 1500;
+        await new Promise(r => setTimeout(r, delayMs));
         if (checkAborted()) break;
 
-        for (const b of checkBots) {
-          const incoming = await this.client.getMessages(b, { limit: 5 }).catch(() => []);
+        const incomingResults = await Promise.allSettled(
+          checkBots.map(b => this.client.getMessages(b, { limit: 5 }))
+        );
+
+        for (let bIdx = 0; bIdx < checkBots.length; bIdx++) {
+          const b = checkBots[bIdx];
+          const res = incomingResults[bIdx];
+          const incoming = (res.status === 'fulfilled' && Array.isArray(res.value)) ? res.value : [];
           const baseId = baselineMsgIds[b] || 0;
 
           for (const im of incoming) {
@@ -545,7 +589,10 @@ export class PencuriResolver extends BaseResolver {
                       const matchApp = btn.url.match(/t\.me\/([a-zA-Z0-9_]+)\?startapp=([a-zA-Z0-9_-]+)/i);
                       const targetMiniAppBot = matchApp ? matchApp[1] : deliveryBot;
                       const targetStartParam = matchApp ? matchApp[2] : startParam;
-                      if (!checkBots.includes(targetMiniAppBot)) checkBots.push(targetMiniAppBot);
+                      if (!checkBots.includes(targetMiniAppBot)) {
+                        checkBots.push(targetMiniAppBot);
+                        baselineMsgIds[targetMiniAppBot] = im.id;
+                      }
                       miniAppTriggered = true;
                       console.log(`[PENCURI RESOLVE] Detected Mini App button for @${targetMiniAppBot} (param: "${targetStartParam}"). Triggering delivery flow...`);
                       await triggerMiniAppDelivery(this.client, {
