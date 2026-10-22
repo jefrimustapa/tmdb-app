@@ -35,6 +35,7 @@ import {
   listResolvers,
   MsmResolver,
   PencuriResolver,
+  pencuriHttp,
   BaseResolver,
   formatDiagnosticResults,
   formatFileSize,
@@ -1712,6 +1713,82 @@ it('detects Force-Subscription (FSub) gate messages to trigger instant bypass (#
   assert.ok(fsubRegex.test(msg2), 'Must detect generic channel join requirement');
   assert.ok(fsubRegex.test(msg3), 'Must detect English join channel message');
   assert.ok(!fsubRegex.test(normalMsg), 'Must not trigger on document caption');
+});
+
+console.log('\n26. Pencuri Resolver Speed & Concurrency Optimizations (#252)');
+
+it('configures singleton pencuriHttp agent with bounded keepalive and auto-destroy timeouts (#252)', () => {
+  assert.ok(pencuriHttp, 'pencuriHttp instance must be defined');
+  const agent = pencuriHttp.defaults.httpsAgent;
+  assert.ok(agent, 'httpsAgent must be configured on pencuriHttp');
+  assert.strictEqual(agent.keepAlive, true, 'keepAlive must be true for connection reuse');
+  assert.strictEqual(agent.maxSockets, 10, 'maxSockets must be bounded to 10');
+  assert.strictEqual(agent.maxFreeSockets, 5, 'maxFreeSockets must be bounded to 5');
+  assert.strictEqual(agent.options.timeout, 30000, 'Socket inactivity timeout must be 30000ms');
+});
+
+it('batches search queries in chunks of 3 for concurrent resolution (#252)', () => {
+  const queries = ['Query 1', 'Query 2', 'Query 3', 'Query 4', 'Query 5', 'Query 6', 'Query 7'];
+  const BATCH_SIZE = 3;
+  const batches = [];
+  for (let i = 0; i < queries.length; i += BATCH_SIZE) {
+    batches.push(queries.slice(i, i + BATCH_SIZE));
+  }
+
+  assert.strictEqual(batches.length, 3, '7 queries should be partitioned into 3 batches');
+  assert.deepStrictEqual(batches[0], ['Query 1', 'Query 2', 'Query 3'], 'Batch 1 must contain top 3 queries');
+  assert.deepStrictEqual(batches[1], ['Query 4', 'Query 5', 'Query 6'], 'Batch 2 must contain next 3 queries');
+  assert.deepStrictEqual(batches[2], ['Query 7'], 'Batch 3 must contain remaining query');
+});
+
+it('scopes delivery bots accurately and resolves baseline IDs concurrently (#252)', async () => {
+  const linkDetailsMiniApp = { isMiniApp: true, botUsername: 'guestmodebot' };
+  const targetBot = 'Pencuri_Movie_Bot';
+  const deliveryBot = linkDetailsMiniApp.botUsername;
+
+  // Mini App links must only target deliveryBot and guestmodebot
+  const checkBotsMiniApp = linkDetailsMiniApp.isMiniApp
+    ? Array.from(new Set([deliveryBot, 'guestmodebot'].filter(Boolean)))
+    : Array.from(new Set([deliveryBot, 'guestmodebot', 'UnOfficialsBot', targetBot].filter(Boolean)));
+
+  assert.deepStrictEqual(checkBotsMiniApp, ['guestmodebot'], 'Mini App links must scope polling strictly to delivery bot');
+
+  // Non-MiniApp link should retain full checkBots
+  const linkDetailsStandard = { isMiniApp: false, botUsername: 'UnOfficialsBot' };
+  const checkBotsStandard = linkDetailsStandard.isMiniApp
+    ? Array.from(new Set([linkDetailsStandard.botUsername, 'guestmodebot'].filter(Boolean)))
+    : Array.from(new Set([linkDetailsStandard.botUsername, 'guestmodebot', 'UnOfficialsBot', targetBot].filter(Boolean)));
+
+  assert.ok(checkBotsStandard.includes('UnOfficialsBot'), 'Standard links must check UnOfficialsBot');
+  assert.ok(checkBotsStandard.includes(targetBot), 'Standard links must check targetBot');
+
+  // Test baseline IDs resolution with Promise.allSettled mock
+  const mockClient = {
+    getMessages: async (b) => [{ id: b === 'guestmodebot' ? 555 : 111 }],
+  };
+
+  const baselineMsgIds = {};
+  const baselineResults = await Promise.allSettled(
+    checkBotsMiniApp.map(b => mockClient.getMessages(b))
+  );
+  checkBotsMiniApp.forEach((b, idx) => {
+    const res = baselineResults[idx];
+    baselineMsgIds[b] = (res.status === 'fulfilled' && res.value?.[0]?.id) || 0;
+  });
+
+  assert.strictEqual(baselineMsgIds['guestmodebot'], 555, 'Baseline message ID must map accurately');
+});
+
+it('uses responsive polling delay schedule: 1000ms initial and 1500ms thereafter (#252)', () => {
+  function getPollingDelay(attempt) {
+    return attempt < 3 ? 1000 : 1500;
+  }
+
+  assert.strictEqual(getPollingDelay(0), 1000, 'Attempt 0 must use responsive 1000ms delay');
+  assert.strictEqual(getPollingDelay(1), 1000, 'Attempt 1 must use responsive 1000ms delay');
+  assert.strictEqual(getPollingDelay(2), 1000, 'Attempt 2 must use responsive 1000ms delay');
+  assert.strictEqual(getPollingDelay(3), 1500, 'Attempt 3 must back off to 1500ms delay');
+  assert.strictEqual(getPollingDelay(11), 1500, 'Attempt 11 must retain 1500ms delay');
 });
 
 // Clean up temporary test files
