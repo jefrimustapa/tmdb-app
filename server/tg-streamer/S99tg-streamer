@@ -98,6 +98,14 @@ start() {
     # Verify and heal node before launching supervisor
     check_and_heal_node
 
+    # Clean up any lingering legacy/competing PID files and orphaned node processes
+    rm -f /opt/var/run/*msm-getter*.pid
+    if netstat -tlpn 2>/dev/null | grep -E ':3033|:3034' >/dev/null 2>&1; then
+        echo -n "(cleaning up orphaned node instances holding ports 3033/3034)... "
+        killall -9 node 2>/dev/null
+        sleep 1
+    fi
+
     # Ensure overcommit memory is enabled for V8 engine
     echo 1 > /proc/sys/vm/overcommit_memory
     # Disable USB flash swap to prevent catastrophic kernel D-state stalls
@@ -158,11 +166,19 @@ status() {
     if [ -f "$SUP_PID_FILE" ] && kill -0 $(cat "$SUP_PID_FILE") 2>/dev/null; then
         SUP_PID=$(cat "$SUP_PID_FILE")
         if [ -f "$PID_FILE" ] && kill -0 $(cat "$PID_FILE") 2>/dev/null; then
-            echo "$DESC is running (Supervisor PID: $SUP_PID, Node PID: $(cat $PID_FILE))."
+            NODE_PID=$(cat "$PID_FILE")
+            # Verify endpoint health and confirm no looping crashes
+            if curl -k -s -m 2 http://127.0.0.1:3034/api/system/stats 2>/dev/null | grep -q '"status":"ok"'; then
+                echo "$DESC is running and healthy (Supervisor PID: $SUP_PID, Node PID: $NODE_PID, status: ok)."
+                return 0
+            else
+                echo "$DESC is running (Supervisor PID: $SUP_PID, Node PID: $NODE_PID), but health check probe failed."
+                return 1
+            fi
         else
             echo "$DESC supervisor is running (PID: $SUP_PID), waiting for node process."
+            return 1
         fi
-        return 0
     elif pidof node >/dev/null 2>&1; then
         echo "$DESC unmanaged node process is running (PID: $(pidof node))."
         return 0

@@ -243,6 +243,8 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const [resolveTrigger, setResolveTrigger] = useState(0);
   const forceFreshTelegramRef = useRef(false);
   const hasRetriedTelegramForceRef = useRef(false);
+  const hasRetriedAudioTranscodeRef = useRef(false);
+  const hasRetriedDirectFallbackRef = useRef(false);
 
   // Auto-Cycle Provider until first working stream state (disabled when user manually selects provider)
   const [autoCycle, setAutoCycle] = useState(!isUserSelected);
@@ -520,6 +522,8 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       forceFreshTelegramRef.current = false;
       if (!isForceFresh) {
         hasRetriedTelegramForceRef.current = false;
+        hasRetriedAudioTranscodeRef.current = false;
+        hasRetriedDirectFallbackRef.current = false;
       }
       setIsExtracting(true);
       setPlayerMode('loading');
@@ -693,7 +697,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             const isDesktopWeb = typeof window !== 'undefined' && !/Mobile|Android|iPhone|iPad|iPod|SmartTV|Tizen|Web0S/i.test(navigator.userAgent);
             const isHevc = isDesktopWeb && (msmRes.videoCodec === 'hevc' || msmRes.videoCodec === 'h265' || (msmRes.filename && /(x265|hevc|h265)/i.test(msmRes.filename)));
             const isSurroundOrDolbyAudio = msmRes.filename
-              ? /(\.mkv$|mkv\b|ddp|dd\+|ac3|ac-3|eac3|e-ac-3|atmos|dts|truehd|thd|5[._-]1|7[._-]1|[345678]ch|surround)/i.test(msmRes.filename)
+              ? /(ddp|dd\+|ac3|ac-3|eac3|e-ac-3|atmos|dts|truehd|thd|[345678]ch|surround|(?<!\d)5[._-]1(?!\d)|(?<!\d)7[._-]1(?!\d))/i.test(msmRes.filename)
               : false;
             let finalUrl = msmRes.streamUrl;
             if (isSurroundOrDolbyAudio || isAviOrLegacy) {
@@ -2709,13 +2713,23 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
               setResolveTrigger(prev => prev + 1);
               return;
             }
-            // 2. If playing a direct stream without transcode and direct playback errors out (e.g. unsupported audio codec), retry once with transcode=audio!
-            if (directStreamUrl && !directStreamUrl.includes('transcode=audio')) {
+            // 2a. If playing a direct stream without transcode and direct playback errors out (e.g. unsupported audio codec), retry once with transcode=audio!
+            if (directStreamUrl && !directStreamUrl.includes('transcode=audio') && !hasRetriedAudioTranscodeRef.current) {
+              hasRetriedAudioTranscodeRef.current = true;
               const sep = directStreamUrl.includes('?') ? '&' : '?';
               const transcodedUrl = `${directStreamUrl}${sep}transcode=audio`;
               console.log('[DirectStream] Direct playback failed. Retrying with AAC audio transcode pipe:', transcodedUrl);
               setDirectStreamUrl(transcodedUrl);
               setResolvedMsmUrl(transcodedUrl);
+              return;
+            }
+            // 2b. If playing an audio transcoded stream and it errors out, retry once with raw direct stream (stripping transcode=audio)!
+            if (directStreamUrl && directStreamUrl.includes('transcode=audio') && !hasRetriedDirectFallbackRef.current) {
+              hasRetriedDirectFallbackRef.current = true;
+              const directUrl = directStreamUrl.replace(/([?&])transcode=audio(&?)/, (match, p1, p2) => (p1 === '?' && p2 ? '?' : '')).replace(/\?$/, '');
+              console.log('[DirectStream] Audio transcode failed. Retrying with raw direct stream:', directUrl);
+              setDirectStreamUrl(directUrl);
+              setResolvedMsmUrl(directUrl);
               return;
             }
             if (autoCycle && !isUserSelected && !allFailed) {
