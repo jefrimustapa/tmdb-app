@@ -529,6 +529,7 @@ export class PencuriResolver extends BaseResolver {
       // Poll for document delivery or Mini App button concurrently (#252)
       let deliveredDoc = null;
       let deliveredMsgId = null;
+      let deliveredBot = deliveryBot;
       let resolvedFilename = file.title;
       let fsubDetected = false;
 
@@ -555,6 +556,7 @@ export class PencuriResolver extends BaseResolver {
               if (im.media?.document && im.media.document.size > 10000000) {
                 deliveredDoc = im.media.document;
                 deliveredMsgId = im.id;
+                deliveredBot = b;
                 const fnAttr = deliveredDoc.attributes?.find(a => a.className === 'DocumentAttributeFilename');
                 if (fnAttr) resolvedFilename = fnAttr.fileName;
                 break;
@@ -620,13 +622,14 @@ export class PencuriResolver extends BaseResolver {
       }
 
       if (deliveredDoc) {
-        console.log(`[PENCURI RESOLVE] Received delivered document for "${resolvedFilename}"!`);
+        console.log(`[PENCURI RESOLVE] Received delivered document for "${resolvedFilename}" via @${deliveredBot}!`);
         const actualTier = detectVideoQualityTier(resolvedFilename, '', deliveredDoc, deliveredDoc.size);
         return {
           document: deliveredDoc,
           msgId: deliveredMsgId,
           filename: resolvedFilename,
           tier: actualTier,
+          bot: deliveredBot,
         };
       }
     }

@@ -401,6 +401,7 @@ export class MsmResolver extends BaseResolver {
           filename: chosen.filename,
           msgId: chosen.msgId,
           tier: chosenTier,
+          bot: targetBot,
         };
       }
     }
@@ -770,6 +771,7 @@ export class MsmResolver extends BaseResolver {
       msgId: deliveredMsgId,
       filename: resolvedFilename || queryTitle,
       tier: actualTier,
+      bot: targetBot,
     };
   }
 }

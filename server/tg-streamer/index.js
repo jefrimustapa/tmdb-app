@@ -4058,6 +4058,8 @@ app.get(['/api/resolve', '/tg/api/resolve', '/msm/api/resolve', '/api/prefetch',
     const resolvedItem = db.set(baseCacheKey, {
       docId: docIdStr,
       msgId: deliveredMsgId,
+      bot: (resolvedData.bot || targetBotHandle || '').replace(/^@/, ''),
+      resolver: activeResolverId,
       accessHash: deliveredDoc.accessHash?.toString() || '',
       fileReference: deliveredDoc.fileReference ? deliveredDoc.fileReference.toString('hex') : '',
       filename,
@@ -4170,18 +4172,38 @@ async function refreshDocumentFileReference(client, targetDoc) {
     console.log(`[FILE_REF RECOVERY] Refreshing expired fileReference for Doc ID: ${docIdStr}...`);
     const dbRecord = db.getByDocId(docIdStr);
 
-    // 1. Direct message ID lookup (official MTProto fast path: re-fetching the message provides fresh HMAC file_reference)
+    // Provider-agnostic candidate bot determination (#256)
+    const candidateBots = new Set();
+    if (dbRecord?.bot) candidateBots.add(dbRecord.bot.replace(/^@/, ''));
+    if (BOT_USERNAME) candidateBots.add(BOT_USERNAME.replace(/^@/, ''));
+    if (savedSettings?.targetBotUsernames) {
+      Object.values(savedSettings.targetBotUsernames).forEach(b => {
+        if (b) candidateBots.add(b.replace(/^@/, ''));
+      });
+    }
+    // Include known delivery bots across all supported providers
+    candidateBots.add('UnOfficialsBot');
+    candidateBots.add('guestmodebot');
+    candidateBots.add('Pencuri_Movie_Bot');
+    candidateBots.add('msm34bot');
+    candidateBots.add('msm32bot');
+
+    const botList = Array.from(candidateBots).filter(Boolean);
+    const primaryBot = (dbRecord?.bot ? dbRecord.bot.replace(/^@/, '') : null) || botList[0] || BOT_USERNAME;
+
+    // 1. Direct message ID lookup on primary origin bot (fast path)
     if (dbRecord && dbRecord.msgId) {
       try {
-        const msgs = await client.getMessages(BOT_USERNAME, { ids: [Number(dbRecord.msgId)] });
+        const msgs = await client.getMessages(primaryBot, { ids: [Number(dbRecord.msgId)] });
         const m = msgs?.[0];
         if (m && m.media?.document?.id?.toString() === docIdStr) {
           const freshRef = m.media.document.fileReference;
           if (freshRef) {
-            console.log(`[FILE_REF RECOVERY] Found fresh fileReference via direct msgId ${dbRecord.msgId} for Doc ID: ${docIdStr}!`);
+            console.log(`[FILE_REF RECOVERY] Found fresh fileReference via direct msgId ${dbRecord.msgId} in @${primaryBot} for Doc ID: ${docIdStr}!`);
             if (dbRecord.queryKey) {
               db.set(dbRecord.queryKey, {
                 ...dbRecord,
+                bot: primaryBot,
                 fileReference: freshRef.toString('hex'),
                 updatedAt: Date.now(),
               });
@@ -4190,35 +4212,47 @@ async function refreshDocumentFileReference(client, targetDoc) {
           }
         }
       } catch (idErr) {
-        console.warn(`[FILE_REF RECOVERY] Message ID lookup failed (${idErr.message}). Falling back to scan...`);
+        console.warn(`[FILE_REF RECOVERY] Message ID lookup failed on @${primaryBot} (${idErr.message}). Falling back to multi-bot scan...`);
       }
     }
 
-    // 2. Scan recent chat messages from @${BOT_USERNAME} for the exact document ID
+    // 2. Scan recent chat messages across candidate bots concurrently (#256)
     try {
-      const recentMsgs = await client.getMessages(BOT_USERNAME, { limit: 100 });
-      for (const m of recentMsgs) {
-        if (m.media?.document?.id?.toString() === docIdStr) {
-          const freshRef = m.media.document.fileReference;
-          if (freshRef) {
-            console.log(`[FILE_REF RECOVERY] Found fresh fileReference in chat message ${m.id} for Doc ID: ${docIdStr}!`);
-            if (dbRecord && dbRecord.queryKey) {
-              db.set(dbRecord.queryKey, {
-                ...dbRecord,
-                msgId: m.id,
-                fileReference: freshRef.toString('hex'),
-                updatedAt: Date.now(),
-              });
+      const scanPromises = botList.map(async b => {
+        try {
+          const recentMsgs = await client.getMessages(b, { limit: 50 });
+          return { bot: b, msgs: recentMsgs };
+        } catch {
+          return { bot: b, msgs: [] };
+        }
+      });
+
+      const scanResults = await Promise.all(scanPromises);
+      for (const res of scanResults) {
+        for (const m of res.msgs) {
+          if (m.media?.document?.id?.toString() === docIdStr) {
+            const freshRef = m.media.document.fileReference;
+            if (freshRef) {
+              console.log(`[FILE_REF RECOVERY] Found fresh fileReference in @${res.bot} chat message ${m.id} for Doc ID: ${docIdStr}!`);
+              if (dbRecord && dbRecord.queryKey) {
+                db.set(dbRecord.queryKey, {
+                  ...dbRecord,
+                  bot: res.bot,
+                  msgId: m.id,
+                  fileReference: freshRef.toString('hex'),
+                  updatedAt: Date.now(),
+                });
+              }
+              return freshRef;
             }
-            return freshRef;
           }
         }
       }
     } catch (scanErr) {
-      console.warn('[FILE_REF RECOVERY] Chat scan error:', scanErr.message);
+      console.warn('[FILE_REF RECOVERY] Multi-bot chat scan error:', scanErr.message);
     }
 
-    // 3. Search Telegram MTProto servers for historical media documents
+    // 3. Search Telegram MTProto servers for historical media documents across candidate bots (#256)
     if (dbRecord) {
       let searchTerm = '';
       if (dbRecord.queryKey) {
@@ -4228,27 +4262,39 @@ async function refreshDocumentFileReference(client, targetDoc) {
       }
 
       if (searchTerm) {
-        console.log(`[FILE_REF RECOVERY] Searching server messages for "${searchTerm}" (Doc ID: ${docIdStr})...`);
+        console.log(`[FILE_REF RECOVERY] Searching server messages for "${searchTerm}" across bots [${botList.join(', ')}] (Doc ID: ${docIdStr})...`);
         try {
-          const serverDocs = await client.getMessages(BOT_USERNAME, {
-            search: searchTerm,
-            limit: 30,
-            filter: new Api.InputMessagesFilterDocument(),
-          }).catch(() => []);
-          for (const m of serverDocs) {
-            if (m.media?.document?.id?.toString() === docIdStr) {
-              const freshRef = m.media.document.fileReference;
-              if (freshRef) {
-                console.log(`[FILE_REF RECOVERY] Successfully recovered fresh fileReference via MTProto server search (msgId: ${m.id})!`);
-                if (dbRecord.queryKey) {
-                  db.set(dbRecord.queryKey, {
-                    ...dbRecord,
-                    msgId: m.id,
-                    fileReference: freshRef.toString('hex'),
-                    updatedAt: Date.now(),
-                  });
+          const searchPromises = botList.map(async b => {
+            try {
+              const serverDocs = await client.getMessages(b, {
+                search: searchTerm,
+                limit: 25,
+                filter: new Api.InputMessagesFilterDocument(),
+              });
+              return { bot: b, docs: serverDocs || [] };
+            } catch {
+              return { bot: b, docs: [] };
+            }
+          });
+
+          const searchResults = await Promise.all(searchPromises);
+          for (const res of searchResults) {
+            for (const m of res.docs) {
+              if (m.media?.document?.id?.toString() === docIdStr) {
+                const freshRef = m.media.document.fileReference;
+                if (freshRef) {
+                  console.log(`[FILE_REF RECOVERY] Successfully recovered fresh fileReference via MTProto server search in @${res.bot} (msgId: ${m.id})!`);
+                  if (dbRecord.queryKey) {
+                    db.set(dbRecord.queryKey, {
+                      ...dbRecord,
+                      bot: res.bot,
+                      msgId: m.id,
+                      fileReference: freshRef.toString('hex'),
+                      updatedAt: Date.now(),
+                    });
+                  }
+                  return freshRef;
                 }
-                return freshRef;
               }
             }
           }
