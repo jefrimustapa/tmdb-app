@@ -490,7 +490,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           setStreamResolverTimeout(s.streamResolverTimeout);
           streamResolverTimeoutRef.current = s.streamResolverTimeout;
         }
-        const loadedMsmTimeout = typeof s.msmTimeout === 'number' ? s.msmTimeout : (typeof s.msm32Timeout === 'number' ? s.msm32Timeout : undefined);
+        const loadedMsmTimeout = typeof s.tgTimeout === 'number' ? s.tgTimeout : (typeof s.msmTimeout === 'number' ? s.msmTimeout : (typeof s.msm32Timeout === 'number' ? s.msm32Timeout : undefined));
         if (typeof loadedMsmTimeout === 'number') {
           setMsmTimeout(loadedMsmTimeout);
           msmTimeoutRef.current = loadedMsmTimeout;
@@ -540,7 +540,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         if (!isTelegramOriginMatching && !isUserSelected) {
           console.log(`[Resolver] Title origin (${effectiveOriginCountries.join(',') || 'unknown'}) is not within telegram-msm filter, auto-cycling to next provider...`);
           if (autoCycle && !allFailed) {
-            cycleToNextProvider();
+            cycleToNextProviderRef.current();
             return;
           } else {
             setResolvingStatus('Title origin is not supported by Telegram MSM filter.');
@@ -734,7 +734,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           console.warn('[Resolver] Telegram stream not found');
           if (autoCycle && !isUserSelected && !allFailed) {
             setResolvingStatus('Telegram stream not found, cycling to next provider...');
-            cycleToNextProvider();
+            cycleToNextProviderRef.current();
             return;
           } else {
             console.log('[Resolver] Telegram stream not found and auto-cycle is unavailable.');
@@ -749,7 +749,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           console.warn('[Resolver] Telegram resolution error:', err);
           if (autoCycle && !isUserSelected && !allFailed) {
             setResolvingStatus('Telegram resolver error, cycling to next provider...');
-            cycleToNextProvider();
+            cycleToNextProviderRef.current();
             return;
           } else {
             setResolvingStatus('Telegram resolver error.');
@@ -1058,7 +1058,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       isMounted = false;
       abortController.abort();
     };
-  }, [enabledResolvers, tmdbId, title, mediaType, season, episode, activeAsean, providerId, releaseYear, originalTitle, topAnimeProviders, topAseanProviders, isUserSelected, isTelegramOriginMatching, resolveTrigger, cycleToNextProvider, autoCycle, allFailed]);
+  }, [enabledResolvers, tmdbId, title, mediaType, season, episode, activeAsean, providerId, releaseYear, originalTitle, isUserSelected, isTelegramOriginMatching, resolveTrigger, autoCycle, allFailed]);
 
   const [resumeTimestamp, setResumeTimestamp] = useState<number>(initialTimestamp || 0);
   const [resolvedAnimeMapping, setResolvedAnimeMapping] = useState<ResolvedAnimeMapping | null>(null);

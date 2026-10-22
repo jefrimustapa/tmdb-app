@@ -3813,6 +3813,13 @@ app.get(['/api/cache/evict', '/tg/api/cache/evict', '/msm/api/cache/evict'], (re
 
 // Resolver endpoint: /api/resolve and Prefetch endpoint: /api/prefetch
 app.get(['/api/resolve', '/tg/api/resolve', '/msm/api/resolve', '/api/prefetch', '/tg/api/prefetch', '/msm/api/prefetch'], async (req, res) => {
+  // Keep socket alive across mobile WAN / carrier NAT while Telegram bot resolves in background
+  if (req.socket) {
+    try {
+      req.socket.setKeepAlive(true, 5000);
+      req.socket.setTimeout(0);
+    } catch {}
+  }
   const { title, year, season, episode, totalSeasons: totalSeasonsQuery, maxQuality = '720', force, refresh, minTvSize, minMovieSize, altTitle: altTitleQuery, englishTitle, maxPages: maxPagesQuery } = req.query;
   if (!title) {
     return res.status(400).json({ success: false, error: 'Missing title query parameter' });
@@ -5373,6 +5380,12 @@ const sslCertFile = certCandidates.find(p => fs.existsSync(p));
 const sslKeyFile = keyCandidates.find(p => fs.existsSync(p));
 
 function attachServerErrorHandler(server, name, sPort, onFatal) {
+  try {
+    // Configure socket and keepalive timeouts so mobile WAN clients (S25) do not get dropped during long resolves (up to 180s)
+    server.keepAliveTimeout = 200000;
+    server.headersTimeout = 205000;
+    server.requestTimeout = 0;
+  } catch {}
   server.on('error', (err) => {
     if (err.code === 'EADDRINUSE') {
       console.error(`[SERVER FATAL] ${name} port ${sPort} is already in use (EADDRINUSE). Another instance may be running.`);
