@@ -12,6 +12,7 @@ import { isAnimeMedia } from '../../services/animeMappingService';
 import { isAseanMedia, isKoreanMedia } from '../../services/lariMappingService';
 import { msmService } from '../../services/msmMappingService';
 import { isEpisodeAired } from '../../services/episodeAirStatus';
+import { getWatchHeaderYear } from '../../utils/watchHeader';
 import { ArrowLeft, SkipForward, SkipBack, Settings, FastForward, Rewind } from 'lucide-react';
 
 import type { VirtualCursorStyle, StreamResolverType } from '../../types/db';
@@ -792,6 +793,7 @@ export const Watch: React.FC = () => {
 
   const title = details.title || details.name;
   const releaseYear = (details.release_date || details.first_air_date || '').split('-')[0];
+  const headerYear = getWatchHeaderYear({ mediaType, details, seasonParam, seasonDetails });
   const episodeLabel = mediaType === 'tv' ? `S${seasonParam}:E${episodeParam}` : null;
 
   return (
@@ -869,33 +871,46 @@ export const Watch: React.FC = () => {
             </div>
           </div>
 
-          {/* Row 2: Season & Episode Info (Left) + Episode Navigation (Prev & Next) (Right) */}
-          {mediaType === 'tv' && (episodeLabel || prevEpisodeInfo || (nextEpisodeInfo && nextEpisodeInfo.isAired)) && (
+          {/* Row 2: Year / Season & Episode Info (Left) + Episode Navigation (Prev & Next) (Right) */}
+          {(mediaType === 'tv' ? (headerYear || episodeLabel || prevEpisodeInfo || (nextEpisodeInfo && nextEpisodeInfo.isAired)) : Boolean(headerYear)) && (
             <div className="flex items-center justify-between gap-3 w-full pl-0.5 sm:pl-1">
-              {/* Left: S1:E4 • Episode Title without box (with smooth gradient fade edge) */}
+              {/* Left: <YEAR> • <SEASON & EPISODE> • <EPISODE TITLE> */}
               <div className="flex items-center gap-2 min-w-0 flex-1 max-w-[calc(100%-160px)] sm:max-w-xl">
-                {episodeLabel && (
+                {headerYear && (
                   <span className="text-xs sm:text-sm font-semibold tracking-wider text-white/90 flex-shrink-0">
-                    {episodeLabel}
+                    {headerYear}
                   </span>
                 )}
-                {currentEpisode?.name && (
-                  <div
-                    className="overflow-hidden whitespace-nowrap min-w-0"
-                    style={episodeTitleOverflows ? {
-                      WebkitMaskImage: 'linear-gradient(to right, black 85%, transparent 100%)',
-                      maskImage: 'linear-gradient(to right, black 85%, transparent 100%)'
-                    } : undefined}
-                  >
-                    <span ref={episodeTitleRef} className="text-xs sm:text-sm text-white/75 font-medium">
-                      • {currentEpisode.name}
-                    </span>
-                  </div>
+                {mediaType === 'tv' && (
+                  <>
+                    {headerYear && episodeLabel && (
+                      <span className="text-xs sm:text-sm text-white/60 select-none">•</span>
+                    )}
+                    {episodeLabel && (
+                      <span className="text-xs sm:text-sm font-semibold tracking-wider text-white/90 flex-shrink-0">
+                        {episodeLabel}
+                      </span>
+                    )}
+                    {currentEpisode?.name && (
+                      <div
+                        className="overflow-hidden whitespace-nowrap min-w-0"
+                        style={episodeTitleOverflows ? {
+                          WebkitMaskImage: 'linear-gradient(to right, black 85%, transparent 100%)',
+                          maskImage: 'linear-gradient(to right, black 85%, transparent 100%)'
+                        } : undefined}
+                      >
+                        <span ref={episodeTitleRef} className="text-xs sm:text-sm text-white/75 font-medium">
+                          • {currentEpisode.name}
+                        </span>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
 
               {/* Right: Prev & Next Episode Buttons (Unified Style) */}
-              <div className="flex items-center gap-2 flex-shrink-0 ml-auto">
+              {mediaType === 'tv' && (prevEpisodeInfo || (nextEpisodeInfo && nextEpisodeInfo.isAired)) && (
+                <div className="flex items-center gap-2 flex-shrink-0 ml-auto">
                 {prevEpisodeInfo && (
                   <button
                     type="button"
@@ -939,7 +954,8 @@ export const Watch: React.FC = () => {
                     <SkipForward className="w-3.5 h-3.5" />
                   </button>
                 )}
-              </div>
+                </div>
+              )}
             </div>
           )}
         </div>
