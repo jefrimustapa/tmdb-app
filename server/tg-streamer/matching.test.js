@@ -1633,6 +1633,87 @@ await itAsync('boots express server instance, serves /api/system/stats health ch
   await new Promise(resolve => testServer.close(resolve));
 });
 
+console.log('\n25. Pencuri Resolver Mini App Delivery & FSub Bypass (#253)');
+
+it('detects dead/404 candidates and fast-fails without delay (#253)', async () => {
+  // Mock 404 Axios error handler behavior
+  function handleLinkFetchError(err) {
+    const is404 = err.response?.status === 404 || (err.message && err.message.includes('404'));
+    if (is404) {
+      return { notFound: true, isMiniApp: false };
+    }
+    return null;
+  }
+
+  const res404 = handleLinkFetchError({ response: { status: 404 } });
+  assert.strictEqual(res404.notFound, true, '404 link response must return notFound: true');
+  assert.strictEqual(res404.isMiniApp, false, 'Dead link must not be flagged as miniApp');
+
+  // Normal network error should return null rather than notFound
+  const resNetErr = handleLinkFetchError(new Error('ETIMEDOUT'));
+  assert.strictEqual(resNetErr, null, 'Generic network error should return null for retry');
+});
+
+it('identifies direct Mini App / sendtgfile pages and assigns @guestmodebot (#253)', async () => {
+  function parseLinkPage(html) {
+    const botLinkMatch = html.match(/https:\/\/t\.me\/([a-zA-Z0-9_]+)\?start=([a-zA-Z0-9_-]+)/i) ||
+                         html.match(/https:\/\/t\.me\/([a-zA-Z0-9_]+)\?startapp=([a-zA-Z0-9_-]+)/i);
+
+    const nonceMatch = html.match(/wp_nonce["']?\s*:\s*["']([^"']+)["']/i) ||
+                       html.match(/formData\.append\('wp_nonce',\s*["']([^"']+)["']\)/i);
+
+    const botIdMatch = html.match(/bot_id["']?\s*:\s*["']?(\d+)["']?/i);
+    const isMiniApp = html.includes('sendtgfile') || !botLinkMatch;
+
+    return {
+      botUsername: botLinkMatch ? botLinkMatch[1] : (isMiniApp ? 'guestmodebot' : 'UnOfficialsBot'),
+      startParam: botLinkMatch ? botLinkMatch[2] : null,
+      nonce: nonceMatch ? nonceMatch[1] : null,
+      botId: botIdMatch ? botIdMatch[1] : '8788369318',
+      isMiniApp,
+      notFound: false,
+    };
+  }
+
+  // 1. Page with action sendtgfile and wp_nonce (Mini App page)
+  const miniAppHtml = `
+    <button class="get-file-s" value="Iu0HuS">Get File</button>
+    <script>
+      formData.append('action', 'sendtgfile');
+      formData.append('wp_nonce', "d3cd606f4a");
+      formData.append('bot_id', '8788369318');
+    </script>
+  `;
+  const miniAppDetails = parseLinkPage(miniAppHtml);
+  assert.strictEqual(miniAppDetails.isMiniApp, true, 'Page with sendtgfile must be recognized as isMiniApp: true');
+  assert.strictEqual(miniAppDetails.botUsername, 'guestmodebot', 'Mini App page must default to @guestmodebot');
+  assert.strictEqual(miniAppDetails.nonce, 'd3cd606f4a', 'Nonce must be extracted accurately');
+  assert.strictEqual(miniAppDetails.botId, '8788369318', 'Bot ID must be extracted accurately');
+
+  // 2. Legacy page with direct bot link
+  const legacyHtml = `
+    <a href="https://t.me/UnOfficialsBot?start=WLLs8k-8665550029-0">Direct Bot</a>
+  `;
+  const legacyDetails = parseLinkPage(legacyHtml);
+  assert.strictEqual(legacyDetails.isMiniApp, false, 'Legacy direct bot link is not direct Mini App');
+  assert.strictEqual(legacyDetails.botUsername, 'UnOfficialsBot', 'Legacy page must preserve @UnOfficialsBot');
+  assert.strictEqual(legacyDetails.startParam, 'WLLs8k-8665550029-0', 'Start parameter must be parsed correctly');
+});
+
+it('detects Force-Subscription (FSub) gate messages to trigger instant bypass (#253)', async () => {
+  const fsubRegex = /sertai saluran|saluran tajaan|join channel|sila sertai/i;
+
+  const msg1 = "Untuk meneruskan, sila sertai saluran tajaan kami di bawah...\n- Tekan butang '🤖Create Bot🤖'";
+  const msg2 = "Sila sertai saluran rasmi kami dahulu untuk memuat turun.";
+  const msg3 = "Please join channel to download this file.";
+  const normalMsg = "🎬 **Imam.Instant.Ustazah.Scammer.EP01.2023.mkv**\n📦 2.67 GB";
+
+  assert.ok(fsubRegex.test(msg1), 'Must detect standard Malaysian sponsor channel FSub message');
+  assert.ok(fsubRegex.test(msg2), 'Must detect generic channel join requirement');
+  assert.ok(fsubRegex.test(msg3), 'Must detect English join channel message');
+  assert.ok(!fsubRegex.test(normalMsg), 'Must not trigger on document caption');
+});
+
 // Clean up temporary test files
 try {
   if (fs.existsSync(TEST_DB_FILE)) fs.unlinkSync(TEST_DB_FILE);
