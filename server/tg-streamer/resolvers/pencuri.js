@@ -46,7 +46,7 @@ export async function searchPencariApi(query) {
 export async function fetchPencariLinkDetails(linkUrl) {
   try {
     const res = await axios.get(linkUrl, {
-      timeout: 15000,
+      timeout: 5000,
       maxRedirects: 5,
       headers: {
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
