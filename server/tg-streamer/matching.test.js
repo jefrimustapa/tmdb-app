@@ -1,3 +1,5 @@
+import http from 'http';
+import { EventEmitter } from 'events';
 import assert from 'assert';
 import fs from 'fs';
 import path from 'path';
@@ -24,6 +26,9 @@ import {
   isJunkMedia,
   JUNK_MEDIA_REGEX,
   getActiveTargetBot,
+  getTranscodeContainerConfig,
+  app,
+  attachServerErrorHandler,
 } from './index.js';
 import {
   createResolver,
@@ -46,6 +51,19 @@ function it(desc, fn) {
   total++;
   try {
     fn();
+    console.log(`  ✓ ${desc}`);
+    passed++;
+  } catch (err) {
+    console.error(`  ✗ ${desc}`);
+    console.error(`    ${err.message}`);
+    process.exitCode = 1;
+  }
+}
+
+async function itAsync(desc, fn) {
+  total++;
+  try {
+    await fn();
     console.log(`  ✓ ${desc}`);
     passed++;
   } catch (err) {
@@ -1513,6 +1531,106 @@ it('correctly matches single-digit episode (EP1, EP8) and rejects mismatched sin
   };
   const resEp8 = scoreCandidateWithReason(ep8File, contextEp8);
   assert.ok(resEp8.score > 150, `EP8 file must match Episode 8 search (score: ${resEp8.score})`);
+});
+
+
+console.log('\n23. Transcode Container Configuration & Universal Fragmented MP4 (#250)');
+
+it('configures universal Fragmented MP4 container for MKV transcode stream (#250)', () => {
+  const mkvFile = 'Imam_Instant_Ustazah_Scammer_EP02_1080p_WEB_DL_x264_DD5_1_KIKI.mkv';
+  const config = getTranscodeContainerConfig(mkvFile, { needsVideoTranscode: false });
+
+  assert.strictEqual(config.useMp4Muxer, true, 'Must use MP4 muxer for live MKV transcode pipe');
+  assert.strictEqual(config.outputMime, 'video/mp4', 'MIME type must be video/mp4 for Android car head unit compatibility');
+  assert.strictEqual(config.outputExt, 'mp4', 'Extension must be mp4');
+  assert.ok(config.muxerArgs.includes('mp4'), 'Muxer args must specify -f mp4');
+  assert.ok(config.muxerArgs.some(a => a.includes('frag_keyframe')), 'Muxer args must include frag_keyframe');
+  assert.ok(config.muxerArgs.some(a => a.includes('empty_moov')), 'Muxer args must include empty_moov');
+  assert.ok(config.muxerArgs.some(a => a.includes('default_base_moof')), 'Muxer args must include default_base_moof');
+  assert.ok(config.muxerArgs.some(a => a.includes('separate_moof')), 'Muxer args must include separate_moof to flush audio independently');
+  assert.ok(config.muxerArgs.includes('-frag_duration'), 'Muxer args must include -frag_duration for 1s intervals');
+  assert.ok(config.muxerArgs.includes('-flush_packets'), 'Muxer args must include -flush_packets for zero-stall streaming');
+});
+
+it('configures universal Fragmented MP4 container for MP4 and video re-encoded streams (#250)', () => {
+  const mp4Config = getTranscodeContainerConfig('Sample.mp4', { needsVideoTranscode: false });
+  assert.strictEqual(mp4Config.outputMime, 'video/mp4');
+  assert.strictEqual(mp4Config.useMp4Muxer, true);
+
+  const aviConfig = getTranscodeContainerConfig('Legacy.avi', { needsVideoTranscode: true });
+  assert.strictEqual(aviConfig.outputMime, 'video/mp4');
+  assert.strictEqual(aviConfig.useMp4Muxer, true);
+});
+
+
+console.log('\n24. Server Startup Health & Crash-Loop Prevention (#250)');
+
+it('intercepts EADDRINUSE port collision fatal errors to prevent unmanaged crash loops (#250)', () => {
+  const mockServer = new EventEmitter();
+  let fatalError = null;
+
+  attachServerErrorHandler(mockServer, 'Test Service', 3033, (err) => {
+    fatalError = err;
+  });
+
+  // Simulate an EADDRINUSE error
+  const inUseErr = new Error('bind EADDRINUSE 0.0.0.0:3033');
+  inUseErr.code = 'EADDRINUSE';
+  mockServer.emit('error', inUseErr);
+
+  assert.ok(fatalError, 'Must invoke onFatal callback when port collision occurs');
+  assert.strictEqual(fatalError.code, 'EADDRINUSE');
+});
+
+it('handles standard non-collision server errors without fatal termination (#250)', () => {
+  const mockServer = new EventEmitter();
+  let fatalTriggered = false;
+
+  attachServerErrorHandler(mockServer, 'Test Service', 3033, () => {
+    fatalTriggered = true;
+  });
+
+  const normalErr = new Error('read ECONNRESET');
+  normalErr.code = 'ECONNRESET';
+  mockServer.emit('error', normalErr);
+
+  assert.strictEqual(fatalTriggered, false, 'Non-collision error must not trigger fatal exit');
+});
+
+await itAsync('boots express server instance, serves /api/system/stats health check, and cleans up without crash (#250)', async () => {
+  assert.ok(app, 'Express app instance must be defined');
+
+  // Launch test HTTP server on ephemeral port (OS picks a free port)
+  const testServer = http.createServer(app);
+  await new Promise((resolve, reject) => {
+    testServer.listen(0, '127.0.0.1', () => resolve());
+    testServer.on('error', reject);
+  });
+
+  const port = testServer.address().port;
+  assert.ok(port > 0, 'Test server must bind to a valid ephemeral port');
+
+  // Query health check endpoint
+  const statsRes = await new Promise((resolve, reject) => {
+    http.get(`http://127.0.0.1:${port}/api/system/stats`, (res) => {
+      let data = '';
+      res.on('data', chunk => data += chunk);
+      res.on('end', () => {
+        try {
+          resolve(JSON.parse(data));
+        } catch (e) {
+          reject(e);
+        }
+      });
+    }).on('error', reject);
+  });
+
+  assert.strictEqual(statsRes.status, 'ok', 'Health check must return status: ok');
+  assert.strictEqual(typeof statsRes.uptime, 'number', 'Uptime must be a valid number');
+  assert.ok(statsRes.uptime >= 0, 'Uptime must be non-negative');
+
+  // Clean close
+  await new Promise(resolve => testServer.close(resolve));
 });
 
 // Clean up temporary test files

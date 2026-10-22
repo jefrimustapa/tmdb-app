@@ -133,6 +133,26 @@ export function getActiveTargetBot() {
   return BOT_USERNAME.replace(/^@/, '');
 }
 
+function getTranscodeContainerConfig(filename = '', options = {}) {
+  // Live streaming transcode pipes ALWAYS output Fragmented MP4 (video/mp4) with
+  // frag_keyframe+empty_moov+default_base_moof flags.
+  // Matroska over a live HTTP chunked pipe (Accept-Ranges: none) cannot be parsed by
+  // Android Chromium / car head units without byte-range seeking.
+  // Fragmented MP4 is universally supported across Android car head units, mobile WebViews,
+  // Smart TVs, and desktop browsers without requiring Range seeking.
+  return {
+    useMp4Muxer: true,
+    outputMime: 'video/mp4',
+    outputExt: 'mp4',
+    muxerArgs: [
+      '-f', 'mp4',
+      '-movflags', 'frag_keyframe+empty_moov+default_base_moof+separate_moof',
+      '-frag_duration', '1000000',
+      '-flush_packets', '1',
+    ],
+  };
+}
+
 export function getGeoBadgeHtml(isGeoEnabled) {
   if (isGeoEnabled) {
     return '<span id="geoBadge" class="text-xs px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-mono hidden sm:inline-block">🛡️ MY Only</span>';
@@ -4994,16 +5014,15 @@ app.get('/stream/:docId', async (req, res) => {
         needsVideoTranscode = isAvi || req.query.vcodec === 'h264' || isHevc || mediaDetails.isHevc || mediaDetails.isLegacyVideo;
       }
 
-      const isMp4Source = /\.mp4$/i.test(filename);
-      const isMkvSource = /\.mkv$/i.test(filename);
       // Container Selection:
-      // When stream-copying video (-c:v copy), preserve original container format:
-      // MKV sources MUST stay Matroska (-f matroska) to preserve B-frame DTS/PTS alignment.
-      // MP4 sources stay Fragmented MP4 (-f mp4).
-      // When video is actively re-encoded to H.264 baseline, Fragmented MP4 is universally supported.
-      const useMp4Muxer = isMp4Source || (needsVideoTranscode && !isMkvSource);
-      const outputMime = useMp4Muxer ? 'video/mp4' : 'video/x-matroska';
-      const outputExt = useMp4Muxer ? 'mp4' : 'mkv';
+      // Live transcode pipes ALWAYS use Fragmented MP4 (video/mp4) with frag_keyframe+empty_moov+default_base_moof.
+      // Progressive Matroska (video/x-matroska) cannot be parsed by Android Chromium / car head units without Range seeking.
+      // Fragmented MP4 is universally supported across Android car head units, Android WebView, Smart TVs, and desktop browsers.
+      // DTS/PTS A/V sync is guaranteed via -fflags +genpts, -af aresample=async=1:first_pts=0, and -avoid_negative_ts make_zero.
+      const transcodeContainer = getTranscodeContainerConfig(filename, { needsVideoTranscode });
+      const useMp4Muxer = transcodeContainer.useMp4Muxer;
+      const outputMime = transcodeContainer.outputMime;
+      const outputExt = transcodeContainer.outputExt;
 
       console.log(`[TRANSCODE ${needsVideoTranscode ? 'VIDEO H264' : 'AUDIO (Direct Video Copy)'}] Starting transcode for [${clientIdentity.name} (${clientIdentity.ip})] doc ${docId} (${filename}, Container: ${outputExt.toUpperCase()}, Tier: ${detectedTier.toUpperCase()} [${tierConcurrency}x512KB]) at ${seekSec}s...`);
 
@@ -5043,9 +5062,7 @@ app.get('/stream/:docId', async (req, res) => {
           ]
         : ['-c:v', 'copy'];
 
-      const muxerArgs = useMp4Muxer
-        ? ['-f', 'mp4', '-movflags', 'frag_keyframe+empty_moov+default_base_moof']
-        : ['-flush_packets', '1', '-cluster_time_limit', '1000', '-cluster_size_limit', '524288', '-f', 'matroska'];
+      const muxerArgs = transcodeContainer.muxerArgs;
 
       const ffmpegBin = process.env.FFMPEG_PATH || (fs.existsSync('/opt/bin/ffmpeg') ? '/opt/bin/ffmpeg' : 'ffmpeg');
       // When stream copying (-c:v copy) with seeking, use -noaccurate_seek so audio starts on the exact same keyframe as the video stream
@@ -5063,7 +5080,7 @@ app.get('/stream/:docId', async (req, res) => {
         '-reconnect_delay_max', '2',
         '-probesize', '1000000',
         '-analyzeduration', '1000000',
-        '-fflags', '+nobuffer+flush_packets',
+        '-fflags', '+nobuffer+flush_packets+genpts',
         '-i', `http://127.0.0.1:${INTERNAL_HTTP_PORT}/stream/${docId}?direct=1&concurrency=${tierConcurrency}`,
         '-map', '0:v:0',
         '-map', audioMapSpecifier,
@@ -5071,7 +5088,7 @@ app.get('/stream/:docId', async (req, res) => {
         '-c:a', 'aac',
         '-ac', '2',
         '-b:a', '128k',
-        '-af', 'aresample=async=1:first_pts=0',
+        '-af', 'aresample=async=1',
         '-avoid_negative_ts', 'make_zero',
         ...muxerArgs,
         'pipe:1',
@@ -5355,10 +5372,15 @@ const keyCandidates = [
 const sslCertFile = certCandidates.find(p => fs.existsSync(p));
 const sslKeyFile = keyCandidates.find(p => fs.existsSync(p));
 
-function attachServerErrorHandler(server, name, sPort) {
+function attachServerErrorHandler(server, name, sPort, onFatal) {
   server.on('error', (err) => {
     if (err.code === 'EADDRINUSE') {
       console.error(`[SERVER FATAL] ${name} port ${sPort} is already in use (EADDRINUSE). Another instance may be running.`);
+      if (typeof onFatal === 'function') {
+        onFatal(err);
+      } else if (process.env.NODE_ENV !== 'test') {
+        process.exit(1);
+      }
     } else {
       console.error(`[SERVER ERROR] ${name} listener error:`, err);
     }
@@ -5431,6 +5453,9 @@ if (isMain) {
 }
 
 export {
+  app,
+  attachServerErrorHandler,
+  getTranscodeContainerConfig,
   DEFAULT_PIPELINE_BUFFERS,
   detectVideoQualityTier,
   BaseResolver,
