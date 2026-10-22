@@ -9,7 +9,7 @@
     "prebuild": "node scripts/prebuild.js",
     "build": "tsc -b && vite build",
     "postbuild": "node scripts/postbuild.js",
-    "test": "npx tsx tests/episodeAirStatus.test.js && npx tsx tests/updateVersionCheck.test.js && npx tsx tests/detailsDirectorSeasonCast.test.ts && npx tsx tests/rulesOfHooksDetails.test.ts && npx tsx tests/subtitleSyncTiming.test.ts && npx tsx tests/searchCountryFilter.test.ts",
+    "test": "npx tsx tests/episodeAirStatus.test.js && npx tsx tests/updateVersionCheck.test.js && npx tsx tests/detailsDirectorSeasonCast.test.ts && npx tsx tests/rulesOfHooksDetails.test.ts && npx tsx tests/subtitleSyncTiming.test.ts && npx tsx tests/searchCountryFilter.test.ts && npx tsx tests/watchHeaderYear.test.ts",
     "preview": "vite preview",
     "bump:patch": "npm version patch --no-git-tag-version",
     "bump:minor": "npm version minor --no-git-tag-version",
