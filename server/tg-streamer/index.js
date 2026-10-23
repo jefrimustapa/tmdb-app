@@ -4179,24 +4179,31 @@ async function refreshDocumentFileReference(client, targetDoc) {
     console.log(`[FILE_REF RECOVERY] Refreshing expired fileReference for Doc ID: ${docIdStr}...`);
     const dbRecord = db.getByDocId(docIdStr);
 
-    // Provider-agnostic candidate bot determination (#256)
-    const candidateBots = new Set();
-    if (dbRecord?.bot) candidateBots.add(dbRecord.bot.replace(/^@/, ''));
-    if (BOT_USERNAME) candidateBots.add(BOT_USERNAME.replace(/^@/, ''));
-    if (savedSettings?.targetBotUsernames) {
-      Object.values(savedSettings.targetBotUsernames).forEach(b => {
-        if (b) candidateBots.add(b.replace(/^@/, ''));
-      });
-    }
-    // Include known delivery bots across all supported providers
-    candidateBots.add('UnOfficialsBot');
-    candidateBots.add('guestmodebot');
-    candidateBots.add('Pencuri_Movie_Bot');
-    candidateBots.add('msm34bot');
-    candidateBots.add('msm32bot');
+    // Targeted origin bot determination (strictly target recorded bot when present)
+    const originBot = dbRecord?.bot ? dbRecord.bot.replace(/^@/, '') : null;
+    let botList = [];
 
-    const botList = Array.from(candidateBots).filter(Boolean);
-    const primaryBot = (dbRecord?.bot ? dbRecord.bot.replace(/^@/, '') : null) || botList[0] || BOT_USERNAME;
+    if (originBot) {
+      // Precise targeted recovery: only query the bot that actually delivered the document
+      botList = [originBot];
+    } else {
+      // Legacy fallback: assemble candidate bots dynamically
+      const candidateBots = new Set();
+      if (BOT_USERNAME) candidateBots.add(BOT_USERNAME.replace(/^@/, ''));
+      if (savedSettings?.targetBotUsernames) {
+        Object.values(savedSettings.targetBotUsernames).forEach(b => {
+          if (b) candidateBots.add(b.replace(/^@/, ''));
+        });
+      }
+      candidateBots.add('UnOfficialsBot');
+      candidateBots.add('guestmodebot');
+      candidateBots.add('Pencuri_Movie_Bot');
+      candidateBots.add('msm34bot');
+      candidateBots.add('msm32bot');
+      botList = Array.from(candidateBots).filter(Boolean);
+    }
+
+    const primaryBot = originBot || botList[0] || BOT_USERNAME;
 
     // 1. Direct message ID lookup on primary origin bot (fast path)
     if (dbRecord && dbRecord.msgId) {
@@ -4311,7 +4318,7 @@ async function refreshDocumentFileReference(client, targetDoc) {
       }
     }
 
-    console.warn(`[FILE_REF RECOVERY] Unable to refresh fileReference for Doc ID: ${docIdStr}. Evicting stale entry from DB...`);
+    console.warn(`[FILE_REF RECOVERY] Unable to refresh fileReference for Doc ID: ${docIdStr}${originBot ? ` on @${originBot}` : ''}. Evicting stale entry from DB...`);
     db.deleteByDocId(docIdStr);
     return null;
   })().finally(() => {
