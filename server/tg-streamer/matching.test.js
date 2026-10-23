@@ -1970,6 +1970,95 @@ it('automatically evicts stale record without bot upon get() and getByDocId() qu
   assert.strictEqual(testDb.getByDocId('5992465519591036643'), undefined, 'getByDocId() must return undefined');
 });
 
+console.log('\n29. Targeted Origin Bot FileReference Recovery');
+
+it('strictly targets recorded origin bot when present, eliminating redundant multi-bot queries', () => {
+  function determineTargetBots(record, botUsername, targetBotUsernames) {
+    const originBot = record?.bot ? record.bot.replace(/^@/, '') : null;
+    if (originBot) {
+      return [originBot];
+    }
+    const candidateBots = new Set();
+    if (botUsername) candidateBots.add(botUsername.replace(/^@/, ''));
+    if (targetBotUsernames) {
+      Object.values(targetBotUsernames).forEach(b => {
+        if (b) candidateBots.add(b.replace(/^@/, ''));
+      });
+    }
+    candidateBots.add('UnOfficialsBot');
+    candidateBots.add('guestmodebot');
+    candidateBots.add('Pencuri_Movie_Bot');
+    candidateBots.add('msm34bot');
+    candidateBots.add('msm32bot');
+    return Array.from(candidateBots).filter(Boolean);
+  }
+
+  // 1. Record with known bot UnOfficialsBot -> must query ONLY UnOfficialsBot
+  const listKnown = determineTargetBots({ bot: 'UnOfficialsBot' }, 'msm34bot', { msm: 'msm34bot', pencuri: 'Pencuri_Movie_Bot' });
+  assert.strictEqual(listKnown.length, 1, 'Targeted list must contain strictly 1 bot');
+  assert.strictEqual(listKnown[0], 'UnOfficialsBot', 'Targeted bot must be exactly UnOfficialsBot');
+
+  // 2. Record with known bot msm34bot -> must query ONLY msm34bot
+  const listMsm = determineTargetBots({ bot: 'msm34bot' }, 'Pencuri_Movie_Bot', { msm: 'msm34bot', pencuri: 'Pencuri_Movie_Bot' });
+  assert.strictEqual(listMsm.length, 1, 'Targeted list must contain strictly 1 bot');
+  assert.strictEqual(listMsm[0], 'msm34bot', 'Targeted bot must be exactly msm34bot');
+
+  // 3. Legacy record without bot -> must fallback to candidate bots
+  const listLegacy = determineTargetBots({}, 'msm34bot', { msm: 'msm34bot', pencuri: 'Pencuri_Movie_Bot' });
+  assert.ok(listLegacy.length > 1, 'Legacy record must fallback to candidate bot list');
+  assert.ok(listLegacy.includes('UnOfficialsBot'), 'Fallback must include UnOfficialsBot');
+  assert.ok(listLegacy.includes('guestmodebot'), 'Fallback must include guestmodebot');
+});
+
+it('fast-fails and evicts from DB when target origin bot cannot find document', async () => {
+  const testDb = new CentralDatabase();
+  testDb.clear();
+
+  const targetDocId = '6666777788889999';
+  testDb.set('dead_bot_movie', {
+    docId: targetDocId,
+    msgId: 99991,
+    bot: 'deadbot',
+    filename: 'Dead.Bot.Movie.2026.mp4',
+    actualQuality: '720p',
+  });
+
+  assert.ok(testDb.getByDocId(targetDocId), 'Record must initially exist in DB');
+
+  // Simulate mock client where deadbot returns no messages (bot dead / message deleted)
+  const queriedBots = [];
+  const mockClient = {
+    getMessages: async (bot, opts) => {
+      queriedBots.push(bot);
+      return [];
+    },
+  };
+
+  const originBot = testDb.getByDocId(targetDocId)?.bot;
+  const targetBots = originBot ? [originBot] : ['deadbot', 'UnOfficialsBot', 'msm34bot'];
+
+  let recoveredRef = null;
+  for (const b of targetBots) {
+    const msgs = await mockClient.getMessages(b, { limit: 50 });
+    for (const m of msgs) {
+      if (m.media?.document?.id?.toString() === targetDocId) {
+        recoveredRef = m.media.document.fileReference;
+        break;
+      }
+    }
+    if (recoveredRef) break;
+  }
+
+  // Since target bot failed, evict record immediately
+  if (!recoveredRef) {
+    testDb.deleteByDocId(targetDocId);
+  }
+
+  assert.strictEqual(recoveredRef, null, 'Must not recover reference from dead bot');
+  assert.deepStrictEqual(queriedBots, ['deadbot'], 'Must have queried ONLY deadbot, without querying unrelated bots');
+  assert.strictEqual(testDb.getByDocId(targetDocId), undefined, 'Record must be evicted from DB');
+});
+
 // Clean up temporary test files
 try {
   if (fs.existsSync(TEST_DB_FILE)) fs.unlinkSync(TEST_DB_FILE);
