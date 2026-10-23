@@ -256,12 +256,15 @@ console.log('\n7. Search Query Generation (generateSeriesSearchQueries)');
 it('generates the adaptive 12 query patterns without episode/episod for Season 1', () => {
   const queries = generateSeriesSearchQueries('Kelas Cikgu Hiragi', 1, 3, 1, '2024');
   const expectedPatterns = [
-    'Kelas Cikgu Hiragi EP03',
-    'Kelas Cikgu Hiragi E03',
-    'Kelas Cikgu Hiragi S01E03',
     'Kelas Cikgu Hiragi 2024 EP03',
     'Kelas Cikgu Hiragi 2024 E03',
     'Kelas Cikgu Hiragi 2024 S01E03',
+    'Kelas Cikgu Hiragi 2024 EP3',
+    'Kelas Cikgu Hiragi 2024 E3',
+    'Kelas Cikgu Hiragi 2024 S1E3',
+    'Kelas Cikgu Hiragi EP03',
+    'Kelas Cikgu Hiragi E03',
+    'Kelas Cikgu Hiragi S01E03',
     'Kelas Cikgu Hiragi EP3',
     'Kelas Cikgu Hiragi E3',
     'Kelas Cikgu Hiragi S1E3',
@@ -283,17 +286,20 @@ it('generates the adaptive 12 query patterns without episode/episod for Season 1
 it('generates the adaptive 12 query patterns without episode/episod for Multi-Season (sNum > 1)', () => {
   const queries = generateSeriesSearchQueries('Ted Lasso', 4, 9, 4, '2026');
   const expectedPatterns = [
-    'Ted Lasso S04E09',
     'Ted Lasso 2026 S04E09',
-    'Ted Lasso S4 EP09',
-    'Ted Lasso S04 EP09',
     'Ted Lasso 2026 EP09',
     'Ted Lasso 2026 E09',
+    'Ted Lasso 2026 S04E9',
+    'Ted Lasso 2026 EP9',
+    'Ted Lasso 2026 E9',
+    'Ted Lasso S04E09',
+    'Ted Lasso S4 EP09',
+    'Ted Lasso S04 EP09',
     'Ted Lasso S04E9',
     'Ted Lasso EP09',
     'Ted Lasso E09',
-    'Ted Lasso EP9',
     'Ted Lasso 2026',
+    'Ted Lasso EP9',
     'Ted Lasso'
   ];
 
@@ -305,6 +311,23 @@ it('generates the adaptive 12 query patterns without episode/episod for Multi-Se
   for (const q of queries) {
     assert.ok(!/\bepisod/i.test(q), `Query "${q}" should not contain episod or episode`);
   }
+});
+
+it('keeps the year-less query order unchanged when no year is known (#248)', () => {
+  assert.deepStrictEqual(generateSeriesSearchQueries('Ted Lasso', 4, 9, 4, null), [
+    'Ted Lasso S04E09', 'Ted Lasso S4 EP09', 'Ted Lasso S04 EP09', 'Ted Lasso S04E9',
+    'Ted Lasso EP09', 'Ted Lasso E09', 'Ted Lasso EP9', 'Ted Lasso',
+  ]);
+  assert.deepStrictEqual(generateSeriesSearchQueries('Bad Cop', 1, 1, 1, null), [
+    'Bad Cop EP01', 'Bad Cop E01', 'Bad Cop S01E01', 'Bad Cop EP1', 'Bad Cop E1', 'Bad Cop S1E1', 'Bad Cop S01', 'Bad Cop',
+  ]);
+});
+
+it('puts year variants (double then single digit) before year-less variants in batches of 3 (#248)', () => {
+  const q = generateSeriesSearchQueries('Bad Cop', 1, 1, 1, '2025');
+  assert.deepStrictEqual(q.slice(0, 3), ['Bad Cop 2025 EP01', 'Bad Cop 2025 E01', 'Bad Cop 2025 S01E01']);
+  assert.deepStrictEqual(q.slice(3, 6), ['Bad Cop 2025 EP1', 'Bad Cop 2025 E1', 'Bad Cop 2025 S1E1']);
+  assert.deepStrictEqual(q.slice(6, 9), ['Bad Cop EP01', 'Bad Cop E01', 'Bad Cop S01E01']);
 });
 
 console.log('\n8. Video Quality Detection & Pipeline Buffers (detectVideoQualityTier)');

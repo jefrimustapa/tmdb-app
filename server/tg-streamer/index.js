@@ -3882,7 +3882,7 @@ app.get(['/api/resolve', '/tg/api/resolve', '/msm/api/resolve', '/api/prefetch',
   const requestedTier = (targetQuality >= 2160 ? '4k' : targetQuality >= 1080 ? '1080p' : targetQuality <= 480 ? 'sd' : '720p');
   const inFlightKey = `${baseCacheKey}_${requestedTier}`;
 
-  console.log(`[${logPrefix}] Request: "${queryTitle}" (isTv: ${isTv}, maxQuality: ${targetQuality}, maxPages: ${effectiveMaxPages}, bypassCache: ${shouldBypassCache}, cacheKey: "${cacheKey}", tier: ${requestedTier}${altTitle ? `, altTitle: "${altTitle}"` : ''})`);
+  console.log(`[${logPrefix}] Request: "${queryTitle}" (isTv: ${isTv}, maxQuality: ${targetQuality}, maxPages: ${effectiveMaxPages}, bypassCache: ${shouldBypassCache}, cacheKey: "${cacheKey}", tier: ${requestedTier}${year ? `, year: ${year}` : ''}${altTitle ? `, altTitle: "${altTitle}"` : ''})`);
 
   let isAborted = false;
   const onClientClose = () => {
