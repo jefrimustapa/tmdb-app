@@ -10,6 +10,14 @@ export const DEFAULT_PIPELINE_BUFFERS = {
   '4k': 8,     // 8 x 512KB = 4.0 MB
 };
 
+/**
+ * Parallel MTProto block fetches for a quality tier: saved setting, then default, then 4.
+ * Only sizes the Telegram download pipeline; unrelated to ffmpeg process limits.
+ */
+export function getTierConcurrency(tier, pipelineBuffers) {
+  return (pipelineBuffers && pipelineBuffers[tier]) || DEFAULT_PIPELINE_BUFFERS[tier] || 4;
+}
+
 export function detectVideoQualityTier(filename = '', queryKey = '', targetDoc = null, customSize = null) {
   // 1. Genuine Telegram Video Dimensions (Highest authority: real pixel metadata of the stream)
   // Strictly check DocumentAttributeVideo only - NEVER use DocumentAttributeImageSize or generic (w && h) poster thumbnails!
