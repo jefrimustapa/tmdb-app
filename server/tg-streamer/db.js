@@ -159,8 +159,10 @@ export class CentralDatabase {
           this.byDocId.set(docIdStr, r);
         }
         console.log(`[DB] Successfully loaded ${this.byQuery.size} queries (${this.byDocId.size} unique docs) from ${this.dbFile}`);
+        const purgedStale = this.purgeStaleLegacyRecords(12 * 60 * 60 * 1000);
+        if (purgedStale > 0) diskNeedsSave = true;
         if (diskNeedsSave) {
-          console.log(`[DB] Deduplicated stream cache records on disk (#246).`);
+          console.log(`[DB] Deduplicated and synchronized stream cache records on disk.`);
           this.save();
         }
       }
@@ -219,6 +221,30 @@ export class CentralDatabase {
     }
   }
 
+  _isStaleNoBot(record, maxAgeMs = 12 * 60 * 60 * 1000) {
+    if (!record || record.bot) return false;
+    const now = Date.now();
+    const recordTime = Number(record.updatedAt || record.createdAt || (record.date ? record.date * 1000 : 0) || 0);
+    // Only purge real timestamps (> year 2001), ignoring synthetic test numbers (e.g. 1000, 2000)
+    if (!recordTime || recordTime < 1000000000000) return false;
+    return (now - recordTime) > maxAgeMs;
+  }
+
+  purgeStaleLegacyRecords(maxAgeMs = 12 * 60 * 60 * 1000) {
+    let purged = 0;
+    for (const [docId, r] of Array.from(this.byDocId.entries())) {
+      if (this._isStaleNoBot(r, maxAgeMs)) {
+        this.deleteByDocId(docId);
+        purged++;
+      }
+    }
+    if (purged > 0) {
+      console.log(`[DB] Auto-purged ${purged} stale legacy stream records without bot name (> ${Math.round(maxAgeMs / 3600000)}h).`);
+      this.save();
+    }
+    return purged;
+  }
+
   get(queryKey, targetQuality) {
     if (!queryKey) return undefined;
     const cleanKey = this._stripQualitySuffix(queryKey);
@@ -238,8 +264,23 @@ export class CentralDatabase {
         }
       }
     }
+    if (docs && docs.length > 0) {
+      const validDocs = [];
+      for (const d of docs) {
+        if (this._isStaleNoBot(d)) {
+          this.deleteByDocId(d.docId);
+        } else {
+          validDocs.push(d);
+        }
+      }
+      docs = validDocs.length > 0 ? validDocs : undefined;
+    }
     if (!docs || docs.length === 0) {
       const docRecord = this.byDocId.get(String(queryKey));
+      if (docRecord && this._isStaleNoBot(docRecord)) {
+        this.deleteByDocId(String(queryKey));
+        return undefined;
+      }
       return docRecord || undefined;
     }
 
@@ -281,6 +322,17 @@ export class CentralDatabase {
         }
       }
     }
+    if (docs && docs.length > 0) {
+      const validDocs = [];
+      for (const d of docs) {
+        if (this._isStaleNoBot(d)) {
+          this.deleteByDocId(d.docId);
+        } else {
+          validDocs.push(d);
+        }
+      }
+      docs = validDocs.length > 0 ? validDocs : undefined;
+    }
     if (!docs || docs.length === 0) return undefined;
 
     let preferred = [];
@@ -298,7 +350,12 @@ export class CentralDatabase {
   }
 
   getByDocId(docId) {
-    return this.byDocId.get(String(docId));
+    const record = this.byDocId.get(String(docId));
+    if (record && this._isStaleNoBot(record)) {
+      this.deleteByDocId(String(docId));
+      return undefined;
+    }
+    return record;
   }
 
   findByTitleAndQuality(baseCacheKey, targetQuality) {
