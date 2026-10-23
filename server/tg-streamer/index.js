@@ -93,6 +93,7 @@ import {
   parseSizeFromText,
   generateSeriesSearchQueries,
   DEFAULT_PIPELINE_BUFFERS,
+  getTierConcurrency,
   JUNK_MEDIA_REGEX,
   searchPencariApi,
   formatDiagnosticResults,
@@ -1198,8 +1199,8 @@ app.get(['/api/system/stats', '/tg/api/system/stats', '/msm/api/system/stats'], 
       clientName: stream.clientName || stream.ip || 'Client',
       filename: stream.filename || 'media',
       qualityTier: stream.qualityTier || detectVideoQualityTier(stream.filename || ''),
-      concurrency: stream.concurrency || 4,
-      pipelineMB: stream.concurrency ? (stream.concurrency * 0.5).toFixed(1) : '2.0',
+      concurrency: stream.concurrency || getTierConcurrency(stream.qualityTier || detectVideoQualityTier(stream.filename || ''), savedSettings.pipelineBuffers),
+      pipelineMB: ((stream.concurrency || getTierConcurrency(stream.qualityTier || detectVideoQualityTier(stream.filename || ''), savedSettings.pipelineBuffers)) * 0.5).toFixed(1),
       isPrefetchOverlapped: stream.isPrefetchOverlapped !== false,
       mode: stream.mode || 'Direct Native',
       status: isStreaming ? 'STREAMING' : 'IDLE',
@@ -2011,23 +2012,23 @@ app.get(['/tg', '/msm/dashboard'], (req, res) => {
       <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-2.5">
         <div class="bg-slate-950/70 border border-slate-800/80 rounded-xl p-2.5">
           <span class="text-[10px] text-slate-400 font-semibold block uppercase">SD Pipeline</span>
-          <span id="stripBufSd" class="text-xs font-bold font-mono text-emerald-400 block mt-0.5">2 × 512KB</span>
-          <span class="text-[10px] text-slate-500 font-mono block">1.0 MB in-flight</span>
+          <span id="stripBufSd" class="text-xs font-bold font-mono text-emerald-400 block mt-0.5">${getTierConcurrency('sd', savedSettings.pipelineBuffers)} × 512KB</span>
+          <span id="stripBufSdMb" class="text-[10px] text-slate-500 font-mono block">${(getTierConcurrency('sd', savedSettings.pipelineBuffers) * 0.5).toFixed(1)} MB in-flight</span>
         </div>
         <div class="bg-slate-950/70 border border-slate-800/80 rounded-xl p-2.5">
           <span class="text-[10px] text-slate-400 font-semibold block uppercase">720p Pipeline</span>
-          <span id="stripBuf720" class="text-xs font-bold font-mono text-emerald-400 block mt-0.5">4 × 512KB</span>
-          <span class="text-[10px] text-slate-500 font-mono block">2.0 MB in-flight</span>
+          <span id="stripBuf720" class="text-xs font-bold font-mono text-emerald-400 block mt-0.5">${getTierConcurrency('720p', savedSettings.pipelineBuffers)} × 512KB</span>
+          <span id="stripBuf720Mb" class="text-[10px] text-slate-500 font-mono block">${(getTierConcurrency('720p', savedSettings.pipelineBuffers) * 0.5).toFixed(1)} MB in-flight</span>
         </div>
         <div class="bg-slate-950/70 border border-slate-800/80 rounded-xl p-2.5">
           <span class="text-[10px] text-slate-400 font-semibold block uppercase">1080p Pipeline</span>
-          <span id="stripBuf1080" class="text-xs font-bold font-mono text-sky-400 block mt-0.5">6 × 512KB</span>
-          <span class="text-[10px] text-slate-500 font-mono block">3.0 MB in-flight</span>
+          <span id="stripBuf1080" class="text-xs font-bold font-mono text-sky-400 block mt-0.5">${getTierConcurrency('1080p', savedSettings.pipelineBuffers)} × 512KB</span>
+          <span id="stripBuf1080Mb" class="text-[10px] text-slate-500 font-mono block">${(getTierConcurrency('1080p', savedSettings.pipelineBuffers) * 0.5).toFixed(1)} MB in-flight</span>
         </div>
         <div class="bg-slate-950/70 border border-slate-800/80 rounded-xl p-2.5">
           <span class="text-[10px] text-slate-400 font-semibold block uppercase">4K Pipeline</span>
-          <span id="stripBuf4k" class="text-xs font-bold font-mono text-purple-400 block mt-0.5">8 × 512KB</span>
-          <span class="text-[10px] text-slate-500 font-mono block">4.0 MB in-flight</span>
+          <span id="stripBuf4k" class="text-xs font-bold font-mono text-purple-400 block mt-0.5">${getTierConcurrency('4k', savedSettings.pipelineBuffers)} × 512KB</span>
+          <span id="stripBuf4kMb" class="text-[10px] text-slate-500 font-mono block">${(getTierConcurrency('4k', savedSettings.pipelineBuffers) * 0.5).toFixed(1)} MB in-flight</span>
         </div>
         <div class="bg-slate-950/70 border border-slate-800/80 rounded-xl p-2.5">
           <span class="text-[10px] text-slate-400 font-semibold block uppercase">Overlap Prefetch</span>
@@ -2217,10 +2218,15 @@ app.get(['/tg', '/msm/dashboard'], (req, res) => {
         // 6. Buffering Performance Strip
         if (d.pipelineBuffers) {
           const p = d.pipelineBuffers;
-          if (p.sd) document.getElementById('stripBufSd').textContent = p.sd + ' × 512KB';
-          if (p['720p']) document.getElementById('stripBuf720').textContent = p['720p'] + ' × 512KB';
-          if (p['1080p']) document.getElementById('stripBuf1080').textContent = p['1080p'] + ' × 512KB';
-          if (p['4k']) document.getElementById('stripBuf4k').textContent = p['4k'] + ' × 512KB';
+          const setStripBuf = (id, n) => {
+            if (!n) return;
+            document.getElementById(id).textContent = n + ' × 512KB';
+            document.getElementById(id + 'Mb').textContent = (n * 0.5).toFixed(1) + ' MB in-flight';
+          };
+          setStripBuf('stripBufSd', p.sd);
+          setStripBuf('stripBuf720', p['720p']);
+          setStripBuf('stripBuf1080', p['1080p']);
+          setStripBuf('stripBuf4k', p['4k']);
         }
         if (d.overlapPrefetch !== undefined) {
           const el = document.getElementById('stripPrefetch');
@@ -2269,7 +2275,7 @@ app.get(['/tg', '/msm/dashboard'], (req, res) => {
                 : '<span class="inline-flex items-center gap-1 text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20 font-medium text-[10px]">⏸ Idle (' + (c.idleSec || 0) + 's)</span>';
 
               const tierBadge = '<span class="text-sky-300 font-mono font-bold uppercase">' + escapeHtml(c.qualityTier || '720p') + '</span> · ' +
-                (c.concurrency || 4) + '×512KB (' + (c.pipelineMB || '2.0') + ' MB)';
+                c.concurrency + '×512KB (' + c.pipelineMB + ' MB)';
 
               rowsHtml += '<tr class="text-slate-300 hover:bg-slate-800/40 transition">' +
                 '<td class="py-2 px-2.5 font-bold text-sky-400 font-sans flex items-center gap-1.5">📺 ' + escapeHtml(c.clientName || 'Client') + '</td>' +
@@ -4356,9 +4362,11 @@ async function streamTelegramPipelined(client, targetDoc, startByte, endByte, re
   const isInternal = req?.headers?.['x-internal-transcoder'] === '1' || req?.query?.direct === '1';
   const parentSessionKey = req?.headers?.['x-parent-session'] || req?.query?.parentSession;
   const clientIdentity = resolveClientIdentity(req?.headers?.['x-forwarded-for'] || req?.ip || req?.socket?.remoteAddress, req);
+  const requestedConcurrency = CONCURRENCY;
   if (isProbe) {
     CONCURRENCY = Math.min(CONCURRENCY, 3); // Fast metadata & cues retrieval without timeout
   }
+  const probeCapped = CONCURRENCY < requestedConcurrency;
 
   const streamKey = passedStreamKey || `${isInternal ? (parentSessionKey ? `worker-${parentSessionKey}` : `internal-${Date.now()}`) : clientIdentity.ip}:${targetDoc.id}`;
 
@@ -4373,7 +4381,17 @@ async function streamTelegramPipelined(client, targetDoc, startByte, endByte, re
   let aborted = false;
   const inFlight = new Map();
 
+  // Close diagnostics (issue #257): why/when a pipeline ended and how far it got.
+  const pipeStartedAt = Date.now();
+  let firstBlockMs = null;
+  let blocksSent = 0;
+  let endReason = null;
+  const pipeSummary = () =>
+    `sent ${blocksSent} blocks, first block ${firstBlockMs === null ? 'n/a' : firstBlockMs + 'ms'}, ` +
+    `concurrency ${CONCURRENCY}${probeCapped ? ` (probe-capped from ${requestedConcurrency})` : ''}, lived ${Date.now() - pipeStartedAt}ms`;
+
   const abortPipeline = () => {
+    if (!endReason) endReason = 'superseded';
     aborted = true;
     inFlight.clear();
   };
@@ -4410,9 +4428,10 @@ async function streamTelegramPipelined(client, targetDoc, startByte, endByte, re
   }
 
   const onReqClose = () => {
+    endReason = 'client-closed';
     abortPipeline();
     cleanupStream();
-    console.log(`[PIPELINE CLOSED] [${clientIdentity.name} (${clientIdentity.ip})] active: block ${activeBlock}/${endBlock}, aborted remaining blocks.`);
+    console.log(`[PIPELINE CLOSED] [${clientIdentity.name} (${clientIdentity.ip})] active: block ${activeBlock}/${endBlock}, aborted remaining blocks. reason: client-closed, ${pipeSummary()}`);
   };
   const onResFinish = () => {
     cleanupStream();
@@ -4481,7 +4500,7 @@ async function streamTelegramPipelined(client, targetDoc, startByte, endByte, re
     thumbSize: '',
   });
 
-  console.log(`[PIPELINE START] [${clientIdentity.name} (${clientIdentity.ip})] blocks ${startBlock}..${endBlock} (${endBlock - startBlock + 1} blocks), concurrency: ${CONCURRENCY}, chunkSize: ${CHUNK_SIZE / 1024}KB`);
+  console.log(`[PIPELINE START] [${clientIdentity.name} (${clientIdentity.ip})] blocks ${startBlock}..${endBlock} (${endBlock - startBlock + 1} blocks), concurrency: ${CONCURRENCY}, chunkSize: ${CHUNK_SIZE / 1024}KB${probeCapped ? `, probe-capped from ${requestedConcurrency}` : ''}`);
 
   async function fetchBlock(blockIdx) {
     if (aborted) return null;
@@ -4656,8 +4675,10 @@ async function streamTelegramPipelined(client, targetDoc, startByte, endByte, re
   const firstBlockStart = startBlock * CHUNK_SIZE;
   const firstSliceStart = Math.max(0, startByte - firstBlockStart);
   const firstSliceEnd = Math.min(firstBlockData.length, (endByte - firstBlockStart) + 1);
+  firstBlockMs = Date.now() - pipeStartedAt;
   if (firstSliceStart < firstSliceEnd) {
     await writeWithBackpressure(res, firstBlockData.subarray(firstSliceStart, firstSliceEnd), touchActive);
+    blocksSent++;
   }
   firstBlockData = null; // Explicitly release 512KB buffer immediately for GC
 
@@ -4688,11 +4709,15 @@ async function streamTelegramPipelined(client, targetDoc, startByte, endByte, re
     if (sliceStart < sliceEnd) {
       const slice = buffer.subarray(sliceStart, sliceEnd);
       await writeWithBackpressure(res, slice, touchActive);
+      blocksSent++;
     }
   }
 
   } finally {
     cleanupStream();
+    if (endReason !== 'client-closed') {
+      console.log(`[PIPELINE END] [${clientIdentity.name} (${clientIdentity.ip})] reason: ${endReason || 'finished'}, ${pipeSummary()}`);
+    }
     if (!res.writableEnded) {
       try { res.end(); } catch {}
     }
@@ -5065,7 +5090,7 @@ app.get('/stream/:docId', async (req, res) => {
     if (shouldTranscode) {
       const seekSec = Math.max(0, parseFloat(req.query.ss) || 0);
       const detectedTier = detectVideoQualityTier(filename, '', targetDoc);
-      const tierConcurrency = (savedSettings.pipelineBuffers && savedSettings.pipelineBuffers[detectedTier]) || DEFAULT_PIPELINE_BUFFERS[detectedTier] || 4;
+      const tierConcurrency = getTierConcurrency(detectedTier, savedSettings.pipelineBuffers);
 
       let mediaDetails = { audioMapSpecifier: '0:a:0', videoCodec: '', isHevc: false, isLegacyVideo: false };
       try {
@@ -5294,7 +5319,7 @@ app.get('/stream/:docId', async (req, res) => {
 
     // Detect video resolution quality tier (sd, 720p, 1080p, 4k) based on ACTUAL media (never downgraded by requested queryKey)
     const detectedTier = detectVideoQualityTier(filename, '', targetDoc);
-    const tierConcurrency = (savedSettings.pipelineBuffers && savedSettings.pipelineBuffers[detectedTier]) || DEFAULT_PIPELINE_BUFFERS[detectedTier] || 4;
+    const tierConcurrency = getTierConcurrency(detectedTier, savedSettings.pipelineBuffers);
 
     // Parse user-specified chunk size / pipeline mode from query parameter (for debug or backward compatibility)
     const parsedChunk = parseInt(req.query.chunkSize, 10);
@@ -5530,6 +5555,7 @@ export {
   attachServerErrorHandler,
   getTranscodeContainerConfig,
   DEFAULT_PIPELINE_BUFFERS,
+  getTierConcurrency,
   detectVideoQualityTier,
   BaseResolver,
   MsmResolver,
