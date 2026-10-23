@@ -21,6 +21,7 @@ import {
   validateTitleBoundaries,
   buildSearchQueries,
   scoreCandidateWithReason,
+  validateDeliveredDocument,
 } from './base.js';
 
 // Singleton HTTPS Agent with bounded keepalive pooling for zero memory leaks (#252)
@@ -532,6 +533,7 @@ export class PencuriResolver extends BaseResolver {
       let deliveredBot = deliveryBot;
       let resolvedFilename = file.title;
       let fsubDetected = false;
+      const rejectedMsgIds = new Set();
 
       for (let attempt = 0; attempt < 12; attempt++) {
         if (checkAborted()) break;
@@ -554,11 +556,22 @@ export class PencuriResolver extends BaseResolver {
             if (im.id > baseId) {
               // 1. Direct document delivery check
               if (im.media?.document && im.media.document.size > 10000000) {
-                deliveredDoc = im.media.document;
+                const doc = im.media.document;
+                const fnAttr = doc.attributes?.find(a => a.className === 'DocumentAttributeFilename');
+                const docName = fnAttr ? fnAttr.fileName : file.title;
+                // Providers can deliver the wrong file for a short code (#266); never accept a mismatched title/episode
+                const verdict = validateDeliveredDocument({ filename: docName, caption: im.message, sizeBytes: doc.size }, evalContext);
+                if (!verdict.ok) {
+                  if (!rejectedMsgIds.has(im.id)) {
+                    rejectedMsgIds.add(im.id);
+                    console.warn(`[PENCURI RESOLVE] Ignoring mismatched delivered document "${docName}" for "${title}"${isTv ? ` S${sNum}E${eNum}` : ''} (${verdict.reason})`);
+                  }
+                  continue;
+                }
+                deliveredDoc = doc;
                 deliveredMsgId = im.id;
                 deliveredBot = b;
-                const fnAttr = deliveredDoc.attributes?.find(a => a.className === 'DocumentAttributeFilename');
-                if (fnAttr) resolvedFilename = fnAttr.fileName;
+                resolvedFilename = docName;
                 break;
               }
 
