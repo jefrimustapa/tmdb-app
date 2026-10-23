@@ -24,57 +24,51 @@ export function generateSeriesSearchQueries(cleanT, sNum, eNum, totalSeasons, ye
     }
   };
 
+  // Queries run in batches of 3; with a year, each batch lists the year variants before the year-less ones
+  // so results tied to the right release are gathered first (#248).
   if (sNum > 1) {
     // Multi-Season (sNum > 1): Season tags are crucial to prevent picking wrong season
-    // 1. Scene standard
-    addQuery(`${cleanT} S${s2}E${e2}`);
-    // 2. Scene standard with year
+    // Batch 1: year variants
     if (year) addQuery(`${cleanT} ${year} S${s2}E${e2}`);
-    // 3. Single digit season + EP
-    addQuery(`${cleanT} S${sNum} EP${e2}`);
-    // 4. Double digit season + EP
-    addQuery(`${cleanT} S${s2} EP${e2}`);
-    // 5. Year + EP (uploader might use year to distinguish season)
     if (year) addQuery(`${cleanT} ${year} EP${e2}`);
-    // 6. Year + E
     if (year) addQuery(`${cleanT} ${year} E${e2}`);
-    // 7. Scene standard single digit episode
+    // Batch 2: year variants of the single-digit forms (providers often name files EP9, not EP09)
+    if (year) addQuery(`${cleanT} ${year} S${s2}E${e1}`);
+    if (year) addQuery(`${cleanT} ${year} EP${e1}`);
+    if (year) addQuery(`${cleanT} ${year} E${e1}`);
+    // Batch 3: scene standard + season/EP forms
+    addQuery(`${cleanT} S${s2}E${e2}`);
+    addQuery(`${cleanT} S${sNum} EP${e2}`);
+    addQuery(`${cleanT} S${s2} EP${e2}`);
+    // Batch 4: single digit episode + base EP/E
     addQuery(`${cleanT} S${s2}E${e1}`);
-    // 8. Base EP double digit
     addQuery(`${cleanT} EP${e2}`);
-    // 9. Base E double digit
     addQuery(`${cleanT} E${e2}`);
-    // 10. Base EP single digit
-    addQuery(`${cleanT} EP${e1}`);
-    // 11. Year alone
+    // Batch 5: year alone, single digit EP, title alone
     if (year) addQuery(`${cleanT} ${year}`);
-    // 12. Title alone
+    addQuery(`${cleanT} EP${e1}`);
     addQuery(cleanT);
   } else {
     // Season 1 (sNum === 1): Asian / local dramas rarely tag S01; they use EPxx / Exx
-    // 1. Base EP double digit
-    addQuery(`${cleanT} EP${e2}`);
-    // 2. Base E double digit
-    addQuery(`${cleanT} E${e2}`);
-    // 3. S01 standard
-    addQuery(`${cleanT} S01E${e2}`);
-    // 4. Year + EP
+    // Batch 1: year variants
     if (year) addQuery(`${cleanT} ${year} EP${e2}`);
-    // 5. Year + E
     if (year) addQuery(`${cleanT} ${year} E${e2}`);
-    // 6. Year + S01 standard
     if (year) addQuery(`${cleanT} ${year} S01E${e2}`);
-    // 7. Base EP single digit
+    // Batch 2: year variants of the single-digit forms (providers often name files EP2, not EP02)
+    if (year) addQuery(`${cleanT} ${year} EP${e1}`);
+    if (year) addQuery(`${cleanT} ${year} E${e1}`);
+    if (year) addQuery(`${cleanT} ${year} S1E${e1}`);
+    // Batch 3: base double digit
+    addQuery(`${cleanT} EP${e2}`);
+    addQuery(`${cleanT} E${e2}`);
+    addQuery(`${cleanT} S01E${e2}`);
+    // Batch 4: base single digit
     addQuery(`${cleanT} EP${e1}`);
-    // 8. Base E single digit
     addQuery(`${cleanT} E${e1}`);
-    // 9. S1 standard single digit
     addQuery(`${cleanT} S1E${e1}`);
-    // 10. Year alone
+    // Batch 5: year alone, season 1 alone, title alone
     if (year) addQuery(`${cleanT} ${year}`);
-    // 11. Season 1 alone
     addQuery(`${cleanT} S01`);
-    // 12. Title alone
     addQuery(cleanT);
   }
 
