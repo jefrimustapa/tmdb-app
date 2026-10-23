@@ -19,6 +19,7 @@ import {
   generateSeriesSearchQueries,
   detectVideoQualityTier,
   DEFAULT_PIPELINE_BUFFERS,
+  getTierConcurrency,
   getBlockCacheMaxEntries,
   isAllowedTitleSuffix,
   validateTitleBoundaries,
@@ -340,6 +341,26 @@ it('provides expected default pipeline buffer values per tier', () => {
   assert.strictEqual(DEFAULT_PIPELINE_BUFFERS['720p'], 4); // 4 x 512KB = 2.0 MB
   assert.strictEqual(DEFAULT_PIPELINE_BUFFERS['1080p'], 6); // 6 x 512KB = 3.0 MB
   assert.strictEqual(DEFAULT_PIPELINE_BUFFERS['4k'], 8);    // 8 x 512KB = 4.0 MB
+});
+
+it('getTierConcurrency prefers the saved setting over the default (e.g. 1080p set to 10)', () => {
+  assert.strictEqual(getTierConcurrency('1080p', { ...DEFAULT_PIPELINE_BUFFERS, '1080p': 10 }), 10);
+  assert.strictEqual(getTierConcurrency('sd', { sd: 3 }), 3);
+});
+
+it('getTierConcurrency falls back to the tier default, then to 4', () => {
+  assert.strictEqual(getTierConcurrency('1080p', {}), DEFAULT_PIPELINE_BUFFERS['1080p']);
+  assert.strictEqual(getTierConcurrency('4k', undefined), DEFAULT_PIPELINE_BUFFERS['4k']);
+  assert.strictEqual(getTierConcurrency('unknown-tier', {}), 4);
+});
+
+it('resolves the same concurrency for msm- and pencuri-style files of the same tier (provider agnostic)', () => {
+  const buffers = { ...DEFAULT_PIPELINE_BUFFERS, '1080p': 10 };
+  const msmTier = detectVideoQualityTier('Fall.2.Deadpoint.2026.1080p.MalaySub.WEB.MSM.mp4');
+  const pencuriTier = detectVideoQualityTier('Fall 2 Deadpoint (2026) 1080p WEB-DL.mkv');
+  assert.strictEqual(msmTier, '1080p');
+  assert.strictEqual(pencuriTier, '1080p');
+  assert.strictEqual(getTierConcurrency(msmTier, buffers), getTierConcurrency(pencuriTier, buffers));
 });
 
 console.log('\n9. 480p and 4K Candidate Scoring & Dynamic Block Cache');
