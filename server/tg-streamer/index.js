@@ -2660,7 +2660,9 @@ app.get(['/tg/streams', '/msm/cache'], (req, res) => {
         const key = (item.queryKey || '').toLowerCase();
         const doc = String(item.docId || '').toLowerCase();
         const reqStr = (Array.isArray(item.requestedQualities) ? item.requestedQualities.join(' ') : (item.requestedQuality || '')).toLowerCase();
-        return fn.includes(q) || key.includes(q) || doc.includes(q) || reqStr.includes(q);
+        const botStr = (item.bot || '').toLowerCase();
+        const resStr = (item.resolver || '').toLowerCase();
+        return fn.includes(q) || key.includes(q) || doc.includes(q) || reqStr.includes(q) || botStr.includes(q) || resStr.includes(q);
       });
 
       filtered.sort((a, b) => {
@@ -2724,6 +2726,8 @@ app.get(['/tg/streams', '/msm/cache'], (req, res) => {
               '<span class="px-2 py-0.5 rounded bg-sky-500/10 text-sky-400 border border-sky-500/20 font-bold">' + escapeHtml(item.sizeFormatted) + '</span>' +
               '<span class="px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700/70">Key: ' + escapeHtml(item.queryKey || '--') + '</span>' +
               reqBadge +
+              (item.bot ? '<span class="px-2 py-0.5 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 font-medium">🤖 @' + escapeHtml(item.bot.replace(/^@/, '')) + '</span>' : '') +
+              (item.resolver ? '<span class="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 uppercase font-medium">' + escapeHtml(item.resolver) + '</span>' : '') +
               '<span class="px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700/70">DC ' + escapeHtml(item.dcId || 4) + '</span>' +
               (item.videoCodec ? '<span class="px-2 py-0.5 rounded bg-purple-500/10 text-purple-400 border border-purple-500/20 uppercase">' + escapeHtml(item.videoCodec) + '</span>' : '') +
               '<span class="text-slate-500 text-[10px]">' + escapeHtml(dateStr) + '</span>' +
@@ -3755,6 +3759,9 @@ app.get(['/api/cache', '/tg/api/cache', '/msm/api/cache'], (req, res) => {
       queryKey: item.queryKey,
       docId: item.docId,
       filename: item.filename,
+      bot: item.bot,
+      resolver: item.resolver,
+      msgId: item.msgId,
       size: !isNaN(bytes) ? bytes : 0,
       sizeFormatted,
       qualityTier,
