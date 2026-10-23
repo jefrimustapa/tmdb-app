@@ -323,79 +323,13 @@ export class PencuriResolver extends BaseResolver {
       minMovieSizeMb: effectiveMinMovie,
     };
 
-    // 1. Check recent chat messages in both targetBot and UnOfficialsBot concurrently (#252)
-    const botsToCheck = [targetBot, 'UnOfficialsBot'];
-    const matchingRecentDocs = [];
-
-    const recentResults = await Promise.allSettled(
-      botsToCheck.map(bName => this.client.getMessages(bName, { limit: 25 }))
-    );
-
-    for (let i = 0; i < botsToCheck.length; i++) {
-      const bName = botsToCheck[i];
-      const res = recentResults[i];
-      if (res.status === 'fulfilled' && Array.isArray(res.value)) {
-        for (const msg of res.value) {
-          if (msg.media?.document) {
-            const doc = msg.media.document;
-            const fnAttr = doc.attributes?.find(a => a.className === 'DocumentAttributeFilename');
-            const filename = fnAttr ? fnAttr.fileName : msg.message;
-            const docSizeMB = Number(doc.size || 0) / (1024 * 1024);
-
-            const evalRes = scoreCandidateWithReason({
-              text: filename,
-              contextText: msg.message,
-              sizeMB: docSizeMB,
-            }, evalContext);
-
-            if (evalRes.score > 0) {
-              matchingRecentDocs.push({
-                doc,
-                filename,
-                msgId: msg.id,
-                tier: evalRes.tier,
-                bot: bName,
-                qualityScore: evalRes.score,
-              });
-            }
-          }
-        }
-      } else if (res.status === 'rejected') {
-        console.warn(`[PENCURI CHAT] Error checking messages for @${bName}:`, res.reason?.message);
-      }
-    }
-
-    if (matchingRecentDocs.length > 0) {
-      matchingRecentDocs.sort((a, b) => b.qualityScore - a.qualityScore);
-      const chosen = matchingRecentDocs[0];
-      let isTargetQualityMet = false;
-      if (targetQuality >= 2160) {
-        isTargetQualityMet = chosen.tier === '4k';
-      } else if (targetQuality >= 1080) {
-        isTargetQualityMet = chosen.tier === '1080p' || chosen.tier === '4k';
-      } else if (targetQuality <= 480) {
-        isTargetQualityMet = chosen.tier === 'sd';
-      } else {
-        isTargetQualityMet = chosen.tier === '720p';
-      }
-
-      if (isTargetQualityMet && chosen.qualityScore >= 150) {
-        console.log(`[PENCURI RESOLVE] Found matching recent document in @${chosen.bot}: ${chosen.filename} (${chosen.tier}, score: ${chosen.qualityScore})`);
-        return {
-          document: chosen.doc,
-          filename: chosen.filename,
-          msgId: chosen.msgId,
-          tier: chosen.tier,
-        };
-      }
-    }
-
-    // 2. Prepare prioritized search queries (unified across resolvers)
+    // 1. Prepare prioritized search queries (unified across resolvers)
     const uniqueSearchQueries = buildSearchQueries(params);
 
-    // 3. Query search API for candidate files in concurrent batches (#252)
+    // 2. Query search API for candidate files in concurrent batches (#252)
     const candidateFiles = [];
     const seenFileIds = new Set();
+    const foundByQuery = new Map(); // file id -> first query that returned it
     const BATCH_SIZE = 3;
 
     for (let i = 0; i < uniqueSearchQueries.length; i += BATCH_SIZE) {
@@ -418,6 +352,7 @@ export class PencuriResolver extends BaseResolver {
           for (const f of files) {
             if (!seenFileIds.has(f.id)) {
               seenFileIds.add(f.id);
+              foundByQuery.set(f.id, sq);
               candidateFiles.push(f);
             }
           }
@@ -442,32 +377,34 @@ export class PencuriResolver extends BaseResolver {
       }
     }
 
-    // 4. Score API candidates using shared agnostic scoring
-    const validCandidates = [];
+    // 3. Score API candidates using shared agnostic scoring
+    const scored = [];
     for (const f of candidateFiles) {
       const fn = f.title || '';
       const sizeMB = Number(f.file_size || 0) / (1024 * 1024);
       const evalRes = scoreCandidateWithReason({ text: fn, sizeMB }, evalContext);
-
-      console.log(`[PENCURI SCORE] Candidate: "${fn}" (${sizeMB.toFixed(1)} MB) | Tier: ${evalRes.tier} | Score: ${evalRes.score} | Decision: ${evalRes.reason}`);
-
-      if (evalRes.score > 0) {
-        validCandidates.push({
-          file: f,
-          score: evalRes.score,
-          tier: evalRes.tier,
-          reason: evalRes.reason,
-        });
-      }
+      scored.push({ file: f, fn, sizeMB, score: evalRes.score, tier: evalRes.tier, reason: evalRes.reason, accepted: evalRes.score > 0 });
     }
 
-    validCandidates.sort((a, b) => b.score - a.score);
+    const validCandidates = scored
+      .filter(c => c.accepted)
+      .sort((a, b) => b.score - a.score)
+      .map(c => ({ file: c.file, score: c.score, tier: c.tier, reason: c.reason }));
 
-    // 5. Try triggering delivery for the best candidates
-    for (const cand of validCandidates) {
+    // Log every candidate with its score and ACCEPT/REJECT verdict (accepted ranked first, best score first)
+    const rankOf = new Map(validCandidates.map((c, idx) => [c.file.id, idx + 1]));
+    const logOrder = [...scored].sort((a, b) => (b.accepted - a.accepted) || (b.score - a.score));
+    for (const c of logOrder) {
+      const verdict = c.accepted ? `ACCEPT #${rankOf.get(c.file.id)}` : 'REJECT';
+      console.log(`[PENCURI SCORE] ${verdict} "${c.fn}" | ${c.sizeMB.toFixed(1)} MB | tier: ${c.tier || 'n/a'} | score: ${c.score} | shortcode: ${c.file.short_code} | via: "${foundByQuery.get(c.file.id) || 'n/a'}" | ${c.reason}`);
+    }
+    console.log(`[PENCURI SCORE] ${scored.length} candidate(s) from ${uniqueSearchQueries.length} planned queries: ${validCandidates.length} accepted, ${scored.length - validCandidates.length} rejected${validCandidates.length ? '' : ' (no acceptable candidate)'}`);
+
+    // 4. Try triggering delivery for the best candidates
+    for (const [candIdx, cand] of validCandidates.entries()) {
       if (checkAborted()) break;
       const file = cand.file;
-      console.log(`[PENCURI RESOLVE] Selected candidate "${file.title}" (tier: ${cand.tier}, score: ${cand.score}, shortcode: ${file.short_code})`);
+      console.log(`[PENCURI RESOLVE] Selected candidate ${candIdx + 1}/${validCandidates.length} "${file.title}" (tier: ${cand.tier}, score: ${cand.score}, shortcode: ${file.short_code})`);
 
       const linkDetails = await fetchPencariLinkDetails(file.play_url || `https://unofficialsbot.pencarimovie.com/link/${file.short_code}`);
 
@@ -564,10 +501,11 @@ export class PencuriResolver extends BaseResolver {
                 if (!verdict.ok) {
                   if (!rejectedMsgIds.has(im.id)) {
                     rejectedMsgIds.add(im.id);
-                    console.warn(`[PENCURI RESOLVE] Ignoring mismatched delivered document "${docName}" for "${title}"${isTv ? ` S${sNum}E${eNum}` : ''} (${verdict.reason})`);
+                    console.warn(`[PENCURI RESOLVE] REJECT delivered document "${docName}" for "${title}"${isTv ? ` S${sNum}E${eNum}` : ''} (${verdict.reason}), ignoring`);
                   }
                   continue;
                 }
+                console.log(`[PENCURI RESOLVE] ACCEPT delivered document "${docName}" (score: ${verdict.score}, ${verdict.reason})`);
                 deliveredDoc = doc;
                 deliveredMsgId = im.id;
                 deliveredBot = b;
