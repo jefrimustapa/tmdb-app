@@ -13,6 +13,7 @@ import {
   isBareButton,
   normalizeTitle,
   scoreCandidateWithReason,
+  validateDeliveredDocument,
   scoreCandidateButton,
   scoreCandidateButtonWithReason,
   parseSizeFromText,
@@ -1555,6 +1556,50 @@ it('correctly matches single-digit episode (EP1, EP8) and rejects mismatched sin
   assert.ok(resEp8.score > 150, `EP8 file must match Episode 8 search (score: ${resEp8.score})`);
 });
 
+console.log('\n22b. Delivered Document Validation (#266)');
+
+const crystalLakeCtx = {
+  isTv: true,
+  title: 'Crystal Lake',
+  sNum: 1,
+  eNum: 3,
+  targetQuality: 720,
+  minTvSizeMb: 80,
+};
+
+it('rejects a wrong show delivered by the provider (#266 Crystal Lake S01E03 -> The Diplomat S04E06)', () => {
+  const v = validateDeliveredDocument({
+    filename: 'The.Diplomat.S04E06.1080p.10bit.WEBRip.6CH.x265.HEVC-PSA.mkv',
+    caption: 'Crystal.Lake.S01E03.720p.10bit.WEBRip.2CH.x265.HEVC-PSA.mkv',
+    sizeBytes: 558361107,
+  }, crystalLakeCtx);
+  assert.strictEqual(v.ok, false, `Expected mismatch to be rejected, got: ${v.reason}`);
+});
+
+it('accepts the correct delivered document (#266)', () => {
+  const v = validateDeliveredDocument({
+    filename: 'Crystal.Lake.S01E03.720p.10bit.WEBRip.2CH.x265.HEVC-PSA.mkv',
+    sizeBytes: 288.39 * 1024 * 1024,
+  }, crystalLakeCtx);
+  assert.strictEqual(v.ok, true, `Expected correct file to be accepted, got: ${v.reason}`);
+});
+
+it('rejects the right show with the wrong episode (#266)', () => {
+  const v = validateDeliveredDocument({
+    filename: 'Crystal.Lake.S01E04.720p.10bit.WEBRip.2CH.x265.HEVC-PSA.mkv',
+    sizeBytes: 300 * 1024 * 1024,
+  }, crystalLakeCtx);
+  assert.strictEqual(v.ok, false);
+  assert.ok(v.reason.includes('episode mismatch'), `Expected episode mismatch, got: ${v.reason}`);
+});
+
+it('still accepts a normal movie file and rejects a different movie (#266)', () => {
+  const movieCtx = { isTv: false, title: 'Inception', year: '2010', targetQuality: 1080, minMovieSizeMb: 180 };
+  const good = validateDeliveredDocument({ filename: 'Inception.2010.1080p.BluRay.x264.mkv', sizeBytes: 2000 * 1024 * 1024 }, movieCtx);
+  const bad = validateDeliveredDocument({ filename: 'Interstellar.2014.1080p.BluRay.x264.mkv', sizeBytes: 2000 * 1024 * 1024 }, movieCtx);
+  assert.strictEqual(good.ok, true, `Expected Inception accepted, got: ${good.reason}`);
+  assert.strictEqual(bad.ok, false, `Expected Interstellar rejected, got: ${bad.reason}`);
+});
 
 console.log('\n23. Transcode Container Configuration & Universal Fragmented MP4 (#250)');
 

@@ -685,6 +685,15 @@ export function scoreCandidateWithReason(candidate, context = {}) {
   };
 }
 
+// Verify a document a provider bot actually delivered is the title/season/episode that was requested (#266).
+// Providers can send the wrong file for a short code; only hard disqualifications (score -999) are rejected,
+// so weakly named but otherwise matching files are still accepted.
+export function validateDeliveredDocument({ filename = '', caption = '', sizeBytes = null } = {}, context = {}) {
+  const sizeMB = sizeBytes ? Number(sizeBytes) / (1024 * 1024) : null;
+  const res = scoreCandidateWithReason({ text: filename, contextText: caption, sizeMB }, context);
+  return { ok: res.score > -999, score: res.score, reason: res.reason };
+}
+
 // Score a candidate download button against search context with detailed reason (delegates to scoreCandidateWithReason)
 export function scoreCandidateButtonWithReason(btn, msg, context = {}) {
   if (!btn || (btn.className !== 'KeyboardButtonUrlAuth' && btn.className !== 'KeyboardButtonUrl') || !btn.url) {
