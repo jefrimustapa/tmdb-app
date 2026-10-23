@@ -14,6 +14,7 @@ import { isAnimeMedia } from '../../services/animeMappingService';
 import { isAseanMedia, isKoreanMedia } from '../../services/lariMappingService';
 import { msmService } from '../../services/msmMappingService';
 import { isEpisodeAired } from '../../services/episodeAirStatus';
+import { canCast } from '../../utils/platform';
 import { getWatchHeaderYear } from '../../utils/watchHeader';
 import { ArrowLeft, SkipForward, SkipBack, Cast, Tv, X, Settings, Maximize, Minimize } from 'lucide-react';
 import { useDevice } from '../../hooks/useDevice';
@@ -535,6 +536,8 @@ export const Watch: React.FC = () => {
   }, [checkEpisodeTitleOverflow, currentEpisode?.name]);
 
   const [showCastMenu, setShowCastMenu] = useState(false);
+  // Cast only works through the Android bridge; hide it on web
+  const castAvailable = canCast();
 
   const handleOpenCastMenu = useCallback(() => {
     setShowCastMenu(true);
@@ -651,26 +654,28 @@ export const Watch: React.FC = () => {
 
             {/* Right: Cast Button + CC Subtitle Button + Quick Provider Switcher Dropdown */}
             <div className="flex items-center gap-2 flex-shrink-0">
-              <button
-                type="button"
-                onClick={handleOpenCastMenu}
-                id="watch-cast-btn"
-                data-watch-header-item="true"
-                aria-label="Cast to TV"
-                tabIndex={0}
-                onKeyDown={(e) => {
-                  if (e.key === 'ArrowRight') {
-                    e.preventDefault();
-                    document.getElementById('watch-settings-btn')?.focus();
-                  } else if (e.key === 'ArrowLeft') {
-                    e.preventDefault();
-                    document.getElementById('watch-back-btn')?.focus();
-                  }
-                }}
-                className="p-2 rounded-full bg-black/60 hover:bg-black/90 text-white/90 hover:text-white border border-white/15 transition active:scale-95 hover:scale-105 flex-shrink-0 tv-focus-target focus:outline-none focus:border-hbo-cyan focus:ring-2 focus:ring-hbo-cyan shadow-sm cursor-pointer"
-              >
-                <Cast className="w-4 h-4 sm:w-5 sm:h-5 text-hbo-cyan/90 hover:text-hbo-cyan" />
-              </button>
+              {castAvailable && (
+                <button
+                  type="button"
+                  onClick={handleOpenCastMenu}
+                  id="watch-cast-btn"
+                  data-watch-header-item="true"
+                  aria-label="Cast to TV"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === 'ArrowRight') {
+                      e.preventDefault();
+                      document.getElementById('watch-settings-btn')?.focus();
+                    } else if (e.key === 'ArrowLeft') {
+                      e.preventDefault();
+                      document.getElementById('watch-back-btn')?.focus();
+                    }
+                  }}
+                  className="p-2 rounded-full bg-black/60 hover:bg-black/90 text-white/90 hover:text-white border border-white/15 transition active:scale-95 hover:scale-105 flex-shrink-0 tv-focus-target focus:outline-none focus:border-hbo-cyan focus:ring-2 focus:ring-hbo-cyan shadow-sm cursor-pointer"
+                >
+                  <Cast className="w-4 h-4 sm:w-5 sm:h-5 text-hbo-cyan/90 hover:text-hbo-cyan" />
+                </button>
+              )}
 
               <button
                 type="button"
@@ -690,7 +695,7 @@ export const Watch: React.FC = () => {
                     }
                   } else if (e.key === 'ArrowLeft') {
                     e.preventDefault();
-                    document.getElementById('watch-cast-btn')?.focus();
+                    (document.getElementById('watch-cast-btn') || document.getElementById('watch-back-btn'))?.focus();
                   }
                 }}
                 className="flex items-center gap-2 px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-full bg-black/60 hover:bg-black/90 text-white border border-white/15 transition active:scale-95 hover:scale-105 flex-shrink-0 tv-focus-target focus:outline-none focus:border-hbo-cyan focus:ring-2 focus:ring-hbo-cyan shadow-sm cursor-pointer"
@@ -901,7 +906,7 @@ export const Watch: React.FC = () => {
       />
 
       {/* Cast Selection Modal */}
-      {showCastMenu && (
+      {castAvailable && showCastMenu && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fadeIn"
           onClick={handleCloseCastMenu}
