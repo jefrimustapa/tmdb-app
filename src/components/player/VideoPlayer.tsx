@@ -17,6 +17,7 @@ import { SubtitleOverlay } from './SubtitleOverlay';
 import type { SubtitleCue } from '../../services/subtitleService';
 import { CustomDirectPlayer } from './CustomDirectPlayer';
 import { isEpisodeAired } from '../../services/episodeAirStatus';
+import { getDirectStreamErrorView } from '../../utils/directStreamError';
 
 interface VideoPlayerProps {
   mediaType: 'movie' | 'tv';
@@ -2784,8 +2785,10 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         />
       )}
 
-      {/* STATE 5: Direct Stream Not Resolved Error (Embed Disabled) */}
-      {playerMode === 'error' && (
+      {/* STATE 5: Direct Stream Not Resolved Error (message follows whether Embed Resolver is enabled) */}
+      {playerMode === 'error' && (() => {
+        const errorView = getDirectStreamErrorView(enabledResolvers, resolvingStatus);
+        return (
         <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-black/95 backdrop-blur-md p-6 text-center animate-fade-in">
           <div className="mb-4">
             <Logo size="lg" showText={true} />
@@ -2798,20 +2801,40 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             Could Not Resolve Direct Stream
           </h3>
           <p className="text-xs sm:text-sm text-gray-400 max-w-md mb-6 leading-relaxed">
-            The active direct stream engines (<span className="text-white font-semibold">{enabledResolvers.map(r => r === 'telegram' ? 'TGStrm' : 'Embed Resolver').join(', ')}</span>) did not return a working direct video stream for "<span className="text-white">{originalTitle && originalTitle !== title ? `${title} (${originalTitle})` : title}</span>".
-            <br /><br />
-            <span className="text-gray-300">Embed Resolver is currently disabled in your Settings.</span>
+            The active direct stream engines (<span className="text-white font-semibold">{errorView.engines}</span>) did not return a working direct video stream for "<span className="text-white">{originalTitle && originalTitle !== title ? `${title} (${originalTitle})` : title}</span>".
+            {errorView.embedDisabled && (
+              <>
+                <br /><br />
+                <span className="text-gray-300">Embed Resolver is currently disabled in your Settings.</span>
+              </>
+            )}
+            {errorView.reason && (
+              <>
+                <br /><br />
+                <span className="text-gray-300">{errorView.reason}</span>
+              </>
+            )}
           </p>
           <div className="flex flex-wrap items-center justify-center gap-3">
-            <button
-              onClick={() => window.location.href = '/settings'}
-              className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-hbo-purple to-hbo-cyan text-white font-bold text-xs sm:text-sm shadow-hbo-glow hover:scale-105 transition tv-focus-target"
-            >
-              Open Settings to Enable Embed Resolver
-            </button>
+            {errorView.embedDisabled ? (
+              <button
+                onClick={() => window.location.href = '/settings'}
+                className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-hbo-purple to-hbo-cyan text-white font-bold text-xs sm:text-sm shadow-hbo-glow hover:scale-105 transition tv-focus-target"
+              >
+                Open Settings to Enable Embed Resolver
+              </button>
+            ) : (
+              <button
+                onClick={() => setResolveTrigger(prev => prev + 1)}
+                className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-hbo-purple to-hbo-cyan text-white font-bold text-xs sm:text-sm shadow-hbo-glow hover:scale-105 transition tv-focus-target"
+              >
+                Try Again
+              </button>
+            )}
           </div>
         </div>
-      )}
+        );
+      })()}
 
       {/* Fallback Error Overlay */}
       {hasError && playerMode !== 'direct' && (
