@@ -755,17 +755,23 @@ export const Watch: React.FC = () => {
                       </span>
                     )}
                     {currentEpisode?.name && (
-                      <div
-                        className="overflow-hidden whitespace-nowrap min-w-0"
-                        style={episodeTitleOverflows ? {
-                          WebkitMaskImage: 'linear-gradient(to right, black 85%, transparent 100%)',
-                          maskImage: 'linear-gradient(to right, black 85%, transparent 100%)'
-                        } : undefined}
-                      >
-                        <span ref={episodeTitleRef} className="text-xs text-white/75 font-medium">
-                          • {currentEpisode.name}
-                        </span>
-                      </div>
+                      <>
+                        {(headerYear || episodeLabel) && (
+                          <span className="text-xs text-white/60 select-none">•</span>
+                        )}
+                        {/* text-xs on the wrapper keeps its line box the same height as the sibling labels */}
+                        <div
+                          className="overflow-hidden whitespace-nowrap min-w-0 text-xs"
+                          style={episodeTitleOverflows ? {
+                            WebkitMaskImage: 'linear-gradient(to right, black 85%, transparent 100%)',
+                            maskImage: 'linear-gradient(to right, black 85%, transparent 100%)'
+                          } : undefined}
+                        >
+                          <span ref={episodeTitleRef} className="text-xs text-white/75 font-medium">
+                            {currentEpisode.name}
+                          </span>
+                        </div>
+                      </>
                     )}
                   </>
                 )}
