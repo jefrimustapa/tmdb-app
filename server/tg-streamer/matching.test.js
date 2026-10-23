@@ -1898,6 +1898,78 @@ it('persists bot and resolver fields on central DB stream records (#256)', () =>
   assert.strictEqual(record.resolver, 'pencuri', 'Resolver name must be persisted in record');
 });
 
+console.log('\n28. Stale Legacy Cache Purge (#256 follow-up)');
+
+it('purges stale records without bot name while retaining fresh records and bot-enabled records', () => {
+  const testDb = new CentralDatabase();
+  testDb.clear();
+
+  const now = Date.now();
+  const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+  const ONE_HOUR_MS = 60 * 60 * 1000;
+
+  // 1. Stale legacy record (older than 12h, no bot) -> MUST BE PURGED
+  testDb.set('stale_movie_2025', {
+    docId: '10001',
+    filename: 'Stale.Movie.2025.mp4',
+    actualQuality: '720p',
+    createdAt: now - ONE_DAY_MS,
+    updatedAt: now - ONE_DAY_MS,
+  });
+
+  // 2. Fresh record without bot (created 1 hour ago) -> MUST BE RETAINED
+  testDb.set('fresh_no_bot_2026', {
+    docId: '10002',
+    filename: 'Fresh.No.Bot.2026.mp4',
+    actualQuality: '720p',
+    createdAt: now - ONE_HOUR_MS,
+    updatedAt: now - ONE_HOUR_MS,
+  });
+
+  // 3. Stale record WITH bot (created 1 day ago) -> MUST BE RETAINED (can be refreshed via bot)
+  testDb.set('stale_with_bot_2025', {
+    docId: '10003',
+    bot: 'Pencuri_Movie_Bot',
+    resolver: 'pencuri',
+    filename: 'Stale.With.Bot.2025.mp4',
+    actualQuality: '720p',
+    createdAt: now - ONE_DAY_MS,
+    updatedAt: now - ONE_DAY_MS,
+  });
+
+  assert.strictEqual(testDb.byDocId.size, 3, 'Must have 3 initial records');
+
+  const purgedCount = testDb.purgeStaleLegacyRecords(12 * 60 * 60 * 1000);
+  assert.strictEqual(purgedCount, 1, 'Must purge exactly 1 stale legacy record');
+  assert.strictEqual(testDb.byDocId.size, 2, 'Must have 2 records remaining');
+
+  assert.strictEqual(testDb.get('stale_movie_2025'), undefined, 'Stale record must not be found');
+  assert.ok(testDb.get('fresh_no_bot_2026'), 'Fresh record without bot must be found');
+  assert.ok(testDb.get('stale_with_bot_2025'), 'Record with bot must be preserved');
+});
+
+it('automatically evicts stale record without bot upon get() and getByDocId() queries', () => {
+  const testDb = new CentralDatabase();
+  testDb.clear();
+
+  const now = Date.now();
+  const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+
+  testDb.set('heads of state 2025', {
+    docId: '5992465519591036643',
+    filename: 'Heads.of.State.2025.720p.WEB.MalaySub.MSM.mp4',
+    actualQuality: '720p',
+    createdAt: now - ONE_DAY_MS,
+    updatedAt: now - ONE_DAY_MS,
+  });
+
+  // Querying get() should detect stale legacy record, evict it, and return undefined
+  const hit = testDb.get('heads of state 2025');
+  assert.strictEqual(hit, undefined, 'get() must return undefined for stale record without bot');
+  assert.strictEqual(testDb.byDocId.size, 0, 'Record must be evicted from DB');
+  assert.strictEqual(testDb.getByDocId('5992465519591036643'), undefined, 'getByDocId() must return undefined');
+});
+
 // Clean up temporary test files
 try {
   if (fs.existsSync(TEST_DB_FILE)) fs.unlinkSync(TEST_DB_FILE);
