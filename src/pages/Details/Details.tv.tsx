@@ -776,8 +776,8 @@ export const Details: React.FC = () => {
         {/* Crew Section */}
         {crewMembers.length > 0 && (
           <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg sm:text-xl font-bold font-display text-white flex items-center gap-2">
+            <div className="flex items-center justify-between flex-wrap gap-x-3 gap-y-1">
+              <h3 className="text-lg sm:text-xl font-bold font-display text-white flex items-center gap-2 whitespace-nowrap">
                 <span className="w-1.5 h-5 bg-gradient-to-b from-hbo-purple to-hbo-cyan rounded-full inline-block"></span>
                 Crew {mediaType === 'tv' && selectedSeasonData ? `(Season ${selectedSeasonData.season})` : ''}
               </h3>
@@ -813,8 +813,8 @@ export const Details: React.FC = () => {
         {/* Cast Section */}
         {displayCast.length > 0 && (
           <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg sm:text-xl font-bold font-display text-white flex items-center gap-2">
+            <div className="flex items-center justify-between flex-wrap gap-x-3 gap-y-1">
+              <h3 className="text-lg sm:text-xl font-bold font-display text-white flex items-center gap-2 whitespace-nowrap">
                 <span className="w-1.5 h-5 bg-gradient-to-b from-hbo-purple to-hbo-cyan rounded-full inline-block"></span>
                 Cast {mediaType === 'tv' && selectedSeasonData ? `(Season ${selectedSeasonData.season})` : ''}
               </h3>
