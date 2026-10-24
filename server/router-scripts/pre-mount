@@ -1,10 +1,60 @@
 #!/bin/sh
+# Asuswrt-Merlin pre-mount hook: $1 = device, $2 = filesystem type.
+# 1) fsck the ext filesystem before it is mounted.
+# 2) If the fsck was slow, the firmware gives up waiting (~120 s, "failed to mount!") and the disk stays
+#    unmounted although it is now clean. A detached watcher mounts it afterwards when still needed.
+
+WATCH_DELAY=30
+
+log() { logger -t "pre-mount" "$*"; }
+
+is_mounted() { grep -q "^$1 " /proc/mounts; }
+
+mount_watcher() {
+    DEV="$1"
+    sleep "$WATCH_DELAY"
+    if is_mounted "$DEV"; then
+        log "watcher: $DEV already mounted by the firmware, nothing to do"
+        exit 0
+    fi
+    if pidof e2fsck >/dev/null 2>&1; then
+        log "watcher: e2fsck still running, not mounting $DEV"
+        exit 0
+    fi
+    LABEL=$(/usr/sbin/tune2fs -l "$DEV" 2>/dev/null | sed -n 's/^Filesystem volume name: *//p')
+    [ -z "$LABEL" ] || [ "$LABEL" = "<none>" ] && LABEL=$(basename "$DEV")
+    MP="/tmp/mnt/$LABEL"
+    log "watcher: $DEV is not mounted after fsck, mounting on $MP"
+    mkdir -p "$MP"
+    if mount -t ext4 -o noatime,nodev "$DEV" "$MP"; then
+        log "watcher: mounted $DEV on $MP, running post-mount"
+        [ -x /jffs/scripts/post-mount ] && /jffs/scripts/post-mount "$MP"
+    else
+        log "watcher: mount of $DEV on $MP FAILED"
+    fi
+    exit 0
+}
+
+if [ "$1" = "--watch" ]; then
+    mount_watcher "$2"
+fi
 
 if [ -b "$1" ]; then
     if /usr/sbin/tune2fs -l "$1" >/dev/null 2>&1; then
-        logger -t "pre-mount" "Checking ext filesystem on $1..."
-        /usr/sbin/e2fsck -p "$1" 2>&1 | logger -t "pre-mount"
+        log "Checking ext filesystem on $1..."
+        # Capture e2fsck's own exit code: in sh, $? after "cmd | logger" is logger's (always 0)
+        FSCK_LOG="/tmp/pre-mount-fsck.$$"
+        /usr/sbin/e2fsck -p "$1" > "$FSCK_LOG" 2>&1
         FSCK_EXIT=$?
-        logger -t "pre-mount" "e2fsck on $1 finished with exit code $FSCK_EXIT"
+        logger -t "pre-mount" < "$FSCK_LOG"
+        if [ "$FSCK_EXIT" -gt 1 ]; then
+            log "e2fsck -p reported errors ($FSCK_EXIT). Running automatic self-heal e2fsck -y..."
+            /usr/sbin/e2fsck -y "$1" > "$FSCK_LOG" 2>&1
+            FSCK_EXIT=$?
+            logger -t "pre-mount" < "$FSCK_LOG"
+        fi
+        rm -f "$FSCK_LOG"
+        log "e2fsck on $1 finished with exit code $FSCK_EXIT"
+        nohup sh "$0" --watch "$1" >/dev/null 2>&1 </dev/null &
     fi
 fi
