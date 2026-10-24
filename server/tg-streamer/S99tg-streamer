@@ -28,6 +28,54 @@ check_and_heal_node() {
     fi
 }
 
+# --- node_modules self-heal (second-disk copy) ---
+# Clean node_modules copy + md5 manifest live on the second disk (not the Entware disk that can be damaged).
+# Build them on the PC with scripts/build-deps-backup.mjs and copy them to this folder.
+DEPS_BACKUP_DIR=/tmp/mnt/ASUS-USB/tg-streamer-deps
+
+sup_log() {
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" >> "$LOG_FILE"
+}
+
+# Write the node_modules files that are missing or differ from the manifest into $1; success when none
+verify_deps() {
+    ( cd "$APP_DIR" && md5sum -c "$DEPS_BACKUP_DIR/node_modules.md5" 2>/dev/null ) | grep ': FAILED' | sed 's/: FAILED.*$//' > "$1"
+    [ ! -s "$1" ]
+}
+
+# Restore corrupted/missing node_modules files from the second-disk copy (e.g. after e2fsck removed files).
+# Returns 1 when node_modules is broken and could not be restored, so the caller backs off instead of crash-looping.
+check_and_heal_deps() {
+    # The second disk can mount a few seconds after the app disk: wait briefly, only right after boot
+    WAITED=0
+    while [ ! -f "$DEPS_BACKUP_DIR/node_modules.md5" ] && [ "$WAITED" -lt 60 ] && [ "$(cut -d. -f1 /proc/uptime)" -lt 600 ]; do
+        sleep 5
+        WAITED=$((WAITED + 5))
+    done
+    if [ ! -f "$DEPS_BACKUP_DIR/node_modules.md5" ] || [ ! -f "$DEPS_BACKUP_DIR/node_modules.tgz" ] || [ ! -f "$DEPS_BACKUP_DIR/package-lock.md5" ]; then
+        sup_log "[SUPERVISOR WARN] dependency backup not found in $DEPS_BACKUP_DIR, skipping node_modules check"
+        return 0
+    fi
+    LOCK_NOW=$(tr -d '\r' < "$APP_DIR/package-lock.json" 2>/dev/null | md5sum | cut -d' ' -f1)
+    if [ "$LOCK_NOW" != "$(cut -d' ' -f1 "$DEPS_BACKUP_DIR/package-lock.md5")" ]; then
+        sup_log "[SUPERVISOR WARN] dependency backup is stale (package-lock.json changed), skipping node_modules check"
+        return 0
+    fi
+
+    BAD_LIST=/tmp/tg-streamer-baddeps.txt
+    if verify_deps "$BAD_LIST"; then
+        return 0
+    fi
+    sup_log "[SUPERVISOR HEAL] $(wc -l < "$BAD_LIST") corrupted/missing file(s) in node_modules, e.g. $(head -3 "$BAD_LIST" | tr '\n' ' ')- restoring from $DEPS_BACKUP_DIR"
+    if tar -xzf "$DEPS_BACKUP_DIR/node_modules.tgz" -C "$APP_DIR" -T "$BAD_LIST" >> "$LOG_FILE" 2>&1 && verify_deps "$BAD_LIST"; then
+        sup_log "[SUPERVISOR HEAL] node_modules restored and verified"
+        return 0
+    fi
+    sup_log "[SUPERVISOR ERROR] corrupted dependency: could not restore node_modules ($(wc -l < "$BAD_LIST") file(s) still bad, e.g. $(head -1 "$BAD_LIST")). Retrying in 300s"
+    return 1
+}
+# --- end node_modules self-heal ---
+
 supervisor_loop() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] [SUPERVISOR] Starting supervisor loop (PID $$)..." >> "$LOG_FILE"
     CRASH_COUNT=0
@@ -36,6 +84,12 @@ supervisor_loop() {
 
         # Auto-heal: verify /opt/bin/node works before attempting spawn
         check_and_heal_node
+
+        # Auto-heal: restore corrupted/missing node_modules files from the second-disk copy
+        if ! check_and_heal_deps; then
+            sleep 300
+            continue
+        fi
 
         # Verify node binary and index.js exist before attempting spawn
         if [ ! -x "/opt/bin/node" ] || [ ! -f "$APP_DIR/index.js" ]; then
