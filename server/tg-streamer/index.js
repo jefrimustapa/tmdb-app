@@ -2112,7 +2112,7 @@ app.get(['/tg', '/msm/dashboard'], (req, res) => {
       </div>
       <p class="text-xs text-slate-400">Test live query extraction and view raw candidate buttons directly from the active Telegram bot.</p>
       <div class="flex flex-col sm:flex-row gap-2">
-        <input id="diagInput" type="text" value="Kudrat 1968" placeholder="Title (e.g. Spider-Man, Carrie)..." class="flex-1 px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm text-white focus:outline-none focus:border-sky-500/50" />
+        <input id="diagInput" type="text" placeholder="Kudrat 1968" class="flex-1 px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm text-white focus:outline-none focus:border-sky-500/50" />
         <button id="diagBtn" onclick="runDiagnostic()" class="w-full sm:w-auto px-5 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs rounded-xl transition flex items-center justify-center gap-1.5 shrink-0">
           Test Query
         </button>
@@ -2342,6 +2342,10 @@ app.get(['/tg', '/msm/dashboard'], (req, res) => {
         btn.textContent = 'Test Query';
       }
     }
+
+    document.getElementById('diagInput').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !document.getElementById('diagBtn').disabled) runDiagnostic();
+    });
 
     loadStats();
     setInterval(loadStats, 3000);
