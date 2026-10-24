@@ -10,14 +10,6 @@ import {
   cleanSearchTitle,
   detectVideoQualityTier,
   extractSignificantTokens,
-  extractTitleTokens,
-  extractSequelInfo,
-  extractYear,
-  extractEpisodeInfo,
-  extractSeasonInfo,
-  isJunkMedia,
-  calculateTitleCoverage,
-  validateTitleBoundaries,
   generateSeriesSearchQueries,
   buildSearchQueries,
   scoreCandidateButtonWithReason,
@@ -121,6 +113,14 @@ function findPageButton(replyMarkup, targetPage, currentPage) {
   return null;
 }
 
+// Identity of a bot reply's visible state (id, last edit, button labels) so an unchanged reply is not re-evaluated
+function botMessageState(msg) {
+  const labels = (msg.replyMarkup?.rows || [])
+    .flatMap(row => row.buttons.map(b => b.text || ''))
+    .join('');
+  return `${msg.id}|${msg.editDate || 0}|${labels}`;
+}
+
 // Navigate message in-place to targetPage via bot callback answer
 async function navigateToPage(client, targetBot, msgId, targetPage, currentMsg, currentMsgPage, checkAborted = () => false) {
   let activeMsg = currentMsg;
@@ -217,196 +217,9 @@ export class MsmResolver extends BaseResolver {
     const tvTag = isTv ? `S${sPadded}E${epPadded}` : '';
     const queryTitle = isTv ? `${title} ${tvTag}` : `${title} ${year || ''}`.trim();
 
-    // 1. Search recent and server-side chat messages
-    const recentMsgs = await this.client.getMessages(targetBot, { limit: 30 });
-    const cleanTitle = cleanSearchTitle(title);
-    const candidateMsgs = [...recentMsgs];
-
-    try {
-      const serverDocs = await this.client.getMessages(targetBot, {
-        search: isTv ? `${cleanTitle} ${epPadded}` : cleanTitle,
-        limit: 20,
-        filter: new Api.InputMessagesFilterDocument(),
-      });
-      if (serverDocs && serverDocs.length > 0) {
-        const seenIds = new Set(candidateMsgs.map(m => m.id));
-        for (const sm of serverDocs) {
-          if (!seenIds.has(sm.id)) {
-            candidateMsgs.push(sm);
-            seenIds.add(sm.id);
-          }
-        }
-      }
-      if (isTv) {
-        const epWordDocs = await this.client.getMessages(targetBot, {
-          search: `${cleanTitle} Episod ${eNum}`,
-          limit: 15,
-          filter: new Api.InputMessagesFilterDocument(),
-        }).catch(() => []);
-        if (epWordDocs && epWordDocs.length > 0) {
-          const seenIds = new Set(candidateMsgs.map(m => m.id));
-          for (const sm of epWordDocs) {
-            if (!seenIds.has(sm.id)) {
-              candidateMsgs.push(sm);
-              seenIds.add(sm.id);
-            }
-          }
-        }
-      }
-    } catch (sErr) {
-      console.warn('[MSM SEARCH SERVER] MTProto document search warning:', sErr.message);
-    }
-
-    const titleTokens = extractTitleTokens(title);
     const significantTokens = extractSignificantTokens(title);
-    const targetSequel = extractSequelInfo(title);
-    const explicitTargetYear = parseInt(year, 10);
-    const targetYear = !isNaN(explicitTargetYear) ? explicitTargetYear : extractYear(title, significantTokens);
-    const matchingRecentDocs = [];
 
-    for (const msg of candidateMsgs) {
-      if (msg.media?.document) {
-        const doc = msg.media.document;
-        const fnAttr = doc.attributes?.find(a => a.className === 'DocumentAttributeFilename');
-        const filename = fnAttr ? fnAttr.fileName : msg.message;
-        const normFn = filename.toLowerCase();
-
-        // Junk media filter
-        if (isJunkMedia(filename, title, altTitle) || isJunkMedia(msg.message, title, altTitle)) {
-          continue;
-        }
-
-        // File size check
-        const docSizeMB = Number(doc.size || 0) / (1024 * 1024);
-        if (isTv ? docSizeMB < effectiveMinTv : docSizeMB < effectiveMinMovie) {
-          continue;
-        }
-
-        // Strict title coverage check
-        const coverage = calculateTitleCoverage(significantTokens, filename);
-        if (significantTokens.length <= 2 ? coverage < 1.0 : coverage < 0.70) {
-          continue;
-        }
-
-        // Boundary check
-        const checkBoundary = validateTitleBoundaries(normFn, title);
-        if (checkBoundary.matched && !checkBoundary.ok) {
-          if (!altTitle || !validateTitleBoundaries(normFn, altTitle).ok) {
-            continue;
-          }
-        }
-
-        let matchesCandidate = true;
-
-        if (isTv) {
-          const epInfo = extractEpisodeInfo(filename);
-          if (!epInfo) {
-            matchesCandidate = false;
-          } else if (epInfo.isRange) {
-            if (eNum < epInfo.start || eNum > epInfo.end) {
-              matchesCandidate = false;
-            }
-          } else if (epInfo.episode !== eNum) {
-            matchesCandidate = false;
-          }
-
-          if (matchesCandidate) {
-            const seasonFound = extractSeasonInfo(filename);
-            if (seasonFound !== null && seasonFound !== sNum) {
-              matchesCandidate = false;
-            }
-          }
-
-          if (matchesCandidate && targetYear) {
-            const docYear = extractYear(filename, significantTokens);
-            if (docYear && Math.abs(targetYear - docYear) > 1 && !isNaN(explicitTargetYear)) {
-              matchesCandidate = false;
-            }
-          }
-        } else {
-          const isTvDoc = /\b(s\d{1,2}e\d{1,2}|s\d{1,2}\s*ep?\s*\d{1,2}|season\s*\d+|musim\s*\d+|episode\s*\d+|episod\s*\d+|ep\s*\d+|\.end\.)\b/i.test(filename) ||
-                          /\b(s\d{1,2}e\d{1,2}|s\d{1,2}\s*ep?\s*\d{1,2}|season\s*\d+|musim\s*\d+|episode\s*\d+|episod\s*\d+|ep\s*\d+|\.end\.)\b/i.test(msg.message || '');
-          if (isTvDoc) {
-            matchesCandidate = false;
-          }
-
-          const docSequel = extractSequelInfo(filename);
-          if (targetSequel) {
-            if (docSequel !== targetSequel) {
-              matchesCandidate = false;
-            }
-          } else {
-            if (docSequel) {
-              matchesCandidate = false;
-            }
-          }
-
-          const docYear = extractYear(filename, significantTokens);
-          if (targetYear && docYear && Math.abs(targetYear - docYear) > 1 && !isNaN(explicitTargetYear)) {
-            matchesCandidate = false;
-          }
-        }
-
-        if (matchesCandidate) {
-          const fnLower = (filename || '').toLowerCase();
-          const is4k = fnLower.includes('2160p') || fnLower.includes('4k') || fnLower.includes('uhd');
-          const is1080 = fnLower.includes('1080p') || fnLower.includes('1080');
-          const is720 = fnLower.includes('720p') || fnLower.includes('720');
-          const isLower = fnLower.includes('480p') || fnLower.includes('540p') || fnLower.includes('360p');
-
-          let qualityScore = 10;
-          if (targetQuality <= 480) {
-            if (isLower) qualityScore = 60;
-            else if (is720) qualityScore = 30;
-            else if (is1080) qualityScore = 5;
-          } else if (targetQuality <= 720) {
-            if (is720) qualityScore = 50;
-            else if (isLower) qualityScore = 30;
-            else if (is1080) qualityScore = 5;
-          } else if (targetQuality >= 2160) {
-            if (is4k) qualityScore = 70;
-            else if (is1080) qualityScore = 40;
-            else if (is720) qualityScore = 20;
-          } else {
-            if (is1080) qualityScore = 50;
-            else if (is720) qualityScore = 30;
-          }
-          if (fnLower.includes('.mp4') || fnLower.includes('mp4')) qualityScore += 15;
-
-          matchingRecentDocs.push({ doc, filename, qualityScore, msgId: msg.id });
-        }
-      }
-    }
-
-    if (matchingRecentDocs.length > 0) {
-      matchingRecentDocs.sort((a, b) => b.qualityScore - a.qualityScore);
-      const chosen = matchingRecentDocs[0];
-      const chosenTier = detectVideoQualityTier(chosen.filename, '', chosen.doc);
-
-      let isTargetQualityMet = false;
-      if (targetQuality >= 2160) {
-        isTargetQualityMet = chosenTier === '4k';
-      } else if (targetQuality >= 1080) {
-        isTargetQualityMet = chosenTier === '1080p' || chosenTier === '4k';
-      } else if (targetQuality <= 480) {
-        isTargetQualityMet = chosenTier === 'sd';
-      } else {
-        isTargetQualityMet = chosenTier === '720p' || chosenTier === '1080p' || chosenTier === '4k';
-      }
-
-      if (isTargetQualityMet && chosen.qualityScore >= 30) {
-        console.log(`[MSM RESOLVE] Found matching recent document in chat: ${chosen.filename} (ID: ${chosen.doc.id}, score: ${chosen.qualityScore}, tier: ${chosenTier})`);
-        return {
-          document: chosen.doc,
-          filename: chosen.filename,
-          msgId: chosen.msgId,
-          tier: chosenTier,
-          bot: targetBot,
-        };
-      }
-    }
-
-    // 2. Prepare prioritized search queries (unified across resolvers)
+    // 1. Prepare prioritized search queries (unified across resolvers)
     const uniqueSearchQueries = buildSearchQueries(params);
     const cleanT = cleanSearchTitle(title);
     let effectiveAltTitle = altTitle ? cleanSearchTitle(altTitle) : '';
@@ -448,14 +261,19 @@ export class MsmResolver extends BaseResolver {
 
       let noResults = false;
 
+      // Bot replies are polled until they settle; each distinct reply state is evaluated once per query.
+      const candidates = [];
+      const evaluatedStates = new Set();
+      let activeBotMsg = null;
+      let activeBotPage = 1;
+      let unchangedPolls = 0;
+
       for (let poll = 0; poll < 8; poll++) {
         if (checkAborted()) break;
         await new Promise(r => setTimeout(r, 400));
         const msgs = await this.client.getMessages(targetBot, { limit: 5 });
-        const candidates = [];
-
-        let activeBotMsg = null;
-        let activeBotPage = 1;
+        let sawReply = false;
+        let evaluatedNew = false;
 
         for (const m of msgs) {
           if (m.id > sentMsgId) {
@@ -470,6 +288,11 @@ export class MsmResolver extends BaseResolver {
             }
 
             if (m.replyMarkup?.rows) {
+              sawReply = true;
+              const stateKey = botMessageState(m);
+              if (evaluatedStates.has(stateKey)) continue;
+              evaluatedStates.add(stateKey);
+              evaluatedNew = true;
               let currentMsg = m;
               let pageCount = 0;
               const MAX_PAGES = effectiveMaxPages;
@@ -526,6 +349,7 @@ export class MsmResolver extends BaseResolver {
                       currentMsg = refreshed[0];
                       activeBotMsg = currentMsg;
                       activeBotPage = pageCount + 1;
+                      evaluatedStates.add(botMessageState(currentMsg));
                     } else {
                       break;
                     }
@@ -542,6 +366,8 @@ export class MsmResolver extends BaseResolver {
         }
 
         if (noResults || checkAborted()) break;
+
+        unchangedPolls = sawReply && !evaluatedNew ? unchangedPolls + 1 : 0;
 
         const valid = candidates.filter(c => c.score >= 0).sort((a, b) => b.score - a.score);
         if (valid.length > 0) {
@@ -747,6 +573,11 @@ export class MsmResolver extends BaseResolver {
             }
           }
 
+          break;
+        }
+
+        if (unchangedPolls >= 2) {
+          console.log(`[MSM RESOLVE] Bot reply for "${sq}" unchanged after ${unchangedPolls} polls with no acceptable result, advancing.`);
           break;
         }
       }
