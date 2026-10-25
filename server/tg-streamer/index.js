@@ -3021,11 +3021,11 @@ app.get(['/msm/setting', '/tg/settings'], (req, res) => {
           <div class="flex items-center justify-between gap-3 bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/80">
             <div>
               <div class="text-xs font-semibold text-white">Overlap Prefetch</div>
-              <div class="text-[11px] text-slate-400">Proactively queues upcoming chunks during initial seek/play</div>
+              <div class="text-[11px] text-slate-400">Starts the read-ahead window as soon as the first chunk arrives (before it is sent to the player)</div>
             </div>
             <select id="prefetchSelect" class="bg-slate-900 border border-slate-700 text-xs text-white rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-sky-500">
               <option value="true" selected>Enabled (Fast Playback)</option>
-              <option value="false">Disabled (Strict Sequential)</option>
+              <option value="false">Disabled (After First Chunk Is Sent)</option>
             </select>
           </div>
 
@@ -4646,7 +4646,12 @@ async function streamTelegramPipelined(client, targetDoc, startByte, endByte, re
     if (s) s.lastActive = Date.now();
   };
 
+  // Timeline log for issue #278 (skipped for small probe reads): first block alone, then window filled.
+  const logTimeline = !isProbe;
+  let windowLogged = false;
+
   function fillPipeline() {
+    const firstRequested = nextBlockToFetch;
     while (!aborted && inFlight.size < CONCURRENCY && nextBlockToFetch <= endBlock) {
       const idx = nextBlockToFetch++;
       const p = fetchBlockWithRetry(idx).catch(err => {
@@ -4655,19 +4660,18 @@ async function streamTelegramPipelined(client, targetDoc, startByte, endByte, re
       });
       inFlight.set(idx, p);
     }
+    if (logTimeline && !windowLogged && nextBlockToFetch > firstRequested) {
+      windowLogged = true;
+      console.log(`[PIPELINE WINDOW] [${clientIdentity.name} (${clientIdentity.ip})] read-ahead window filled at ${Date.now() - pipeStartedAt}ms: ${inFlight.size}/${CONCURRENCY} blocks requested (${firstRequested}..${nextBlockToFetch - 1})`);
+    }
   }
 
-  // 1. Overlapped Prefetching Delivery:
-  // Concurrently fetch startBlock AND immediately trigger prefetching for subsequent blocks when enabled.
-  // When startBlock arrives and streams to the player, upcoming blocks (startBlock + 1..)
-  // are already in-flight or completed, eliminating the ~200ms initial playback stall!
+  // 1. Single-block start (issue #278): the start block is requested alone so it gets the whole link
+  // and playback begins as early as possible, on a fresh play and on a seek alike. Only once it has
+  // arrived is the full-concurrency window started, so the buffer builds while the first block is
+  // being written to the player. With overlapPrefetch off the window starts after that write instead.
   const isOverlapPrefetchEnabled = savedSettings.overlapPrefetch !== false;
-  const firstBlockPromise = fetchBlockWithRetry(startBlock);
-  if (startBlock < endBlock && isOverlapPrefetchEnabled) {
-    fillPipeline();
-  }
-
-  let firstBlockData = await firstBlockPromise;
+  let firstBlockData = await fetchBlockWithRetry(startBlock);
   if (aborted || res.destroyed || res.writableEnded) {
     firstBlockData = null;
     return;
@@ -4675,6 +4679,12 @@ async function streamTelegramPipelined(client, targetDoc, startByte, endByte, re
   if (!firstBlockData || firstBlockData.length === 0) {
     firstBlockData = null;
     return;
+  }
+  if (logTimeline) {
+    console.log(`[PIPELINE FIRST BLOCK] [${clientIdentity.name} (${clientIdentity.ip})] block ${startBlock} arrived alone at ${Date.now() - pipeStartedAt}ms (concurrency ${CONCURRENCY}, window starts ${isOverlapPrefetchEnabled ? 'now' : 'after it is sent'})`);
+  }
+  if (startBlock < endBlock && isOverlapPrefetchEnabled) {
+    fillPipeline();
   }
 
   const firstBlockStart = startBlock * CHUNK_SIZE;
@@ -4684,6 +4694,9 @@ async function streamTelegramPipelined(client, targetDoc, startByte, endByte, re
   if (firstSliceStart < firstSliceEnd) {
     await writeWithBackpressure(res, firstBlockData.subarray(firstSliceStart, firstSliceEnd), touchActive);
     blocksSent++;
+    if (logTimeline) {
+      console.log(`[PIPELINE FIRST BLOCK SENT] [${clientIdentity.name} (${clientIdentity.ip})] block ${startBlock} written to the player at ${Date.now() - pipeStartedAt}ms`);
+    }
   }
   firstBlockData = null; // Explicitly release 512KB buffer immediately for GC
 
