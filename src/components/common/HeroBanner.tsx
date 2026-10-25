@@ -334,7 +334,7 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ items, onActiveItemChang
             </h1>
 
             {/* Overview Synopsis (120ms delay) */}
-            <p className="text-xs sm:text-sm text-gray-300 line-clamp-3 mb-4 max-w-xl leading-relaxed drop-shadow-sm animate-hero-overview">
+            <p className="hidden sm:block text-xs sm:text-sm text-gray-300 line-clamp-3 mb-4 max-w-xl leading-relaxed drop-shadow-sm animate-hero-overview">
               {currentFeatured.overview}
             </p>
 
