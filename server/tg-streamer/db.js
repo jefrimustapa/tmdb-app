@@ -8,6 +8,33 @@ const __dirname = path.dirname(__filename);
 const DATA_DIR = path.join(__dirname, 'data');
 const DB_FILE = path.join(DATA_DIR, 'streams.json');
 
+// Windows can refuse a rename while antivirus/indexer or another save still holds the file (#279).
+const RENAME_RETRY_CODES = new Set(['EPERM', 'EBUSY', 'EACCES']);
+const RENAME_RETRIES = 5;
+const RENAME_RETRY_DELAY_MS = 20;
+
+async function renameWithRetry(from, to) {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await fs.promises.rename(from, to);
+    } catch (err) {
+      if (!RENAME_RETRY_CODES.has(err.code) || attempt >= RENAME_RETRIES) throw err;
+      await new Promise(resolve => setTimeout(resolve, RENAME_RETRY_DELAY_MS * (attempt + 1)));
+    }
+  }
+}
+
+function renameSyncWithRetry(from, to) {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return fs.renameSync(from, to);
+    } catch (err) {
+      if (!RENAME_RETRY_CODES.has(err.code) || attempt >= RENAME_RETRIES) throw err;
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, RENAME_RETRY_DELAY_MS * (attempt + 1));
+    }
+  }
+}
+
 try {
   fs.mkdirSync(DATA_DIR, { recursive: true });
 } catch {
@@ -194,7 +221,7 @@ export class CentralDatabase {
       const records = this._getSerializableRecords();
       const tmpFile = `${this.dbFile}.tmp`;
       await fs.promises.writeFile(tmpFile, JSON.stringify(records, null, 2), 'utf-8');
-      await fs.promises.rename(tmpFile, this.dbFile);
+      await renameWithRetry(tmpFile, this.dbFile);
     } catch (err) {
       console.error('[DB ERROR] Failed to persist streams.json:', err.message);
     } finally {
@@ -215,7 +242,7 @@ export class CentralDatabase {
       const records = this._getSerializableRecords();
       const tmpFile = `${this.dbFile}.tmp`;
       fs.writeFileSync(tmpFile, JSON.stringify(records, null, 2), 'utf-8');
-      fs.renameSync(tmpFile, this.dbFile);
+      renameSyncWithRetry(tmpFile, this.dbFile);
     } catch (err) {
       console.error('[DB ERROR] Failed to persist streams.json synchronously:', err.message);
     }
