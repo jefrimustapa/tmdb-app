@@ -13,6 +13,7 @@ import { Logger } from 'telegram/extensions/Logger.js';
 import bigInt from 'big-integer';
 import axios from 'axios';
 import fs from 'fs';
+import crypto from 'crypto';
 import os from 'os';
 import { spawn, execSync } from 'child_process';
 import { db } from './db.js';
@@ -116,6 +117,8 @@ if (savedSettings.videoTranscodeMode === undefined) savedSettings.videoTranscode
 if (savedSettings.minTvSizeMb === undefined) savedSettings.minTvSizeMb = 80;
 if (savedSettings.minMovieSizeMb === undefined) savedSettings.minMovieSizeMb = 180;
 if (savedSettings.resolverMaxPages === undefined) savedSettings.resolverMaxPages = 3;
+if (savedSettings.speedTestMb === undefined) savedSettings.speedTestMb = 16;
+if (savedSettings.speedTestBudgetMbPerMin === undefined) savedSettings.speedTestBudgetMbPerMin = 150;
 if (savedSettings.geoBlockEnabled === undefined) savedSettings.geoBlockEnabled = true;
 if (savedSettings.geoBlockAllowedCountries === undefined) savedSettings.geoBlockAllowedCountries = ['MY'];
 if (savedSettings.geoBlockWhitelistedIps === undefined) savedSettings.geoBlockWhitelistedIps = [];
@@ -1720,6 +1723,8 @@ app.get(['/api/settings', '/tg/api/settings', '/msm/api/settings'], (req, res) =
     minTvSizeMb: savedSettings.minTvSizeMb ?? 80,
     minMovieSizeMb: savedSettings.minMovieSizeMb ?? 180,
     resolverMaxPages: savedSettings.resolverMaxPages ?? 3,
+    speedTestMb: getSpeedTestMb(),
+    speedTestBudgetMbPerMin: getSpeedTestBudgetMbPerMin(),
     geoBlockEnabled: savedSettings.geoBlockEnabled !== false,
     geoBlockAllowedCountries: savedSettings.geoBlockAllowedCountries || ['MY'],
     geoBlockWhitelistedIps: savedSettings.geoBlockWhitelistedIps || [],
@@ -1743,6 +1748,8 @@ app.post(['/api/settings', '/tg/api/settings', '/msm/api/settings'], (req, res) 
       minTvSizeMb,
       minMovieSizeMb,
       resolverMaxPages,
+      speedTestMb,
+      speedTestBudgetMbPerMin,
       geoBlockEnabled,
       geoBlockWhitelistedIps,
     } = req.body || {};
@@ -1841,6 +1848,24 @@ app.post(['/api/settings', '/tg/api/settings', '/msm/api/settings'], (req, res) 
       }
     }
 
+    if (speedTestMb !== undefined) {
+      const stMb = parseInt(speedTestMb, 10);
+      if (!isNaN(stMb) && stMb >= SPEEDTEST_MIN_MB && stMb <= SPEEDTEST_MAX_MB) {
+        savedSettings.speedTestMb = stMb;
+        changed = true;
+        console.log(`[SETTINGS] Speed test size updated to: ${stMb} MB`);
+      }
+    }
+
+    if (speedTestBudgetMbPerMin !== undefined) {
+      const stBudget = parseInt(speedTestBudgetMbPerMin, 10);
+      if (!isNaN(stBudget) && stBudget >= 10 && stBudget <= 2000) {
+        savedSettings.speedTestBudgetMbPerMin = stBudget;
+        changed = true;
+        console.log(`[SETTINGS] Speed test budget updated to: ${stBudget} MB/min per IP`);
+      }
+    }
+
     if (geoBlockEnabled !== undefined) {
       savedSettings.geoBlockEnabled = Boolean(geoBlockEnabled);
       changed = true;
@@ -1877,6 +1902,8 @@ app.post(['/api/settings', '/tg/api/settings', '/msm/api/settings'], (req, res) 
       minTvSizeMb: savedSettings.minTvSizeMb ?? 80,
       minMovieSizeMb: savedSettings.minMovieSizeMb ?? 180,
       resolverMaxPages: savedSettings.resolverMaxPages ?? 3,
+      speedTestMb: getSpeedTestMb(),
+      speedTestBudgetMbPerMin: getSpeedTestBudgetMbPerMin(),
       geoBlockEnabled: savedSettings.geoBlockEnabled !== false,
       geoBlockAllowedCountries: savedSettings.geoBlockAllowedCountries || ['MY'],
       geoBlockWhitelistedIps: savedSettings.geoBlockWhitelistedIps || [],
@@ -3107,6 +3134,55 @@ app.get(['/msm/setting', '/tg/settings'], (req, res) => {
         </div>
       </div>
 
+      <!-- Card: Network Speed Test (issue #281) -->
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 glow-box space-y-4">
+        <div class="flex items-center justify-between">
+          <h2 class="text-sm font-semibold text-white flex items-center gap-2">
+            📶 Network Speed Test
+          </h2>
+          <span class="text-xs px-2.5 py-0.5 rounded-full bg-sky-500/20 text-sky-300 border border-sky-500/30 font-mono">Analytics</span>
+        </div>
+        <p class="text-xs text-slate-400">Limits for the app's Network Speed Analytics (Settings &gt; Telegram Provider &gt; TGStrm).</p>
+
+        <div class="space-y-3 pt-1">
+          <!-- Speed Test Size -->
+          <div class="flex items-center justify-between gap-3 bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/80">
+            <div>
+              <div class="text-xs font-semibold text-white">Speed Test Size</div>
+              <div class="text-[11px] text-slate-400">Data read per quality in the app's Network Speed Analytics (12-64 MB; smaller never fills the read-ahead window)</div>
+            </div>
+            <div class="flex items-center gap-1.5 bg-slate-900 border border-slate-700 rounded-lg p-1">
+              <button type="button" onclick="adjustSpeedTestInput('speedTestMbInput', -4, 12, 64)" class="w-6 h-6 flex items-center justify-center rounded bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white font-bold text-xs transition select-none">-</button>
+              <input id="speedTestMbInput" type="number" step="4" min="12" max="64" value="16" class="w-12 bg-transparent text-center text-xs font-mono font-semibold text-white focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
+              <span class="text-[11px] text-slate-400 pr-1">MB</span>
+              <button type="button" onclick="adjustSpeedTestInput('speedTestMbInput', 4, 12, 64)" class="w-6 h-6 flex items-center justify-center rounded bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white font-bold text-xs transition select-none">+</button>
+            </div>
+          </div>
+
+          <!-- Speed Test Budget -->
+          <div class="flex items-center justify-between gap-3 bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/80">
+            <div>
+              <div class="text-xs font-semibold text-white">Speed Test Budget</div>
+              <div class="text-[11px] text-slate-400">Maximum speed test data per client IP per minute (HTTP 429 beyond it)</div>
+            </div>
+            <div class="flex items-center gap-1.5 bg-slate-900 border border-slate-700 rounded-lg p-1">
+              <button type="button" onclick="adjustSpeedTestInput('speedTestBudgetInput', -10, 10, 2000)" class="w-6 h-6 flex items-center justify-center rounded bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white font-bold text-xs transition select-none">-</button>
+              <input id="speedTestBudgetInput" type="number" step="10" min="10" max="2000" value="150" class="w-12 bg-transparent text-center text-xs font-mono font-semibold text-white focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
+              <span class="text-[11px] text-slate-400 pr-1">MB/min</span>
+              <button type="button" onclick="adjustSpeedTestInput('speedTestBudgetInput', 10, 10, 2000)" class="w-6 h-6 flex items-center justify-center rounded bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white font-bold text-xs transition select-none">+</button>
+            </div>
+          </div>
+
+          <div class="flex items-center justify-between pt-2">
+            <span id="saveSpeedTestMsg" class="text-xs text-emerald-400 hidden">✓ Speed test settings saved & applied!</span>
+            <div class="flex-1"></div>
+            <button id="saveSpeedTestBtn" onclick="saveSpeedTestSettings()" class="px-4 py-1.5 bg-sky-500 hover:bg-sky-400 text-slate-950 font-semibold text-xs rounded-xl transition">
+              Save Speed Test Settings
+            </button>
+          </div>
+        </div>
+      </div>
+
       <!-- Card 4: Service Management (Reboot / Restart TGStrm Server) -->
       <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 glow-box space-y-4">
         <div class="flex items-center justify-between">
@@ -3309,6 +3385,12 @@ app.get(['/msm/setting', '/tg/settings'], (req, res) => {
           document.getElementById('resolverMaxPagesInput').value = String(res.resolverMaxPages);
           updateResolverMaxPagesLabel();
         }
+        if (res.speedTestMb !== undefined) {
+          document.getElementById('speedTestMbInput').value = String(res.speedTestMb);
+        }
+        if (res.speedTestBudgetMbPerMin !== undefined) {
+          document.getElementById('speedTestBudgetInput').value = String(res.speedTestBudgetMbPerMin);
+        }
         if (res.geoBlockEnabled !== undefined) {
           const toggle = document.getElementById('geoBlockToggle');
           if (toggle) toggle.checked = Boolean(res.geoBlockEnabled);
@@ -3438,6 +3520,12 @@ app.get(['/msm/setting', '/tg/settings'], (req, res) => {
       updateResolverMaxPagesLabel();
     }
 
+    function adjustSpeedTestInput(id, delta, min, max) {
+      const input = document.getElementById(id);
+      const val = (parseInt(input.value, 10) || min) + delta;
+      input.value = String(Math.max(min, Math.min(max, val)));
+    }
+
     function updateResolverMaxPagesLabel() {
       const pages = parseInt(document.getElementById('resolverMaxPagesInput').value, 10) || 3;
       document.getElementById('resolverMaxPagesHint').textContent = 'Traverse up to ' + pages + ' page' + (pages === 1 ? '' : 's') + ' per search query during media resolution';
@@ -3486,6 +3574,36 @@ app.get(['/msm/setting', '/tg/settings'], (req, res) => {
       } finally {
         btn.disabled = false;
         btn.textContent = 'Save Pipeline Buffers';
+      }
+    }
+
+    async function saveSpeedTestSettings() {
+      const speedTestMb = parseInt(document.getElementById('speedTestMbInput').value, 10) || 16;
+      const speedTestBudgetMbPerMin = parseInt(document.getElementById('speedTestBudgetInput').value, 10) || 150;
+
+      const btn = document.getElementById('saveSpeedTestBtn');
+      btn.disabled = true;
+      btn.textContent = 'Saving...';
+
+      try {
+        const res = await fetch('/tg/api/settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ speedTestMb: speedTestMb, speedTestBudgetMbPerMin: speedTestBudgetMbPerMin })
+        });
+        const data = await res.json();
+        if (data.success) {
+          document.getElementById('speedTestMbInput').value = String(data.speedTestMb);
+          document.getElementById('speedTestBudgetInput').value = String(data.speedTestBudgetMbPerMin);
+          const msg = document.getElementById('saveSpeedTestMsg');
+          msg.classList.remove('hidden');
+          setTimeout(() => msg.classList.add('hidden'), 3000);
+        }
+      } catch (e) {
+        alert('Failed to save speed test settings: ' + e.message);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Save Speed Test Settings';
       }
     }
 
@@ -3827,6 +3945,181 @@ app.get(['/api/cache/evict', '/tg/api/cache/evict', '/msm/api/cache/evict'], (re
   if (key) evicted = db.delete(key) || evicted;
   if (docId) evicted = db.deleteByDocId(docId) || evicted;
   return res.json({ success: true, evicted, key, docId });
+});
+
+// ---------------------------------------------------------------------------
+// Network speed test (issue #281)
+// The client measures delivery end to end; the server hands out sample files, enforces its own size and
+// per-IP byte budget, and reports its side of the same transfer (time waiting for Telegram vs for the client).
+// ---------------------------------------------------------------------------
+const SPEEDTEST_MIN_MB = 12; // 512 KB blocks and a ~10 block window on 1080p/4K: anything smaller never fills the window
+const SPEEDTEST_MAX_MB = 64;
+const SPEEDTEST_MIN_FILE_BYTES = 64 * 1024 * 1024;
+const SPEEDTEST_TIER_MIN_MBPS = { '720p': 3, '1080p': 5, '4k': 15 }; // Netflix recommended minimums; SD is not tested
+const SPEEDTEST_SESSION_TTL_MS = 10 * 60 * 1000;
+const speedTests = new Map(); // testId -> session
+const speedTestSpend = new Map(); // ip -> [{ t, mb }] spent within the last minute
+let speedTestRandomChunk = null;
+
+function getSpeedTestMb() {
+  const v = parseInt(savedSettings.speedTestMb, 10);
+  return (!isNaN(v) && v >= SPEEDTEST_MIN_MB && v <= SPEEDTEST_MAX_MB) ? v : 16;
+}
+
+function getSpeedTestBudgetMbPerMin() {
+  const v = parseInt(savedSettings.speedTestBudgetMbPerMin, 10);
+  const budget = (!isNaN(v) && v >= 10 && v <= 2000) ? v : 150;
+  return Math.max(budget, getSpeedTestMb()); // a single test must always fit
+}
+
+function getRequestIp(req) {
+  return resolveClientIdentity(req.headers['x-forwarded-for'] || req.ip || req.socket?.remoteAddress, req).ip;
+}
+
+/** Returns 0 and records the spend when it fits the per-IP budget, otherwise the seconds to wait. */
+function chargeSpeedTestBudget(ip, mb) {
+  const now = Date.now();
+  const spent = (speedTestSpend.get(ip) || []).filter(e => now - e.t < 60000);
+  const total = spent.reduce((sum, e) => sum + e.mb, 0);
+  if (total + mb > getSpeedTestBudgetMbPerMin()) {
+    speedTestSpend.set(ip, spent);
+    return spent.length ? Math.max(1, Math.ceil((spent[0].t + 60000 - now) / 1000)) : 60;
+  }
+  spent.push({ t: now, mb });
+  speedTestSpend.set(ip, spent);
+  return 0;
+}
+
+function cachedItemTier(item) {
+  const bytes = parseInt(item.size, 10);
+  const fakeDoc = (item.width || item.height) ? { size: bytes, attributes: [{ className: 'DocumentAttributeVideo', w: item.width, h: item.height }] } : (bytes > 0 ? { size: bytes } : null);
+  return detectVideoQualityTier(item.filename || '', item.queryKey || '', fakeDoc, bytes);
+}
+
+/**
+ * Stable sample for a tier so repeated runs test the same file: among the tier's files big enough for a
+ * test, take the Telegram DC holding most of them, then the median-sized file of that DC.
+ */
+function pickSpeedTestSample(tier) {
+  const minBytes = Math.max(SPEEDTEST_MIN_FILE_BYTES, getSpeedTestMb() * 1024 * 1024 * 2);
+  const candidates = db.getAll('').filter(r => r.accessHash && parseInt(r.size, 10) >= minBytes && cachedItemTier(r) === tier);
+  if (candidates.length === 0) return null;
+  const byDc = new Map();
+  for (const r of candidates) {
+    const key = String(r.dcId ?? 'unknown');
+    if (!byDc.has(key)) byDc.set(key, []);
+    byDc.get(key).push(r);
+  }
+  const [, files] = [...byDc.entries()].sort((a, b) => b[1].length - a[1].length || a[0].localeCompare(b[0]))[0];
+  files.sort((a, b) => parseInt(a.size, 10) - parseInt(b.size, 10) || String(a.docId).localeCompare(String(b.docId)));
+  return files[Math.floor((files.length - 1) / 2)];
+}
+
+function createSpeedTestSession(record, tier) {
+  const now = Date.now();
+  for (const [id, s] of speedTests) {
+    if (now - s.createdAt > SPEEDTEST_SESSION_TTL_MS) speedTests.delete(id);
+  }
+  const BLOCK = 512 * 1024;
+  const size = parseInt(record.size, 10);
+  const bytes = getSpeedTestMb() * 1024 * 1024;
+  // Read from the middle of the file: away from the pinned head/tail blocks and the tail-metadata probe zone
+  const hi = Math.min(Math.floor(size * 0.8), size - bytes - 11 * 1024 * 1024);
+  const lo = Math.min(Math.floor(size * 0.2), hi);
+  const offset = Math.floor((lo + Math.floor(Math.random() * Math.max(1, hi - lo))) / BLOCK) * BLOCK;
+  const session = {
+    id: crypto.randomBytes(9).toString('hex'),
+    docId: String(record.docId),
+    tier,
+    filename: record.filename || '',
+    sizeBytes: size,
+    dcId: record.dcId ?? null,
+    offset,
+    bytes,
+    createdAt: now,
+    state: 'ready', // ready -> running -> done | error
+    metrics: null,
+  };
+  speedTests.set(session.id, session);
+  return session;
+}
+
+// One sample file per requested quality (720p / 1080p / 4K), each with its own single-use test id.
+app.get(['/api/speedtest/targets', '/tg/api/speedtest/targets', '/msm/api/speedtest/targets'], (req, res) => {
+  const wanted = String(req.query.tiers || '').split(',').map(t => t.trim().toLowerCase()).filter(t => SPEEDTEST_TIER_MIN_MBPS[t]);
+  const tiers = wanted.length > 0 ? [...new Set(wanted)] : Object.keys(SPEEDTEST_TIER_MIN_MBPS);
+  const targets = [];
+  const missing = [];
+  for (const tier of tiers) {
+    const record = pickSpeedTestSample(tier);
+    if (!record) {
+      missing.push(tier);
+      continue;
+    }
+    const s = createSpeedTestSession(record, tier);
+    targets.push({
+      tier,
+      testId: s.id,
+      docId: s.docId,
+      filename: s.filename,
+      sizeBytes: s.sizeBytes,
+      dcId: s.dcId,
+      bytes: s.bytes,
+      minMbps: SPEEDTEST_TIER_MIN_MBPS[tier],
+      concurrency: getTierConcurrency(tier, savedSettings.pipelineBuffers),
+    });
+  }
+  res.json({
+    success: true,
+    mb: getSpeedTestMb(),
+    budgetMbPerMin: getSpeedTestBudgetMbPerMin(),
+    minMbps: SPEEDTEST_TIER_MIN_MBPS,
+    targets,
+    missing,
+  });
+});
+
+// Router -> client throughput without Telegram: the configured number of MB of incompressible bytes from RAM.
+app.get(['/api/speedtest/download', '/tg/api/speedtest/download', '/msm/api/speedtest/download'], async (req, res) => {
+  const mb = getSpeedTestMb();
+  const retry = chargeSpeedTestBudget(getRequestIp(req), mb);
+  if (retry > 0) {
+    res.set('Retry-After', String(retry));
+    return res.status(429).json({ success: false, error: 'Speed test budget exceeded for this IP', retryAfterSec: retry });
+  }
+  if (!speedTestRandomChunk) speedTestRandomChunk = crypto.randomBytes(1024 * 1024);
+  if (req.socket) {
+    try { req.socket.setNoDelay(true); } catch {}
+  }
+  res.writeHead(200, {
+    'Content-Type': 'application/octet-stream',
+    'Content-Length': mb * 1024 * 1024,
+    'Cache-Control': 'no-store, no-transform',
+    'X-Accel-Buffering': 'no',
+  });
+  for (let i = 0; i < mb; i++) {
+    if (res.destroyed || res.writableEnded) break;
+    await writeWithBackpressure(res, speedTestRandomChunk);
+  }
+  if (!res.writableEnded) res.end();
+});
+
+// Server-side numbers of a finished (or running) quality test: first block, sustained rate and the time the
+// pipeline spent waiting for blocks. The bottleneck is decided by the client by comparing the sustained rate
+// with the network baseline (the wait times alone do not separate Telegram from router CPU or socket delays).
+app.get(['/api/speedtest/result', '/tg/api/speedtest/result', '/msm/api/speedtest/result'], (req, res) => {
+  const s = speedTests.get(String(req.query.id || ''));
+  if (!s) return res.status(404).json({ success: false, error: 'Unknown or expired speed test id' });
+  res.json({
+    success: true,
+    state: s.state,
+    tier: s.tier,
+    docId: s.docId,
+    filename: s.filename,
+    dcId: s.dcId,
+    bytes: s.bytes,
+    metrics: s.metrics,
+  });
 });
 
 // Resolver endpoint: /api/resolve and Prefetch endpoint: /api/prefetch
@@ -4386,6 +4679,29 @@ async function streamTelegramPipelined(client, targetDoc, startByte, endByte, re
   let aborted = false;
   const inFlight = new Map();
 
+  // Speed test (issue #281): server-side counters, only used when the request carries a speed test session.
+  // The "sustained" part starts once the first block is out: its rate, and the time spent waiting for blocks
+  // (starved) and for the socket write/drain.
+  const speedTest = req?.speedTestSession || null;
+  let stSustainedStart = 0;
+  let stSustainedBytes = 0;
+  let stStarvedMs = 0;
+  let stWriteMs = 0;
+  let stFirstSentMs = null;
+  let stBytes = 0;
+  // Arrival times of blocks from Telegram: the first block is excluded like in the client's sustained rate,
+  // the rest give the Telegram -> router rate (a lower bound when the client was the slower side)
+  let stFirstArrival = 0;
+  let stLastArrival = 0;
+  let stLaterBytes = 0;
+  const stTrackArrival = (n) => {
+    if (!speedTest) return;
+    const t = Date.now();
+    if (!stFirstArrival) stFirstArrival = t;
+    else stLaterBytes += n;
+    stLastArrival = t;
+  };
+
   // Close diagnostics (issue #257): why/when a pipeline ended and how far it got.
   const pipeStartedAt = Date.now();
   let firstBlockMs = null;
@@ -4513,7 +4829,7 @@ async function streamTelegramPipelined(client, targetDoc, startByte, endByte, re
     const docIdStr = targetDoc.id.toString();
 
     // 1. Check in-memory LRU cache (0ms instant lookup)
-    const cached = getCachedBlock(docIdStr, blockIdx);
+    const cached = speedTest ? null : getCachedBlock(docIdStr, blockIdx);
     if (cached) {
       return cached;
     }
@@ -4538,7 +4854,7 @@ async function streamTelegramPipelined(client, targetDoc, startByte, endByte, re
       if (aborted) return null;
       const bytes = result.bytes;
       if (bytes && bytes.length > 0) {
-        setCachedBlock(docIdStr, blockIdx, bytes, isPinnedBlock);
+        if (!speedTest) setCachedBlock(docIdStr, blockIdx, bytes, isPinnedBlock);
       }
       return bytes;
     } catch (err) {
@@ -4557,7 +4873,7 @@ async function streamTelegramPipelined(client, targetDoc, startByte, endByte, re
         if (aborted) return null;
         const bytes = result.bytes;
         if (bytes && bytes.length > 0) {
-          setCachedBlock(docIdStr, blockIdx, bytes, isPinnedBlock);
+          if (!speedTest) setCachedBlock(docIdStr, blockIdx, bytes, isPinnedBlock);
         }
         return bytes;
       }
@@ -4579,7 +4895,7 @@ async function streamTelegramPipelined(client, targetDoc, startByte, endByte, re
             if (aborted) return null;
             const bytes = result.bytes;
             if (bytes && bytes.length > 0) {
-              setCachedBlock(docIdStr, blockIdx, bytes, isPinnedBlock);
+              if (!speedTest) setCachedBlock(docIdStr, blockIdx, bytes, isPinnedBlock);
             }
             return bytes;
           } catch (e2) {
@@ -4609,7 +4925,7 @@ async function streamTelegramPipelined(client, targetDoc, startByte, endByte, re
           if (aborted) return null;
           const bytes = result.bytes;
           if (bytes && bytes.length > 0) {
-            setCachedBlock(docIdStr, blockIdx, bytes, isPinnedBlock);
+            if (!speedTest) setCachedBlock(docIdStr, blockIdx, bytes, isPinnedBlock);
           }
           return bytes;
         }
@@ -4654,7 +4970,7 @@ async function streamTelegramPipelined(client, targetDoc, startByte, endByte, re
     const firstRequested = nextBlockToFetch;
     while (!aborted && inFlight.size < CONCURRENCY && nextBlockToFetch <= endBlock) {
       const idx = nextBlockToFetch++;
-      const p = fetchBlockWithRetry(idx).catch(err => {
+      const p = fetchBlockWithRetry(idx).then(b => { if (b && b.length) stTrackArrival(b.length); return b; }).catch(err => {
         if (!aborted) console.warn(`[STREAM PIPE WARN] Block ${idx} fetch error: ${err.message}`);
         return null;
       });
@@ -4672,6 +4988,7 @@ async function streamTelegramPipelined(client, targetDoc, startByte, endByte, re
   // being written to the player. With overlapPrefetch off the window starts after that write instead.
   const isOverlapPrefetchEnabled = savedSettings.overlapPrefetch !== false;
   let firstBlockData = await fetchBlockWithRetry(startBlock);
+  if (firstBlockData && firstBlockData.length) stTrackArrival(firstBlockData.length);
   if (aborted || res.destroyed || res.writableEnded) {
     firstBlockData = null;
     return;
@@ -4692,8 +5009,11 @@ async function streamTelegramPipelined(client, targetDoc, startByte, endByte, re
   const firstSliceEnd = Math.min(firstBlockData.length, (endByte - firstBlockStart) + 1);
   firstBlockMs = Date.now() - pipeStartedAt;
   if (firstSliceStart < firstSliceEnd) {
-    await writeWithBackpressure(res, firstBlockData.subarray(firstSliceStart, firstSliceEnd), touchActive);
+    const firstSlice = firstBlockData.subarray(firstSliceStart, firstSliceEnd);
+    await writeWithBackpressure(res, firstSlice, touchActive);
     blocksSent++;
+    stBytes += firstSlice.length;
+    stFirstSentMs = Date.now() - pipeStartedAt;
     if (logTimeline) {
       console.log(`[PIPELINE FIRST BLOCK SENT] [${clientIdentity.name} (${clientIdentity.ip})] block ${startBlock} written to the player at ${Date.now() - pipeStartedAt}ms`);
     }
@@ -4705,6 +5025,7 @@ async function streamTelegramPipelined(client, targetDoc, startByte, endByte, re
   }
 
   // 2. Sliding-Window Pipeline for subsequent blocks
+  stSustainedStart = Date.now();
 
   for (let currentBlock = startBlock + 1; currentBlock <= endBlock; currentBlock++) {
     activeBlock = currentBlock;
@@ -4717,7 +5038,9 @@ async function streamTelegramPipelined(client, targetDoc, startByte, endByte, re
 
     if (!blockPromise) break;
 
+    const waitStartedAt = Date.now();
     const buffer = await blockPromise;
+    stStarvedMs += Date.now() - waitStartedAt;
     if (!buffer || buffer.length === 0) break;
 
     const blockStartPos = currentBlock * CHUNK_SIZE;
@@ -4726,12 +5049,34 @@ async function streamTelegramPipelined(client, targetDoc, startByte, endByte, re
 
     if (sliceStart < sliceEnd) {
       const slice = buffer.subarray(sliceStart, sliceEnd);
+      const writeStartedAt = Date.now();
       await writeWithBackpressure(res, slice, touchActive);
+      stWriteMs += Date.now() - writeStartedAt;
+      stBytes += slice.length;
+      stSustainedBytes += slice.length;
       blocksSent++;
     }
   }
 
   } finally {
+    if (speedTest) {
+      const sustainedMs = stSustainedStart ? Date.now() - stSustainedStart : 0;
+      speedTest.metrics = {
+        endReason: endReason || 'finished',
+        concurrency: CONCURRENCY,
+        firstBlockMs,
+        firstBlockSentMs: stFirstSentMs,
+        bytesSent: stBytes,
+        sustainedBytes: stSustainedBytes,
+        sustainedMs,
+        sustainedMbps: sustainedMs > 0 ? Math.round((stSustainedBytes * 8 / (sustainedMs / 1000) / 1e6) * 100) / 100 : null,
+        starvedMs: stStarvedMs,
+        writeWaitMs: stWriteMs,
+        telegramMbps: stLastArrival > stFirstArrival ? Math.round((stLaterBytes * 8 / ((stLastArrival - stFirstArrival) / 1000) / 1e6) * 100) / 100 : null,
+      };
+      speedTest.state = 'done';
+      console.log(`[SPEEDTEST END] ${speedTest.tier.toUpperCase()} reason: ${speedTest.metrics.endReason}, first block ${firstBlockMs ?? 'n/a'}ms, sustained ${speedTest.metrics.sustainedMbps ?? 'n/a'} Mbps over ${sustainedMs}ms, Telegram -> router ${speedTest.metrics.telegramMbps ?? 'n/a'} Mbps, waiting for blocks ${stStarvedMs}ms / for the socket ${stWriteMs}ms`);
+    }
     cleanupStream();
     if (endReason !== 'client-closed') {
       console.log(`[PIPELINE END] [${clientIdentity.name} (${clientIdentity.ip})] reason: ${endReason || 'finished'}, ${pipeSummary()}`);
@@ -5001,7 +5346,28 @@ app.get('/stream/:docId', async (req, res) => {
     const clientSession = isInternal
       ? (parentSessionKey ? `worker-${parentSessionKey}` : `internal-${docId}-${Date.now()}`)
       : (req.headers['x-client-id'] || clientIdentity.ip || 'client');
-    const streamSessionKey = isInternal ? clientSession : `${clientSession}:${docId}`;
+
+    // Speed test request (issue #281): a single-use test id handed out by /api/speedtest/targets decides the
+    // range, so the client cannot use this to read arbitrary parts of a file.
+    let speedTest = null;
+    if (req.query.speedtest !== undefined) {
+      speedTest = speedTests.get(String(req.query.speedtest));
+      if (!speedTest || speedTest.docId !== String(docId) || Date.now() - speedTest.createdAt > SPEEDTEST_SESSION_TTL_MS) {
+        return res.status(404).json({ success: false, error: 'Unknown or expired speed test id' });
+      }
+      if (speedTest.state !== 'ready') {
+        return res.status(409).json({ success: false, error: 'Speed test id already used' });
+      }
+      const retry = chargeSpeedTestBudget(clientIdentity.ip, Math.round(speedTest.bytes / (1024 * 1024)));
+      if (retry > 0) {
+        res.set('Retry-After', String(retry));
+        return res.status(429).json({ success: false, error: 'Speed test budget exceeded for this IP', retryAfterSec: retry });
+      }
+      speedTest.state = 'running';
+      req.speedTestSession = speedTest;
+    }
+    // A speed test gets its own session key so it never aborts the same client's real playback of this file
+    const streamSessionKey = speedTest ? `speedtest:${speedTest.id}` : (isInternal ? clientSession : `${clientSession}:${docId}`);
 
     // Only cancel if previous stream was an active transcode process replaced by a seek query (?ss=)
     const existingStream = activeStreams.get(streamSessionKey);
@@ -5058,6 +5424,7 @@ app.get('/stream/:docId', async (req, res) => {
     }
 
     if (!targetDoc || !targetMedia || fileSize <= 0) {
+      if (speedTest) speedTest.state = 'error';
       return res.status(404).send('Media document not found or invalid media size');
     }
 
@@ -5068,7 +5435,7 @@ app.get('/stream/:docId', async (req, res) => {
     let isHevc = isHevcFilename || dbRecord?.videoCodec === 'hevc' || dbRecord?.videoCodec === 'h265';
 
     // If not known yet, check in-memory cache or probe media details before serving to prevent serving raw HEVC to Chrome
-    if (!isInternalTranscoder && !isAvi && !isHevc) {
+    if (!isInternalTranscoder && !speedTest && !isAvi && !isHevc) {
       const memCached = docMediaDetailsCache.get(docId);
       if (memCached?.isHevc) {
         isHevc = true;
@@ -5099,7 +5466,7 @@ app.get('/stream/:docId', async (req, res) => {
       autoVideoTranscodeNeeded = isAvi || isHevc;
     }
 
-    const shouldTranscode = !isInternalTranscoder && (
+    const shouldTranscode = !isInternalTranscoder && !speedTest && (
       isAudioTranscodeRequested ||
       isVideoTranscodeRequested ||
       autoVideoTranscodeNeeded
@@ -5350,7 +5717,20 @@ app.get('/stream/:docId', async (req, res) => {
       } catch {}
     }
 
-    if (!rangeHeader) {
+    if (speedTest) {
+      const start = speedTest.offset;
+      const end = Math.min(start + speedTest.bytes - 1, fileSize - 1);
+      console.log(`[SPEEDTEST] [${clientIdentity.name} (${clientIdentity.ip})] ${detectedTier.toUpperCase()} ${filename} (DC ${speedTest.dcId ?? '?'}): ${end - start + 1} bytes from ${start} [${tierConcurrency}x512KB]`);
+      res.writeHead(206, {
+        'Content-Range': `bytes ${start}-${end}/${fileSize}`,
+        'Accept-Ranges': 'bytes',
+        'Content-Length': (end - start) + 1,
+        'Content-Type': mimeType,
+        'Cache-Control': 'no-cache, no-store, no-transform',
+        'X-Accel-Buffering': 'no',
+      });
+      await streamTelegramPipelined(client, targetDoc, start, end, res, req, downloadChunkSize, tierConcurrency, streamSessionKey, detectedTier);
+    } else if (!rangeHeader) {
       res.writeHead(200, {
         'Content-Length': fileSize,
         'Content-Type': mimeType,

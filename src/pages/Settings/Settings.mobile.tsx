@@ -5,6 +5,9 @@ import { STREAM_PROVIDERS, CATEGORY_BADGE_CONFIG, ORIGIN_COUNTRY_LABELS } from '
 import type { OriginCountryCode } from '../../types/stream';
 import { msmService, getMsmServerLabel, type MsmHealthResult, type CachedStreamRecord } from '../../services/msmMappingService';
 import { useDevice } from '../../hooks/useDevice';
+import { useSpeedTest } from '../../hooks/useSpeedTest';
+import { SpeedTestResults } from '../../components/common/SpeedTestResults';
+import { SPEEDTEST_TIERS, SPEEDTEST_TIER_LABEL, type SpeedTestTier } from '../../utils/speedTest';
 import { Logo } from '../../components/common/Logo';
 import { APP_VERSION, APP_BUILD_NUMBER, APP_VERSION_FULL, APP_BUILD_CHANNEL, APP_CHANGELOG } from '../../version';
 import { updateService, type UpdateInfo } from '../../services/updateService';
@@ -46,6 +49,7 @@ import {
   ExternalLink,
   Search,
   Database,
+  Gauge,
 } from 'lucide-react';
 
 type MobileCategory = 'playback' | 'display' | 'content' | 'system';
@@ -171,6 +175,8 @@ export const Settings: React.FC = () => {
   const [updateError, setUpdateError] = useState<string | null>(null);
   const [activeCategory, setActiveCategory] = useState<MobileCategory>('playback');
   const [isFilterFrozen, setIsFilterFrozen] = useState(false);
+  const speedTest = useSpeedTest();
+  const [speedTestTiers, setSpeedTestTiers] = useState<SpeedTestTier[]>([...SPEEDTEST_TIERS]);
   const [activeDrawer, setActiveDrawer] = useState<
     | 'autoplay'
     | 'autoplayTrigger'
@@ -187,6 +193,7 @@ export const Settings: React.FC = () => {
     | 'telegram-timeout'
     | 'telegram-buffer-timeout'
     | 'telegram-cache'
+    | 'telegram-speedtest'
     | 'engine-embed'
     | 'embed-timeout'
     | 'embed-retries'
@@ -1757,29 +1764,6 @@ export const Settings: React.FC = () => {
             )}
           </div>
 
-          {/* Navigation to Live Server Logs Drawer */}
-          <button
-            type="button"
-            onClick={() => setActiveDrawer('telegram-logs')}
-            className="w-full flex items-center justify-between p-3.5 rounded-xl bg-white/5 border border-white/10 hover:border-sky-400/50 hover:bg-white/10 transition-all text-left"
-          >
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-lg bg-sky-500/10 border border-sky-500/20 flex items-center justify-center text-sky-400 flex-shrink-0">
-                <Terminal className="w-4 h-4" />
-              </div>
-              <div className="space-y-0.5">
-                <span className="text-xs font-semibold text-white block">Live Server Logs &amp; Diagnostics</span>
-                <span className="text-[10px] text-gray-400">View real-time TGStrm logs, memory &amp; active streams</span>
-              </div>
-            </div>
-            <div className="flex items-center gap-1.5 flex-shrink-0">
-              <span className="text-[10px] text-emerald-400 font-mono font-bold bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-400/20">
-                Logs
-              </span>
-              <ChevronRight className="w-4 h-4 text-gray-400" />
-            </div>
-          </button>
-
           {/* Quality Selection Button */}
           <button
             type="button"
@@ -1869,6 +1853,32 @@ export const Settings: React.FC = () => {
             </div>
           </button>
 
+          {/* Diagnostics & Analytics group */}
+          <div className="pt-2 space-y-3">
+            <span className="text-[10px] text-gray-400 block uppercase tracking-wider font-semibold px-1">Diagnostics &amp; Analytics</span>
+          {/* Navigation to Live Server Logs Drawer */}
+          <button
+            type="button"
+            onClick={() => setActiveDrawer('telegram-logs')}
+            className="w-full flex items-center justify-between p-3.5 rounded-xl bg-white/5 border border-white/10 hover:border-sky-400/50 hover:bg-white/10 transition-all text-left"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-sky-500/10 border border-sky-500/20 flex items-center justify-center text-sky-400 flex-shrink-0">
+                <Terminal className="w-4 h-4" />
+              </div>
+              <div className="space-y-0.5">
+                <span className="text-xs font-semibold text-white block">Live Server Logs &amp; Diagnostics</span>
+                <span className="text-[10px] text-gray-400">View real-time TGStrm logs, memory &amp; active streams</span>
+              </div>
+            </div>
+            <div className="flex items-center gap-1.5 flex-shrink-0">
+              <span className="text-[10px] text-emerald-400 font-mono font-bold bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-400/20">
+                Logs
+              </span>
+              <ChevronRight className="w-4 h-4 text-gray-400" />
+            </div>
+          </button>
+
           {/* Navigation to Persistent Stream Cache Manager Sub-Drawer */}
           <button
             type="button"
@@ -1888,6 +1898,23 @@ export const Settings: React.FC = () => {
               <ChevronRight className="w-4 h-4 text-gray-400" />
             </div>
           </button>
+
+          {/* Navigation to Network Speed Analytics Sub-Drawer */}
+          <button
+            type="button"
+            onClick={() => setActiveDrawer('telegram-speedtest')}
+            className="w-full flex items-center justify-between p-3.5 rounded-xl bg-white/5 border border-white/10 hover:border-sky-400/50 hover:bg-white/10 transition-all text-left"
+          >
+            <div className="space-y-0.5">
+              <span className="text-xs font-semibold text-white block">Network Speed Analytics</span>
+              <span className="text-[11px] text-gray-400">Test stream delivery per quality (Telegram to router to this device)</span>
+            </div>
+            <div className="flex items-center gap-1.5 flex-shrink-0">
+              <Gauge className="w-4 h-4 text-sky-400" />
+              <ChevronRight className="w-4 h-4 text-gray-400" />
+            </div>
+          </button>
+          </div>
 
 
           <p className="text-[11px] text-gray-400 leading-relaxed">
@@ -2029,6 +2056,65 @@ export const Settings: React.FC = () => {
                 })
             )}
           </div>
+        </div>
+      </SettingsDrawer>
+
+      {/* 3a-TG-SPEEDTEST. Sub-Drawer: Network Speed Analytics (issue #281) */}
+      <SettingsDrawer
+        isOpen={activeDrawer === 'telegram-speedtest'}
+        onClose={() => { speedTest.stop(); setActiveDrawer(null); }}
+        onBack={() => { speedTest.stop(); setActiveDrawer('telegram-msm'); }}
+        title="Network Speed Analytics"
+        subtitle="Measure stream delivery per video quality, from Telegram through the router to this device."
+        categoryLabel="Telegram > TGStrm > Network Speed Analytics"
+      >
+        <div className="space-y-3">
+          <div className="space-y-1.5">
+            <span className="text-[10px] text-gray-400 block uppercase tracking-wider font-semibold px-1">Qualities to test</span>
+            <div className="grid grid-cols-3 gap-2">
+              {SPEEDTEST_TIERS.map((tier) => {
+                const selected = speedTestTiers.includes(tier);
+                return (
+                  <button
+                    key={tier}
+                    type="button"
+                    disabled={speedTest.state.running}
+                    onClick={() => setSpeedTestTiers(prev => selected ? prev.filter(t => t !== tier) : [...prev, tier])}
+                    className={`py-2 rounded-xl border text-xs font-bold transition-all ${selected ? 'bg-sky-500/15 border-sky-400/60 text-sky-300' : 'bg-white/5 border-white/10 text-gray-400'} ${speedTest.state.running ? 'opacity-60' : ''}`}
+                  >
+                    {tier === '4k' ? '4K' : tier}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {speedTest.state.running ? (
+            <button
+              type="button"
+              onClick={() => speedTest.stop()}
+              className="w-full py-2.5 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 border border-rose-400/40 text-rose-300 text-xs font-bold transition-all"
+            >
+              Stop
+            </button>
+          ) : (
+            <button
+              type="button"
+              disabled={speedTestTiers.length === 0}
+              onClick={() => speedTest.start(speedTestTiers)}
+              className="w-full py-2.5 rounded-xl bg-sky-500 hover:bg-sky-400 disabled:opacity-50 text-slate-950 text-xs font-bold transition-all flex items-center justify-center gap-1.5"
+            >
+              <Gauge className="w-4 h-4" />
+              Start speed test
+            </button>
+          )}
+
+          <SpeedTestResults state={speedTest.state} />
+
+          <p className="text-[10px] text-gray-500 leading-relaxed">
+            Each quality reads a few MB from a real file on the server (the size is set on the server), one quality after another.
+            Smooth needs at least 1.5x the quality's minimum speed (Netflix: 720p 3, 1080p 5, 4K 15 Mbps).
+          </p>
         </div>
       </SettingsDrawer>
 
