@@ -4240,6 +4240,7 @@ app.get(['/api/resolve', '/tg/api/resolve', '/msm/api/resolve', '/api/prefetch',
     return res.json({
       success: true,
       cached: true,
+      ...(await getAudioInfo(cached.docId, cached)),
       streamUrl: `${protocol}://${host}/stream/${cached.docId}${transcodeQuery}`,
       filename: cached.filename,
       size: cached.size,
@@ -4271,6 +4272,7 @@ app.get(['/api/resolve', '/tg/api/resolve', '/msm/api/resolve', '/api/prefetch',
       return res.json({
         success: true,
         cached: true,
+        ...(await getAudioInfo(result.docId, db.getByDocId(result.docId))),
         streamUrl: `${protocol}://${host}/stream/${result.docId}${transcodeQuery}`,
         filename: result.filename,
         size: result.size,
@@ -4419,6 +4421,7 @@ app.get(['/api/resolve', '/tg/api/resolve', '/msm/api/resolve', '/api/prefetch',
     return res.json({
       success: true,
       cached: false,
+      ...(await getAudioInfo(result.docId, db.getByDocId(result.docId))),
       streamUrl: `${protocol}://${host}/stream/${result.docId}${transcodeQuery}`,
       filename: result.filename,
       size: result.size,
@@ -5187,7 +5190,7 @@ async function resolveMediaDetails(docId, parentSessionKey) {
     '-headers', probeHeaders.join('\r\n') + '\r\n',
     '-probesize', '524288',
     '-analyzeduration', '1000000',
-    '-show_entries', 'stream=index,codec_type,codec_name,codec_tag_string:stream_tags=language,title',
+    '-show_entries', 'stream=index,codec_type,codec_name,codec_tag_string,channels:stream_tags=language,title',
     '-of', 'json',
     `http://127.0.0.1:${INTERNAL_HTTP_PORT}/stream/${docId}?direct=1&probe=1`,
   ];
@@ -5243,14 +5246,21 @@ async function resolveMediaDetails(docId, parentSessionKey) {
             }
           }
 
+          const chosenAudio = audioStreams.find(s => `0:${s.index}` === audioSpec) || audioStreams[0];
+          const audioCodec = String(chosenAudio?.codec_name || '').toLowerCase();
+          const audioChannels = chosenAudio?.channels ? Number(chosenAudio.channels) : 0;
+
           if (videoCodec) {
             db.updateVideoCodec(docId, videoCodec);
+          }
+          if (audioCodec) {
+            db.updateAudioInfo(docId, audioCodec, audioChannels);
           }
           if (height) {
             db.updateVideoDimensions(docId, width, height);
           }
 
-          console.log(`[MEDIA PROBE] Doc ${docId} probed: videoCodec=${videoCodec || 'none'} (isHevc: ${isHevc}), dimensions=${width}x${height}, audioTrack=${audioSpec}`);
+          console.log(`[MEDIA PROBE] Doc ${docId} probed: videoCodec=${videoCodec || 'none'} (isHevc: ${isHevc}), dimensions=${width}x${height}, audioTrack=${audioSpec}, audioCodec=${audioCodec || 'none'} (${audioChannels || '?'}ch)`);
           return resolve({
             audioMapSpecifier: audioSpec,
             videoCodec,
@@ -5258,6 +5268,8 @@ async function resolveMediaDetails(docId, parentSessionKey) {
             isLegacyVideo,
             width,
             height,
+            audioCodec,
+            audioChannels,
           });
         } catch (err) {
           reject(err);
@@ -5285,6 +5297,21 @@ async function resolveMediaDetails(docId, parentSessionKey) {
       isLegacyVideo: false,
     };
   }
+}
+
+// Real audio codec of a doc for the resolve response, so the client can pick the audio transcode even when the
+// filename gives no hint (#284). Uses the DB record when known, otherwise probes once. Failures keep the defaults.
+async function getAudioInfo(docId, record) {
+  if (record?.audioCodec) {
+    return { audioCodec: record.audioCodec, audioChannels: record.audioChannels || undefined };
+  }
+  try {
+    const details = await resolveMediaDetails(String(docId));
+    if (details?.audioCodec) {
+      return { audioCodec: details.audioCodec, audioChannels: details.audioChannels || undefined };
+    }
+  } catch {}
+  return {};
 }
 
 // Backward compatibility alias for resolveBestAudioTrack
@@ -5565,7 +5592,9 @@ app.get('/stream/:docId', async (req, res) => {
         '-c:a', 'aac',
         '-ac', '2',
         '-b:a', '128k',
-        '-af', 'aresample=async=1',
+        // aformat forces the stereo downmix inside the filter chain so the boost applies AFTER it (the default
+        // downmix is normalised and comes out quiet, #284); alimiter keeps the boosted peaks from clipping.
+        '-af', 'aresample=async=1,aformat=channel_layouts=stereo,volume=1.8,alimiter=limit=0.95:level=disabled',
         '-avoid_negative_ts', 'make_zero',
         ...muxerArgs,
         'pipe:1',

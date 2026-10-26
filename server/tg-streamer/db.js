@@ -469,6 +469,8 @@ export class CentralDatabase {
       bot: data.bot || existing?.bot || undefined,
       resolver: data.resolver || existing?.resolver || undefined,
       videoCodec: data.videoCodec || existing?.videoCodec || undefined,
+      audioCodec: data.audioCodec || existing?.audioCodec || undefined,
+      audioChannels: data.audioChannels || existing?.audioChannels || undefined,
       width: data.width !== undefined ? data.width : existing?.width,
       height: data.height !== undefined ? data.height : existing?.height,
       actualQuality: normActualQuality,
@@ -558,6 +560,19 @@ export class CentralDatabase {
       existing.videoCodec = videoCodec;
       this.save();
       console.log(`[DB] Updated videoCodec for doc ${docIdStr}: ${videoCodec}`);
+      return true;
+    }
+    return false;
+  }
+
+  updateAudioInfo(docId, audioCodec, audioChannels) {
+    const docIdStr = String(docId);
+    const existing = this.byDocId.get(docIdStr);
+    if (existing && audioCodec && (existing.audioCodec !== audioCodec || existing.audioChannels !== audioChannels)) {
+      existing.audioCodec = audioCodec;
+      existing.audioChannels = audioChannels || undefined;
+      this.save();
+      console.log(`[DB] Updated audio for doc ${docIdStr}: ${audioCodec} (${audioChannels || '?'}ch)`);
       return true;
     }
     return false;
