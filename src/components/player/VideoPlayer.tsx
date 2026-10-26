@@ -18,6 +18,7 @@ import type { SubtitleCue } from '../../services/subtitleService';
 import { CustomDirectPlayer } from './CustomDirectPlayer';
 import { isEpisodeAired } from '../../services/episodeAirStatus';
 import { getDirectStreamErrorView } from '../../utils/directStreamError';
+import { needsAudioTranscode } from '../../utils/audioTranscode';
 
 interface VideoPlayerProps {
   mediaType: 'movie' | 'tv';
@@ -697,9 +698,12 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
               : false;
             const isDesktopWeb = typeof window !== 'undefined' && !/Mobile|Android|iPhone|iPad|iPod|SmartTV|Tizen|Web0S/i.test(navigator.userAgent);
             const isHevc = isDesktopWeb && (msmRes.videoCodec === 'hevc' || msmRes.videoCodec === 'h265' || (msmRes.filename && /(x265|hevc|h265)/i.test(msmRes.filename)));
-            const isSurroundOrDolbyAudio = msmRes.filename
-              ? /(ddp|dd\+|ac3|ac-3|eac3|e-ac-3|atmos|dts|truehd|thd|[345678]ch|surround|(?<!\d)5[._-]1(?!\d)|(?<!\d)7[._-]1(?!\d))/i.test(msmRes.filename)
-              : false;
+            // Real codec from the server probe wins; the filename is only a fallback (#284)
+            const isSurroundOrDolbyAudio = needsAudioTranscode({
+              filename: msmRes.filename,
+              audioCodec: msmRes.audioCodec,
+              audioChannels: msmRes.audioChannels,
+            });
             let finalUrl = msmRes.streamUrl;
             if (isSurroundOrDolbyAudio || isAviOrLegacy) {
               const sep = finalUrl.includes('?') ? '&' : '?';
