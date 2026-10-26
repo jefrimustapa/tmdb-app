@@ -45,6 +45,17 @@ The log (`/tmp/tg-streamer.log` on the router, emptied on restart) tracks the se
 ```
 A first block of 0-1 ms comes from the RAM block cache (blocks 0-3 and anything already fetched), not from Telegram. `[PIPELINE END|CLOSED] ... first block Nms` still gives the same figure in the summary.
 
+## Network speed test (issue #281)
+The app (Settings > Telegram Provider > TGStrm > Diagnostics & Analytics > Network Speed Analytics, mobile and Android TV) measures stream delivery for 720p, 1080p and 4K, one quality after another (SD is not tested). Four endpoints (also under `/tg/api` and `/msm/api`), all behind the geo-block:
+- `GET /api/speedtest/targets?tiers=720p,1080p,4k`: one sample file per quality from the central DB plus a single-use `testId`. Sample choice is stable, not random: among the tier's files big enough for a test, the Telegram DC holding most of them, then the median-sized file of that DC; only the read offset is random (middle of the file, away from the pinned head/tail blocks). Also returns the test size `mb`, the budget and the minimum Mbps per quality. Qualities without a sample come back in `missing`.
+- `GET /stream/<docId>?speedtest=<testId>`: the normal stream path (Telegram to router to client) for `speedTestMb` MB at the server-chosen offset. It bypasses the RAM block cache (no reads, no writes), never transcodes, and uses its own session key so it cannot abort real playback. The id is single use (409 afterwards).
+- `GET /api/speedtest/result?id=<testId>`: server-side numbers of that transfer (first block, sustained Mbps, time spent waiting for blocks / for the socket).
+- `GET /api/speedtest/download`: `speedTestMb` MB of random bytes from RAM, no Telegram: the router to device baseline.
+
+The app compares the stream's sustained rate (after the first 512 KB block) with the minimum for the quality (Netflix: 720p 3, 1080p 5, 4K 15 Mbps): under 1.0x is too slow, 1.0-1.5x marginal, 1.5x or more smooth. If the stream stays well below the baseline (under 85%) the limit is on the server side (Telegram to router or the router itself); if it reaches the baseline the device network is the limit. The baseline is the path the client really uses to reach TGStrm: TGStrm runs on the router, so on the home network it is the Wi-Fi/LAN speed, and the router's per-device Bandwidth Limiter does not apply to it (that limiter skips traffic from the router itself and only shapes internet-sourced traffic); from outside it is the internet path.
+
+Server settings (dashboard `/tg/settings` > Engine, or `POST /api/settings`): `speedTestMb` (default 16, 12-64; the block size is 512 KB and the 1080p/4K window about 10 blocks, so a smaller test never fills the window) and `speedTestBudgetMbPerMin` (default 150 per client IP; HTTP 429 with Retry-After beyond it). A 3-quality run at 16 MB is about 48 MB. Log lines: `[SPEEDTEST]` and `[SPEEDTEST END]`.
+
 ## Router deployment and disk-corruption recovery
 The service runs on the ASUS router (Entware): app in `/tmp/mnt/Entware/entware/app/tg-streamer`, started by `/opt/etc/init.d/S99tg-streamer` (supervisor that respawns Node). The Entware USB disk has had ext4 errors, so recovery is automated at three levels.
 
