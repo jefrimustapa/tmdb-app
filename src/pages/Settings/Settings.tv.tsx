@@ -5,6 +5,9 @@ import { STREAM_PROVIDERS, CATEGORY_BADGE_CONFIG, ORIGIN_COUNTRY_LABELS } from '
 import type { OriginCountryCode } from '../../types/stream';
 import { msmService, getMsmServerLabel, type MsmHealthResult } from '../../services/msmMappingService';
 import { useDevice } from '../../hooks/useDevice';
+import { useSpeedTest } from '../../hooks/useSpeedTest';
+import { SpeedTestResults } from '../../components/common/SpeedTestResults';
+import { SPEEDTEST_TIERS } from '../../utils/speedTest';
 import { Logo } from '../../components/common/Logo';
 import { APP_VERSION, APP_BUILD_NUMBER, APP_VERSION_FULL, APP_BUILD_CHANNEL, APP_CHANGELOG } from '../../version';
 import { updateService, type UpdateInfo } from '../../services/updateService';
@@ -41,6 +44,7 @@ import {
   Download,
   Upload,
   HardDrive,
+  Gauge,
   Globe,
   Sliders,
   Save,
@@ -168,6 +172,11 @@ export const Settings: React.FC = () => {
   const [showEnginesDrawer, setShowEnginesDrawer] = useState(false);
   const [showEnginePriorityDrawer, setShowEnginePriorityDrawer] = useState(false);
   const [showTelegramDrawer, setShowTelegramDrawer] = useState(false);
+  const speedTest = useSpeedTest();
+  const stopSpeedTest = speedTest.stop;
+  useEffect(() => {
+    if (!showTelegramDrawer) stopSpeedTest();
+  }, [showTelegramDrawer, stopSpeedTest]);
   const [showTelegramMsmDrawer, setShowTelegramMsmDrawer] = useState(false);
   const [showTelegramUrlDrawer, setShowTelegramUrlDrawer] = useState(false);
   const [showTelegramCountryDrawer, setShowTelegramCountryDrawer] = useState(false);
@@ -4441,7 +4450,7 @@ export const Settings: React.FC = () => {
                       onKeyDown={(e) => {
                         if (e.key === 'ArrowDown') {
                           e.preventDefault();
-                          const target = document.getElementById('drawer-msm-sub-quality');
+                          const target = document.getElementById('drawer-btn-msm-speedtest');
                           target?.focus();
                           target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
                         }
@@ -4459,6 +4468,39 @@ export const Settings: React.FC = () => {
                       <ExternalLink className="w-3.5 h-3.5 text-sky-400" />
                     </button>
 
+                    {/* Network Speed Analytics (issue #281): runs every quality the server has a sample for */}
+                    <button
+                      id="drawer-btn-msm-speedtest"
+                      data-telegram-msm-drawer-item="true"
+                      type="button"
+                      onKeyDown={(e) => {
+                        if (e.key === 'ArrowUp') {
+                          e.preventDefault();
+                          const target = document.getElementById('drawer-btn-msm-cache');
+                          target?.focus();
+                          target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                        } else if (e.key === 'ArrowDown') {
+                          e.preventDefault();
+                          const target = document.getElementById('drawer-msm-sub-quality');
+                          target?.focus();
+                          target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                        }
+                      }}
+                      onClick={() => {
+                        if (speedTest.state.running) speedTest.stop();
+                        else speedTest.start([...SPEEDTEST_TIERS]);
+                      }}
+                      className="w-full py-2.5 px-3 rounded-xl border text-xs font-bold transition-all tv-focus-target flex items-center justify-between border-sky-500/30 bg-sky-500/10 hover:bg-sky-500/20 text-sky-300"
+                    >
+                      <div className="flex items-center gap-2">
+                        <Gauge className="w-4 h-4 text-sky-400" />
+                        <span>{speedTest.state.running ? 'Stop Network Speed Test' : 'Run Network Speed Analytics (720p / 1080p / 4K)'}</span>
+                      </div>
+                    </button>
+                    {(speedTest.state.running || speedTest.state.baseline || speedTest.state.error || Object.keys(speedTest.state.results).length > 0 || Object.keys(speedTest.state.tierErrors).length > 0 || speedTest.state.missing.length > 0) && (
+                      <SpeedTestResults state={speedTest.state} />
+                    )}
+
                     {/* Sub-Drawer Item: Max Stream Resolution */}
                     <div className="bg-black/40 border border-hbo-border rounded-xl p-3.5 flex items-center justify-between">
                       <div className="min-w-0 pr-2">
@@ -4475,7 +4517,7 @@ export const Settings: React.FC = () => {
                         onKeyDown={(e) => {
                           if (e.key === 'ArrowUp') {
                             e.preventDefault();
-                            const target = document.getElementById('drawer-btn-msm-cache');
+                            const target = document.getElementById('drawer-btn-msm-speedtest');
                             target?.focus();
                             target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
                           } else if (e.key === 'ArrowDown') {
