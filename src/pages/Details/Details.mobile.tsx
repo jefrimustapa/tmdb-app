@@ -579,7 +579,7 @@ export const Details: React.FC = () => {
         {/* Cinematic Smooth Gradients Layer */}
         <div className="absolute inset-0 hero-gradient-overlay" />
         {isLandscape ? (
-          <div className="absolute inset-0 bg-gradient-to-r from-black/75 via-black/35 to-transparent max-w-3xl" />
+          <div className="absolute inset-0 bg-gradient-to-r from-black/75 via-black/35 to-transparent" />
         ) : (
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/30" />
         )}
@@ -843,7 +843,7 @@ export const Details: React.FC = () => {
       {/* Main Lower Content Area (Synopsis, Episodes, Cast, Recommendations) */}
       <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-8 lg:px-12 pt-6 sm:pt-8 space-y-8 sm:space-y-10">
         {/* Synopsis & Tagline */}
-        <div className="max-w-3xl space-y-3 pt-2">
+        <div className="space-y-3 pt-2">
           {'tagline' in details && details.tagline && (
             <p className="text-base sm:text-lg font-semibold italic text-hbo-cyan/90">
               &ldquo;{details.tagline}&rdquo;
