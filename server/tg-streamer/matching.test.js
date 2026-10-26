@@ -50,8 +50,18 @@ import {
 let passed = 0;
 let total = 0;
 
+// Every test gets its own CentralDatabase file: a debounced save armed by one test must never write or
+// rename the same .tmp file while another test is persisting (EPERM/ENOENT on Windows, #279).
+let TEST_DB_FILE = '';
+const testDbFiles = [];
+function rotateTestDbFile() {
+  TEST_DB_FILE = path.join(path.dirname(fileURLToPath(import.meta.url)), 'data', `test_streams_201_${testDbFiles.length}.json`);
+  testDbFiles.push(TEST_DB_FILE);
+}
+
 function it(desc, fn) {
   total++;
+  rotateTestDbFile();
   try {
     fn();
     console.log(`  ✓ ${desc}`);
@@ -756,12 +766,6 @@ console.log('\n14. Quality-Specific Caching & Multi-Tier DB Persistence (#201)')
 
 const __testFilename = fileURLToPath(import.meta.url);
 const __testDirname = path.dirname(__testFilename);
-const TEST_DB_FILE = path.join(__testDirname, 'data', 'test_streams_201.json');
-
-try {
-  if (fs.existsSync(TEST_DB_FILE)) fs.unlinkSync(TEST_DB_FILE);
-  if (fs.existsSync(`${TEST_DB_FILE}.tmp`)) fs.unlinkSync(`${TEST_DB_FILE}.tmp`);
-} catch {}
 
 it('stores different quality cache entries for the same title without overwriting (#201)', () => {
   const testDb = new CentralDatabase(TEST_DB_FILE);
@@ -2148,11 +2152,14 @@ it('fast-fails and evicts from DB when target origin bot cannot find document', 
   assert.strictEqual(testDb.getByDocId(targetDocId), undefined, 'Record must be evicted from DB');
 });
 
-// Clean up temporary test files
-try {
-  if (fs.existsSync(TEST_DB_FILE)) fs.unlinkSync(TEST_DB_FILE);
-  if (fs.existsSync(`${TEST_DB_FILE}.tmp`)) fs.unlinkSync(`${TEST_DB_FILE}.tmp`);
-} catch {}
+// Clean up temporary test files (pending debounced saves are flushed first by waiting them out)
+setTimeout(() => {
+  for (const f of testDbFiles) {
+    for (const p of [f, `${f}.tmp`]) {
+      try { fs.unlinkSync(p); } catch {}
+    }
+  }
+}, 600);
 
 console.log(`\nResults: ${passed}/${total} tests passed!\n`);
 if (passed === total) {
