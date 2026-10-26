@@ -495,7 +495,7 @@ export const Details: React.FC = () => {
 
         {/* Cinematic HBO Gradients Layer */}
         <div className="absolute inset-0 hero-gradient-overlay" />
-        <div className="absolute inset-0 bg-gradient-to-r from-black/75 via-black/35 to-transparent max-w-3xl" />
+        <div className="absolute inset-0 bg-gradient-to-r from-black/75 via-black/35 to-transparent" />
         <div className="absolute inset-x-0 bottom-0 h-36 bg-gradient-to-t from-[#050508] via-[#050508]/85 to-transparent" />
         <div className="absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-black/50 to-transparent" />
       </div>
@@ -735,7 +735,7 @@ export const Details: React.FC = () => {
         </div>
 
         {/* Synopsis & Tagline */}
-        <div className="max-w-3xl space-y-3 pt-2">
+        <div className="space-y-3 pt-2">
           {'tagline' in details && details.tagline && (
             <p className="text-base sm:text-lg font-semibold italic text-hbo-cyan/90">
               &ldquo;{details.tagline}&rdquo;
