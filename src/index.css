@@ -270,18 +270,16 @@ aside .tv-focus-target:focus-visible .tv-nav-label,
   scroll-behavior: auto;
 }
 
-/* Smooth gradient overlays */
+/* Smooth gradient overlay: clear until 45%, ramps to solid #050508 at the bottom edge */
 .hero-gradient-overlay {
   background: linear-gradient(
     180deg,
     rgba(5, 5, 8, 0) 0%,
-    rgba(5, 5, 8, 0.01) 15%,
-    rgba(5, 5, 8, 0.05) 30%,
-    rgba(5, 5, 8, 0.10) 45%,
-    rgba(5, 5, 8, 0.50) 60%,
-    rgba(5, 5, 8, 0.70) 72%,
-    rgba(5, 5, 8, 0.95) 80%,
-    #050508 85%,
+    rgba(5, 5, 8, 0) 45%,
+    rgba(5, 5, 8, 0.25) 60%,
+    rgba(5, 5, 8, 0.30) 72%,
+    rgba(5, 5, 8, 0.50) 80%,
+    rgba(5, 5, 8, 0.70) 90%,
     #050508 100%
   );
 }
