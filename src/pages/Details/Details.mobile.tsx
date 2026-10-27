@@ -578,12 +578,6 @@ export const Details: React.FC = () => {
 
         {/* Cinematic Smooth Gradients Layer */}
         <div className="absolute inset-0 hero-gradient-overlay" />
-        {isLandscape ? (
-          <div className="absolute inset-0 bg-gradient-to-r from-black/75 via-black/35 to-transparent" />
-        ) : (
-          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/30" />
-        )}
-        <div className="absolute inset-x-0 bottom-0 h-44 bg-gradient-to-t from-[#050508] via-[#050508]/85 to-transparent" />
         <div className="absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-black/50 to-transparent" />
       </div>
 
