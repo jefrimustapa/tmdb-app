@@ -19,6 +19,8 @@ import { CustomDirectPlayer } from './CustomDirectPlayer';
 import { isEpisodeAired } from '../../services/episodeAirStatus';
 import { getDirectStreamErrorView } from '../../utils/directStreamError';
 import { needsAudioTranscode } from '../../utils/audioTranscode';
+import { hasAndroidBridge } from '../../utils/platform';
+import { UNVERIFIABLE_GRACE_MS, loadReporters, saveReporters, isPlaybackUnverifiable } from '../../utils/embedPlaybackDetection';
 
 interface VideoPlayerProps {
   mediaType: 'movie' | 'tv';
@@ -1599,10 +1601,22 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   }, [recordProgress, provider.id, streamUrl]);
 
   const lastPostMessageTimeRef = useRef<number>(0);
+  // Messages received from the embed iframe itself, and the providers known to post any (issue #294)
+  const frameMessageCountRef = useRef(0);
+  const reportersRef = useRef<Set<string>>(loadReporters());
+  const providerIdRef = useRef(providerId);
+  providerIdRef.current = providerId;
 
   // Listen for Cross-Origin Embed postMessage events (VidLink, PlayerJS, Plyr)
   useEffect(() => {
     const handlePostMessage = (e: MessageEvent) => {
+      if (e.source && e.source === iframeRef.current?.contentWindow) {
+        frameMessageCountRef.current += 1;
+        if (!reportersRef.current.has(providerIdRef.current)) {
+          reportersRef.current.add(providerIdRef.current);
+          saveReporters(reportersRef.current);
+        }
+      }
       try {
         const data = typeof e.data === 'string' ? JSON.parse(e.data) : e.data;
         if (!data) return;
@@ -2166,6 +2180,35 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       clearInterval(audioPoll);
     };
   }, [providerId, autoCycle, isUserSelected, allFailed, playerMode, hasError, provider.name, clearWatchdog, streamResolverTimeout]);
+
+  // Web fallback (issue #294): an embed that has stayed silent (no postMessage, and no native audio check on
+  // the web) cannot be verified, so offer a manual "skip timeout" button instead of timing out over a playing video.
+  const [canSkipTimeout, setCanSkipTimeout] = useState(false);
+  useEffect(() => {
+    setCanSkipTimeout(false);
+    if (playerMode !== 'embed' || hasError || allFailed) return;
+    frameMessageCountRef.current = 0;
+    const timer = setTimeout(() => {
+      if (!autoCycleTimeoutRef.current) return;
+      if (isPlaybackUnverifiable({
+        hasNativeBridge: hasAndroidBridge(),
+        providerId,
+        frameMessageCount: frameMessageCountRef.current,
+        reporters: reportersRef.current,
+      })) {
+        setCanSkipTimeout(true);
+      }
+    }, UNVERIFIABLE_GRACE_MS);
+    return () => clearTimeout(timer);
+  }, [providerId, playerMode, hasError, allFailed]);
+
+  const handleSkipTimeout = useCallback(() => {
+    clearWatchdog(`"${providerId}" timeout skipped manually`);
+    setCanSkipTimeout(false);
+    setIsLoading(false);
+    setHasError(false);
+    setIsProbing(false);
+  }, [providerId, clearWatchdog]);
 
   // Clean up watchdog timer only when providerId changes or player unmounts
   useEffect(() => {
@@ -2754,12 +2797,21 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
       {/* Floating Watchdog Countdown Pill (Visible while iframe is mounted but still waiting for active video playback) */}
       {playerMode === 'embed' && !isLoading && !hasError && typeof watchdogCountdown === 'number' && watchdogCountdown > 0 && (
-        <div className="absolute top-16 right-5 z-30 pointer-events-none flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/85 backdrop-blur-md border border-hbo-cyan/40 shadow-2xl text-xs font-medium text-gray-200 animate-fade-in">
+        <div className="absolute top-28 right-5 z-50 pointer-events-none flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/85 backdrop-blur-md border border-hbo-cyan/40 shadow-2xl text-xs font-medium text-gray-200 animate-fade-in">
           <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
           <span>Starting <span className="text-hbo-cyan font-semibold">{provider.name}</span>:</span>
           <span className="px-1.5 py-0.5 rounded bg-white/10 text-amber-300 font-mono font-bold text-xs">{watchdogCountdown}s</span>
           {autoCycle && !isUserSelected && (
             <span className="text-[10px] text-gray-400 border-l border-white/20 pl-2">Auto-cycle</span>
+          )}
+          {canSkipTimeout && (
+            <button
+              type="button"
+              onClick={handleSkipTimeout}
+              className="pointer-events-auto ml-1 px-2.5 py-1 rounded-full bg-hbo-purple/80 hover:bg-hbo-purple border border-white/20 text-white text-[11px] font-bold transition-colors tv-focus-target"
+            >
+              Playing? Skip timeout
+            </button>
           )}
         </div>
       )}
