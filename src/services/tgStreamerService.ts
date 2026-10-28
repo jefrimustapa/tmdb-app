@@ -192,17 +192,11 @@ class TgStreamerService {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), 6000);
 
-      // Probe /tg/health, fallback /msm/health, fallback /health
+      // Probe /tg/health, fallback /health
       let res = await fetch(`${baseUrl}/tg/health`, {
         signal: controller.signal,
         headers: { 'Accept': 'application/json' },
       });
-      if (!res.ok && res.status === 404) {
-        res = await fetch(`${baseUrl}/msm/health`, {
-          signal: controller.signal,
-          headers: { 'Accept': 'application/json' },
-        });
-      }
       if (!res.ok && res.status === 404) {
         res = await fetch(`${baseUrl}/health`, {
           signal: controller.signal,

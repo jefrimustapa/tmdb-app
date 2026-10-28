@@ -1983,7 +1983,7 @@ export const Settings: React.FC = () => {
             <button
               type="button"
               onClick={() => {
-                const target = `${(settings.msmGetterUrl || 'https://www.julietmike.net:3033').replace(/\/+$/, '')}/msm/logs`;
+                const target = `${(settings.msmGetterUrl || 'https://www.julietmike.net:3033').replace(/\/+$/, '')}/tg/logs`;
                 openExternalUrl(target);
               }}
               className="px-3 py-1.5 rounded-lg bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 border border-sky-500/20 text-xs font-semibold flex items-center gap-1.5 transition-colors"
