@@ -5,6 +5,7 @@ import type { TMDBMediaItem } from '../../types/tmdb';
 import { MediaCard } from '../../components/common/MediaCard';
 import { History, Heart, Bookmark, Trash2 } from 'lucide-react';
 import { useDevice } from '../../hooks/useDevice';
+import { useProgressiveList } from '../../hooks/useProgressiveList';
 
 export const Library: React.FC = () => {
   const { isTV } = useDevice();
@@ -13,9 +14,13 @@ export const Library: React.FC = () => {
   const [likes, setLikes] = useState<LikedItem[]>([]);
   const [watchlist, setWatchlist] = useState<WatchlistItem[]>([]);
 
+  const historyList = useProgressiveList(history, activeTab);
+  const likesList = useProgressiveList(likes, activeTab);
+  const watchlistList = useProgressiveList(watchlist, activeTab);
+
   const loadData = async () => {
     const [h, l, w] = await Promise.all([
-      dbService.getHistory(50),
+      dbService.getHistory(Infinity),
       dbService.getLikes(),
       dbService.getWatchlist()
     ]);
@@ -154,7 +159,7 @@ export const Library: React.FC = () => {
         <div>
           {history.length > 0 ? (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-3 sm:gap-4 md:gap-5 py-2 px-1">
-              {history.map((item) => (
+              {historyList.visible.map((item) => (
                 <div key={`${item.tmdbId}-${item.mediaType}`} className="w-full flex justify-center">
                   <MediaCard
                     item={convertToMediaItem(item)}
@@ -173,6 +178,7 @@ export const Library: React.FC = () => {
                   />
                 </div>
               ))}
+              {historyList.hasMore && <div ref={historyList.sentinelRef} className="col-span-full h-8" aria-hidden="true" />}
             </div>
           ) : (
             <div className="text-center py-20 text-gray-400">
@@ -188,7 +194,7 @@ export const Library: React.FC = () => {
         <div>
           {likes.length > 0 ? (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-3 sm:gap-4 md:gap-5 py-2 px-1">
-              {likes.map((item) => (
+              {likesList.visible.map((item) => (
                 <div key={`${item.tmdbId}-${item.mediaType}`} className="w-full flex justify-center">
                   <MediaCard
                     item={convertToMediaItem(item)}
@@ -201,11 +207,12 @@ export const Library: React.FC = () => {
                   />
                 </div>
               ))}
+              {likesList.hasMore && <div ref={likesList.sentinelRef} className="col-span-full h-8" aria-hidden="true" />}
             </div>
           ) : (
-            <div className="text-center py-20 bg-hbo-card/30 border border-hbo-border/40 rounded-2xl">
-              <Heart className="w-12 h-12 text-gray-600 mx-auto mb-3" />
-              <h3 className="text-lg font-bold text-gray-300">No liked titles yet</h3>
+            <div className="text-center py-20 text-gray-400">
+              <Heart className="w-12 h-12 mx-auto mb-3 text-gray-600" />
+              <p className="text-base font-bold">No liked titles yet</p>
               <p className="text-xs text-gray-500 mt-1">Tap the heart on any title to save your favorites here.</p>
             </div>
           )}
@@ -216,7 +223,7 @@ export const Library: React.FC = () => {
         <div>
           {watchlist.length > 0 ? (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-3 sm:gap-4 md:gap-5 py-2 px-1">
-              {watchlist.map((item) => (
+              {watchlistList.visible.map((item) => (
                 <div key={`${item.tmdbId}-${item.mediaType}`} className="w-full flex justify-center">
                   <MediaCard
                     item={convertToMediaItem(item)}
@@ -229,6 +236,7 @@ export const Library: React.FC = () => {
                   />
                 </div>
               ))}
+              {watchlistList.hasMore && <div ref={watchlistList.sentinelRef} className="col-span-full h-8" aria-hidden="true" />}
             </div>
           ) : (
             <div className="text-center py-20 text-gray-400">
