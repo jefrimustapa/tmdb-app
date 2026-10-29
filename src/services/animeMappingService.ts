@@ -87,7 +87,76 @@ interface AniListNode {
   };
 }
 
-async function queryAniListFranchise(title: string): Promise<Array<{ malId: number; episodes: number; title: string; seasonNumber: number }> | null> {
+export interface FranchiseEntry {
+  malId: number;
+  episodes: number;
+  title: string;
+  seasonNumber: number;
+  year?: number;
+  /** TV side story (e.g. Fumoffu): not part of the sequel chain, but TMDB lists it as a season. */
+  sideStory?: boolean;
+}
+
+/**
+ * Collects the sequel chain from the AniList root node, plus TV side stories of every chain node.
+ * Side stories are not sequels, so a chain-only walk misses seasons TMDB counts (issue #288).
+ */
+export function collectFranchiseEntries(root: AniListNode, fallbackTitle: string): FranchiseEntry[] {
+  const entries: FranchiseEntry[] = [];
+  const visited = new Set<number>();
+  const titleOf = (node: AniListNode) => node.title?.english || node.title?.romaji || fallbackTitle;
+
+  function addNode(node: AniListNode | undefined, seasonNum: number) {
+    if (!node) return;
+    const malId = node.idMal || node.id;
+    if (!malId || visited.has(malId)) return;
+    visited.add(malId);
+    entries.push({
+      malId,
+      episodes: node.episodes || 12,
+      title: titleOf(node),
+      seasonNumber: seasonNum,
+      year: node.seasonYear
+    });
+
+    for (const edge of node.relations?.edges ?? []) {
+      const side = edge.node;
+      if (edge.relationType !== 'SIDE_STORY' || !side || side.format !== 'TV' || !side.seasonYear) continue;
+      const sideId = side.idMal || side.id;
+      if (!sideId || visited.has(sideId)) continue;
+      visited.add(sideId);
+      entries.push({
+        malId: sideId,
+        episodes: side.episodes || 12,
+        title: titleOf(side),
+        seasonNumber: 0,
+        year: side.seasonYear,
+        sideStory: true
+      });
+    }
+
+    const nextSequel = node.relations?.edges?.find((e) => e.relationType === 'SEQUEL' && e.node)?.node;
+    if (nextSequel) {
+      addNode(nextSequel, seasonNum + 1);
+    }
+  }
+
+  addNode(root, 1);
+  return entries;
+}
+
+/** Entries in TMDB season order: the sequel chain with each side story inserted by air year. */
+export function orderSeasonsForTmdb(entries: FranchiseEntry[]): FranchiseEntry[] {
+  const ordered = entries.filter((e) => !e.sideStory);
+  for (const side of entries.filter((e) => e.sideStory)) {
+    const at = ordered.findIndex((e) => e.year !== undefined && side.year !== undefined && e.year > side.year);
+    if (at === -1) ordered.push(side);
+    else ordered.splice(at, 0, side);
+  }
+  return ordered;
+}
+
+async function queryAniListFranchise(title: string): Promise<FranchiseEntry[] | null> {
   try {
     const query = `
       query ($search: String) {
@@ -156,28 +225,7 @@ async function queryAniListFranchise(title: string): Promise<Array<{ malId: numb
     const root = json?.data?.Media as AniListNode | undefined;
     if (!root || (!root.idMal && !root.id)) return null;
 
-    const entries: Array<{ malId: number; episodes: number; title: string; seasonNumber: number }> = [];
-    const visited = new Set<number>();
-
-    function addNode(node: AniListNode | undefined, seasonNum: number) {
-      if (!node) return;
-      const malId = node.idMal || node.id;
-      if (!malId || visited.has(malId)) return;
-      visited.add(malId);
-      entries.push({
-        malId,
-        episodes: node.episodes || 12,
-        title: node.title?.english || node.title?.romaji || title,
-        seasonNumber: seasonNum
-      });
-
-      const nextSequel = node.relations?.edges?.find((e) => e.relationType === "SEQUEL" && e.node)?.node;
-      if (nextSequel) {
-        addNode(nextSequel, seasonNum + 1);
-      }
-    }
-
-    addNode(root, 1);
+    const entries = collectFranchiseEntries(root, title);
     return entries.length > 0 ? entries : null;
   } catch (err) {
     console.warn("[AnimeMapping] AniList franchise query error:", err);
@@ -261,9 +309,12 @@ export async function resolveAnimeMapping(options: AnimeMappingOptions): Promise
   const franchise = await queryAniListFranchise(title) || (originalTitle ? await queryAniListFranchise(originalTitle) : null);
 
   if (franchise && franchise.length > 0) {
-    // Scenario A: User explicitly selected Season > 1 (e.g., Season 2 Episode 1)
+    // Absolute episode numbering follows the sequel chain only; side stories have their own episodes.
+    const chain = franchise.filter((e) => !e.sideStory);
+
+    // Scenario A: User explicitly selected Season > 1 (e.g., Season 2 Episode 1), numbered like TMDB
     if (season > 1) {
-      const seasonEntry = franchise.find((e) => e.seasonNumber === season) || franchise[season - 1];
+      const seasonEntry = orderSeasonsForTmdb(franchise)[season - 1];
       if (seasonEntry) {
         const result: ResolvedAnimeMapping = {
           malId: seasonEntry.malId,
@@ -274,13 +325,16 @@ export async function resolveAnimeMapping(options: AnimeMappingOptions): Promise
         setCachedMapping(cacheKey, result);
         return result;
       }
+      // The franchise has no such season: a text search would only find the base title again (issue #288)
+      setCachedMapping(cacheKey, null);
+      return null;
     }
 
     // Scenario B: User is on Season 1, but episode exceeds Season 1 count (Continuous / Absolute Numbering)
     // E.g., Rent-a-Girlfriend S1 has 60 eps on TMDB, but Season 1 on MAL only has 12 eps. Ep 13 belongs to Season 2 Ep 1.
-    if (season === 1 && episode > franchise[0].episodes && franchise.length > 1) {
+    if (season === 1 && episode > chain[0].episodes && chain.length > 1) {
       let remainingEpisode = episode;
-      for (const entry of franchise) {
+      for (const entry of chain) {
         if (remainingEpisode <= entry.episodes) {
           const result: ResolvedAnimeMapping = {
             malId: entry.malId,
@@ -294,7 +348,7 @@ export async function resolveAnimeMapping(options: AnimeMappingOptions): Promise
         remainingEpisode -= entry.episodes;
       }
       // If beyond all known sequel episode counts, map to latest sequel with remaining offset
-      const last = franchise[franchise.length - 1];
+      const last = chain[chain.length - 1];
       const result: ResolvedAnimeMapping = {
         malId: last.malId,
         episode: Math.max(1, remainingEpisode),
@@ -331,6 +385,12 @@ export async function resolveAnimeMapping(options: AnimeMappingOptions): Promise
       setCachedMapping(cacheKey, result);
       return result;
     }
+  }
+
+  // A later season that no source could resolve must not play season 1 instead (issue #288)
+  if (season > 1) {
+    setCachedMapping(cacheKey, null);
+    return null;
   }
 
   // 3. Fallback to base title via Kitsu or Jikan
