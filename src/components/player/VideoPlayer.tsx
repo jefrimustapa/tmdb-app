@@ -1074,6 +1074,8 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   // Attempt resolving MAL ID and episode mapping for anime providers or anime titles
   useEffect(() => {
     let isCancelled = false;
+    // Never keep the previous season/episode mapping while (or if) the new one fails to resolve
+    setResolvedAnimeMapping(null);
     if (!title || !title.trim()) return;
 
     resolveAnimeMapping({
