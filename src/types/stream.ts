@@ -28,6 +28,8 @@ export interface StreamProvider {
   engine?: StreamEngineType;
   countries?: OriginCountryCode[];
   categories: StreamProviderCategory[];
+  /** Embed answers HTTP 404 yet serves a working page: ignore the native 404 report (issue #295). */
+  ignoreHttp404?: boolean;
   getMovieUrl: (tmdbId: number) => string;
   getTVUrl: (tmdbId: number, season: number, episode: number) => string;
   getAnimeUrl?: (malId: number, season?: number, episode?: number, type?: 'sub' | 'dub') => string;

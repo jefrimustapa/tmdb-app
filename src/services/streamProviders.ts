@@ -58,6 +58,7 @@ export const STREAM_PROVIDERS: StreamProvider[] = [
     name: 'FlaxMovies (No Ads)',
     tagline: 'Streamlined server with seamless episode navigation',
     categories: ['hollywood', 'general'],
+    ignoreHttp404: true,
     getMovieUrl: (tmdbId: number) => `https://flaxmovies.xyz/embed/movie/${tmdbId}`,
     getTVUrl: (tmdbId: number, s: number, e: number) => `https://flaxmovies.xyz/embed/tv/${tmdbId}/${s}/${e}`
   },
