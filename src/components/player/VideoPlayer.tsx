@@ -21,6 +21,7 @@ import { getDirectStreamErrorView } from '../../utils/directStreamError';
 import { needsAudioTranscode } from '../../utils/audioTranscode';
 import { hasAndroidBridge } from '../../utils/platform';
 import { UNVERIFIABLE_GRACE_MS, loadReporters, saveReporters, isPlaybackUnverifiable } from '../../utils/embedPlaybackDetection';
+import { shouldIgnoreNativeIframeError } from '../../utils/nativeIframeError';
 
 interface VideoPlayerProps {
   mediaType: 'movie' | 'tv';
@@ -2244,6 +2245,11 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       const detail = customEvent.detail;
       console.warn('[VideoPlayer] Intercepted native iframe error:', detail?.url, detail);
 
+      if (shouldIgnoreNativeIframeError(provider, detail)) {
+        console.log(`[VideoPlayer] Ignoring HTTP 404 from "${provider.id}" (page still serves)`);
+        return;
+      }
+
       // Verify that the error URL actually relates to the active streamUrl domain
       if (detail?.url && streamUrl) {
         try {
@@ -2308,7 +2314,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     return () => {
       window.removeEventListener('tmdb_iframe_load_error', handleNativeIframeError);
     };
-  }, [provider.name, playerMode, streamUrl, autoCycle, isUserSelected, allFailed, cycleToNextProvider]);
+  }, [provider, playerMode, streamUrl, autoCycle, isUserSelected, allFailed, cycleToNextProvider]);
 
   // Proactive pre-flight connection test for embed providers
   // Catches hard TCP connection refusals within 1.5s before Chromium displays native sad document
