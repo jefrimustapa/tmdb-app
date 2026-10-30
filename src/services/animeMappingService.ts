@@ -1,7 +1,7 @@
 /**
  * Anime ID Mapping Service
  * Resolves TMDB anime media to MyAnimeList (MAL) IDs using:
- * 1. AniList GraphQL API with recursive relation graphs for multi-season & absolute episode offsets
+ * 1. AniList GraphQL API, walking the sequel chain for multi-season & absolute episode offsets
  * 2. Kitsu API (High reliability & 100% uptime with explicit MAL cross-references)
  * 3. Jikan REST API (fallback)
  */
@@ -29,7 +29,7 @@ interface CachedAnimeEntry {
 
 const MEMORY_CACHE = new Map<string, CachedAnimeEntry>();
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
-const SESSION_CACHE_KEY_PREFIX = "tmdb_anime_mal_v2_";
+const SESSION_CACHE_KEY_PREFIX = "tmdb_anime_mal_v3_";
 
 function getNormalizedKey(options: AnimeMappingOptions): string {
   const cleanTitle = (options.title || "").trim().toLowerCase().replace(/[^\w\s]/g, "");
@@ -70,7 +70,8 @@ function setCachedMapping(cacheKey: string, mapping: ResolvedAnimeMapping | null
 
 /**
  * 1. Primary Multi-Season & Offset Resolver: AniList GraphQL
- * Traverses SEQUEL relations to discover seasons, MAL IDs, and episode counts.
+ * Walks the SEQUEL chain one request per hop to discover seasons, MAL IDs and episode counts.
+ * (A single nested query only reached ~3 seasons, so long franchises such as MHA were cut off.)
  */
 interface AniListNode {
   id: number;
@@ -97,36 +98,65 @@ export interface FranchiseEntry {
   sideStory?: boolean;
 }
 
+export interface SeasonPart {
+  malId: number;
+  episodes: number;
+}
+
+/** One TMDB season: usually one MAL entry, several when the show is split into cours/parts. */
+export interface Season {
+  malId: number;
+  title: string;
+  episodes: number;
+  parts: SeasonPart[];
+}
+
+/** Formats counted as a season; movies and specials are walked through but not counted. */
+const SEASON_FORMATS = ["TV", "TV_SHORT", "ONA"];
+const MAX_WALK_HOPS = 12;
+/** "... Part 2", "... Cour 2": a continuation that TMDB folds into the previous season. */
+const SPLIT_COUR = /\b(?:part|cour)\s*([2-9])\s*$/i;
+
+export type AniListFetchById = (id: number) => Promise<AniListNode | null>;
+
 /**
- * Collects the sequel chain from the AniList root node, plus TV side stories of every chain node.
- * Side stories are not sequels, so a chain-only walk misses seasons TMDB counts (issue #288).
+ * Walks the sequel chain from the AniList root, one fetch per hop, and collects the counted
+ * entries plus TV side stories (not sequels, but listed as seasons by TMDB, issue #288).
+ * `complete` is false when the walk stopped early (failed request or hop cap).
  */
-export function collectFranchiseEntries(root: AniListNode, fallbackTitle: string): FranchiseEntry[] {
+export async function walkFranchise(
+  root: AniListNode,
+  fetchById: AniListFetchById,
+  fallbackTitle: string
+): Promise<{ entries: FranchiseEntry[]; complete: boolean }> {
   const entries: FranchiseEntry[] = [];
   const visited = new Set<number>();
   const titleOf = (node: AniListNode) => node.title?.english || node.title?.romaji || fallbackTitle;
+  let complete = true;
+  let chainNumber = 0;
+  let node: AniListNode | null = root;
 
-  function addNode(node: AniListNode | undefined, seasonNum: number) {
-    if (!node) return;
+  for (let hop = 0; node; hop++) {
+    visited.add(node.id);
     const malId = node.idMal || node.id;
-    if (!malId || visited.has(malId)) return;
-    visited.add(malId);
-    entries.push({
-      malId,
-      episodes: node.episodes || 12,
-      title: titleOf(node),
-      seasonNumber: seasonNum,
-      year: node.seasonYear
-    });
+    if (malId && (hop === 0 || SEASON_FORMATS.includes(node.format ?? ""))) {
+      chainNumber++;
+      entries.push({
+        malId,
+        episodes: node.episodes || 12,
+        title: titleOf(node),
+        seasonNumber: chainNumber,
+        year: node.seasonYear
+      });
+    }
 
     for (const edge of node.relations?.edges ?? []) {
       const side = edge.node;
-      if (edge.relationType !== 'SIDE_STORY' || !side || side.format !== 'TV' || !side.seasonYear) continue;
-      const sideId = side.idMal || side.id;
-      if (!sideId || visited.has(sideId)) continue;
-      visited.add(sideId);
+      if (edge.relationType !== "SIDE_STORY" || !side || side.format !== "TV" || !side.seasonYear) continue;
+      if (visited.has(side.id)) continue;
+      visited.add(side.id);
       entries.push({
-        malId: sideId,
+        malId: side.idMal || side.id,
         episodes: side.episodes || 12,
         title: titleOf(side),
         seasonNumber: 0,
@@ -135,14 +165,24 @@ export function collectFranchiseEntries(root: AniListNode, fallbackTitle: string
       });
     }
 
-    const nextSequel = node.relations?.edges?.find((e) => e.relationType === 'SEQUEL' && e.node)?.node;
-    if (nextSequel) {
-      addNode(nextSequel, seasonNum + 1);
+    const sequels = (node.relations?.edges ?? []).filter(
+      (e) => e.relationType === "SEQUEL" && e.node && !visited.has(e.node.id)
+    );
+    const pick = (formats: string[]) => sequels.find((e) => formats.includes(e.node?.format ?? ""));
+    // Movies and, as a last resort, OVAs/specials are walked through without being counted
+    // (Slime: S1 -> OVA -> S2), but any TV/ONA sequel is preferred.
+    const next = pick(["TV", "TV_SHORT"]) ?? pick(["ONA"]) ?? pick(["MOVIE"]) ?? pick(["OVA", "SPECIAL"]);
+    if (!next?.node) break;
+    if (hop + 1 >= MAX_WALK_HOPS) {
+      complete = false;
+      break;
+    }
+    node = await fetchById(next.node.id);
+    if (!node) {
+      complete = false;
     }
   }
-
-  addNode(root, 1);
-  return entries;
+  return { entries, complete };
 }
 
 /** Entries in TMDB season order: the sequel chain with each side story inserted by air year. */
@@ -156,81 +196,147 @@ export function orderSeasonsForTmdb(entries: FranchiseEntry[]): FranchiseEntry[]
   return ordered;
 }
 
-async function queryAniListFranchise(title: string): Promise<FranchiseEntry[] | null> {
-  try {
-    const query = `
-      query ($search: String) {
-        Media(search: $search, type: ANIME, format_in: [TV, TV_SHORT, ONA, MOVIE]) {
-          id
-          idMal
-          title { english romaji }
-          format
-          episodes
-          seasonYear
-          relations {
-            edges {
-              relationType
-              node {
-                id
-                idMal
-                title { english romaji }
-                format
-                episodes
-                seasonYear
-                relations {
-                  edges {
-                    relationType
-                    node {
-                      id
-                      idMal
-                      title { english romaji }
-                      format
-                      episodes
-                      seasonYear
-                      relations {
-                        edges {
-                          relationType
-                          node {
-                            id
-                            idMal
-                            title { english romaji }
-                            format
-                            episodes
-                            seasonYear
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    `;
+/** Folds split cours ("Part 2", "Cour 2") into the previous season, like TMDB does. */
+export function groupSeasons(ordered: FranchiseEntry[]): Season[] {
+  const seasons: Season[] = [];
+  for (const entry of ordered) {
+    const part: SeasonPart = { malId: entry.malId, episodes: entry.episodes };
+    const prev = seasons[seasons.length - 1];
+    if (prev && !entry.sideStory && SPLIT_COUR.test(entry.title)) {
+      prev.parts.push(part);
+      prev.episodes += entry.episodes;
+      continue;
+    }
+    seasons.push({ malId: entry.malId, title: entry.title, episodes: entry.episodes, parts: [part] });
+  }
+  return seasons;
+}
 
+/** Maps a TMDB episode number inside a season onto the MAL entry (part) that holds it. */
+export function routeEpisode(season: Season, episode: number): { malId: number; episode: number } {
+  let remaining = Math.max(1, episode);
+  for (let i = 0; i < season.parts.length; i++) {
+    const part = season.parts[i];
+    if (remaining <= part.episodes || i === season.parts.length - 1) {
+      return { malId: part.malId, episode: remaining };
+    }
+    remaining -= part.episodes;
+  }
+  return { malId: season.malId, episode: remaining };
+}
+
+const ANILIST_FIELDS = `
+  id
+  idMal
+  title { english romaji }
+  format
+  episodes
+  seasonYear
+  relations {
+    edges {
+      relationType
+      node { id idMal title { english romaji } format episodes seasonYear }
+    }
+  }
+`;
+const ROOT_QUERY = `
+  query ($search: String) {
+    Media(search: $search, type: ANIME, format_in: [TV, TV_SHORT, ONA, MOVIE]) { ${ANILIST_FIELDS} }
+  }
+`;
+const NODE_QUERY = `
+  query ($id: Int) {
+    Media(id: $id, type: ANIME) { ${ANILIST_FIELDS} }
+  }
+`;
+
+async function anilistRequest(query: string, variables: Record<string, unknown>, attempt = 0): Promise<AniListNode | null> {
+  try {
     const res = await fetch("https://graphql.anilist.co", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Accept: "application/json"
       },
-      body: JSON.stringify({ query, variables: { search: title } }),
+      body: JSON.stringify({ query, variables }),
       signal: AbortSignal.timeout(6000)
     });
-
+    if (res.status === 429 && attempt === 0) {
+      // Rate limited (~90 requests/minute): wait once, briefly, then retry
+      const waitSeconds = Math.min(Number(res.headers.get("Retry-After")) || 5, 10);
+      await new Promise((resolve) => setTimeout(resolve, waitSeconds * 1000));
+      return anilistRequest(query, variables, 1);
+    }
     if (!res.ok) return null;
     const json = await res.json();
-    const root = json?.data?.Media as AniListNode | undefined;
-    if (!root || (!root.idMal && !root.id)) return null;
-
-    const entries = collectFranchiseEntries(root, title);
-    return entries.length > 0 ? entries : null;
+    return (json?.data?.Media as AniListNode | undefined) ?? null;
   } catch (err) {
-    console.warn("[AnimeMapping] AniList franchise query error:", err);
+    console.warn("[AnimeMapping] AniList request error:", err);
     return null;
   }
+}
+
+interface LoadedFranchise {
+  entries: FranchiseEntry[];
+  complete: boolean;
+}
+
+const FRANCHISE_MEMORY = new Map<string, { entries: FranchiseEntry[]; timestamp: number }>();
+const FRANCHISE_INFLIGHT = new Map<string, Promise<LoadedFranchise | null>>();
+const FRANCHISE_SESSION_PREFIX = "tmdb_anime_franchise_v1_";
+
+function franchiseKey(title: string): string {
+  return title.trim().toLowerCase().replace(/[^\w\s]/g, "");
+}
+
+function readFranchiseCache(key: string): FranchiseEntry[] | undefined {
+  const mem = FRANCHISE_MEMORY.get(key);
+  if (mem && Date.now() - mem.timestamp < CACHE_TTL_MS) return mem.entries;
+  if (typeof window !== "undefined" && window.sessionStorage) {
+    try {
+      const raw = sessionStorage.getItem(`${FRANCHISE_SESSION_PREFIX}${key}`);
+      if (raw) {
+        const parsed = JSON.parse(raw) as { entries: FranchiseEntry[]; timestamp: number };
+        if (Date.now() - parsed.timestamp < CACHE_TTL_MS) {
+          FRANCHISE_MEMORY.set(key, parsed);
+          return parsed.entries;
+        }
+      }
+    } catch {}
+  }
+  return undefined;
+}
+
+function writeFranchiseCache(key: string, entries: FranchiseEntry[]) {
+  const value = { entries, timestamp: Date.now() };
+  FRANCHISE_MEMORY.set(key, value);
+  if (typeof window !== "undefined" && window.sessionStorage) {
+    try {
+      sessionStorage.setItem(`${FRANCHISE_SESSION_PREFIX}${key}`, JSON.stringify(value));
+    } catch {}
+  }
+}
+
+/** One walk per title: later seasons/episodes of the same show reuse it. Partial walks are not cached. */
+function queryAniListFranchise(title: string): Promise<LoadedFranchise | null> {
+  const key = franchiseKey(title);
+  const cached = readFranchiseCache(key);
+  if (cached) return Promise.resolve({ entries: cached, complete: true });
+
+  const running = FRANCHISE_INFLIGHT.get(key);
+  if (running) return running;
+
+  const job = (async (): Promise<LoadedFranchise | null> => {
+    const root = await anilistRequest(ROOT_QUERY, { search: title });
+    if (!root || (!root.idMal && !root.id)) return null;
+    const walked = await walkFranchise(root, (id) => anilistRequest(NODE_QUERY, { id }), title);
+    if (walked.entries.length === 0) return null;
+    if (walked.complete) writeFranchiseCache(key, walked.entries);
+    return walked;
+  })().finally(() => FRANCHISE_INFLIGHT.delete(key));
+
+  FRANCHISE_INFLIGHT.set(key, job);
+  return job;
 }
 
 /**
@@ -305,28 +411,34 @@ export async function resolveAnimeMapping(options: AnimeMappingOptions): Promise
     return cached;
   }
 
-  // 1. Query AniList franchise graph
-  const franchise = await queryAniListFranchise(title) || (originalTitle ? await queryAniListFranchise(originalTitle) : null);
+  // 1. Walk the AniList franchise
+  const loaded = await queryAniListFranchise(title) || (originalTitle ? await queryAniListFranchise(originalTitle) : null);
+  const franchise = loaded?.entries;
+  // A partial walk (failed request) must not leave a sticky wrong or null answer behind
+  const remember = (value: ResolvedAnimeMapping | null) => {
+    if (!loaded || loaded.complete) setCachedMapping(cacheKey, value);
+  };
 
   if (franchise && franchise.length > 0) {
     // Absolute episode numbering follows the sequel chain only; side stories have their own episodes.
     const chain = franchise.filter((e) => !e.sideStory);
 
-    // Scenario A: User explicitly selected Season > 1 (e.g., Season 2 Episode 1), numbered like TMDB
+    // Scenario A: User explicitly selected Season > 1, numbered like TMDB (split cours folded together)
     if (season > 1) {
-      const seasonEntry = orderSeasonsForTmdb(franchise)[season - 1];
+      const seasonEntry = groupSeasons(orderSeasonsForTmdb(franchise))[season - 1];
       if (seasonEntry) {
+        const routed = routeEpisode(seasonEntry, episode);
         const result: ResolvedAnimeMapping = {
-          malId: seasonEntry.malId,
-          episode: episode,
+          malId: routed.malId,
+          episode: routed.episode,
           season: season,
           title: seasonEntry.title
         };
-        setCachedMapping(cacheKey, result);
+        remember(result);
         return result;
       }
       // The franchise has no such season: a text search would only find the base title again (issue #288)
-      setCachedMapping(cacheKey, null);
+      remember(null);
       return null;
     }
 
@@ -342,7 +454,7 @@ export async function resolveAnimeMapping(options: AnimeMappingOptions): Promise
             season: entry.seasonNumber,
             title: entry.title
           };
-          setCachedMapping(cacheKey, result);
+          remember(result);
           return result;
         }
         remainingEpisode -= entry.episodes;
@@ -355,7 +467,7 @@ export async function resolveAnimeMapping(options: AnimeMappingOptions): Promise
         season: last.seasonNumber,
         title: last.title
       };
-      setCachedMapping(cacheKey, result);
+      remember(result);
       return result;
     }
 
@@ -367,7 +479,7 @@ export async function resolveAnimeMapping(options: AnimeMappingOptions): Promise
       season: 1,
       title: root.title
     };
-    setCachedMapping(cacheKey, result);
+    remember(result);
     return result;
   }
 
