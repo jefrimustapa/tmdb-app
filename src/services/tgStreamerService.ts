@@ -193,13 +193,15 @@ class TgStreamerService {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), 6000);
 
-      // Probe /tg/health, fallback /health
-      let res = await fetch(`${baseUrl}/tg/health`, {
+      // Probe /tg/health, fallback /health with cache busting
+      let res = await fetch(`${baseUrl}/tg/health?_t=${Date.now()}`, {
+        cache: 'no-store',
         signal: controller.signal,
         headers: { 'Accept': 'application/json' },
       });
       if (!res.ok && res.status === 404) {
-        res = await fetch(`${baseUrl}/health`, {
+        res = await fetch(`${baseUrl}/health?_t=${Date.now()}`, {
+          cache: 'no-store',
           signal: controller.signal,
           headers: { 'Accept': 'application/json' },
         });

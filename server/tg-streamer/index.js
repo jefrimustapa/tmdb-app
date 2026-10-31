@@ -1753,9 +1753,17 @@ app.get(['/logs', '/tg/logs', '/msm/logs'], (req, res) => {
 // 2. STREAM RESOLUTION & PLAYBACK ENDPOINTS
 // ==========================================
 
-// Health check endpoint (moved /health/ to /msm/health/)
-app.get(['/health', '/health/', '/msm/health', '/msm/health/'], (req, res) => res.redirect(301, '/tg/health/'));
-app.get(['/tg/health', '/tg/health/', '/msm/health', '/msm/health/', '/api/health', '/api/health/', '/tg/api/health', '/tg/api/health/', '/msm/api/health', '/msm/api/health/'], (req, res) => {
+// Health check endpoint
+app.get([
+  '/health', '/health/',
+  '/tg/health', '/tg/health/',
+  '/msm/health', '/msm/health/',
+  '/api/health', '/api/health/',
+  '/tg/api/health', '/tg/api/health/',
+  '/msm/api/health', '/msm/api/health/'
+], (req, res) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+  res.setHeader('Pragma', 'no-cache');
   res.json({
     status: 'ok',
     uptime: process.uptime(),
