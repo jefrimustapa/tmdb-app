@@ -46,6 +46,24 @@ const app = express();
 app.set('trust proxy', true);
 app.use(cors());
 app.use(express.json());
+// Transition: the legacy router instance sends clients to the Docker deployment (set only on the router, e.g. https://tgstrm.julietmike.net).
+// Placed after cors() so CORS preflights are still answered here and only the real request is redirected.
+const REDIRECT_TO = (process.env.REDIRECT_TO || '').trim().replace(/\/+$/, '');
+const redirectSeen = new Map();
+if (REDIRECT_TO) {
+  app.use((req, res, next) => {
+    if (req.path === '/tg/health' || req.path === '/tg/health/' || req.path === '/health') return next();
+    // One line per client (IP + user agent) every 10 minutes, so it is visible who still uses the old URL without flooding the log with Range requests
+    const who = `${req.ip} | ${(req.headers['user-agent'] || '-').slice(0, 80)}`;
+    const now = Date.now();
+    if (now - (redirectSeen.get(who) || 0) > 10 * 60 * 1000) {
+      redirectSeen.set(who, now);
+      if (redirectSeen.size > 500) redirectSeen.clear();
+      console.log(`[REDIRECT] ${who} -> ${REDIRECT_TO}${req.path}`);
+    }
+    res.redirect(307, `${REDIRECT_TO}${req.originalUrl}`);
+  });
+}
 // Catch malformed JSON payloads gracefully without logging uncaught SyntaxError stack traces
 app.use((err, req, res, next) => {
   if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
@@ -64,7 +82,7 @@ const apiHash = process.env.TG_API_HASH;
 let session = process.env.TG_SESSION || '';
 const LOG_PATH = process.env.LOG_FILE || (process.platform === 'win32' ? path.join(__dirname, 'tg-streamer.log') : '/tmp/tg-streamer.log');
 
-const SETTINGS_FILE = path.join(__dirname, 'data', 'settings.json');
+const SETTINGS_FILE = path.join(process.env.DATA_DIR || path.join(__dirname, 'data'), 'settings.json');
 
 import {
   BaseResolver,

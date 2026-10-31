@@ -14,6 +14,7 @@ import { updateService, type UpdateInfo } from '../../services/updateService';
 import { UpdateModal } from '../../components/common/UpdateModal';
 import { FormattedChangelog } from '../../components/common/FormattedChangelog';
 import { openExternalUrl } from '../../services/browserService';
+import { DEFAULT_TGSTRM_URL } from '../../services/tgStreamerDefaults';
 import {
   Settings as SettingsIcon,
   Monitor,
@@ -225,7 +226,7 @@ export const Settings: React.FC = () => {
   useEffect(() => {
     const url = settings?.msmGetterUrl || settings?.msm32GetterUrl;
     if (url !== undefined) {
-      setMsmUrlInput(url || 'https://www.julietmike.net:3033');
+      setMsmUrlInput(url || DEFAULT_TGSTRM_URL);
     }
   }, [settings?.msmGetterUrl, settings?.msm32GetterUrl]);
 
@@ -265,7 +266,7 @@ export const Settings: React.FC = () => {
   const [autoPollLogs, setAutoPollLogs] = useState(false);
 
   const fetchServerLogs = async () => {
-    const baseUrl = (settings?.msmGetterUrl || 'https://www.julietmike.net:3033').replace(/\/+$/, '');
+    const baseUrl = (settings?.msmGetterUrl || DEFAULT_TGSTRM_URL).replace(/\/+$/, '');
     setLoadingServerLogs(true);
     try {
       const [logsRes, statsRes] = await Promise.all([
@@ -1627,7 +1628,7 @@ export const Settings: React.FC = () => {
           {(() => {
             const enabledTg = settings.enabledTelegramProviders || ['telegram-msm'];
             const isMsmEnabled = enabledTg.includes('telegram-msm') || enabledTg.includes('telegram-msm32');
-            const displayUrl = (settings.msmGetterUrl || settings.msm32GetterUrl || 'https://www.julietmike.net:3033').replace(/^https?:\/\//, '');
+            const displayUrl = (settings.msmGetterUrl || settings.msm32GetterUrl || DEFAULT_TGSTRM_URL).replace(/^https?:\/\//, '');
             return (
               <button
                 type="button"
@@ -1929,7 +1930,7 @@ export const Settings: React.FC = () => {
         onClose={() => setActiveDrawer(null)}
         onBack={() => setActiveDrawer('telegram-msm')}
         title="Server Logs & Console"
-        subtitle={`Live diagnostic logs from ${settings.msmGetterUrl || 'https://www.julietmike.net:3033'}`}
+        subtitle={`Live diagnostic logs from ${settings.msmGetterUrl || DEFAULT_TGSTRM_URL}`}
         categoryLabel="Telegram > TGStrm > Server Logs"
       >
         <div className="space-y-3">
@@ -1983,7 +1984,7 @@ export const Settings: React.FC = () => {
             <button
               type="button"
               onClick={() => {
-                const target = `${(settings.msmGetterUrl || 'https://www.julietmike.net:3033').replace(/\/+$/, '')}/tg/logs`;
+                const target = `${(settings.msmGetterUrl || DEFAULT_TGSTRM_URL).replace(/\/+$/, '')}/tg/logs`;
                 openExternalUrl(target);
               }}
               className="px-3 py-1.5 rounded-lg bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 border border-sky-500/20 text-xs font-semibold flex items-center gap-1.5 transition-colors"
@@ -2124,7 +2125,7 @@ export const Settings: React.FC = () => {
         onClose={() => setActiveDrawer(null)}
         onBack={() => setActiveDrawer('telegram-msm')}
         title="Persistent Stream Cache"
-        subtitle={`Central DB video cache on ${settings.msmGetterUrl || 'https://www.julietmike.net:3033'}`}
+        subtitle={`Central DB video cache on ${settings.msmGetterUrl || DEFAULT_TGSTRM_URL}`}
         categoryLabel="Telegram > TGStrm > Stream Cache"
       >
         <div className="space-y-3">
@@ -2289,7 +2290,7 @@ export const Settings: React.FC = () => {
               <button
                 type="button"
                 onClick={() => {
-                  const jmUrl = 'https://www.julietmike.net:3033';
+                  const jmUrl = DEFAULT_TGSTRM_URL;
                   msmService.clearCache();
                   setMsmUrlInput(jmUrl);
                   handleUpdate({ msmGetterUrl: jmUrl });
@@ -2301,7 +2302,7 @@ export const Settings: React.FC = () => {
                     .finally(() => setTestingMsm(false));
                 }}
                 className={`w-full p-3.5 rounded-xl border text-left transition-all flex items-center justify-between gap-3 ${
-                  (settings.msmGetterUrl || 'https://www.julietmike.net:3033') === 'https://www.julietmike.net:3033'
+                  (settings.msmGetterUrl || DEFAULT_TGSTRM_URL) === DEFAULT_TGSTRM_URL
                     ? 'bg-sky-950/40 border-sky-400 text-white'
                     : 'bg-white/5 border-white/10 text-gray-400'
                 }`}
@@ -2313,11 +2314,11 @@ export const Settings: React.FC = () => {
                       Default (SSL)
                     </span>
                   </div>
-                  <p className="text-[10px] text-gray-400 font-mono truncate">https://www.julietmike.net:3033</p>
+                  <p className="text-[10px] text-gray-400 font-mono truncate">{DEFAULT_TGSTRM_URL}</p>
                   <p className="text-[10px] text-gray-500 mt-1">Direct HTTPS streaming on port 3033. High performance.</p>
                 </div>
                 <div className={`w-5 h-5 rounded-full border flex items-center justify-center flex-shrink-0 ${
-                  (settings.msmGetterUrl || 'https://www.julietmike.net:3033') === 'https://www.julietmike.net:3033'
+                  (settings.msmGetterUrl || DEFAULT_TGSTRM_URL) === DEFAULT_TGSTRM_URL
                     ? 'bg-sky-500 border-sky-400 text-black'
                     : 'border-gray-600 bg-black/40 text-transparent'
                 }`}>
@@ -2347,7 +2348,7 @@ export const Settings: React.FC = () => {
               }}
               onBlur={() => {
                 const trimmed = msmUrlInput.trim().replace(/\/+$/, '');
-                const finalUrl = trimmed || 'https://www.julietmike.net:3033';
+                const finalUrl = trimmed || DEFAULT_TGSTRM_URL;
                 if (finalUrl !== settings.msmGetterUrl) {
                   msmService.clearCache();
                   handleUpdate({ msmGetterUrl: finalUrl });
@@ -2360,7 +2361,7 @@ export const Settings: React.FC = () => {
                     .finally(() => setTestingMsm(false));
                 }
               }}
-              placeholder="https://www.julietmike.net:3033"
+              placeholder={DEFAULT_TGSTRM_URL}
               className="w-full bg-black/40 border border-white/15 rounded-xl px-3.5 py-2.5 text-xs text-white font-mono placeholder:text-gray-600 focus:outline-none focus:border-sky-400/80 transition-colors"
             />
           </div>
