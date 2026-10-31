@@ -2337,13 +2337,10 @@ export const Settings: React.FC = () => {
             <input
               type="text"
               value={msmUrlInput}
-              onChange={(e) => {
-                const val = e.target.value;
-                setMsmUrlInput(val);
-                const trimmed = val.trim().replace(/\/+$/, '');
-                if (trimmed && (trimmed.startsWith('http://') || trimmed.startsWith('https://'))) {
-                  msmService.clearCache();
-                  handleUpdate({ msmGetterUrl: trimmed });
+              onChange={(e) => setMsmUrlInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  (e.target as HTMLInputElement).blur();
                 }
               }}
               onBlur={() => {

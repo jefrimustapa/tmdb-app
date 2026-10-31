@@ -2,13 +2,13 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20261022-0335';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.fix-250-car-unit-aud.20261022-0335';
+export const APP_BUILD_NUMBER = '20261031-2341';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.refactor-remove-tg-r.20261031-2341';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
-export const APP_BRANCH = 'fix-250-car-unit-aud';
-export const APP_CHANGELOG = `* fix(player): close watch header year issue (closes #249)
-* fix(player): move year to second row before season and episode (#249)
-* feat(player): add release/season year next to title in watch header (#249)
-* fix(tg-streamer): decouple scoring and fix series episode resolution (#248)
-* refactor(client): cleanup hardcoded MSM and MTProto strings to TGStrm (#247)`;
+export const APP_BRANCH = 'refactor-remove-tg-r';
+export const APP_CHANGELOG = `* feat(app): auto-upgrade legacy port 3033 streamer url to tgstrm.julietmike.net
+* refactor(tgstrm): serve web ui at root and redirect legacy port 3033 to https
+* feat(tgstrm): dynamic node ram cap setting and 40% gc threshold (#311)
+* fix(tgstrm): real-time file logging and dynamic log path for docker (#309)
+* feat(tg-streamer): log clients that still use the old URL via the redirect (refs #301)`;
