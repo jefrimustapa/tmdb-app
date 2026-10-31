@@ -1,4 +1,5 @@
 import './logger.js';
+import { getLogFilePath, resetLogSizeCache } from './logger.js';
 import express from 'express';
 import http from 'http';
 import https from 'https';
@@ -80,7 +81,7 @@ const INTERNAL_HTTP_PORT = parseInt(process.env.INTERNAL_PORT || '3034', 10);
 const apiId = parseInt(process.env.TG_API_ID, 10);
 const apiHash = process.env.TG_API_HASH;
 let session = process.env.TG_SESSION || '';
-const LOG_PATH = process.env.LOG_FILE || (process.platform === 'win32' ? path.join(__dirname, 'tg-streamer.log') : '/tmp/tg-streamer.log');
+const LOG_PATH = getLogFilePath();
 
 const SETTINGS_FILE = path.join(process.env.DATA_DIR || path.join(__dirname, 'data'), 'settings.json');
 
@@ -184,11 +185,7 @@ export function getGeoBadgeHtml(isGeoEnabled) {
 }
 
 
-function getLogFilePath() {
-  if (fs.existsSync('/tmp/tg-streamer.log')) return '/tmp/tg-streamer.log';
-  if (fs.existsSync(LOG_PATH)) return LOG_PATH;
-  return path.join(__dirname, 'tg-streamer.log');
-}
+export { getLogFilePath };
 
 if (!apiId || !apiHash) {
   console.error('[ERROR] TG_API_ID or TG_API_HASH missing from .env!');
@@ -1412,6 +1409,7 @@ app.post(['/api/logs/clear', '/tg/api/logs/clear', '/msm/api/logs/clear'], (req,
     const logPath = getLogFilePath();
     if (fs.existsSync(logPath)) {
       fs.truncateSync(logPath, 0);
+      resetLogSizeCache();
     }
     console.log('[SYSTEM] Log file physically truncated and cleared by user.');
     return res.json({ success: true, message: 'Log file cleared successfully.' });
@@ -1524,7 +1522,7 @@ app.get('/tg/logs', (req, res) => {
             <span class="w-3 h-3 rounded-full bg-amber-500/70 inline-block"></span>
             <span class="w-3 h-3 rounded-full bg-emerald-500/70 inline-block"></span>
           </div>
-          <span class="text-[11px] font-mono text-slate-400 ml-2">/tmp/tg-streamer.log</span>
+          <span id="logPathLabel" class="text-[11px] font-mono text-slate-400 ml-2">${getLogFilePath()}</span>
         </div>
         <div class="flex items-center gap-2 text-[11px] text-slate-400 font-mono">
           <span id="lineCount">0 lines</span>
@@ -1610,7 +1608,7 @@ app.get('/tg/logs', (req, res) => {
     }
 
     async function clearServerLog() {
-      if (!confirm('Are you sure you want to physically clear and truncate the log file on the router?')) return;
+      if (!confirm('Are you sure you want to physically clear and truncate the log file?')) return;
       try {
         const res = await fetch('/tg/api/logs/clear', { method: 'POST' });
         const data = await res.json();
