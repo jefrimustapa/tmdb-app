@@ -32,6 +32,9 @@ import {
   app,
   attachServerErrorHandler,
   getLogFilePath,
+  getNodeRamCap,
+  getNodeRamCapOptions,
+  getIdlePurgeThresholdMb,
 } from './index.js';
 import { rotateLogFile, resetLogSizeCache, MAX_LOG_BYTES } from './logger.js';
 import {
@@ -2225,6 +2228,63 @@ it('rotates log file when size reaches MAX_LOG_BYTES', () => {
         try { fs.unlinkSync(p); } catch {}
       }
     }
+  }
+});
+
+
+// -------------------------------------------------------------
+// 31. Dynamic Node RAM Cap & 40% GC Idle Purge Threshold (#310)
+// -------------------------------------------------------------
+console.log('\n31. Dynamic Node RAM Cap & 40% GC Idle Purge Threshold (#310)');
+
+it('calculates powers-of-2 cap options accurately within 25% physical RAM cap', () => {
+  // 1 GB Router (1024 MB) -> 25% is 256 MB -> only [256]
+  const routerOpts = getNodeRamCapOptions(1024 * 1024 * 1024);
+  assert.deepStrictEqual(routerOpts.options, [256], '1 GB router must only allow 256 MB option');
+  assert.strictEqual(routerOpts.maxCapMb, 256);
+
+  // 4 GB Machine (4096 MB) -> 25% is 1024 MB -> [256, 512, 1024]
+  const m4gOpts = getNodeRamCapOptions(4096 * 1024 * 1024);
+  assert.deepStrictEqual(m4gOpts.options, [256, 512, 1024]);
+  assert.strictEqual(m4gOpts.maxCapMb, 1024);
+
+  // 11 GB Firebat R3 (11264 MB) -> 25% is 2816 MB -> [256, 512, 1024, 2048]
+  const firebatOpts = getNodeRamCapOptions(11 * 1024 * 1024 * 1024);
+  assert.deepStrictEqual(firebatOpts.options, [256, 512, 1024, 2048], '11 GB Firebat must allow up to 2048 MB');
+  assert.strictEqual(firebatOpts.maxCapMb, 2048);
+
+  // 16 GB Machine -> 25% is 4096 MB -> [256, 512, 1024, 2048, 4096]
+  const m16gOpts = getNodeRamCapOptions(16 * 1024 * 1024 * 1024);
+  assert.deepStrictEqual(m16gOpts.options, [256, 512, 1024, 2048, 4096]);
+  assert.strictEqual(m16gOpts.maxCapMb, 4096);
+
+  // Verify all options are powers of 2 and multiples of 16
+  for (const opt of m16gOpts.options) {
+    assert.strictEqual(opt % 16, 0, `${opt} must be multiple of 16`);
+    assert.strictEqual((opt & (opt - 1)), 0, `${opt} must be power of 2`);
+  }
+});
+
+it('calculates 40% GC idle purge threshold accurately', () => {
+  assert.strictEqual(getIdlePurgeThresholdMb(256), 102, '40% of 256 MB must be 102 MB');
+  assert.strictEqual(getIdlePurgeThresholdMb(512), 205, '40% of 512 MB must be 205 MB');
+  assert.strictEqual(getIdlePurgeThresholdMb(1024), 410, '40% of 1024 MB must be 410 MB');
+  assert.strictEqual(getIdlePurgeThresholdMb(2048), 819, '40% of 2048 MB must be 819 MB');
+});
+
+it('getNodeRamCap falls back safely to 256 and respects valid power-of-2 setting', () => {
+  const origCap = savedSettings.nodeRamCapMb;
+  try {
+    delete savedSettings.nodeRamCapMb;
+    assert.strictEqual(getNodeRamCap(), 256, 'Default must be 256 when unset');
+
+    savedSettings.nodeRamCapMb = 999; // invalid non-power-of-2 / not in options
+    assert.strictEqual(getNodeRamCap(), 256, 'Must fallback to 256 on invalid option');
+
+    savedSettings.nodeRamCapMb = 512;
+    assert.strictEqual(getNodeRamCap(), 512, 'Must accept 512 when in options');
+  } finally {
+    if (origCap !== undefined) savedSettings.nodeRamCapMb = origCap; else delete savedSettings.nodeRamCapMb;
   }
 });
 

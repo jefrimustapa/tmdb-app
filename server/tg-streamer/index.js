@@ -132,6 +132,7 @@ try {
 savedSettings.pipelineBuffers = Object.assign({}, DEFAULT_PIPELINE_BUFFERS, savedSettings.pipelineBuffers || {});
 if (savedSettings.overlapPrefetch === undefined) savedSettings.overlapPrefetch = true;
 if (savedSettings.routerRamCacheMb === undefined) savedSettings.routerRamCacheMb = 16;
+if (savedSettings.nodeRamCapMb === undefined) savedSettings.nodeRamCapMb = 256;
 if (savedSettings.videoTranscodeMode === undefined) savedSettings.videoTranscodeMode = 'disabled';
 if (savedSettings.minTvSizeMb === undefined) savedSettings.minTvSizeMb = 80;
 if (savedSettings.minMovieSizeMb === undefined) savedSettings.minMovieSizeMb = 180;
@@ -825,6 +826,37 @@ const internalWorkers = new Map(); // key: workerKey -> { abort: Function, paren
 
 // In-Memory LRU Block Cache for Telegram MTProto Stream Chunks
 // Configurable cache (8, 16, 32, 64 MB RAM) to eliminate seek latency while protecting router RAM from exhaustion.
+// Calculate dynamic Node RAM Cap (powers of 2: 256, 512, 1024..., min=256, max=25% of physical RAM rounded down to power of 2)
+export function getNodeRamCapOptions(totalMemBytes = os.totalmem()) {
+  const totalMemMb = Math.round(totalMemBytes / (1024 * 1024));
+  const maxAllowedMb = Math.max(256, Math.floor(totalMemMb * 0.25));
+  const options = [];
+  let val = 256;
+  while (val <= maxAllowedMb) {
+    options.push(val);
+    val *= 2;
+  }
+  if (!options.includes(256)) options.unshift(256);
+  return {
+    options,
+    minCapMb: 256,
+    maxCapMb: options[options.length - 1],
+    totalMemMb,
+  };
+}
+
+export function getNodeRamCap() {
+  const val = parseInt(savedSettings.nodeRamCapMb, 10);
+  const { options } = getNodeRamCapOptions();
+  if (options.includes(val)) return val;
+  return 256;
+}
+
+export function getIdlePurgeThresholdMb(capMb) {
+  const cap = capMb || getNodeRamCap();
+  return Math.round(cap * 0.40);
+}
+
 export function getBlockCacheMaxEntries() {
   const mb = parseInt(savedSettings.routerRamCacheMb, 10) || 16;
   return mb * 2; // 2 x 512KB blocks per MB
@@ -977,11 +1009,13 @@ setInterval(() => {
     }
   }
 
-  // Periodic Idle Memory Watchdog: If no streams are running and RSS > 85 MB, purge idle memory
+  // Periodic Idle Memory Watchdog: If no streams are running and RSS > 40% of cap, purge idle memory
   if (activeStreams.size === 0) {
     const curRssMB = Math.round(process.memoryUsage().rss / (1024 * 1024));
-    if (curRssMB > 85) {
-      console.log(`[MEMORY WATCHDOG] Idle RSS is ${curRssMB}MB (>85MB target). Triggering idle purge...`);
+    const capMB = getNodeRamCap();
+    const purgeThresholdMB = getIdlePurgeThresholdMb(capMB);
+    if (curRssMB > purgeThresholdMB) {
+      console.log(`[MEMORY WATCHDOG] Idle RSS is ${curRssMB}MB (>${purgeThresholdMB}MB target, 40% of ${capMB}MB cap). Triggering idle purge...`);
       purgeIdleMemory();
     }
   }
@@ -1230,8 +1264,9 @@ app.get(['/api/system/stats', '/tg/api/system/stats', '/msm/api/system/stats'], 
 
   const cpu = getCpuMetrics();
   const rssMB = Math.round(mem.rss / (1024 * 1024));
-  const capMB = 256;
+  const capMB = getNodeRamCap();
   const ramPct = Math.min(100, Math.round((rssMB / capMB) * 100));
+  const purgeThresholdMB = getIdlePurgeThresholdMb(capMB);
 
   res.json({
     status: 'ok',
@@ -1246,6 +1281,7 @@ app.get(['/api/system/stats', '/tg/api/system/stats', '/msm/api/system/stats'], 
       rssMB,
       capMB,
       ramPct,
+      purgeThresholdMB,
       heapUsedMB: Math.round(mem.heapUsed / (1024 * 1024)),
       heapTotalMB: Math.round(mem.heapTotal / (1024 * 1024)),
       externalMB: Math.round((mem.external || 0) / (1024 * 1024)),
@@ -1255,6 +1291,10 @@ app.get(['/api/system/stats', '/tg/api/system/stats', '/msm/api/system/stats'], 
     pipelineBuffers: savedSettings.pipelineBuffers || DEFAULT_PIPELINE_BUFFERS,
     overlapPrefetch: savedSettings.overlapPrefetch !== false,
     routerRamCacheMb: savedSettings.routerRamCacheMb || 16,
+    nodeRamCapMb: getNodeRamCap(),
+    nodeRamCapOptions: getNodeRamCapOptions().options,
+    maxNodeRamCapMb: getNodeRamCapOptions().maxCapMb,
+    idlePurgeThresholdMb: getIdlePurgeThresholdMb(),
     videoTranscodeMode: savedSettings.videoTranscodeMode || 'disabled',
     blockCacheEntries: globalBlockCache.size,
     blockCacheMaxEntries: getBlockCacheMaxEntries(),
@@ -1735,6 +1775,10 @@ app.get(['/api/settings', '/tg/api/settings', '/msm/api/settings'], (req, res) =
     pipelineBuffers: savedSettings.pipelineBuffers || DEFAULT_PIPELINE_BUFFERS,
     overlapPrefetch: savedSettings.overlapPrefetch !== false,
     routerRamCacheMb: savedSettings.routerRamCacheMb || 16,
+    nodeRamCapMb: getNodeRamCap(),
+    nodeRamCapOptions: getNodeRamCapOptions().options,
+    maxNodeRamCapMb: getNodeRamCapOptions().maxCapMb,
+    idlePurgeThresholdMb: getIdlePurgeThresholdMb(getNodeRamCap()),
     videoTranscodeMode: savedSettings.videoTranscodeMode || 'disabled',
     minTvSizeMb: savedSettings.minTvSizeMb ?? 80,
     minMovieSizeMb: savedSettings.minMovieSizeMb ?? 180,
@@ -1760,6 +1804,7 @@ app.post(['/api/settings', '/tg/api/settings', '/msm/api/settings'], (req, res) 
       pipelineBuffers,
       overlapPrefetch,
       routerRamCacheMb,
+      nodeRamCapMb,
       videoTranscodeMode,
       minTvSizeMb,
       minMovieSizeMb,
@@ -1825,6 +1870,16 @@ app.post(['/api/settings', '/tg/api/settings', '/msm/api/settings'], (req, res) 
         changed = true;
         pruneGlobalBlockCache();
         console.log(`[SETTINGS] Router RAM Block Cache updated to: ${mb} MB (${mb * 2} blocks)`);
+      }
+    }
+
+    if (nodeRamCapMb !== undefined) {
+      const cap = parseInt(nodeRamCapMb, 10);
+      const { options } = getNodeRamCapOptions();
+      if (options.includes(cap)) {
+        savedSettings.nodeRamCapMb = cap;
+        changed = true;
+        console.log(`[SETTINGS] Node RAM Cap updated to: ${cap} MB (40% GC purge threshold: ${getIdlePurgeThresholdMb(cap)} MB)`);
       }
     }
 
@@ -2025,7 +2080,7 @@ app.get(['/tg', '/msm/dashboard'], (req, res) => {
       <div class="p-3.5 rounded-2xl bg-slate-900 border border-slate-800/80 glow-box">
         <span class="text-[10px] text-slate-400 font-semibold block uppercase tracking-wider">Node RAM / Cap</span>
         <div class="flex items-baseline gap-1 mt-1 truncate">
-          <span id="metricRam" class="text-xs font-bold font-mono text-sky-400">-- / 256 MB</span>
+          <span id="metricRam" class="text-xs font-bold font-mono text-sky-400">-- / ${getNodeRamCap()} MB</span>
           <span id="metricRamPct" class="text-[10px] font-mono text-slate-400">(--%)</span>
         </div>
         <span id="metricHeapDetail" class="text-[10px] text-slate-500 font-mono block mt-0.5">Heap: -- MB</span>
@@ -2246,7 +2301,7 @@ app.get(['/tg', '/msm/dashboard'], (req, res) => {
           const pct = mem.ramPct !== undefined ? mem.ramPct : Math.round((rss / cap) * 100);
           ramEl.textContent = rss + ' / ' + cap + ' MB';
           if (ramPctEl) ramPctEl.textContent = '(' + pct + '%)';
-          if (heapDetailEl) heapDetailEl.textContent = 'Heap: ' + (mem.heapUsedMB || 0) + ' MB · Cache: ' + (mem.chunkCacheMB !== undefined ? mem.chunkCacheMB : 0) + ' MB';
+          if (heapDetailEl) heapDetailEl.textContent = 'Heap: ' + (mem.heapUsedMB || 0) + ' MB · Cache: ' + (mem.chunkCacheMB !== undefined ? mem.chunkCacheMB : 0) + ' MB · GC > ' + (mem.purgeThresholdMB || Math.round((mem.capMB || 256) * 0.40)) + ' MB';
           if (pct > 80) ramEl.className = 'text-xs font-bold font-mono text-rose-400';
           else if (pct > 50) ramEl.className = 'text-xs font-bold font-mono text-amber-400';
           else ramEl.className = 'text-xs font-bold font-mono text-sky-400';
@@ -3072,6 +3127,21 @@ app.get(['/msm/setting', '/tg/settings'], (req, res) => {
             </select>
           </div>
 
+          <!-- Node RAM Cap -->
+          <div class="flex items-center justify-between gap-3 bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/80">
+            <div>
+              <div class="text-xs font-semibold text-white">Node Process RAM Cap</div>
+              <div id="nodeRamCapHint" class="text-[11px] text-slate-400">Ceiling for dashboard &amp; 40% GC idle purge threshold</div>
+            </div>
+            <select id="nodeRamCapSelect" onchange="updateNodeRamCapLabel()" class="bg-slate-900 border border-slate-700 text-xs text-white rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-sky-500">
+              ${getNodeRamCapOptions().options.map(opt => {
+                const label = opt >= 1024 ? (opt / 1024) + ' GB (' + opt + ' MB)' : opt + ' MB';
+                const suffix = opt === 256 ? ' - Default' : (opt === 1024 ? ' - Recommended' : '');
+                return '<option value="' + opt + '" ' + (opt === getNodeRamCap() ? 'selected' : '') + '>' + label + suffix + '</option>';
+              }).join('')}
+            </select>
+          </div>
+
           <!-- Router RAM Block Cache -->
           <div class="flex items-center justify-between gap-3 bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/80">
             <div>
@@ -3381,6 +3451,19 @@ app.get(['/msm/setting', '/tg/settings'], (req, res) => {
         if (res.overlapPrefetch !== undefined) {
           document.getElementById('prefetchSelect').value = String(res.overlapPrefetch);
         }
+        if (res.nodeRamCapMb !== undefined) {
+          const capSel = document.getElementById('nodeRamCapSelect');
+          if (capSel && res.nodeRamCapOptions) {
+            capSel.innerHTML = res.nodeRamCapOptions.map(opt => {
+              const label = opt >= 1024 ? (opt / 1024) + ' GB (' + opt + ' MB)' : opt + ' MB';
+              const suffix = opt === 256 ? ' - Default' : (opt === 1024 ? ' - Recommended' : '');
+              return '<option value="' + opt + '" ' + (opt === res.nodeRamCapMb ? 'selected' : '') + '>' + label + suffix + '</option>';
+            }).join('');
+          } else if (capSel) {
+            capSel.value = String(res.nodeRamCapMb);
+          }
+          updateNodeRamCapLabel();
+        }
         if (res.routerRamCacheMb !== undefined) {
           document.getElementById('ramCacheSelect').value = String(res.routerRamCacheMb);
           updateRamCacheLabel();
@@ -3495,6 +3578,17 @@ app.get(['/msm/setting', '/tg/settings'], (req, res) => {
       if (p1080Calc) p1080Calc.textContent = p1080 + ' × 512 KB = ' + (p1080 * 0.5).toFixed(1) + ' MB in-flight';
       const p4kCalc = document.getElementById('4kBufCalc');
       if (p4kCalc) p4kCalc.textContent = p4k + ' × 512 KB = ' + (p4k * 0.5).toFixed(1) + ' MB in-flight';
+    }
+
+    function updateNodeRamCapLabel() {
+      const el = document.getElementById('nodeRamCapSelect');
+      if (!el) return;
+      const val = parseInt(el.value, 10) || 256;
+      const purge = Math.round(val * 0.40);
+      const hint = document.getElementById('nodeRamCapHint');
+      if (hint) {
+        hint.textContent = 'Ceiling ' + val + ' MB · 40% GC idle purge threshold: ' + purge + ' MB';
+      }
     }
 
     function updateRamCacheLabel() {
@@ -3625,6 +3719,7 @@ app.get(['/msm/setting', '/tg/settings'], (req, res) => {
 
     async function saveEngineSettings() {
       const prefetch = document.getElementById('prefetchSelect').value === 'true';
+      const nodeCap = parseInt(document.getElementById('nodeRamCapSelect')?.value, 10) || 256;
       const ramMb = parseInt(document.getElementById('ramCacheSelect').value, 10) || 16;
       const transcodeMode = document.getElementById('videoTranscodeSelect').value || 'disabled';
       const minTvMb = parseInt(document.getElementById('minTvSizeInput').value, 10) || 80;
@@ -3642,6 +3737,7 @@ app.get(['/msm/setting', '/tg/settings'], (req, res) => {
           body: JSON.stringify({
             overlapPrefetch: prefetch,
             routerRamCacheMb: ramMb,
+            nodeRamCapMb: nodeCap,
             videoTranscodeMode: transcodeMode,
             minTvSizeMb: minTvMb,
             minMovieSizeMb: minMovieMb,
