@@ -406,6 +406,17 @@ export const dbService = {
       settings.tgActiveResolver = 'msm';
       await db.settings.put(settings);
     }
+    // Auto-upgrade legacy router port 3033 to canonical tgstrm domain
+    const isLegacy3033 = (url?: string) =>
+      typeof url === 'string' &&
+      (url.includes(':3033') || url.includes('www.julietmike.net') || url.includes('julietmike.net:3033'));
+
+    if (isLegacy3033(settings.tgStreamerUrl) || isLegacy3033(settings.msmGetterUrl) || isLegacy3033(settings.msm32GetterUrl)) {
+      settings.tgStreamerUrl = DEFAULT_TGSTRM_URL;
+      settings.msmGetterUrl = DEFAULT_TGSTRM_URL;
+      if (settings.msm32GetterUrl) settings.msm32GetterUrl = DEFAULT_TGSTRM_URL;
+      await db.settings.put(settings);
+    }
     settings.msmGetterUrl = settings.tgStreamerUrl;
     settings.msmChunkSize = settings.tgChunkSize;
     settings.msmMaxQuality = settings.tgMaxQuality;
