@@ -1,4 +1,5 @@
 import { dbService } from './db';
+import { DEFAULT_TGSTRM_URL, DEFAULT_TGSTRM_HOST } from './tgStreamerDefaults';
 import {
   SpeedTestTier,
   SpeedTestVerdict,
@@ -173,7 +174,7 @@ class TgStreamerService {
     let url = (settings?.tgStreamerUrl || settings?.msmGetterUrl || settings?.msm32GetterUrl)?.trim();
     
     if (!url) {
-      url = 'https://www.julietmike.net:3033';
+      url = DEFAULT_TGSTRM_URL;
     }
 
     return url.replace(/\/+$/, '');
@@ -638,6 +639,9 @@ export function getTgStreamerServerLabel(url?: string): string {
     const port = parsed.port ? `:${parsed.port}` : '';
     if (host === 'localhost' || host === '127.0.0.1') {
       return `Local Router (${host}${port})`;
+    }
+    if (host === DEFAULT_TGSTRM_HOST) {
+      return `Primary (${DEFAULT_TGSTRM_HOST})`;
     }
     if (host === 'www.julietmike.net' || host === 'julietmike.net') {
       return `Primary (julietmike.net${port})`;

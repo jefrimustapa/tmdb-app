@@ -1,9 +1,16 @@
 node_modules
 .env
+.git
+data
 *.mp4
 *.html
 *.log
 scripts.txt
 inspect_page.js
 test-*.js
-.git
+*.test.js
+S99tg-streamer
+tg-streamer-watchdog.sh
+scripts
+Dockerfile
+docker-compose.yml

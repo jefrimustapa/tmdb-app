@@ -56,6 +56,25 @@ The app compares the stream's sustained rate (after the first 512 KB block) with
 
 Server settings (dashboard `/tg/settings` > Engine, or `POST /api/settings`): `speedTestMb` (default 16, 12-64; the block size is 512 KB and the 1080p/4K window about 10 blocks, so a smaller test never fills the window) and `speedTestBudgetMbPerMin` (default 150 per client IP; HTTP 429 with Retry-After beyond it). A 3-quality run at 16 MB is about 48 MB. Log lines: `[SPEEDTEST]` and `[SPEEDTEST END]`.
 
+## Docker deployment (Firebat) - issue #301
+TGStrm runs as a container on Firebat behind Nginx Proxy Manager (NPM) at `https://tgstrm.julietmike.net`. The image (`ghcr.io/jefrimustapa/tg-streamer`) is built by `.github/workflows/tg-streamer-image.yml`: PRs only build, a push to a `ci/issue-301-**` branch publishes a branch tag (for testing), `main` publishes `latest`.
+
+Files on Firebat (e.g. `~/tg-streamer/`): `docker-compose.yml`, `.env` (`TG_API_ID`, `TG_API_HASH`, `TG_SESSION`, `TG_BOT_USERNAME`), and `data/` (volume with `streams.json` and `settings.json`).
+
+```bash
+docker compose pull && docker compose up -d     # deploy / update
+docker compose logs -f tg-streamer
+TGSTRM_TAG=ci-issue-301-convert-tgstrm-to-docker-move-location TGSTRM_HOST_PORT=3043 docker compose up -d   # test a branch build on another port
+```
+
+NPM Proxy Host: domain `tgstrm.julietmike.net`, forward to `tg-streamer:3033` (the container joins `npm_default`) or `192.168.0.120:3033`, request a Let's Encrypt cert, Force SSL. Advanced tab: `proxy_buffering off; proxy_request_buffering off; proxy_read_timeout 3600s; proxy_send_timeout 3600s;` so Range streaming and long resolves are not cut. NPM sets `X-Forwarded-For` / `X-Real-IP`, which the geo-block uses as the client IP.
+
+### Migration from the router
+1. Copy `TG_*` from the router `.env` and the router `data/` folder to Firebat (the Telegram session is reused; stop the router instance before starting the container, two live users of one session can invalidate it).
+2. Start the container, check `https://tgstrm.julietmike.net/tg/health`.
+3. On the router set `REDIRECT_TO=https://tgstrm.julietmike.net` in its `.env` and restart `S99tg-streamer`: every request except `/tg/health` now answers `307` to the new host (old app installs keep working). Rollback: remove the variable and restart.
+4. Cleanup of the router instance and the redirect is tracked in #302.
+
 ## Router deployment and disk-corruption recovery
 The service runs on the ASUS router (Entware): app in `/tmp/mnt/Entware/entware/app/tg-streamer`, started by `/opt/etc/init.d/S99tg-streamer` (supervisor that respawns Node). The Entware USB disk has had ext4 errors, so recovery is automated at three levels.
 

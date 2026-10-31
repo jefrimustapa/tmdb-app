@@ -1,5 +1,6 @@
 import Dexie, { type Table } from 'dexie';
 import type { WatchHistoryItem, LikedItem, WatchlistItem, UserSettings, RatingCacheItem, StreamResolverType } from '../types/db';
+import { DEFAULT_TGSTRM_URL } from './tgStreamerDefaults';
 
 export class TMDBStreamerDB extends Dexie {
   history!: Table<WatchHistoryItem, number>;
@@ -79,13 +80,13 @@ export const DEFAULT_SETTINGS: UserSettings = {
   enginePriority: ['telegram', 'embed'],
   enabledTelegramProviders: ['telegram-msm'],
   telegramProviderCountries: { 'telegram-msm': ['MY', 'ID', 'SG'] },
-  tgStreamerUrl: 'https://www.julietmike.net:3033',
+  tgStreamerUrl: DEFAULT_TGSTRM_URL,
   tgChunkSize: 524288,
   tgMaxQuality: '1080',
   tgTimeout: 90,
   tgBufferTimeout: 60,
   tgActiveResolver: 'msm',
-  msmGetterUrl: 'https://www.julietmike.net:3033',
+  msmGetterUrl: DEFAULT_TGSTRM_URL,
   msmChunkSize: 524288,
   msmMaxQuality: '1080',
   msmTimeout: 90,
@@ -366,7 +367,7 @@ export const dbService = {
       await db.settings.put(settings);
     }
     if (settings.msmGetterUrl === undefined) {
-      settings.msmGetterUrl = settings.msm32GetterUrl || 'https://www.julietmike.net:3033';
+      settings.msmGetterUrl = settings.msm32GetterUrl || DEFAULT_TGSTRM_URL;
       await db.settings.put(settings);
     }
     if (settings.msmChunkSize === undefined) {
@@ -382,7 +383,7 @@ export const dbService = {
       await db.settings.put(settings);
     }
     if (settings.tgStreamerUrl === undefined) {
-      settings.tgStreamerUrl = settings.msmGetterUrl || settings.msm32GetterUrl || 'https://www.julietmike.net:3033';
+      settings.tgStreamerUrl = settings.msmGetterUrl || settings.msm32GetterUrl || DEFAULT_TGSTRM_URL;
       await db.settings.put(settings);
     }
     if (settings.tgChunkSize === undefined) {

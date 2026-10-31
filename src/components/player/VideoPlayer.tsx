@@ -22,6 +22,7 @@ import { needsAudioTranscode } from '../../utils/audioTranscode';
 import { hasAndroidBridge } from '../../utils/platform';
 import { UNVERIFIABLE_GRACE_MS, loadReporters, saveReporters, isPlaybackUnverifiable } from '../../utils/embedPlaybackDetection';
 import { shouldIgnoreNativeIframeError } from '../../utils/nativeIframeError';
+import { DEFAULT_TGSTRM_HOST } from '../../services/tgStreamerDefaults';
 
 interface VideoPlayerProps {
   mediaType: 'movie' | 'tv';
@@ -1251,7 +1252,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     const isUsingMsm = provider.id === 'telegram-msm' ||
                        provider.id === 'telegram-msm32' ||
                        provider.engine === 'telegram' ||
-                       (playerMode === 'direct' && Boolean(directStreamUrl && (directStreamUrl.includes(':3033') || directStreamUrl.includes(':3034'))));
+                       (playerMode === 'direct' && Boolean(directStreamUrl && (directStreamUrl.includes(':3033') || directStreamUrl.includes(':3034') || directStreamUrl.includes(DEFAULT_TGSTRM_HOST))));
 
     if (
       mediaType === 'tv' &&
