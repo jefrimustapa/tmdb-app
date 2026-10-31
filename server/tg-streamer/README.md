@@ -72,7 +72,7 @@ NPM Proxy Host: domain `tgstrm.julietmike.net`, forward to `tg-streamer:3033` (t
 ### Migration from the router
 1. Copy `TG_*` from the router `.env` and the router `data/` folder to Firebat (the Telegram session is reused; stop the router instance before starting the container, two live users of one session can invalidate it).
 2. Start the container, check `https://tgstrm.julietmike.net/tg/health`.
-3. On the router set `REDIRECT_TO=https://tgstrm.julietmike.net` in its `.env` and restart `S99tg-streamer`: every request except `/tg/health` now answers `307` to the new host (old app installs keep working). Rollback: remove the variable and restart.
+3. On the router set `REDIRECT_TO=https://tgstrm.julietmike.net` in its `.env` and restart `S99tg-streamer`: every request except `/tg/health` now answers `307` to the new host (old app installs keep working). Rollback: remove the variable and restart. Each client (IP + user agent) is logged once per 10 minutes as `[REDIRECT] ip | agent -> url` in `/tmp/tg-streamer.log`, to see who still uses the old URL before the router instance is removed (#302).
 4. Cleanup of the router instance and the redirect is tracked in #302.
 
 ## Router deployment and disk-corruption recovery

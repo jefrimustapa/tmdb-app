@@ -49,9 +49,18 @@ app.use(express.json());
 // Transition: the legacy router instance sends clients to the Docker deployment (set only on the router, e.g. https://tgstrm.julietmike.net).
 // Placed after cors() so CORS preflights are still answered here and only the real request is redirected.
 const REDIRECT_TO = (process.env.REDIRECT_TO || '').trim().replace(/\/+$/, '');
+const redirectSeen = new Map();
 if (REDIRECT_TO) {
   app.use((req, res, next) => {
     if (req.path === '/tg/health' || req.path === '/tg/health/' || req.path === '/health') return next();
+    // One line per client (IP + user agent) every 10 minutes, so it is visible who still uses the old URL without flooding the log with Range requests
+    const who = `${req.ip} | ${(req.headers['user-agent'] || '-').slice(0, 80)}`;
+    const now = Date.now();
+    if (now - (redirectSeen.get(who) || 0) > 10 * 60 * 1000) {
+      redirectSeen.set(who, now);
+      if (redirectSeen.size > 500) redirectSeen.clear();
+      console.log(`[REDIRECT] ${who} -> ${REDIRECT_TO}${req.path}`);
+    }
     res.redirect(307, `${REDIRECT_TO}${req.originalUrl}`);
   });
 }
