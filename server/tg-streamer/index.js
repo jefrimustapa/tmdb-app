@@ -47,6 +47,24 @@ const app = express();
 app.set('trust proxy', true);
 app.use(cors());
 app.use(express.json());
+export function getPublicStreamHost(req) {
+  const forwardedHost = req.headers['x-forwarded-host'];
+  const reqHost = req.get('host') || '';
+  const host = forwardedHost || reqHost;
+  if (!host || host.startsWith('tg-streamer') || host.startsWith('localhost') || host.startsWith('127.0.0.1')) {
+    return 'tgstrm.julietmike.net';
+  }
+  return host;
+}
+
+export function getPublicStreamProtocol(req) {
+  const forwardedProto = req.headers['x-forwarded-proto'];
+  if (forwardedProto) return forwardedProto;
+  const host = getPublicStreamHost(req);
+  if (host.includes('julietmike.net')) return 'https';
+  return req.protocol || 'https';
+}
+
 export function getCanonicalRedirectUrl(host = '', originalUrl = '/') {
   const h = (host || '').toLowerCase();
   if (h.includes('julietmike.net:3033') || h === 'julietmike.net') {
@@ -4354,8 +4372,8 @@ app.get(['/api/resolve', '/tg/api/resolve', '/msm/api/resolve', '/api/prefetch',
         size: cached.size,
       });
     }
-    const host = req.get('host');
-    const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'https';
+    const host = getPublicStreamHost(req);
+    const protocol = getPublicStreamProtocol(req);
     const isDesktopWeb = isDesktopWebClient(req);
     const isHevc = cached.videoCodec === 'hevc' || cached.videoCodec === 'h265' || /\b(x265|hevc|h265)\b/i.test(cached.filename || '');
     const isAvi = /\.avi$/i.test(cached.filename || '');
@@ -4387,8 +4405,8 @@ app.get(['/api/resolve', '/tg/api/resolve', '/msm/api/resolve', '/api/prefetch',
       const result = await inFlightResolutions.get(cacheKey);
       req.off('close', onClientClose);
       if (isAborted || res.writableEnded) return;
-      const host = req.get('host');
-      const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'https';
+      const host = getPublicStreamHost(req);
+      const protocol = getPublicStreamProtocol(req);
       const isDesktopWeb = isDesktopWebClient(req);
       const isHevc = result.videoCodec === 'hevc' || result.videoCodec === 'h265' || /\b(x265|hevc|h265)\b/i.test(result.filename || '');
       const isAvi = /\.avi$/i.test(result.filename || '');
@@ -4534,8 +4552,8 @@ app.get(['/api/resolve', '/tg/api/resolve', '/msm/api/resolve', '/api/prefetch',
 
     if (isAborted || res.writableEnded) return;
 
-    const host = req.get('host');
-    const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'https';
+    const host = getPublicStreamHost(req);
+    const protocol = getPublicStreamProtocol(req);
     const isDesktopWeb = isDesktopWebClient(req);
     const isHevc = result.videoCodec === 'hevc' || result.videoCodec === 'h265' || /\b(x265|hevc|h265)\b/i.test(result.filename || '');
     const isAvi = /\.avi$/i.test(result.filename || '');
