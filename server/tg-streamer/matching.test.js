@@ -31,7 +31,9 @@ import {
   getTranscodeContainerConfig,
   app,
   attachServerErrorHandler,
+  getLogFilePath,
 } from './index.js';
+import { rotateLogFile, resetLogSizeCache, MAX_LOG_BYTES } from './logger.js';
 import {
   createResolver,
   listResolvers,
@@ -2150,6 +2152,80 @@ it('fast-fails and evicts from DB when target origin bot cannot find document', 
   assert.strictEqual(recoveredRef, null, 'Must not recover reference from dead bot');
   assert.deepStrictEqual(queriedBots, ['deadbot'], 'Must have queried ONLY deadbot, without querying unrelated bots');
   assert.strictEqual(testDb.getByDocId(targetDocId), undefined, 'Record must be evicted from DB');
+});
+
+
+// -------------------------------------------------------------
+// 30. Log File Routing, Real-Time Capture & Rotation (#308)
+// -------------------------------------------------------------
+console.log('\n30. Log File Routing, Real-Time Capture & Rotation (#308)');
+
+it('resolves getLogFilePath correctly prioritizing LOG_FILE and DATA_DIR', () => {
+  const origLogFile = process.env.LOG_FILE;
+  const origDataDir = process.env.DATA_DIR;
+  try {
+    process.env.LOG_FILE = '/custom/path/tg.log';
+    assert.strictEqual(getLogFilePath(), '/custom/path/tg.log', 'Must prioritize process.env.LOG_FILE');
+
+    delete process.env.LOG_FILE;
+    process.env.DATA_DIR = '/custom/data';
+    assert.strictEqual(getLogFilePath(), path.join('/custom/data', 'tg-streamer.log'), 'Must resolve to DATA_DIR/tg-streamer.log');
+  } finally {
+    if (origLogFile !== undefined) process.env.LOG_FILE = origLogFile; else delete process.env.LOG_FILE;
+    if (origDataDir !== undefined) process.env.DATA_DIR = origDataDir; else delete process.env.DATA_DIR;
+  }
+});
+
+it('captures console.log output into the log file in real-time', () => {
+  const testLogPath = path.join(path.dirname(fileURLToPath(import.meta.url)), 'test-capture-308.log');
+  const origLogFile = process.env.LOG_FILE;
+  try {
+    process.env.LOG_FILE = testLogPath;
+    resetLogSizeCache();
+    if (fs.existsSync(testLogPath)) fs.unlinkSync(testLogPath);
+
+    const testSecret = `[TEST_CAPTURE_SECRET_${Date.now()}] hello world log capture`;
+    console.log(testSecret);
+
+    assert(fs.existsSync(testLogPath), 'Log file must be created on disk when console.log is called');
+    const content = fs.readFileSync(testLogPath, 'utf8');
+    assert(content.includes(testSecret), 'Log file content must include the emitted console.log text');
+    assert(/^\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\]/.test(content), 'Emitted line must start with valid ISO-like timestamp');
+  } finally {
+    if (origLogFile !== undefined) process.env.LOG_FILE = origLogFile; else delete process.env.LOG_FILE;
+    resetLogSizeCache();
+    if (fs.existsSync(testLogPath)) {
+      try { fs.unlinkSync(testLogPath); } catch {}
+    }
+  }
+});
+
+it('rotates log file when size reaches MAX_LOG_BYTES', () => {
+  const testRotPath = path.join(path.dirname(fileURLToPath(import.meta.url)), 'test-rot-308.log');
+  const testOldPath = `${testRotPath}.old`;
+  try {
+    for (const p of [testRotPath, testOldPath]) {
+      if (fs.existsSync(p)) fs.unlinkSync(p);
+    }
+
+    // Write dummy lines that exceed MAX_LOG_BYTES
+    const dummyLine = 'A'.repeat(512) + '\n';
+    const numLines = Math.ceil(MAX_LOG_BYTES / 512) + 20;
+    fs.writeFileSync(testRotPath, dummyLine.repeat(numLines), 'utf8');
+
+    assert(fs.statSync(testRotPath).size >= MAX_LOG_BYTES, 'Test file must exceed MAX_LOG_BYTES before rotation');
+
+    rotateLogFile(testRotPath);
+
+    assert(fs.existsSync(testOldPath), 'Rotated .old file must exist after rotation');
+    assert.strictEqual(fs.statSync(testRotPath).size, 0, 'Active log file must be truncated to 0 bytes after rotation');
+  } finally {
+    for (const p of [testRotPath, testOldPath]) {
+      if (fs.existsSync(p)) {
+        try { fs.unlinkSync(p); } catch {}
+      }
+    }
+  }
 });
 
 // Clean up temporary test files (pending debounced saves are flushed first by waiting them out)
