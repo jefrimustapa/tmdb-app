@@ -1,5 +1,5 @@
 import { dbService } from './db';
-import { DEFAULT_TGSTRM_URL, DEFAULT_TGSTRM_HOST } from './tgStreamerDefaults';
+import { DEFAULT_TGSTRM_URL, DEFAULT_TGSTRM_HOST, normalizeTgStrmUrl, isLegacyTgStrmUrl } from './tgStreamerDefaults';
 import {
   SpeedTestTier,
   SpeedTestVerdict,
@@ -171,13 +171,8 @@ class TgStreamerService {
 
   public async getBaseUrl(): Promise<string> {
     const settings = await dbService.getSettings();
-    let url = (settings?.tgStreamerUrl || settings?.msmGetterUrl || settings?.msm32GetterUrl)?.trim();
-    
-    if (!url) {
-      url = DEFAULT_TGSTRM_URL;
-    }
-
-    return url.replace(/\/+$/, '');
+    const rawUrl = (settings?.tgStreamerUrl || settings?.msmGetterUrl || settings?.msm32GetterUrl)?.trim();
+    return normalizeTgStrmUrl(rawUrl);
   }
 
   /**
@@ -187,6 +182,8 @@ class TgStreamerService {
     let target = customUrl?.trim();
     if (!target) {
       target = await this.getBaseUrl();
+    } else {
+      target = normalizeTgStrmUrl(target);
     }
     const baseUrl = target.replace(/\/+$/, '');
     try {
@@ -634,9 +631,9 @@ export const msm32Service = tgStreamerService;
  * Returns a human-friendly label for the TGStrm server badge
  */
 export function getTgStreamerServerLabel(url?: string): string {
-  if (!url) return 'Default (julietmike.net)';
+  const normalized = normalizeTgStrmUrl(url);
   try {
-    const parsed = new URL(url);
+    const parsed = new URL(normalized);
     const host = parsed.hostname;
     const port = parsed.port ? `:${parsed.port}` : '';
     if (host === 'localhost' || host === '127.0.0.1') {
@@ -645,12 +642,9 @@ export function getTgStreamerServerLabel(url?: string): string {
     if (host === DEFAULT_TGSTRM_HOST) {
       return `Primary (${DEFAULT_TGSTRM_HOST})`;
     }
-    if (host === 'www.julietmike.net' || host === 'julietmike.net') {
-      return `Primary (julietmike.net${port})`;
-    }
     return `${host}${port}`;
   } catch {
-    return url;
+    return normalized;
   }
 }
 

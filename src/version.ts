@@ -7,7 +7,8 @@ export const APP_VERSION_FULL = '1.2.0-dev.jefri.refactor-remove-tg-r.20261031-2
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
 export const APP_BRANCH = 'refactor-remove-tg-r';
-export const APP_CHANGELOG = `* fix(settings): debounce mobile custom server input and blur on enter
+export const APP_CHANGELOG = `* fix(app): enforce tgstrm.julietmike.net domain across runtime and settings (#318)
+* fix(settings): debounce mobile custom server input and blur on enter
 * feat(app): auto-upgrade legacy port 3033 streamer url to tgstrm.julietmike.net
 * refactor(tgstrm): serve web ui at root and redirect legacy port 3033 to https
 * feat(tgstrm): dynamic node ram cap setting and 40% gc threshold (#311)

@@ -14,7 +14,7 @@ import { updateService, type UpdateInfo } from '../../services/updateService';
 import { UpdateModal } from '../../components/common/UpdateModal';
 import { FormattedChangelog } from '../../components/common/FormattedChangelog';
 import { openExternalUrl } from '../../services/browserService';
-import { DEFAULT_TGSTRM_URL } from '../../services/tgStreamerDefaults';
+import { DEFAULT_TGSTRM_URL, normalizeTgStrmUrl } from '../../services/tgStreamerDefaults';
 import {
   Settings as SettingsIcon,
   Monitor,
@@ -224,11 +224,11 @@ export const Settings: React.FC = () => {
 
   // Keep local msmUrlInput in sync with persisted settings
   useEffect(() => {
-    const url = settings?.msmGetterUrl || settings?.msm32GetterUrl;
-    if (url !== undefined) {
-      setMsmUrlInput(url || DEFAULT_TGSTRM_URL);
+    const raw = settings?.tgStreamerUrl || settings?.msmGetterUrl || settings?.msm32GetterUrl;
+    if (raw !== undefined) {
+      setMsmUrlInput(normalizeTgStrmUrl(raw));
     }
-  }, [settings?.msmGetterUrl, settings?.msm32GetterUrl]);
+  }, [settings?.tgStreamerUrl, settings?.msmGetterUrl, settings?.msm32GetterUrl]);
 
   // Auto-ping TGStrm microservice whenever the user enters the Telegram or TGStrm drawer
   useEffect(() => {
@@ -1628,7 +1628,7 @@ export const Settings: React.FC = () => {
           {(() => {
             const enabledTg = settings.enabledTelegramProviders || ['telegram-msm'];
             const isMsmEnabled = enabledTg.includes('telegram-msm') || enabledTg.includes('telegram-msm32');
-            const displayUrl = (settings.msmGetterUrl || settings.msm32GetterUrl || DEFAULT_TGSTRM_URL).replace(/^https?:\/\//, '');
+            const displayUrl = normalizeTgStrmUrl(settings.tgStreamerUrl || settings.msmGetterUrl || settings.msm32GetterUrl).replace(/^https?:\/\//, '');
             return (
               <button
                 type="button"
@@ -2293,7 +2293,7 @@ export const Settings: React.FC = () => {
                   const jmUrl = DEFAULT_TGSTRM_URL;
                   msmService.clearCache();
                   setMsmUrlInput(jmUrl);
-                  handleUpdate({ msmGetterUrl: jmUrl });
+                  handleUpdate({ msmGetterUrl: jmUrl, tgStreamerUrl: jmUrl });
                   setTestingMsm(true);
                   setMsmTestResult(null);
                   msmService.testConnection(jmUrl)
@@ -2345,10 +2345,10 @@ export const Settings: React.FC = () => {
               }}
               onBlur={() => {
                 const trimmed = msmUrlInput.trim().replace(/\/+$/, '');
-                const finalUrl = trimmed || DEFAULT_TGSTRM_URL;
-                if (finalUrl !== settings.msmGetterUrl) {
+                const finalUrl = normalizeTgStrmUrl(trimmed);
+                if (finalUrl !== settings.msmGetterUrl || finalUrl !== settings.tgStreamerUrl) {
                   msmService.clearCache();
-                  handleUpdate({ msmGetterUrl: finalUrl });
+                  handleUpdate({ msmGetterUrl: finalUrl, tgStreamerUrl: finalUrl });
                   setMsmUrlInput(finalUrl);
                   setTestingMsm(true);
                   setMsmTestResult(null);
