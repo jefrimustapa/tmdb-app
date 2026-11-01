@@ -1436,7 +1436,7 @@ export const Settings: React.FC = () => {
             { id: 'embed' as const, title: 'Embed Resolver', tag: 'Multi-Mirror', desc: 'Standard multi-server iframe embeds (VidLink, MoviesAPI) with ad sandboxing.', subDrawer: 'engine-embed' as const },
           ].map((resOption) => {
             const currentEnabled = settings.enabledResolvers && settings.enabledResolvers.length > 0
-              ? settings.enabledResolvers : ['embed'];
+              ? settings.enabledResolvers : ['telegram', 'embed'];
             const isEnabled = currentEnabled.includes(resOption.id as any);
             return (
               <div
@@ -1503,7 +1503,7 @@ export const Settings: React.FC = () => {
 
             const currentEnabled = settings.enabledResolvers && settings.enabledResolvers.length > 0
               ? settings.enabledResolvers
-              : ['embed'];
+              : ['telegram', 'embed'];
 
             const engineMeta: Record<StreamResolverType, { title: string; tag: string; desc: string; tagClass: string }> = {
               telegram: {
@@ -1830,7 +1830,7 @@ export const Settings: React.FC = () => {
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">
               <span className="text-[10px] text-sky-400 font-mono font-bold bg-sky-500/10 px-2 py-0.5 rounded border border-sky-400/20">
-                {`${settings.msmTimeout || settings.msm32Timeout || 90}s`}
+                {`${settings.msmTimeout || settings.msm32Timeout || 180}s`}
               </span>
               <ChevronRight className="w-4 h-4 text-gray-400" />
             </div>
@@ -1848,7 +1848,7 @@ export const Settings: React.FC = () => {
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">
               <span className="text-[10px] text-sky-400 font-mono font-bold bg-sky-500/10 px-2 py-0.5 rounded border border-sky-400/20">
-                {`${settings.msmBufferTimeout || settings.msm32BufferTimeout || 60}s`}
+                {`${settings.msmBufferTimeout || settings.msm32BufferTimeout || 90}s`}
               </span>
               <ChevronRight className="w-4 h-4 text-gray-400" />
             </div>
@@ -2452,12 +2452,12 @@ export const Settings: React.FC = () => {
           <div className="grid grid-cols-1 gap-2">
             {[
               { label: '60 Seconds', desc: '1.0 Minute • Fast timeout, quickly failover to fallback providers', val: 60 as const },
-              { label: '90 Seconds', desc: '1.5 Minutes • Balanced wait time for multi-page Telegram queries (Default)', val: 90 as const },
+              { label: '90 Seconds', desc: '1.5 Minutes • Balanced wait time for multi-page Telegram queries', val: 90 as const },
               { label: '120 Seconds', desc: '2.0 Minutes • Extended time for complex multi-episode series searching', val: 120 as const },
               { label: '150 Seconds', desc: '2.5 Minutes • Deep search across extensive page results and high-load bots', val: 150 as const },
-              { label: '180 Seconds', desc: '3.0 Minutes • Maximum patience for congested networks and large TV series', val: 180 as const },
+              { label: '180 Seconds (Default)', desc: '3.0 Minutes • Maximum patience for congested networks and large TV series', val: 180 as const },
             ].map((opt) => {
-              const isCurrent = (settings.msmTimeout || 90) === opt.val;
+              const isCurrent = (settings.msmTimeout || 180) === opt.val;
               return (
                 <button
                   key={opt.val}
@@ -2504,18 +2504,18 @@ export const Settings: React.FC = () => {
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-gray-300 block">Current Timeout:</span>
             <span className="text-xs text-sky-400 font-mono font-bold">
-              {`${settings.msmBufferTimeout || 60}s`}
+              {`${settings.msmBufferTimeout || 90}s`}
             </span>
           </div>
 
           <div className="grid grid-cols-1 gap-2">
             {[
               { label: '30 Seconds', desc: 'Fast timeout • Quickly flag slow or stalled stream chunks', val: 30 as const },
-              { label: '60 Seconds (Default)', desc: '1.0 Minute • Recommended balance for buffer startup and seeking', val: 60 as const },
-              { label: '90 Seconds', desc: '1.5 Minutes • Extended patience for high-bitrate 1080p streams', val: 90 as const },
+              { label: '60 Seconds', desc: '1.0 Minute • Recommended balance for buffer startup and seeking', val: 60 as const },
+              { label: '90 Seconds (Default)', desc: '1.5 Minutes • Extended patience for high-bitrate 1080p streams', val: 90 as const },
               { label: '120 Seconds', desc: '2.0 Minutes • Deep patience for congested or throttled networks', val: 120 as const },
             ].map((opt) => {
-              const isCurrent = (settings.msmBufferTimeout || 60) === opt.val;
+              const isCurrent = (settings.msmBufferTimeout || 90) === opt.val;
               return (
                 <button
                   key={opt.val}

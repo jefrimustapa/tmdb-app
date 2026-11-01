@@ -54,7 +54,7 @@ export const Watch: React.FC = () => {
   const tmdbId = parseInt(id || '0', 10);
   const mediaType = (type === 'tv' ? 'tv' : 'movie') as 'movie' | 'tv';
 
-  const [enabledResolvers, setEnabledResolvers] = useState<StreamResolverType[]>(['embed']);
+  const [enabledResolvers, setEnabledResolvers] = useState<StreamResolverType[]>(['telegram', 'embed']);
 
   const isKorean = useMemo(() => isKoreanMedia(details), [details]);
   const isAnime = useMemo(() => isAnimeMedia(details), [details]);
@@ -215,7 +215,7 @@ export const Watch: React.FC = () => {
         if (fetchedSeason) setSeasonDetails(fetchedSeason);
 
         if (s) {
-          const activeResolvers = s.enabledResolvers && s.enabledResolvers.length > 0 ? s.enabledResolvers : ['embed'];
+          const activeResolvers = s.enabledResolvers && s.enabledResolvers.length > 0 ? s.enabledResolvers : ['telegram', 'embed'];
           const hasEmbed = activeResolvers.includes('embed');
           const hasTelegram = activeResolvers.includes('telegram');
 
