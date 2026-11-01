@@ -33,7 +33,9 @@ export function isTransientTelegramError(err) {
     msg.includes('socket hang up') ||
     msg.includes('ECONNRESET') ||
     msg.includes('hanging states') ||
-    msg.includes('WebSocket connection failed')
+    msg.includes('WebSocket connection failed') ||
+    msg.includes('invalid new nonce hash') ||
+    msg.includes('SecurityError')
   );
 }
 
@@ -259,7 +261,7 @@ let client = new TelegramClient(new StringSession(session), apiId, apiHash, {
 });
 try { client.setLogLevel('error'); } catch {}
 
-function patchExportedSenderProtection(c) {
+export function patchExportedSenderProtection(c) {
   if (!c || typeof c._borrowExportedSender !== 'function') return;
   const originalBorrow = c._borrowExportedSender.bind(c);
   const reconnectStats = new Map(); // dcId -> { count: number, lastAttempt: number }
@@ -304,6 +306,15 @@ function patchExportedSenderProtection(c) {
       stats.count = 0;
       return sender;
     } catch (err) {
+      const isSecurityErr = err?.name === 'SecurityError' || String(err?.message || '').includes('invalid new nonce hash');
+      if (isSecurityErr) {
+        console.warn(`[TG DC GUARD] Nonce hash security glitch on DC ${dcId}. Purging stale authKey and resetting sender...`);
+        try {
+          if (typeof this._cleanupExportedSender === 'function') {
+            await this._cleanupExportedSender(dcId);
+          }
+        } catch {}
+      }
       if (existingSender) {
         try { await existingSender.disconnect().catch(() => {}); } catch {}
       }
@@ -5033,9 +5044,25 @@ async function streamTelegramPipelined(client, targetDoc, startByte, endByte, re
 
       // Automatically recover from dropped/uninitialized secondary DC connections.
       // Also catches 'Not connected' (GramJS _recvLoop race during internal sender reconnect)
-      // which occurs when the router NAT table silently kills idle DC TCP connections after ~30s.
-      if (msg.includes('CONNECTION_NOT_INITED') || msg.includes('disconnected') || msg.includes('Not connected')) {
-        console.warn(`[STREAM RECONNECT] Sender connection on DC ${dcId} invalid (${err.errorMessage || err.message}). Re-initializing...`);
+      // and 'SecurityError: Step 3 invalid new nonce hash' during DH auth negotiation.
+      if (
+        msg.includes('CONNECTION_NOT_INITED') ||
+        msg.includes('disconnected') ||
+        msg.includes('Not connected') ||
+        msg.includes('invalid new nonce hash') ||
+        msg.includes('SecurityError')
+      ) {
+        const isNonceErr = msg.includes('invalid new nonce hash') || msg.includes('SecurityError');
+        if (isNonceErr) {
+          console.warn(`[STREAM RECONNECT] DH nonce verification glitch on DC ${dcId}. Purging auth key and re-acquiring fresh sender...`);
+          try {
+            if (typeof client._cleanupExportedSender === 'function') {
+              await client._cleanupExportedSender(dcId);
+            }
+          } catch {}
+        } else {
+          console.warn(`[STREAM RECONNECT] Sender connection on DC ${dcId} invalid (${err.errorMessage || err.message}). Re-initializing...`);
+        }
         if (aborted) return null;
 
         let retryDelay = 500;
@@ -5053,6 +5080,13 @@ async function streamTelegramPipelined(client, targetDoc, startByte, endByte, re
             return bytes;
           } catch (e2) {
             const e2msg = `${e2.errorMessage || ''} ${e2.message || ''}`;
+            if (e2msg.includes('invalid new nonce hash') || e2msg.includes('SecurityError')) {
+              try {
+                if (typeof client._cleanupExportedSender === 'function') {
+                  await client._cleanupExportedSender(dcId);
+                }
+              } catch {}
+            }
             console.warn(`[STREAM RECONNECT] Re-init attempt ${reconnAttempt + 1}/3 failed (${e2.message}). Retrying in ${retryDelay}ms...`);
             if (reconnAttempt < 2) {
               await new Promise(r => setTimeout(r, retryDelay));

@@ -39,6 +39,7 @@ import {
   isTransientTelegramError,
   QuietLogger,
   attachClientErrorHandler,
+  patchExportedSenderProtection,
 } from './index.js';
 import { rotateLogFile, resetLogSizeCache, MAX_LOG_BYTES } from './logger.js';
 import {
@@ -2466,6 +2467,70 @@ it('attachClientErrorHandler configures client.onError to suppress TIMEOUT and l
   } finally {
     console.error = origConsoleError;
   }
+});
+
+
+console.log('\n34. MTProto SecurityError: Step 3 invalid new nonce hash & DC Sender Purge (#315)');
+
+it('isTransientTelegramError recognizes SecurityError and invalid new nonce hash as transient errors', () => {
+  const secErr = new Error('Step 3 invalid new nonce hash');
+  secErr.name = 'SecurityError';
+  assert.strictEqual(isTransientTelegramError(secErr), true, 'SecurityError instance must be recognized as transient');
+  assert.strictEqual(isTransientTelegramError(new Error('SecurityError: Step 3 invalid new nonce hash')), true);
+  assert.strictEqual(isTransientTelegramError('SecurityError: Step 3 invalid new nonce hash'), true);
+  assert.strictEqual(isTransientTelegramError('[TG CLIENT ERROR] SecurityError: Step 3 invalid new nonce hash'), true);
+});
+
+it('QuietLogger suppresses SecurityError nonce hash glitches from console error output', () => {
+  const logger = new QuietLogger('error');
+  const proto = Object.getPrototypeOf(QuietLogger.prototype);
+  const origProtoLog = proto._log;
+  let superCalled = false;
+  proto._log = function(level, msg, color) {
+    superCalled = true;
+  };
+
+  try {
+    const secErr = new Error('Step 3 invalid new nonce hash');
+    secErr.name = 'SecurityError';
+    logger._log('error', secErr, 'red');
+    assert.strictEqual(superCalled, false, 'SecurityError must be suppressed by QuietLogger');
+
+    superCalled = false;
+    logger._log('error', 'SecurityError: Step 3 invalid new nonce hash', 'red');
+    assert.strictEqual(superCalled, false, 'SecurityError string must be suppressed by QuietLogger');
+  } finally {
+    proto._log = origProtoLog;
+  }
+});
+
+it('patchExportedSenderProtection purges DC auth key and sender promise upon SecurityError', async () => {
+  let cleanedDcId = null;
+  const dummyClient = {
+    _exportedSenderPromises: new Map([[2, Promise.resolve({ isConnected: () => true })]]),
+    _cleanupExportedSender: async (dcId) => {
+      cleanedDcId = dcId;
+      dummyClient._exportedSenderPromises.delete(dcId);
+    },
+    _borrowExportedSender: async (dcId) => {
+      const err = new Error('Step 3 invalid new nonce hash');
+      err.name = 'SecurityError';
+      throw err;
+    }
+  };
+
+  patchExportedSenderProtection(dummyClient);
+
+  let caughtErr = null;
+  try {
+    await dummyClient._borrowExportedSender(2, false);
+  } catch (err) {
+    caughtErr = err;
+  }
+
+  assert.ok(caughtErr, 'Expected borrow to reject with SecurityError');
+  assert.strictEqual(cleanedDcId, 2, 'Must have called _cleanupExportedSender for DC 2');
+  assert.strictEqual(dummyClient._exportedSenderPromises.has(2), false, 'Must have deleted sender promise for DC 2');
 });
 
 // Clean up temporary test files (pending debounced saves are flushed first by waiting them out)
