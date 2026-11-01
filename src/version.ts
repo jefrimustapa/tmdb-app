@@ -2,12 +2,12 @@
 export type BuildChannel = 'dev' | 'nightly' | 'rc' | 'stable' | 'ci';
 
 export const APP_VERSION = '1.2.0';
-export const APP_BUILD_NUMBER = '20261101-1325';
-export const APP_VERSION_FULL = '1.2.0-dev.jefri.feat-issue-319-reloc.20261101-1325';
+export const APP_BUILD_NUMBER = '20261101-1556';
+export const APP_VERSION_FULL = '1.2.0-dev.jefri.fix-issue-327-resolv.20261101-1556';
 export const APP_BUILD_CHANNEL: BuildChannel = 'dev';
 export const APP_BUILD_DEV = 'jefri';
-export const APP_BRANCH = 'feat-issue-319-reloc';
-export const APP_CHANGELOG = `* feat(web): relocate web client base to root and retire github pages deploy (refs #319)
+export const APP_BRANCH = 'fix-issue-327-resolv';
+export const APP_CHANGELOG = `* feat(web): relocate web client to self-hosted container & retire GitHub Pages (#326)
 * fix(tg-streamer): make settings dropdowns and card controls responsive on small screens (#325)
 * fix(app): enforce tgstrm.julietmike.net across runtime, settings and db (#323)
 * fix(tgstrm): recover from MTProto SecurityError Step 3 invalid new nonce hash in exported sender (#316)
