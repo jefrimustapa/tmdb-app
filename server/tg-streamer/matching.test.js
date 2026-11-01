@@ -36,6 +36,9 @@ import {
   getNodeRamCapOptions,
   getIdlePurgeThresholdMb,
   getCanonicalRedirectUrl,
+  isTransientTelegramError,
+  QuietLogger,
+  attachClientErrorHandler,
 } from './index.js';
 import { rotateLogFile, resetLogSizeCache, MAX_LOG_BYTES } from './logger.js';
 import {
@@ -2377,6 +2380,92 @@ it('verifies that root and alias web routes are registered in Express router', (
   assert.ok(routes.includes('/tg/streams'), 'Legacy /tg/streams must be registered');
   assert.ok(routes.includes('/tg/logs'), 'Legacy /tg/logs must be registered');
   assert.ok(routes.includes('/tg/auth'), 'Legacy /tg/auth must be registered');
+});
+
+
+console.log('\n33. GramJS MTProto Updates Loop TIMEOUT & Error Suppression (#313)');
+
+it('isTransientTelegramError recognizes transient timeout and socket errors for both Error objects and strings', () => {
+  assert.strictEqual(isTransientTelegramError(new Error('TIMEOUT')), true);
+  assert.strictEqual(isTransientTelegramError(new Error('ETIMEDOUT')), true);
+  assert.strictEqual(isTransientTelegramError(new Error('socket hang up')), true);
+  assert.strictEqual(isTransientTelegramError(new Error('ECONNRESET')), true);
+  assert.strictEqual(isTransientTelegramError(new Error('Connection closed')), true);
+  assert.strictEqual(isTransientTelegramError(new Error('Not connected')), true);
+  assert.strictEqual(isTransientTelegramError(new Error('hanging states')), true);
+  assert.strictEqual(isTransientTelegramError(new Error('WebSocket connection failed')), true);
+
+  // String forms
+  assert.strictEqual(isTransientTelegramError('Error: TIMEOUT'), true);
+  assert.strictEqual(isTransientTelegramError('[TG CLIENT ERROR] Error: TIMEOUT'), true);
+  assert.strictEqual(isTransientTelegramError('ECONNRESET'), true);
+
+  // Real/Fatal errors must NOT be suppressed
+  assert.strictEqual(isTransientTelegramError(new Error('AUTH_KEY_UNREGISTERED')), false);
+  assert.strictEqual(isTransientTelegramError(new Error('FLOOD_WAIT_60')), false);
+  assert.strictEqual(isTransientTelegramError(new Error('Cannot read property of undefined')), false);
+  assert.strictEqual(isTransientTelegramError(null), false);
+  assert.strictEqual(isTransientTelegramError(undefined), false);
+});
+
+it('QuietLogger suppresses transient Error instances and strings from console output', () => {
+  const logger = new QuietLogger('error');
+  const proto = Object.getPrototypeOf(QuietLogger.prototype);
+  const origProtoLog = proto._log;
+  let superCalled = false;
+  proto._log = function(level, msg, color) {
+    superCalled = true;
+  };
+
+  try {
+    superCalled = false;
+    logger._log('error', new Error('TIMEOUT'), 'red');
+    assert.strictEqual(superCalled, false, 'Error("TIMEOUT") must be suppressed');
+
+    superCalled = false;
+    logger._log('error', new Error('Connection closed'), 'red');
+    assert.strictEqual(superCalled, false, 'Error("Connection closed") must be suppressed');
+
+    superCalled = false;
+    logger._log('error', 'WebSocket connection failed', 'red');
+    assert.strictEqual(superCalled, false, 'String "WebSocket connection failed" must be suppressed');
+
+    superCalled = false;
+    logger._log('error', new Error('CRITICAL_DATABASE_CRASH'), 'red');
+    assert.strictEqual(superCalled, true, 'Non-transient errors must pass to super._log()');
+  } finally {
+    proto._log = origProtoLog;
+  }
+});
+
+it('attachClientErrorHandler configures client.onError to suppress TIMEOUT and log unexpected errors', () => {
+  const dummyClient = {};
+  attachClientErrorHandler(dummyClient);
+  assert.strictEqual(typeof dummyClient.onError, 'function', 'client.onError must be assigned');
+
+  const origConsoleError = console.error;
+  let loggedErrors = [];
+  console.error = (...args) => {
+    loggedErrors.push(args);
+  };
+
+  try {
+    // Transient TIMEOUT error should be suppressed
+    dummyClient.onError(new Error('TIMEOUT'));
+    assert.strictEqual(loggedErrors.length, 0, 'new Error("TIMEOUT") must not be logged to console.error');
+
+    dummyClient.onError(new Error('ETIMEDOUT'));
+    assert.strictEqual(loggedErrors.length, 0, 'new Error("ETIMEDOUT") must not be logged to console.error');
+
+    // Real unexpected error should be logged
+    const fatalErr = new Error('SESSION_REVOKED_FATAL');
+    dummyClient.onError(fatalErr);
+    assert.strictEqual(loggedErrors.length, 1, 'Fatal error must be logged to console.error');
+    assert.strictEqual(loggedErrors[0][0], '[TG CLIENT ERROR]');
+    assert.strictEqual(loggedErrors[0][1], fatalErr);
+  } finally {
+    console.error = origConsoleError;
+  }
 });
 
 // Clean up temporary test files (pending debounced saves are flushed first by waiting them out)

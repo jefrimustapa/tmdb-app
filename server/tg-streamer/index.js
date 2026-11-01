@@ -20,15 +20,26 @@ import { spawn, execSync } from 'child_process';
 import { db } from './db.js';
 import { createGeoBlockMiddleware, isMalaysiaIp, isPrivateIp, checkGeoAccess } from './geoblock.js';
 
-class QuietLogger extends Logger {
+export function isTransientTelegramError(err) {
+  if (!err) return false;
+  const msg = typeof err === 'string'
+    ? err
+    : (err?.message || err?.errorMessage || String(err || ''));
+  return (
+    msg.includes('TIMEOUT') ||
+    msg.includes('ETIMEDOUT') ||
+    msg.includes('Not connected') ||
+    msg.includes('Connection closed') ||
+    msg.includes('socket hang up') ||
+    msg.includes('ECONNRESET') ||
+    msg.includes('hanging states') ||
+    msg.includes('WebSocket connection failed')
+  );
+}
+
+export class QuietLogger extends Logger {
   _log(level, message, color) {
-    if (
-      typeof message === 'string' &&
-      (message.includes('WebSocket connection failed') ||
-       message.includes('Connection closed') ||
-       message.includes('Not connected') ||
-       message.includes('hanging states'))
-    ) {
+    if (isTransientTelegramError(message)) {
       return;
     }
     super._log(level, message, color);
@@ -302,18 +313,10 @@ function patchExportedSenderProtection(c) {
   };
 }
 
-function attachClientErrorHandler(c) {
+export function attachClientErrorHandler(c) {
   if (!c) return;
   c.onError = (err) => {
-    const msg = err?.message || String(err || '');
-    if (
-      msg.includes('Not connected') ||
-      msg.includes('Connection closed') ||
-      msg.includes('socket hang up') ||
-      msg.includes('ECONNRESET') ||
-      msg.includes('ETIMEDOUT') ||
-      msg.includes('hanging states')
-    ) {
+    if (isTransientTelegramError(err)) {
       return;
     }
     console.error('[TG CLIENT ERROR]', err);
