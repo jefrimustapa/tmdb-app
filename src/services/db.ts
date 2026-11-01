@@ -75,22 +75,23 @@ export const DEFAULT_SETTINGS: UserSettings = {
   filterAdult: true,
   filterUnreleased: true,
   maturityLevel: 'all',
-  streamResolver: 'embed',
-  enabledResolvers: ['embed'],
+  streamResolver: 'telegram',
+  enabledResolvers: ['telegram', 'embed'],
   enginePriority: ['telegram', 'embed'],
   enabledTelegramProviders: ['telegram-msm'],
   telegramProviderCountries: { 'telegram-msm': ['MY', 'ID', 'SG'] },
   tgStreamerUrl: DEFAULT_TGSTRM_URL,
   tgChunkSize: 524288,
   tgMaxQuality: '1080',
-  tgTimeout: 90,
-  tgBufferTimeout: 60,
+  tgTimeout: 180,
+  tgBufferTimeout: 90,
   tgActiveResolver: 'msm',
   msmGetterUrl: DEFAULT_TGSTRM_URL,
   msmChunkSize: 524288,
   msmMaxQuality: '1080',
-  msmTimeout: 90,
-  msmBufferTimeout: 60,
+  msmTimeout: 180,
+  msmBufferTimeout: 90,
+  tgDefaultEnforced_v1: true,
   streamHeaderTimeout: 5,
   streamResolverTimeout: 60,
   streamResolverRetries: 1,
@@ -360,10 +361,10 @@ export const dbService = {
     if (settings.msmBufferTimeout === undefined) {
       settings.msmBufferTimeout = (settings.msm32BufferTimeout !== undefined && validBufferTimeouts.includes(settings.msm32BufferTimeout))
         ? settings.msm32BufferTimeout
-        : 60;
+        : 90;
       await db.settings.put(settings);
     } else if (!validBufferTimeouts.includes(settings.msmBufferTimeout)) {
-      settings.msmBufferTimeout = 60;
+      settings.msmBufferTimeout = 90;
       await db.settings.put(settings);
     }
     if (settings.msmGetterUrl === undefined) {
@@ -379,7 +380,7 @@ export const dbService = {
       await db.settings.put(settings);
     }
     if (settings.msmTimeout === undefined) {
-      settings.msmTimeout = settings.msm32Timeout || 90;
+      settings.msmTimeout = settings.msm32Timeout || 180;
       await db.settings.put(settings);
     }
     if (settings.tgStreamerUrl === undefined) {
@@ -395,11 +396,11 @@ export const dbService = {
       await db.settings.put(settings);
     }
     if (settings.tgTimeout === undefined) {
-      settings.tgTimeout = settings.msmTimeout || settings.msm32Timeout || 90;
+      settings.tgTimeout = settings.msmTimeout || settings.msm32Timeout || 180;
       await db.settings.put(settings);
     }
     if (settings.tgBufferTimeout === undefined) {
-      settings.tgBufferTimeout = settings.msmBufferTimeout || settings.msm32BufferTimeout || 60;
+      settings.tgBufferTimeout = settings.msmBufferTimeout || settings.msm32BufferTimeout || 90;
       await db.settings.put(settings);
     }
     if (settings.tgActiveResolver === undefined) {
@@ -457,12 +458,36 @@ export const dbService = {
     delete (settings as any).directStreamApiUrl;
     delete (settings as any).torboxApiKey;
 
+    // Enforce TGStrm enabled by default and upgrade default timeouts (#328)
+    if (!settings.tgDefaultEnforced_v1) {
+      settings.tgDefaultEnforced_v1 = true;
+      if (settings.enabledResolvers && Array.isArray(settings.enabledResolvers)) {
+        if (!settings.enabledResolvers.includes('telegram')) {
+          settings.enabledResolvers.unshift('telegram');
+        }
+      } else {
+        settings.enabledResolvers = ['telegram', 'embed'];
+      }
+      if (!settings.streamResolver || settings.streamResolver === 'embed') {
+        settings.streamResolver = 'telegram';
+      }
+      if (settings.tgTimeout === 90 || settings.msmTimeout === 90) {
+        settings.tgTimeout = 180;
+        settings.msmTimeout = 180;
+      }
+      if (settings.tgBufferTimeout === 60 || settings.msmBufferTimeout === 60) {
+        settings.tgBufferTimeout = 90;
+        settings.msmBufferTimeout = 90;
+      }
+      await db.settings.put(settings);
+    }
+
     const validResolvers: StreamResolverType[] = ['telegram', 'embed'];
     if (settings.enabledResolvers && Array.isArray(settings.enabledResolvers)) {
       const filtered = settings.enabledResolvers.filter(r => validResolvers.includes(r as any)) as StreamResolverType[];
-      settings.enabledResolvers = filtered.length > 0 ? filtered : ['embed'];
+      settings.enabledResolvers = filtered.length > 0 ? filtered : ['telegram', 'embed'];
     } else {
-      settings.enabledResolvers = ['embed'];
+      settings.enabledResolvers = ['telegram', 'embed'];
     }
     if (settings.enginePriority && Array.isArray(settings.enginePriority)) {
       const filtered = settings.enginePriority.filter(r => validResolvers.includes(r as any)) as StreamResolverType[];

@@ -112,7 +112,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const [topAnimeProviders, setTopAnimeProviders] = useState<string[]>(['megaplay-anime', 'cinesrc', 'moviesapi']);
   const [topAseanProviders, setTopAseanProviders] = useState<string[]>(['pencurimovie-my', 'vidlink', '111movies']);
   const [topKoreanProviders, setTopKoreanProviders] = useState<string[]>(['kisskh-kdrama', 'cinesrc', 'moviesapi']);
-  const [enabledResolvers, setEnabledResolvers] = useState<StreamResolverType[]>(['embed']);
+  const [enabledResolvers, setEnabledResolvers] = useState<StreamResolverType[]>(['telegram', 'embed']);
   const [enabledTelegramProviders, setEnabledTelegramProviders] = useState<string[]>(['telegram-msm']);
   const [telegramProviderCountries, setTelegramProviderCountries] = useState<Record<string, OriginCountryCode[]> | undefined>(initialTelegramCountries);
 
@@ -169,9 +169,9 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const [tickerIntervalSec, setTickerIntervalSec] = useState(5);
   const [streamResolverTimeout, setStreamResolverTimeout] = useState(60);
   const streamResolverTimeoutRef = useRef(60);
-  const [msmTimeout, setMsmTimeout] = useState(90);
-  const msmTimeoutRef = useRef(90);
-  const [msmBufferTimeout, setMsmBufferTimeout] = useState(60);
+  const [msmTimeout, setMsmTimeout] = useState(180);
+  const msmTimeoutRef = useRef(180);
+  const [msmBufferTimeout, setMsmBufferTimeout] = useState(90);
   const [streamResolverRetries, setStreamResolverRetries] = useState(1);
   const streamResolverRetriesRef = useRef(1);
 
@@ -454,9 +454,9 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         try {
           (window as any).AndroidBridge?.setAdShieldEnabled?.(s.adBlockShield);
         } catch {}
-        const activeResolver = s.streamResolver || 'embed';
+        const activeResolver = s.streamResolver || 'telegram';
         setStreamResolver(activeResolver);
-        setEnabledResolvers(s.enabledResolvers && s.enabledResolvers.length > 0 ? s.enabledResolvers : ['embed']);
+        setEnabledResolvers(s.enabledResolvers && s.enabledResolvers.length > 0 ? s.enabledResolvers : ['telegram', 'embed']);
         if (s.enabledTelegramProviders && s.enabledTelegramProviders.length > 0) {
           setEnabledTelegramProviders(s.enabledTelegramProviders);
         }
@@ -2734,7 +2734,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           totalDurationSec={((episodeRuntimeMinutes || details?.runtime || 0) * 60)}
           isFullscreen={isFullscreen}
           onToggleFullscreen={handleToggleFullscreen}
-          timeoutSeconds={msmBufferTimeout || 60}
+          timeoutSeconds={msmBufferTimeout || 90}
           onProgress={(current, dur, isPaused) => {
             if (dur > 0) durationRef.current = dur;
             currentTimeRef.current = current;

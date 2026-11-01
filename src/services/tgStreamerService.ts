@@ -254,7 +254,7 @@ class TgStreamerService {
     if (signal?.aborted) return null;
 
     const settings = await dbService.getSettings();
-    const timeoutSeconds = settings?.tgTimeout || settings?.msmTimeout || settings?.msm32Timeout || 90;
+    const timeoutSeconds = settings?.tgTimeout || settings?.msmTimeout || settings?.msm32Timeout || 180;
 
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutSeconds * 1000);

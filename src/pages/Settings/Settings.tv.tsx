@@ -1529,7 +1529,7 @@ export const Settings: React.FC = () => {
                   {(() => {
                     const enabled = settings.enabledResolvers && settings.enabledResolvers.length > 0
                       ? settings.enabledResolvers
-                      : ['embed'];
+                      : ['telegram', 'embed'];
                     const count = enabled.length;
 
                     return (
@@ -3241,7 +3241,7 @@ export const Settings: React.FC = () => {
               {(() => {
                 const currentEnabled = settings.enabledResolvers && settings.enabledResolvers.length > 0
                   ? settings.enabledResolvers
-                  : ['embed'];
+                  : ['telegram', 'embed'];
                 const isTelegramEnabled = currentEnabled.includes('telegram');
                 const isEmbedEnabled = currentEnabled.includes('embed');
 
@@ -3437,7 +3437,7 @@ export const Settings: React.FC = () => {
 
                 const currentEnabled = settings.enabledResolvers && settings.enabledResolvers.length > 0
                   ? settings.enabledResolvers
-                  : ['embed'];
+                  : ['telegram', 'embed'];
 
                 const engineMeta: Record<StreamResolverType, { title: string; tag: string; desc: string; tagClass: string }> = {
                   telegram: {
@@ -3638,7 +3638,7 @@ export const Settings: React.FC = () => {
               {(() => {
                 const currentEnabled = settings.enabledResolvers && settings.enabledResolvers.length > 0
                   ? settings.enabledResolvers
-                  : ['embed'];
+                  : ['telegram', 'embed'];
                 const isTelegramEnabled = currentEnabled.includes('telegram');
                 const enabledTg = settings.enabledTelegramProviders || ['telegram-msm'];
                 const isMsmEnabled = enabledTg.includes('telegram-msm') || enabledTg.includes('telegram-msm32');
@@ -4050,12 +4050,12 @@ export const Settings: React.FC = () => {
               {(() => {
                 const timeoutOptions = [
                   { val: 60 as const, label: '60 Seconds (Fast)', desc: '1.0 Minute • Quickly failover to embed providers if Telegram is unresponsive.' },
-                  { val: 90 as const, label: '90 Seconds (Default)', desc: '1.5 Minutes • Recommended for multi-page Telegram queries and bot ad-gate.' },
+                  { val: 90 as const, label: '90 Seconds', desc: '1.5 Minutes • Recommended for multi-page Telegram queries and bot ad-gate.' },
                   { val: 120 as const, label: '120 Seconds (Extended)', desc: '2.0 Minutes • Extended patience for complex series episode searching.' },
                   { val: 150 as const, label: '150 Seconds (Deep)', desc: '2.5 Minutes • Deep search across multiple result pages on high-load bots.' },
-                  { val: 180 as const, label: '180 Seconds (Maximum)', desc: '3.0 Minutes • Maximum patience for congested networks and slow downloads.' },
+                  { val: 180 as const, label: '180 Seconds (Default)', desc: '3.0 Minutes • Maximum patience for congested networks and slow downloads.' },
                 ];
-                const currentVal = settings.msmTimeout || settings.msm32Timeout || 90;
+                const currentVal = settings.msmTimeout || settings.msm32Timeout || 180;
 
                 return timeoutOptions.map((opt, idx) => {
                   const isSelected = currentVal === opt.val;
@@ -4162,11 +4162,11 @@ export const Settings: React.FC = () => {
               {(() => {
                 const timeoutOptions = [
                   { val: 30 as const, label: '30 Seconds (Fast)', desc: 'Fast timeout • Quickly flag slow or stalled stream chunks.' },
-                  { val: 60 as const, label: '60 Seconds (Default)', desc: '1.0 Minute • Recommended balance for buffer startup and seeking.' },
-                  { val: 90 as const, label: '90 Seconds (Extended)', desc: '1.5 Minutes • Extended patience for high-bitrate 1080p streams.' },
+                  { val: 60 as const, label: '60 Seconds', desc: '1.0 Minute • Recommended balance for buffer startup and seeking.' },
+                  { val: 90 as const, label: '90 Seconds (Default)', desc: '1.5 Minutes • Extended patience for high-bitrate 1080p streams.' },
                   { val: 120 as const, label: '120 Seconds (Maximum)', desc: '2.0 Minutes • Deep patience for congested or throttled networks.' },
                 ];
-                const currentVal = settings.msmBufferTimeout || settings.msm32BufferTimeout || 60;
+                const currentVal = settings.msmBufferTimeout || settings.msm32BufferTimeout || 90;
 
                 return timeoutOptions.map((opt, idx) => {
                   const isSelected = currentVal === opt.val;
@@ -4619,7 +4619,7 @@ export const Settings: React.FC = () => {
                         className="px-3 py-1.5 rounded-lg border text-xs font-bold transition-all tv-focus-target flex items-center gap-1.5 border-hbo-border bg-hbo-dark/80 hover:bg-hbo-hover text-white flex-shrink-0"
                       >
                         <span className="text-sky-400 font-mono">
-                          {`${settings.msmTimeout || settings.msm32Timeout || 90}s`}
+                          {`${settings.msmTimeout || settings.msm32Timeout || 180}s`}
                         </span>
                         <ChevronRight className="w-3.5 h-3.5 text-gray-400" />
                       </button>
@@ -4653,7 +4653,7 @@ export const Settings: React.FC = () => {
                         className="px-3 py-1.5 rounded-lg border text-xs font-bold transition-all tv-focus-target flex items-center gap-1.5 border-hbo-border bg-hbo-dark/80 hover:bg-hbo-hover text-white flex-shrink-0"
                       >
                         <span className="text-sky-400 font-mono">
-                          {`${settings.msmBufferTimeout || settings.msm32BufferTimeout || 60}s`}
+                          {`${settings.msmBufferTimeout || settings.msm32BufferTimeout || 90}s`}
                         </span>
                         <ChevronRight className="w-3.5 h-3.5 text-gray-400" />
                       </button>
@@ -4709,7 +4709,7 @@ export const Settings: React.FC = () => {
               {(() => {
                 const currentEnabled = settings.enabledResolvers && settings.enabledResolvers.length > 0
                   ? settings.enabledResolvers
-                  : ['embed'];
+                  : ['telegram', 'embed'];
                 const isEmbedEnabled = currentEnabled.includes('embed');
 
                 return (
