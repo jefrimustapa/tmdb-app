@@ -358,17 +358,21 @@ export function extractEpisodeInfo(text) {
   const s = String(text);
 
   // 1. Episode range: Ep 01-16, E01-E10, Episod 1 - 20
-  const rangeMatch = s.match(/\b(?:s\d{1,2}\s*)?(?:e|ep|episod|episode)\.?\s*0*(\d{1,4})\s*(?:-|–|—|~|to)\s*(?:e|ep|episod|episode)?\.?\s*0*(\d{1,4})(?!\d)\b/i);
+  const rangeMatch = s.match(/\b(?:s\d{1,2}\s*)?(?:e|ep|episod|episode)\.?\s*0*(\d{1,4})\s*(?:-|–|—|~|to)\s*(?:e|ep|episod|episode)?\.?\s*0*(\d{1,4})(?!\d)(?:\b|ends?|akhir|tamat|final)/i);
   if (rangeMatch) {
     const start = parseInt(rangeMatch[1], 10);
     const end = parseInt(rangeMatch[2], 10);
     return { isRange: true, start, end, episode: start };
   }
 
-  // 2. Standard episode tags: S01E16, E16, Ep 16, Episod 16, Episode 16, Ep. 16, S1 EP 16
-  const stdMatch = s.match(/\b(?:s\d{1,2}\s*)?(?:e|ep|episod|episode)\.?\s*0*(\d{1,4})(?!\d)\b/i);
+  // 2. Standard episode tags: S01E16, E16, Ep 16, Episod 16, Episode 16, Ep. 16, S1 EP 16, EP10ends, EP10Credit
+  const stdMatch = s.match(/\b(?:s\d{1,2}\s*)?(?:e|ep|episod|episode)\.?\s*0*(\d{1,4})(?!\d)(?:\b|ends?|akhir|tamat|final|finale|credit|credits|special|sp|raw|v\d+|[a-z]?\b)/i);
   if (stdMatch) {
-    return { isRange: false, episode: parseInt(stdMatch[1], 10) };
+    const num = parseInt(stdMatch[1], 10);
+    // Ignore resolution numbers like 360, 480, 540, 576, 720, 1080
+    if (![360, 480, 540, 576, 720, 1080, 2160].includes(num)) {
+      return { isRange: false, episode: num };
+    }
   }
 
   // 3. Isolated bracketed or parenthesized number: [ 01 ], [ 16 ], ( 01 ), ( 16 )

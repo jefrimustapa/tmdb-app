@@ -121,6 +121,23 @@ it('detects episode ranges and batches', () => {
   assert.ok(range && range.isRange);
   assert.strictEqual(range.start, 1);
   assert.strictEqual(range.end, 16);
+  const rangeGlued = extractEpisodeInfo('Hantu Punya Boss Ep 01-16ends');
+  assert.ok(rangeGlued && rangeGlued.isRange);
+  assert.strictEqual(rangeGlued.start, 1);
+  assert.strictEqual(rangeGlued.end, 16);
+});
+
+it('extracts episode numbers with glued release suffixes without word boundaries (#327)', () => {
+  assert.strictEqual(extractEpisodeInfo('#FNP22 Ai Crush You (2025) EP10ends [Akhir] Malay.mp4')?.episode, 10);
+  assert.strictEqual(extractEpisodeInfo('Ai.Crush.You.2025.EP10ends.Akhir.Malay.mp4')?.episode, 10);
+  assert.strictEqual(extractEpisodeInfo('Ai.Crush.You.2025.EP10END.mp4')?.episode, 10);
+  assert.strictEqual(extractEpisodeInfo('Ai.Crush.You.2025.EP10Credit.MSM')?.episode, 10);
+  assert.strictEqual(extractEpisodeInfo('Ai.Crush.You.2025.EP10Akhir.mp4')?.episode, 10);
+  assert.strictEqual(extractEpisodeInfo('Ai.Crush.You.2025.EP10Tamat.mp4')?.episode, 10);
+  assert.strictEqual(extractEpisodeInfo('Ai.Crush.You.2025.EP10Final.mp4')?.episode, 10);
+  assert.strictEqual(extractEpisodeInfo('Drama.S01E01a.720p.mp4')?.episode, 1);
+  assert.strictEqual(extractEpisodeInfo('Show.EP01v2.mp4')?.episode, 1);
+  assert.strictEqual(extractEpisodeInfo('Show.EP1080p.mkv')?.episode, undefined);
 });
 
 console.log('\n2. Season Parsing (extractSeasonInfo)');
@@ -199,6 +216,19 @@ it('disqualifies Episode 10 when Episode 1 is searched', () => {
   const msg = { message: 'Hantu Punya Boss' };
   const score = scoreCandidateButton(btnEp10, msg, contextTvEp1);
   assert.strictEqual(score, -999, 'Ep 10 button must be hard disqualified (-999)');
+});
+
+it('hard-disqualifies EP10ends and EP10Credit when Episode 1 is searched and accepts EP1 (#327)', () => {
+  const contextTvEp1 = { isTv: true, title: 'Ai Crush You', year: '2025', sNum: 1, eNum: 1, targetQuality: 1080 };
+  const btnEp10Ends = { className: 'KeyboardButtonUrlAuth', url: 'https://t.me/msm/1', text: '🎞 Ai.Crush.You.2025.EP10ends.Akhir.Malay.mp4 341.19 MB' };
+  const btnEp10Credit = { className: 'KeyboardButtonUrlAuth', url: 'https://t.me/msm/2', text: '🎞 Ai.Crush.You.2025.EP10Credit.MSM 341.19 MB' };
+  const btnEp1 = { className: 'KeyboardButtonUrlAuth', url: 'https://t.me/msm/3', text: '🔥🎞 Ai.Crush.You.2025.EP1.mp4 341.48 MB' };
+  const msg = { message: '' };
+
+  assert.strictEqual(scoreCandidateButton(btnEp10Ends, msg, contextTvEp1), -999, 'EP10ends must be hard-disqualified (-999) when searching for Ep 1');
+  assert.strictEqual(scoreCandidateButton(btnEp10Credit, msg, contextTvEp1), -999, 'EP10Credit must be hard-disqualified (-999) when searching for Ep 1');
+  const scoreEp1 = scoreCandidateButton(btnEp1, msg, contextTvEp1);
+  assert.ok(scoreEp1 >= 300, `EP1 must receive a high accepted score, got ${scoreEp1}`);
 });
 
 it('awards high score for matching Episode 1 buttons (both KeyboardButtonUrlAuth and KeyboardButtonUrl)', () => {
