@@ -3092,12 +3092,12 @@ app.get(['/settings', '/setting', '/tg/settings', '/tg/setting', '/msm/settings'
 
         <div class="space-y-3 pt-1">
           <!-- SD <=480p -->
-          <div class="flex items-center justify-between gap-3 bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/80">
-            <div>
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/80">
+            <div class="min-w-0 flex-1">
               <div class="text-xs font-semibold text-white">SD (≤ 480p / 360p)</div>
               <div id="sdBufCalc" class="text-[11px] text-slate-400 font-mono">2 × 512 KB = 1.0 MB in-flight</div>
             </div>
-            <div class="flex items-center gap-1.5 bg-slate-900 border border-slate-700 rounded-lg p-1">
+            <div class="flex items-center gap-1.5 bg-slate-900 border border-slate-700 rounded-lg p-1 self-start sm:self-auto">
               <button type="button" onclick="adjustPipelineBuf('sd', -1)" class="w-6 h-6 flex items-center justify-center rounded bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white font-bold text-xs transition select-none">-</button>
               <input id="sdBufInput" type="number" step="1" min="1" max="16" value="2" oninput="updatePipelineLabels()" class="w-10 bg-transparent text-center text-xs font-mono font-semibold text-white focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
               <button type="button" onclick="adjustPipelineBuf('sd', 1)" class="w-6 h-6 flex items-center justify-center rounded bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white font-bold text-xs transition select-none">+</button>
@@ -3105,12 +3105,12 @@ app.get(['/settings', '/setting', '/tg/settings', '/tg/setting', '/msm/settings'
           </div>
 
           <!-- HD 720p -->
-          <div class="flex items-center justify-between gap-3 bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/80">
-            <div>
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/80">
+            <div class="min-w-0 flex-1">
               <div class="text-xs font-semibold text-white">HD 720p</div>
               <div id="720pBufCalc" class="text-[11px] text-slate-400 font-mono">4 × 512 KB = 2.0 MB in-flight</div>
             </div>
-            <div class="flex items-center gap-1.5 bg-slate-900 border border-slate-700 rounded-lg p-1">
+            <div class="flex items-center gap-1.5 bg-slate-900 border border-slate-700 rounded-lg p-1 self-start sm:self-auto">
               <button type="button" onclick="adjustPipelineBuf('720p', -1)" class="w-6 h-6 flex items-center justify-center rounded bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white font-bold text-xs transition select-none">-</button>
               <input id="720pBufInput" type="number" step="1" min="1" max="16" value="4" oninput="updatePipelineLabels()" class="w-10 bg-transparent text-center text-xs font-mono font-semibold text-white focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
               <button type="button" onclick="adjustPipelineBuf('720p', 1)" class="w-6 h-6 flex items-center justify-center rounded bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white font-bold text-xs transition select-none">+</button>
@@ -3118,12 +3118,12 @@ app.get(['/settings', '/setting', '/tg/settings', '/tg/setting', '/msm/settings'
           </div>
 
           <!-- FHD 1080p -->
-          <div class="flex items-center justify-between gap-3 bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/80">
-            <div>
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/80">
+            <div class="min-w-0 flex-1">
               <div class="text-xs font-semibold text-white">Full HD 1080p</div>
               <div id="1080pBufCalc" class="text-[11px] text-slate-400 font-mono">6 × 512 KB = 3.0 MB in-flight</div>
             </div>
-            <div class="flex items-center gap-1.5 bg-slate-900 border border-slate-700 rounded-lg p-1">
+            <div class="flex items-center gap-1.5 bg-slate-900 border border-slate-700 rounded-lg p-1 self-start sm:self-auto">
               <button type="button" onclick="adjustPipelineBuf('1080p', -1)" class="w-6 h-6 flex items-center justify-center rounded bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white font-bold text-xs transition select-none">-</button>
               <input id="1080pBufInput" type="number" step="1" min="1" max="16" value="6" oninput="updatePipelineLabels()" class="w-10 bg-transparent text-center text-xs font-mono font-semibold text-white focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
               <button type="button" onclick="adjustPipelineBuf('1080p', 1)" class="w-6 h-6 flex items-center justify-center rounded bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white font-bold text-xs transition select-none">+</button>
@@ -3131,22 +3131,22 @@ app.get(['/settings', '/setting', '/tg/settings', '/tg/setting', '/msm/settings'
           </div>
 
           <!-- 4K UHD -->
-          <div class="flex items-center justify-between gap-3 bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/80">
-            <div>
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/80">
+            <div class="min-w-0 flex-1">
               <div class="text-xs font-semibold text-white">4K UHD (2160p)</div>
               <div id="4kBufCalc" class="text-[11px] text-slate-400 font-mono">8 × 512 KB = 4.0 MB in-flight</div>
             </div>
-            <div class="flex items-center gap-1.5 bg-slate-900 border border-slate-700 rounded-lg p-1">
+            <div class="flex items-center gap-1.5 bg-slate-900 border border-slate-700 rounded-lg p-1 self-start sm:self-auto">
               <button type="button" onclick="adjustPipelineBuf('4k', -1)" class="w-6 h-6 flex items-center justify-center rounded bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white font-bold text-xs transition select-none">-</button>
               <input id="4kBufInput" type="number" step="1" min="1" max="16" value="8" oninput="updatePipelineLabels()" class="w-10 bg-transparent text-center text-xs font-mono font-semibold text-white focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
               <button type="button" onclick="adjustPipelineBuf('4k', 1)" class="w-6 h-6 flex items-center justify-center rounded bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white font-bold text-xs transition select-none">+</button>
             </div>
           </div>
 
-          <div class="flex items-center justify-between pt-2">
+          <div class="flex flex-wrap items-center justify-between gap-2 pt-2">
             <span id="savePipelineMsg" class="text-xs text-emerald-400 hidden">✓ Pipeline buffers saved & applied live!</span>
             <div class="flex-1"></div>
-            <button id="savePipelineBtn" onclick="savePipelineBuffers()" class="px-4 py-1.5 bg-sky-500 hover:bg-sky-400 text-slate-950 font-semibold text-xs rounded-xl transition">
+            <button id="savePipelineBtn" onclick="savePipelineBuffers()" class="w-full sm:w-auto px-4 py-1.5 bg-sky-500 hover:bg-sky-400 text-slate-950 font-semibold text-xs rounded-xl transition">
               Save Pipeline Buffers
             </button>
           </div>
@@ -3165,24 +3165,24 @@ app.get(['/settings', '/setting', '/tg/settings', '/tg/setting', '/msm/settings'
 
         <div class="space-y-3 pt-1">
           <!-- Overlap Prefetch Toggle -->
-          <div class="flex items-center justify-between gap-3 bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/80">
-            <div>
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/80">
+            <div class="min-w-0 flex-1">
               <div class="text-xs font-semibold text-white">Overlap Prefetch</div>
               <div class="text-[11px] text-slate-400">Starts the read-ahead window as soon as the first chunk arrives (before it is sent to the player)</div>
             </div>
-            <select id="prefetchSelect" class="bg-slate-900 border border-slate-700 text-xs text-white rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-sky-500">
+            <select id="prefetchSelect" class="w-full sm:w-auto bg-slate-900 border border-slate-700 text-xs text-white rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-sky-500">
               <option value="true" selected>Enabled (Fast Playback)</option>
               <option value="false">Disabled (After First Chunk Is Sent)</option>
             </select>
           </div>
 
           <!-- Node RAM Cap -->
-          <div class="flex items-center justify-between gap-3 bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/80">
-            <div>
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/80">
+            <div class="min-w-0 flex-1">
               <div class="text-xs font-semibold text-white">Node Process RAM Cap</div>
               <div id="nodeRamCapHint" class="text-[11px] text-slate-400">Ceiling for dashboard &amp; 40% GC idle purge threshold</div>
             </div>
-            <select id="nodeRamCapSelect" onchange="updateNodeRamCapLabel()" class="bg-slate-900 border border-slate-700 text-xs text-white rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-sky-500">
+            <select id="nodeRamCapSelect" onchange="updateNodeRamCapLabel()" class="w-full sm:w-auto bg-slate-900 border border-slate-700 text-xs text-white rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-sky-500">
               ${getNodeRamCapOptions().options.map(opt => {
                 const label = opt >= 1024 ? (opt / 1024) + ' GB (' + opt + ' MB)' : opt + ' MB';
                 const suffix = opt === 256 ? ' - Default' : (opt === 1024 ? ' - Recommended' : '');
@@ -3192,12 +3192,12 @@ app.get(['/settings', '/setting', '/tg/settings', '/tg/setting', '/msm/settings'
           </div>
 
           <!-- Router RAM Block Cache -->
-          <div class="flex items-center justify-between gap-3 bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/80">
-            <div>
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/80">
+            <div class="min-w-0 flex-1">
               <div class="text-xs font-semibold text-white">Router RAM Block Cache</div>
               <div id="ramCacheHint" class="text-[11px] text-slate-400">32 blocks (16 MB cap in Node memory)</div>
             </div>
-            <select id="ramCacheSelect" onchange="updateRamCacheLabel()" class="bg-slate-900 border border-slate-700 text-xs text-white rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-sky-500">
+            <select id="ramCacheSelect" onchange="updateRamCacheLabel()" class="w-full sm:w-auto bg-slate-900 border border-slate-700 text-xs text-white rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-sky-500">
               <option value="8">8 MB (16 blocks)</option>
               <option value="16" selected>16 MB (32 blocks - Recommended)</option>
               <option value="32">32 MB (64 blocks)</option>
@@ -3206,12 +3206,12 @@ app.get(['/settings', '/setting', '/tg/settings', '/tg/setting', '/msm/settings'
           </div>
 
           <!-- Video Transcode Mode -->
-          <div class="flex items-center justify-between gap-3 bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/80">
-            <div>
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/80">
+            <div class="min-w-0 flex-1">
               <div class="text-xs font-semibold text-white">Video Transcoding</div>
               <div id="videoTranscodeHint" class="text-[11px] text-slate-400">100% Direct Stream Copy (0% CPU load) [Recommended]</div>
             </div>
-            <select id="videoTranscodeSelect" onchange="updateVideoTranscodeLabel()" class="bg-slate-900 border border-slate-700 text-xs text-white rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-sky-500">
+            <select id="videoTranscodeSelect" onchange="updateVideoTranscodeLabel()" class="w-full sm:w-auto bg-slate-900 border border-slate-700 text-xs text-white rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-sky-500">
               <option value="disabled" selected>Disabled (100% Direct Copy - 0% CPU)</option>
               <option value="desktop_hevc">Desktop Web Only (HEVC/AVI -> H.264 for PC Chrome)</option>
               <option value="always">Enabled for All Devices</option>
@@ -3219,12 +3219,12 @@ app.get(['/settings', '/setting', '/tg/settings', '/tg/setting', '/msm/settings'
           </div>
 
           <!-- TV Series Minimum File Size -->
-          <div class="flex items-center justify-between gap-3 bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/80">
-            <div>
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/80">
+            <div class="min-w-0 flex-1">
               <div class="text-xs font-semibold text-white">TV Series Minimum Size</div>
               <div id="minTvSizeHint" class="text-[11px] text-slate-400">Files &lt; 80 MB are treated as clips/trailers and skipped</div>
             </div>
-            <div class="flex items-center gap-1.5 bg-slate-900 border border-slate-700 rounded-lg p-1">
+            <div class="flex items-center gap-1.5 bg-slate-900 border border-slate-700 rounded-lg p-1 self-start sm:self-auto">
               <button type="button" onclick="adjustMinTvSize(-5)" class="w-6 h-6 flex items-center justify-center rounded bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white font-bold text-xs transition select-none">-</button>
               <input id="minTvSizeInput" type="number" step="5" min="10" max="500" value="80" oninput="updateMinTvSizeLabel()" class="w-12 bg-transparent text-center text-xs font-mono font-semibold text-white focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
               <span class="text-[11px] text-slate-400 pr-1">MB</span>
@@ -3233,12 +3233,12 @@ app.get(['/settings', '/setting', '/tg/settings', '/tg/setting', '/msm/settings'
           </div>
 
           <!-- Movie Minimum File Size -->
-          <div class="flex items-center justify-between gap-3 bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/80">
-            <div>
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/80">
+            <div class="min-w-0 flex-1">
               <div class="text-xs font-semibold text-white">Movie Minimum Size</div>
               <div id="minMovieSizeHint" class="text-[11px] text-slate-400">Files &lt; 180 MB are treated as clips/trailers and skipped</div>
             </div>
-            <div class="flex items-center gap-1.5 bg-slate-900 border border-slate-700 rounded-lg p-1">
+            <div class="flex items-center gap-1.5 bg-slate-900 border border-slate-700 rounded-lg p-1 self-start sm:self-auto">
               <button type="button" onclick="adjustMinMovieSize(-5)" class="w-6 h-6 flex items-center justify-center rounded bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white font-bold text-xs transition select-none">-</button>
               <input id="minMovieSizeInput" type="number" step="5" min="20" max="2000" value="180" oninput="updateMinMovieSizeLabel()" class="w-12 bg-transparent text-center text-xs font-mono font-semibold text-white focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
               <span class="text-[11px] text-slate-400 pr-1">MB</span>
@@ -3247,22 +3247,22 @@ app.get(['/settings', '/setting', '/tg/settings', '/tg/setting', '/msm/settings'
           </div>
 
           <!-- Resolver Max Paging -->
-          <div class="flex items-center justify-between gap-3 bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/80">
-            <div>
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/80">
+            <div class="min-w-0 flex-1">
               <div class="text-xs font-semibold text-white">Resolver Max Paging</div>
               <div id="resolverMaxPagesHint" class="text-[11px] text-slate-400">Traverse up to 3 pages per search query during media resolution</div>
             </div>
-            <div class="flex items-center gap-1.5 bg-slate-900 border border-slate-700 rounded-lg p-1">
+            <div class="flex items-center gap-1.5 bg-slate-900 border border-slate-700 rounded-lg p-1 self-start sm:self-auto">
               <button type="button" onclick="adjustResolverMaxPages(-1)" class="w-6 h-6 flex items-center justify-center rounded bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white font-bold text-xs transition select-none">-</button>
               <input id="resolverMaxPagesInput" type="number" step="1" min="1" max="15" value="3" oninput="updateResolverMaxPagesLabel()" class="w-10 bg-transparent text-center text-xs font-mono font-semibold text-white focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
               <button type="button" onclick="adjustResolverMaxPages(1)" class="w-6 h-6 flex items-center justify-center rounded bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white font-bold text-xs transition select-none">+</button>
             </div>
           </div>
 
-          <div class="flex items-center justify-between pt-2">
+          <div class="flex flex-wrap items-center justify-between gap-2 pt-2">
             <span id="saveEngineMsg" class="text-xs text-emerald-400 hidden">✓ Engine settings saved & applied!</span>
             <div class="flex-1"></div>
-            <button id="saveEngineBtn" onclick="saveEngineSettings()" class="px-4 py-1.5 bg-sky-500 hover:bg-sky-400 text-slate-950 font-semibold text-xs rounded-xl transition">
+            <button id="saveEngineBtn" onclick="saveEngineSettings()" class="w-full sm:w-auto px-4 py-1.5 bg-sky-500 hover:bg-sky-400 text-slate-950 font-semibold text-xs rounded-xl transition">
               Save Engine Settings
             </button>
           </div>
@@ -3281,12 +3281,12 @@ app.get(['/settings', '/setting', '/tg/settings', '/tg/setting', '/msm/settings'
 
         <div class="space-y-3 pt-1">
           <!-- Speed Test Size -->
-          <div class="flex items-center justify-between gap-3 bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/80">
-            <div>
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/80">
+            <div class="min-w-0 flex-1">
               <div class="text-xs font-semibold text-white">Speed Test Size</div>
               <div class="text-[11px] text-slate-400">Data read per quality in the app's Network Speed Analytics (12-64 MB; smaller never fills the read-ahead window)</div>
             </div>
-            <div class="flex items-center gap-1.5 bg-slate-900 border border-slate-700 rounded-lg p-1">
+            <div class="flex items-center gap-1.5 bg-slate-900 border border-slate-700 rounded-lg p-1 self-start sm:self-auto">
               <button type="button" onclick="adjustSpeedTestInput('speedTestMbInput', -4, 12, 64)" class="w-6 h-6 flex items-center justify-center rounded bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white font-bold text-xs transition select-none">-</button>
               <input id="speedTestMbInput" type="number" step="4" min="12" max="64" value="16" class="w-12 bg-transparent text-center text-xs font-mono font-semibold text-white focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
               <span class="text-[11px] text-slate-400 pr-1">MB</span>
@@ -3295,12 +3295,12 @@ app.get(['/settings', '/setting', '/tg/settings', '/tg/setting', '/msm/settings'
           </div>
 
           <!-- Speed Test Budget -->
-          <div class="flex items-center justify-between gap-3 bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/80">
-            <div>
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/80">
+            <div class="min-w-0 flex-1">
               <div class="text-xs font-semibold text-white">Speed Test Budget</div>
               <div class="text-[11px] text-slate-400">Maximum speed test data per client IP per minute (HTTP 429 beyond it)</div>
             </div>
-            <div class="flex items-center gap-1.5 bg-slate-900 border border-slate-700 rounded-lg p-1">
+            <div class="flex items-center gap-1.5 bg-slate-900 border border-slate-700 rounded-lg p-1 self-start sm:self-auto">
               <button type="button" onclick="adjustSpeedTestInput('speedTestBudgetInput', -10, 10, 2000)" class="w-6 h-6 flex items-center justify-center rounded bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white font-bold text-xs transition select-none">-</button>
               <input id="speedTestBudgetInput" type="number" step="10" min="10" max="2000" value="150" class="w-12 bg-transparent text-center text-xs font-mono font-semibold text-white focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
               <span class="text-[11px] text-slate-400 pr-1">MB/min</span>
@@ -3308,10 +3308,10 @@ app.get(['/settings', '/setting', '/tg/settings', '/tg/setting', '/msm/settings'
             </div>
           </div>
 
-          <div class="flex items-center justify-between pt-2">
+          <div class="flex flex-wrap items-center justify-between gap-2 pt-2">
             <span id="saveSpeedTestMsg" class="text-xs text-emerald-400 hidden">✓ Speed test settings saved & applied!</span>
             <div class="flex-1"></div>
-            <button id="saveSpeedTestBtn" onclick="saveSpeedTestSettings()" class="px-4 py-1.5 bg-sky-500 hover:bg-sky-400 text-slate-950 font-semibold text-xs rounded-xl transition">
+            <button id="saveSpeedTestBtn" onclick="saveSpeedTestSettings()" class="w-full sm:w-auto px-4 py-1.5 bg-sky-500 hover:bg-sky-400 text-slate-950 font-semibold text-xs rounded-xl transition">
               Save Speed Test Settings
             </button>
           </div>
@@ -3403,12 +3403,12 @@ app.get(['/settings', '/setting', '/tg/settings', '/tg/setting', '/msm/settings'
 
         <div class="space-y-3 pt-1">
           <!-- Toggle Geo-Blocking -->
-          <div class="flex items-center justify-between gap-3 bg-slate-950/60 p-3 rounded-xl border border-slate-800/80">
-            <div>
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 bg-slate-950/60 p-3 rounded-xl border border-slate-800/80">
+            <div class="min-w-0 flex-1">
               <div class="text-xs font-semibold text-white">Enforce Malaysia Geo-Blocking</div>
               <div class="text-[11px] text-slate-400">Deny all public WAN connections originating outside Malaysia (403 Forbidden). Local LAN and loopback traffic are always permitted.</div>
             </div>
-            <label class="relative inline-flex items-center cursor-pointer select-none">
+            <label class="relative inline-flex items-center cursor-pointer select-none self-start sm:self-auto">
               <input id="geoBlockToggle" type="checkbox" checked onchange="updateGeoBlockToggleUI()" class="sr-only peer" />
               <div class="w-11 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
             </label>

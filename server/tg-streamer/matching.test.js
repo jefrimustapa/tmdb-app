@@ -2533,6 +2533,47 @@ it('patchExportedSenderProtection purges DC auth key and sender promise upon Sec
   assert.strictEqual(dummyClient._exportedSenderPromises.has(2), false, 'Must have deleted sender promise for DC 2');
 });
 
+// ---------------------------------------------------------------------------
+// 35. Responsive Settings Modal Layout for Small Viewports (#324)
+// ---------------------------------------------------------------------------
+console.log('\n35. Responsive Settings Modal Layout for Small Viewports (#324)');
+
+it('verifies responsive flex layout classes for settings cards and dropdowns', () => {
+  const dir = path.dirname(fileURLToPath(import.meta.url));
+  const indexJs = fs.readFileSync(path.join(dir, 'index.js'), 'utf-8');
+
+  // Must use responsive flex-col sm:flex-row on settings rows
+  assert.ok(
+    indexJs.includes('flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 bg-slate-950/60'),
+    'Settings rows must use responsive flex-col sm:flex-row'
+  );
+
+  // Must ensure label container does not get crushed by having min-w-0 flex-1
+  assert.ok(
+    indexJs.includes('<div class="min-w-0 flex-1">\n              <div class="text-xs font-semibold text-white">Overlap Prefetch</div>') ||
+    indexJs.includes('<div class="min-w-0 flex-1">\r\n              <div class="text-xs font-semibold text-white">Overlap Prefetch</div>'),
+    'Overlap Prefetch label container must have min-w-0 flex-1'
+  );
+
+  // Dropdown selects must use w-full sm:w-auto to prevent overflowing cards
+  assert.ok(
+    indexJs.includes('id="prefetchSelect" class="w-full sm:w-auto bg-slate-900'),
+    'prefetchSelect must have w-full sm:w-auto'
+  );
+  assert.ok(
+    indexJs.includes('id="nodeRamCapSelect" onchange="updateNodeRamCapLabel()" class="w-full sm:w-auto bg-slate-900'),
+    'nodeRamCapSelect must have w-full sm:w-auto'
+  );
+  assert.ok(
+    indexJs.includes('id="ramCacheSelect" onchange="updateRamCacheLabel()" class="w-full sm:w-auto bg-slate-900'),
+    'ramCacheSelect must have w-full sm:w-auto'
+  );
+  assert.ok(
+    indexJs.includes('id="videoTranscodeSelect" onchange="updateVideoTranscodeLabel()" class="w-full sm:w-auto bg-slate-900'),
+    'videoTranscodeSelect must have w-full sm:w-auto'
+  );
+});
+
 // Clean up temporary test files (pending debounced saves are flushed first by waiting them out)
 setTimeout(() => {
   for (const f of testDbFiles) {
