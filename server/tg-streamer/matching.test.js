@@ -35,6 +35,7 @@ import {
   getNodeRamCap,
   getNodeRamCapOptions,
   getIdlePurgeThresholdMb,
+  getCanonicalRedirectUrl,
 } from './index.js';
 import { rotateLogFile, resetLogSizeCache, MAX_LOG_BYTES } from './logger.js';
 import {
@@ -2286,6 +2287,96 @@ it('getNodeRamCap falls back safely to 256 and respects valid power-of-2 setting
   } finally {
     if (origCap !== undefined) savedSettings.nodeRamCapMb = origCap; else delete savedSettings.nodeRamCapMb;
   }
+});
+
+console.log('\n32. Root Route Refactor & Canonical HTTPS Redirection');
+
+it('canonicalizes and redirects legacy julietmike.net:3033 web requests to https://tgstrm.julietmike.net', () => {
+  assert.strictEqual(
+    getCanonicalRedirectUrl('julietmike.net:3033', '/tg'),
+    'https://tgstrm.julietmike.net/',
+    'Should redirect /tg to root https://tgstrm.julietmike.net/'
+  );
+  assert.strictEqual(
+    getCanonicalRedirectUrl('julietmike.net:3033', '/tg/'),
+    'https://tgstrm.julietmike.net/',
+    'Should redirect /tg/ to root https://tgstrm.julietmike.net/'
+  );
+  assert.strictEqual(
+    getCanonicalRedirectUrl('julietmike.net:3033', '/tg/settings'),
+    'https://tgstrm.julietmike.net/settings',
+    'Should redirect /tg/settings to /settings'
+  );
+  assert.strictEqual(
+    getCanonicalRedirectUrl('julietmike.net:3033', '/tg/streams?q=test'),
+    'https://tgstrm.julietmike.net/streams?q=test',
+    'Should preserve query params and redirect to /streams'
+  );
+  assert.strictEqual(
+    getCanonicalRedirectUrl('julietmike.net:3033', '/'),
+    'https://tgstrm.julietmike.net/',
+    'Should redirect / on port 3033 to HTTPS root'
+  );
+  assert.strictEqual(
+    getCanonicalRedirectUrl('julietmike.net', '/tg'),
+    'https://tgstrm.julietmike.net/',
+    'Should redirect julietmike.net without port'
+  );
+});
+
+it('bypasses direct video stream, health checks, and API calls from port 3033 redirection', () => {
+  assert.strictEqual(
+    getCanonicalRedirectUrl('julietmike.net:3033', '/stream/5981210428942851618'),
+    null,
+    'Video streams must not be redirected (served directly)'
+  );
+  assert.strictEqual(
+    getCanonicalRedirectUrl('julietmike.net:3033', '/tg/health'),
+    null,
+    'Healthcheck must not be redirected'
+  );
+  assert.strictEqual(
+    getCanonicalRedirectUrl('julietmike.net:3033', '/api/settings'),
+    null,
+    'API requests must not be redirected'
+  );
+  assert.strictEqual(
+    getCanonicalRedirectUrl('tgstrm.julietmike.net', '/settings'),
+    null,
+    'Canonical domain requests must not be redirected'
+  );
+  assert.strictEqual(
+    getCanonicalRedirectUrl('192.168.0.120:3033', '/settings'),
+    null,
+    'Local LAN requests must not be redirected'
+  );
+});
+
+it('verifies that root and alias web routes are registered in Express router', () => {
+  const routes = [];
+  app._router.stack.forEach(layer => {
+    if (layer.route && layer.route.path) {
+      if (Array.isArray(layer.route.path)) {
+        routes.push(...layer.route.path);
+      } else {
+        routes.push(layer.route.path);
+      }
+    }
+  });
+
+  // Verify Root Routes exist
+  assert.ok(routes.includes('/'), 'Root / must be registered');
+  assert.ok(routes.includes('/settings'), 'Root /settings must be registered');
+  assert.ok(routes.includes('/streams'), 'Root /streams must be registered');
+  assert.ok(routes.includes('/logs'), 'Root /logs must be registered');
+  assert.ok(routes.includes('/auth'), 'Root /auth must be registered');
+
+  // Verify Legacy Alias Routes still exist for backward compatibility
+  assert.ok(routes.includes('/tg'), 'Legacy /tg must be registered');
+  assert.ok(routes.includes('/tg/settings'), 'Legacy /tg/settings must be registered');
+  assert.ok(routes.includes('/tg/streams'), 'Legacy /tg/streams must be registered');
+  assert.ok(routes.includes('/tg/logs'), 'Legacy /tg/logs must be registered');
+  assert.ok(routes.includes('/tg/auth'), 'Legacy /tg/auth must be registered');
 });
 
 // Clean up temporary test files (pending debounced saves are flushed first by waiting them out)

@@ -3954,7 +3954,7 @@ export const Settings: React.FC = () => {
                           </span>
                         </div>
                         <p className="text-[11px] text-gray-400 font-mono truncate">{DEFAULT_TGSTRM_URL}</p>
-                        <p className="text-[10px] text-gray-500 mt-1">Direct HTTPS streaming on port 3033. High performance.</p>
+                        <p className="text-[10px] text-gray-500 mt-1">Direct HTTPS cloud streaming. High performance.</p>
                       </div>
                       <div className={`w-6 h-6 rounded-full border flex items-center justify-center flex-shrink-0 ${
                         isJmSelected ? 'bg-sky-500 border-sky-400 text-black' : 'border-gray-600 bg-black/40 text-transparent'

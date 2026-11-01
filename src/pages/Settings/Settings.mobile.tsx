@@ -2315,7 +2315,7 @@ export const Settings: React.FC = () => {
                     </span>
                   </div>
                   <p className="text-[10px] text-gray-400 font-mono truncate">{DEFAULT_TGSTRM_URL}</p>
-                  <p className="text-[10px] text-gray-500 mt-1">Direct HTTPS streaming on port 3033. High performance.</p>
+                  <p className="text-[10px] text-gray-500 mt-1">Direct HTTPS cloud streaming. High performance.</p>
                 </div>
                 <div className={`w-5 h-5 rounded-full border flex items-center justify-center flex-shrink-0 ${
                   (settings.msmGetterUrl || DEFAULT_TGSTRM_URL) === DEFAULT_TGSTRM_URL
@@ -2337,13 +2337,10 @@ export const Settings: React.FC = () => {
             <input
               type="text"
               value={msmUrlInput}
-              onChange={(e) => {
-                const val = e.target.value;
-                setMsmUrlInput(val);
-                const trimmed = val.trim().replace(/\/+$/, '');
-                if (trimmed && (trimmed.startsWith('http://') || trimmed.startsWith('https://'))) {
-                  msmService.clearCache();
-                  handleUpdate({ msmGetterUrl: trimmed });
+              onChange={(e) => setMsmUrlInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  (e.target as HTMLInputElement).blur();
                 }
               }}
               onBlur={() => {

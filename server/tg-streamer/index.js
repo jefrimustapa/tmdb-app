@@ -47,6 +47,48 @@ const app = express();
 app.set('trust proxy', true);
 app.use(cors());
 app.use(express.json());
+export function getPublicStreamHost(req) {
+  const forwardedHost = req.headers['x-forwarded-host'];
+  const reqHost = req.get('host') || '';
+  const host = forwardedHost || reqHost;
+  if (!host || host.startsWith('tg-streamer') || host.startsWith('localhost') || host.startsWith('127.0.0.1')) {
+    return 'tgstrm.julietmike.net';
+  }
+  return host;
+}
+
+export function getPublicStreamProtocol(req) {
+  const forwardedProto = req.headers['x-forwarded-proto'];
+  if (forwardedProto) return forwardedProto;
+  const host = getPublicStreamHost(req);
+  if (host.includes('julietmike.net')) return 'https';
+  return req.protocol || 'https';
+}
+
+export function getCanonicalRedirectUrl(host = '', originalUrl = '/') {
+  const h = (host || '').toLowerCase();
+  if (h.includes('julietmike.net:3033') || h === 'julietmike.net') {
+    const path = originalUrl.split('?')[0];
+    if (path.startsWith('/stream/') || path.startsWith('/tg/health') || path.startsWith('/health') || path.startsWith('/api/') || path.startsWith('/tg/api/') || path.startsWith('/msm/api/')) {
+      return null;
+    }
+    const query = originalUrl.includes('?') ? '?' + originalUrl.split('?').slice(1).join('?') : '';
+    let cleanPath = path.replace(/^\/(tg|msm)(\/|$)/, '/');
+    if (!cleanPath.startsWith('/')) cleanPath = '/' + cleanPath;
+    return `https://tgstrm.julietmike.net${cleanPath}${query}`;
+  }
+  return null;
+}
+
+// Canonical HTTPS Redirection: Redirect web/browser traffic from legacy host/port (e.g. julietmike.net:3033) to https://tgstrm.julietmike.net
+app.use((req, res, next) => {
+  const target = getCanonicalRedirectUrl(req.headers.host, req.originalUrl);
+  if (target) {
+    return res.redirect(301, target);
+  }
+  next();
+});
+
 // Transition: the legacy router instance sends clients to the Docker deployment (set only on the router, e.g. https://tgstrm.julietmike.net).
 // Placed after cors() so CORS preflights are still answered here and only the real request is redirected.
 const REDIRECT_TO = (process.env.REDIRECT_TO || '').trim().replace(/\/+$/, '');
@@ -525,11 +567,8 @@ app.post(['/api/auth/verify-code', '/tg/api/auth/verify-code', '/msm/api/auth/ve
   }
 });
 
-// Redirect legacy /auth to /tg/auth
-app.get('/auth', (req, res) => res.redirect(301, '/tg/auth'));
-
-// Web Authentication Portal UI (Served exclusively at /tg/auth)
-app.get('/tg/auth', (req, res) => {
+// Web Authentication Portal UI (Served at /auth, with /tg/auth alias)
+app.get(['/auth', '/tg/auth', '/msm/auth'], (req, res) => {
   res.send(`<!DOCTYPE html>
 <html lang="en" class="dark">
 <head>
@@ -559,19 +598,19 @@ app.get('/tg/auth', (req, res) => {
         </div>
       </div>
       <nav class="flex items-center gap-2 flex-wrap">
-        <a href="/tg" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800 transition flex items-center gap-1">
+        <a href="/" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800 transition flex items-center gap-1">
           🏠 Dashboard
         </a>
-        <a href="/tg/streams" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800 transition flex items-center gap-1">
+        <a href="/streams" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800 transition flex items-center gap-1">
           💾 Streams
         </a>
-        <a href="/tg/settings" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800 transition flex items-center gap-1">
+        <a href="/settings" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800 transition flex items-center gap-1">
           ⚙️ Settings
         </a>
-        <a href="/tg/logs" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800 transition flex items-center gap-1">
+        <a href="/logs" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800 transition flex items-center gap-1">
           📜 Logs
         </a>
-        <a href="/tg/auth" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-sky-400 bg-sky-500/10 border border-sky-500/30 flex items-center gap-1">
+        <a href="/auth" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-sky-400 bg-sky-500/10 border border-sky-500/30 flex items-center gap-1">
           🔑 Auth
         </a>
       </nav>
@@ -1459,11 +1498,8 @@ app.post(['/api/logs/clear', '/tg/api/logs/clear', '/msm/api/logs/clear'], (req,
   }
 });
 
-// Redirect legacy /logs to /tg/logs
-app.get('/logs', (req, res) => res.redirect(301, '/tg/logs'));
-
-// Dedicated Web Log Viewer GUI (Served exclusively at /tg/logs)
-app.get('/tg/logs', (req, res) => {
+// Dedicated Web Log Viewer GUI (Served at /logs, with /tg/logs alias)
+app.get(['/logs', '/tg/logs', '/msm/logs'], (req, res) => {
   res.set({
     'Cache-Control': 'no-cache, no-store, must-revalidate',
     'Pragma': 'no-cache',
@@ -1505,19 +1541,19 @@ app.get('/tg/logs', (req, res) => {
         </div>
       </div>
       <nav class="flex items-center gap-2 flex-wrap">
-        <a href="/tg" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800 transition flex items-center gap-1">
+        <a href="/" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800 transition flex items-center gap-1">
           🏠 Dashboard
         </a>
-        <a href="/tg/streams" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800 transition flex items-center gap-1">
+        <a href="/streams" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800 transition flex items-center gap-1">
           💾 Streams
         </a>
-        <a href="/tg/settings" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800 transition flex items-center gap-1">
+        <a href="/settings" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800 transition flex items-center gap-1">
           ⚙️ Settings
         </a>
-        <a href="/tg/logs" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-sky-400 bg-sky-500/10 border border-sky-500/30 flex items-center gap-1">
+        <a href="/logs" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-sky-400 bg-sky-500/10 border border-sky-500/30 flex items-center gap-1">
           📜 Logs
         </a>
-        <a href="/tg/auth" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800 transition flex items-center gap-1">
+        <a href="/auth" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800 transition flex items-center gap-1">
           🔑 Auth
         </a>
         <a href="/tg/api/logs/download" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 bg-slate-800 hover:bg-slate-700 border border-slate-700 transition flex items-center gap-1.5 ml-1">
@@ -1735,9 +1771,17 @@ app.get('/tg/logs', (req, res) => {
 // 2. STREAM RESOLUTION & PLAYBACK ENDPOINTS
 // ==========================================
 
-// Health check endpoint (moved /health/ to /msm/health/)
-app.get(['/health', '/health/', '/msm/health', '/msm/health/'], (req, res) => res.redirect(301, '/tg/health/'));
-app.get(['/tg/health', '/tg/health/', '/msm/health', '/msm/health/', '/api/health', '/api/health/', '/tg/api/health', '/tg/api/health/', '/msm/api/health', '/msm/api/health/'], (req, res) => {
+// Health check endpoint
+app.get([
+  '/health', '/health/',
+  '/tg/health', '/tg/health/',
+  '/msm/health', '/msm/health/',
+  '/api/health', '/api/health/',
+  '/tg/api/health', '/tg/api/health/',
+  '/msm/api/health', '/msm/api/health/'
+], (req, res) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+  res.setHeader('Pragma', 'no-cache');
   res.json({
     status: 'ok',
     uptime: process.uptime(),
@@ -1995,11 +2039,8 @@ app.post(['/api/system/restart', '/tg/api/system/restart', '/msm/api/system/rest
   }, 1000);
 });
 
-// Redirect legacy root / and /dashboard to /msm
-app.get(['/', '/dashboard'], (req, res) => res.redirect(301, '/tg'));
-
-// Dedicated Web Dashboard (Served exclusively at /msm, /msm/dashboard)
-app.get(['/tg', '/msm/dashboard'], (req, res) => {
+// Dedicated Web Dashboard (Served at root /, with /dashboard and /tg aliases)
+app.get(['/', '/dashboard', '/tg', '/msm/dashboard'], (req, res) => {
   const isGeoEnabled = savedSettings.geoBlockEnabled !== false;
   const activeBot = getActiveTargetBot();
   const geoBadgeHtml = getGeoBadgeHtml(isGeoEnabled);
@@ -2041,19 +2082,19 @@ app.get(['/tg', '/msm/dashboard'], (req, res) => {
         </div>
       </div>
       <nav class="flex items-center gap-2 flex-wrap">
-        <a href="/tg" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-sky-400 bg-sky-500/10 border border-sky-500/30 flex items-center gap-1">
+        <a href="/" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-sky-400 bg-sky-500/10 border border-sky-500/30 flex items-center gap-1">
           🏠 Dashboard
         </a>
-        <a href="/tg/streams" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800 transition flex items-center gap-1">
+        <a href="/streams" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800 transition flex items-center gap-1">
           💾 Streams
         </a>
-        <a href="/tg/settings" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800 transition flex items-center gap-1">
+        <a href="/settings" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800 transition flex items-center gap-1">
           ⚙️ Settings
         </a>
-        <a href="/tg/logs" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800 transition flex items-center gap-1">
+        <a href="/logs" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800 transition flex items-center gap-1">
           📜 Logs
         </a>
-        <a href="/tg/auth" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800 transition flex items-center gap-1">
+        <a href="/auth" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800 transition flex items-center gap-1">
           🔑 Auth
         </a>
       </nav>
@@ -2104,7 +2145,7 @@ app.get(['/tg', '/msm/dashboard'], (req, res) => {
           <span class="text-base">⚡</span>
           <h2 class="text-xs font-bold text-white uppercase tracking-wider">Stream Buffering & Engine Performance</h2>
         </div>
-        <a href="/tg/settings" class="text-xs text-sky-400 hover:text-sky-300 font-semibold flex items-center gap-1 transition">
+        <a href="/settings" class="text-xs text-sky-400 hover:text-sky-300 font-semibold flex items-center gap-1 transition">
           ⚙️ Configure in Settings →
         </a>
       </div>
@@ -2163,7 +2204,7 @@ app.get(['/tg', '/msm/dashboard'], (req, res) => {
 
     <!-- Quick Navigation Hub -->
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-      <a href="/tg/streams" class="bg-slate-900 hover:bg-slate-800/90 border border-slate-800 rounded-2xl p-5 space-y-2 transition group block glow-box">
+      <a href="/streams" class="bg-slate-900 hover:bg-slate-800/90 border border-slate-800 rounded-2xl p-5 space-y-2 transition group block glow-box">
         <div class="w-9 h-9 rounded-xl bg-sky-500/10 text-sky-400 border border-sky-500/20 flex items-center justify-center text-lg">
           💾
         </div>
@@ -2172,7 +2213,7 @@ app.get(['/tg', '/msm/dashboard'], (req, res) => {
         <span class="text-xs text-sky-400 font-semibold inline-block pt-1">Open Streams →</span>
       </a>
 
-      <a href="/tg/settings" class="bg-slate-900 hover:bg-slate-800/90 border border-slate-800 rounded-2xl p-5 space-y-2 transition group block glow-box">
+      <a href="/settings" class="bg-slate-900 hover:bg-slate-800/90 border border-slate-800 rounded-2xl p-5 space-y-2 transition group block glow-box">
         <div class="w-9 h-9 rounded-xl bg-purple-500/10 text-purple-400 border border-purple-500/20 flex items-center justify-center text-lg">
           ⚙️
         </div>
@@ -2181,7 +2222,7 @@ app.get(['/tg', '/msm/dashboard'], (req, res) => {
         <span class="text-xs text-sky-400 font-semibold inline-block pt-1">Open Settings →</span>
       </a>
 
-      <a href="/tg/logs" class="bg-slate-900 hover:bg-slate-800/90 border border-slate-800 rounded-2xl p-5 space-y-2 transition group block glow-box">
+      <a href="/logs" class="bg-slate-900 hover:bg-slate-800/90 border border-slate-800 rounded-2xl p-5 space-y-2 transition group block glow-box">
         <div class="w-9 h-9 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center justify-center text-lg">
           📜
         </div>
@@ -2190,7 +2231,7 @@ app.get(['/tg', '/msm/dashboard'], (req, res) => {
         <span class="text-xs text-sky-400 font-semibold inline-block pt-1">View Logs →</span>
       </a>
 
-      <a href="/tg/auth" class="bg-slate-900 hover:bg-slate-800/90 border border-slate-800 rounded-2xl p-5 space-y-2 transition group block glow-box">
+      <a href="/auth" class="bg-slate-900 hover:bg-slate-800/90 border border-slate-800 rounded-2xl p-5 space-y-2 transition group block glow-box">
         <div class="w-9 h-9 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20 flex items-center justify-center text-lg">
           🔑
         </div>
@@ -2470,11 +2511,8 @@ app.get(['/tg', '/msm/dashboard'], (req, res) => {
 </html>`);
 });
 
-// Redirect legacy /streams and /cache to /tg/streams
-app.get(['/streams', '/cache'], (req, res) => res.redirect(301, '/tg/streams'));
-
-// Dedicated Persistent Stream Cache Page (Served exclusively at /tg/streams, /msm/cache)
-app.get(['/tg/streams', '/msm/cache'], (req, res) => {
+// Dedicated Persistent Stream Cache Page (Served at /streams, with /tg/streams and /cache aliases)
+app.get(['/streams', '/cache', '/tg/streams', '/msm/cache'], (req, res) => {
   res.set({
     'Cache-Control': 'no-cache, no-store, must-revalidate',
     'Pragma': 'no-cache',
@@ -2512,19 +2550,19 @@ app.get(['/tg/streams', '/msm/cache'], (req, res) => {
         </div>
       </div>
       <nav class="flex items-center gap-2 flex-wrap">
-        <a href="/tg" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800 transition flex items-center gap-1">
+        <a href="/" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800 transition flex items-center gap-1">
           🏠 Dashboard
         </a>
-        <a href="/tg/streams" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-sky-400 bg-sky-500/10 border border-sky-500/30 flex items-center gap-1">
+        <a href="/streams" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-sky-400 bg-sky-500/10 border border-sky-500/30 flex items-center gap-1">
           💾 Streams
         </a>
-        <a href="/tg/settings" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800 transition flex items-center gap-1">
+        <a href="/settings" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800 transition flex items-center gap-1">
           ⚙️ Settings
         </a>
-        <a href="/tg/logs" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800 transition flex items-center gap-1">
+        <a href="/logs" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800 transition flex items-center gap-1">
           📜 Logs
         </a>
-        <a href="/tg/auth" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800 transition flex items-center gap-1">
+        <a href="/auth" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800 transition flex items-center gap-1">
           🔑 Auth
         </a>
       </nav>
@@ -2924,11 +2962,8 @@ app.get(['/tg/streams', '/msm/cache'], (req, res) => {
 </html>`);
 });
 
-// Redirect legacy /setting and /settings to /tg/settings
-app.get(['/setting', '/settings', '/msm/settings', '/tg/setting'], (req, res) => res.redirect(301, '/tg/settings'));
-
-// Dedicated Web Settings Page (Served exclusively at /msm/setting, /tg/settings)
-app.get(['/msm/setting', '/tg/settings'], (req, res) => {
+// Dedicated Web Settings Page (Served at /settings, with /tg/settings aliases)
+app.get(['/settings', '/setting', '/tg/settings', '/tg/setting', '/msm/settings', '/msm/setting'], (req, res) => {
   res.set({
     'Cache-Control': 'no-cache, no-store, must-revalidate',
     'Pragma': 'no-cache',
@@ -2966,19 +3001,19 @@ app.get(['/msm/setting', '/tg/settings'], (req, res) => {
         </div>
       </div>
       <nav class="flex items-center gap-2 flex-wrap">
-        <a href="/tg" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800 transition flex items-center gap-1">
+        <a href="/" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800 transition flex items-center gap-1">
           🏠 Dashboard
         </a>
-        <a href="/tg/streams" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800 transition flex items-center gap-1">
+        <a href="/streams" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800 transition flex items-center gap-1">
           💾 Streams
         </a>
-        <a href="/tg/settings" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-sky-400 bg-sky-500/10 border border-sky-500/30 flex items-center gap-1">
+        <a href="/settings" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-sky-400 bg-sky-500/10 border border-sky-500/30 flex items-center gap-1">
           ⚙️ Settings
         </a>
-        <a href="/tg/logs" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800 transition flex items-center gap-1">
+        <a href="/logs" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800 transition flex items-center gap-1">
           📜 Logs
         </a>
-        <a href="/tg/auth" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800 transition flex items-center gap-1">
+        <a href="/auth" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800 transition flex items-center gap-1">
           🔑 Auth
         </a>
       </nav>
@@ -3300,7 +3335,7 @@ app.get(['/msm/setting', '/tg/settings'], (req, res) => {
         <p class="text-xs text-slate-400">Central database mapping cached video stream documents in <code class="text-slate-300">streams.json</code>.</p>
         <div class="space-y-3">
           <div class="flex gap-3">
-            <a href="/tg/streams" class="flex-1 text-center py-2 bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-white rounded-xl transition">
+            <a href="/streams" class="flex-1 text-center py-2 bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-white rounded-xl transition">
               Browse Cached Videos
             </a>
             <button onclick="clearCache()" class="px-4 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 text-xs font-semibold rounded-xl transition">
@@ -3329,7 +3364,7 @@ app.get(['/msm/setting', '/tg/settings'], (req, res) => {
               Clear Log
             </button>
           </div>
-          <a href="/tg/auth" class="block text-center py-2 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 text-xs font-semibold rounded-xl transition">
+          <a href="/auth" class="block text-center py-2 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 text-xs font-semibold rounded-xl transition">
             Open Telegram Phone Auth Portal →
           </a>
         </div>
@@ -4337,8 +4372,8 @@ app.get(['/api/resolve', '/tg/api/resolve', '/msm/api/resolve', '/api/prefetch',
         size: cached.size,
       });
     }
-    const host = req.get('host');
-    const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'https';
+    const host = getPublicStreamHost(req);
+    const protocol = getPublicStreamProtocol(req);
     const isDesktopWeb = isDesktopWebClient(req);
     const isHevc = cached.videoCodec === 'hevc' || cached.videoCodec === 'h265' || /\b(x265|hevc|h265)\b/i.test(cached.filename || '');
     const isAvi = /\.avi$/i.test(cached.filename || '');
@@ -4370,8 +4405,8 @@ app.get(['/api/resolve', '/tg/api/resolve', '/msm/api/resolve', '/api/prefetch',
       const result = await inFlightResolutions.get(cacheKey);
       req.off('close', onClientClose);
       if (isAborted || res.writableEnded) return;
-      const host = req.get('host');
-      const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'https';
+      const host = getPublicStreamHost(req);
+      const protocol = getPublicStreamProtocol(req);
       const isDesktopWeb = isDesktopWebClient(req);
       const isHevc = result.videoCodec === 'hevc' || result.videoCodec === 'h265' || /\b(x265|hevc|h265)\b/i.test(result.filename || '');
       const isAvi = /\.avi$/i.test(result.filename || '');
@@ -4517,8 +4552,8 @@ app.get(['/api/resolve', '/tg/api/resolve', '/msm/api/resolve', '/api/prefetch',
 
     if (isAborted || res.writableEnded) return;
 
-    const host = req.get('host');
-    const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'https';
+    const host = getPublicStreamHost(req);
+    const protocol = getPublicStreamProtocol(req);
     const isDesktopWeb = isDesktopWebClient(req);
     const isHevc = result.videoCodec === 'hevc' || result.videoCodec === 'h265' || /\b(x265|hevc|h265)\b/i.test(result.filename || '');
     const isAvi = /\.avi$/i.test(result.filename || '');
