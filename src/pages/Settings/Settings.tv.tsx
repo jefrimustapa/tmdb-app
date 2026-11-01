@@ -14,7 +14,7 @@ import { updateService, type UpdateInfo } from '../../services/updateService';
 import { UpdateModal } from '../../components/common/UpdateModal';
 import { FormattedChangelog } from '../../components/common/FormattedChangelog';
 import { openExternalUrl } from '../../services/browserService';
-import { DEFAULT_TGSTRM_URL } from '../../services/tgStreamerDefaults';
+import { DEFAULT_TGSTRM_URL, normalizeTgStrmUrl } from '../../services/tgStreamerDefaults';
 import {
   Settings as SettingsIcon,
   Tv2,
@@ -223,11 +223,11 @@ export const Settings: React.FC = () => {
 
   // Keep local msmUrlInput in sync with persisted settings
   useEffect(() => {
-    const url = settings?.msmGetterUrl || settings?.msm32GetterUrl;
-    if (url !== undefined) {
-      setMsmUrlInput(url || DEFAULT_TGSTRM_URL);
+    const raw = settings?.tgStreamerUrl || settings?.msmGetterUrl || settings?.msm32GetterUrl;
+    if (raw !== undefined) {
+      setMsmUrlInput(normalizeTgStrmUrl(raw));
     }
-  }, [settings?.msmGetterUrl, settings?.msm32GetterUrl]);
+  }, [settings?.tgStreamerUrl, settings?.msmGetterUrl, settings?.msm32GetterUrl]);
 
   // Auto-ping TGStrm microservice whenever the user enters the Telegram provider or TGStrm drawer
   useEffect(() => {
@@ -3899,14 +3899,14 @@ export const Settings: React.FC = () => {
             {/* Drawer Body */}
             <div className="flex-1 overflow-y-auto px-6 py-6 space-y-4 font-sans">
               {(() => {
-                const currentUrl = settings.msmGetterUrl || settings.msm32GetterUrl || DEFAULT_TGSTRM_URL;
+                const currentUrl = normalizeTgStrmUrl(settings.tgStreamerUrl || settings.msmGetterUrl || settings.msm32GetterUrl);
                 const isJmSelected = currentUrl === DEFAULT_TGSTRM_URL;
 
                 const applyUrl = (url: string) => {
                   const trimmed = url.trim().replace(/\/+$/, '');
-                  const finalUrl = trimmed || DEFAULT_TGSTRM_URL;
+                  const finalUrl = normalizeTgStrmUrl(trimmed);
                   msmService.clearCache();
-                  handleUpdate({ msmGetterUrl: finalUrl });
+                  handleUpdate({ msmGetterUrl: finalUrl, tgStreamerUrl: finalUrl });
                   setMsmUrlInput(finalUrl);
                   setTestingMsm(true);
                   setMsmTestResult(null);
@@ -4271,7 +4271,7 @@ export const Settings: React.FC = () => {
               {(() => {
                 const enabledTg = settings.enabledTelegramProviders || ['telegram-msm'];
                 const isMsmEnabled = enabledTg.includes('telegram-msm') || enabledTg.includes('telegram-msm32');
-                const currentUrl = settings.msmGetterUrl || settings.msm32GetterUrl || DEFAULT_TGSTRM_URL;
+                const currentUrl = normalizeTgStrmUrl(settings.tgStreamerUrl || settings.msmGetterUrl || settings.msm32GetterUrl);
 
                 return (
                   <>
@@ -4431,7 +4431,7 @@ export const Settings: React.FC = () => {
                       data-telegram-msm-drawer-item="true"
                       type="button"
                       onClick={() => {
-                        const target = `${(settings.msmGetterUrl || settings.msm32GetterUrl || DEFAULT_TGSTRM_URL).replace(/\/+$/, '')}/tg/logs`;
+                        const target = `${normalizeTgStrmUrl(settings.tgStreamerUrl || settings.msmGetterUrl || settings.msm32GetterUrl)}/logs`;
                         openExternalUrl(target);
                       }}
                       className="w-full py-2.5 px-3 rounded-xl border text-xs font-bold transition-all tv-focus-target flex items-center justify-between border-sky-500/30 bg-sky-500/10 hover:bg-sky-500/20 text-sky-300"
@@ -4457,7 +4457,7 @@ export const Settings: React.FC = () => {
                         }
                       }}
                       onClick={() => {
-                        const target = `${(settings.msmGetterUrl || settings.msm32GetterUrl || DEFAULT_TGSTRM_URL).replace(/\/+$/, '')}/tg/streams`;
+                        const target = `${normalizeTgStrmUrl(settings.tgStreamerUrl || settings.msmGetterUrl || settings.msm32GetterUrl)}/streams`;
                         openExternalUrl(target);
                       }}
                       className="w-full py-2.5 px-3 rounded-xl border text-xs font-bold transition-all tv-focus-target flex items-center justify-between border-sky-500/30 bg-sky-500/10 hover:bg-sky-500/20 text-sky-300"

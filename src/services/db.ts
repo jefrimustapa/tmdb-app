@@ -1,6 +1,6 @@
 import Dexie, { type Table } from 'dexie';
 import type { WatchHistoryItem, LikedItem, WatchlistItem, UserSettings, RatingCacheItem, StreamResolverType } from '../types/db';
-import { DEFAULT_TGSTRM_URL } from './tgStreamerDefaults';
+import { DEFAULT_TGSTRM_URL, normalizeTgStrmUrl, isLegacyTgStrmUrl } from './tgStreamerDefaults';
 
 export class TMDBStreamerDB extends Dexie {
   history!: Table<WatchHistoryItem, number>;
@@ -406,15 +406,15 @@ export const dbService = {
       settings.tgActiveResolver = 'msm';
       await db.settings.put(settings);
     }
-    // Auto-upgrade legacy router port 3033 to canonical tgstrm domain
-    const isLegacy3033 = (url?: string) =>
-      typeof url === 'string' &&
-      (url.includes(':3033') || url.includes('www.julietmike.net') || url.includes('julietmike.net:3033'));
-
-    if (isLegacy3033(settings.tgStreamerUrl) || isLegacy3033(settings.msmGetterUrl) || isLegacy3033(settings.msm32GetterUrl)) {
-      settings.tgStreamerUrl = DEFAULT_TGSTRM_URL;
-      settings.msmGetterUrl = DEFAULT_TGSTRM_URL;
-      if (settings.msm32GetterUrl) settings.msm32GetterUrl = DEFAULT_TGSTRM_URL;
+    // Auto-upgrade legacy router port 3033 or root domain to canonical tgstrm domain
+    const originalTgUrl = settings.tgStreamerUrl;
+    const originalMsmUrl = settings.msmGetterUrl;
+    settings.tgStreamerUrl = normalizeTgStrmUrl(settings.tgStreamerUrl || settings.msmGetterUrl);
+    settings.msmGetterUrl = settings.tgStreamerUrl;
+    if (settings.msm32GetterUrl) {
+      settings.msm32GetterUrl = settings.tgStreamerUrl;
+    }
+    if (originalTgUrl !== settings.tgStreamerUrl || originalMsmUrl !== settings.msmGetterUrl) {
       await db.settings.put(settings);
     }
     settings.msmGetterUrl = settings.tgStreamerUrl;
@@ -488,6 +488,12 @@ export const dbService = {
   async updateSettings(partial: Partial<UserSettings>): Promise<UserSettings> {
     const current = await this.getSettings();
     const syncedPartial: Partial<UserSettings> = { ...partial };
+    if (syncedPartial.tgStreamerUrl !== undefined) {
+      syncedPartial.tgStreamerUrl = normalizeTgStrmUrl(syncedPartial.tgStreamerUrl);
+    }
+    if (syncedPartial.msmGetterUrl !== undefined) {
+      syncedPartial.msmGetterUrl = normalizeTgStrmUrl(syncedPartial.msmGetterUrl);
+    }
     if (syncedPartial.tgStreamerUrl !== undefined && syncedPartial.msmGetterUrl === undefined) {
       syncedPartial.msmGetterUrl = syncedPartial.tgStreamerUrl;
     } else if (syncedPartial.msmGetterUrl !== undefined && syncedPartial.tgStreamerUrl === undefined) {
