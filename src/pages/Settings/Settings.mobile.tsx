@@ -2286,7 +2286,7 @@ export const Settings: React.FC = () => {
           <div className="p-3.5 rounded-xl bg-white/5 border border-white/10 space-y-3">
             <span className="text-xs font-semibold text-white block">Server Presets</span>
             <div className="space-y-2">
-              {/* Preset 1: www.julietmike.net (Default) */}
+              {/* Preset 1: tgstrm.julietmike.net (Default) */}
               <button
                 type="button"
                 onClick={() => {

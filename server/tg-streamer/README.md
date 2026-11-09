@@ -36,7 +36,7 @@ Measured effect: none that stands out. On the router, 6 seeks to uncached offset
 - Enabled (default): the window starts when the first block arrives, before it is written to the player. The next blocks are usually ready by the time the first one has been sent.
 - Disabled: the window starts after the first block has been written, so there is one extra round trip before block 2.
 
-The log (`/tmp/tg-streamer.log` on the router, emptied on restart) tracks the sequence for every non-probe stream request:
+The log (`docker compose logs tg-streamer`, or `GET /api/logs`) tracks the sequence for every non-probe stream request:
 ```
 [PIPELINE START]             ... blocks 683..3276, concurrency: 10
 [PIPELINE FIRST BLOCK]       block 683 arrived alone at 640ms (concurrency 10, window starts now)
@@ -48,9 +48,9 @@ A first block of 0-1 ms comes from the RAM block cache (blocks 0-3 and anything 
 ## Network speed test (issue #281)
 The app (Settings > Telegram Provider > TGStrm > Diagnostics & Analytics > Network Speed Analytics, mobile and Android TV) measures stream delivery for 720p, 1080p and 4K, one quality after another (SD is not tested). Four endpoints (also under `/tg/api` and `/msm/api`), all behind the geo-block:
 - `GET /api/speedtest/targets?tiers=720p,1080p,4k`: one sample file per quality from the central DB plus a single-use `testId`. Sample choice is stable, not random: among the tier's files big enough for a test, the Telegram DC holding most of them, then the median-sized file of that DC; only the read offset is random (middle of the file, away from the pinned head/tail blocks). Also returns the test size `mb`, the budget and the minimum Mbps per quality. Qualities without a sample come back in `missing`.
-- `GET /stream/<docId>?speedtest=<testId>`: the normal stream path (Telegram to router to client) for `speedTestMb` MB at the server-chosen offset. It bypasses the RAM block cache (no reads, no writes), never transcodes, and uses its own session key so it cannot abort real playback. The id is single use (409 afterwards).
+- `GET /stream/<docId>?speedtest=<testId>`: the normal stream path (Telegram to server to client) for `speedTestMb` MB at the server-chosen offset. It bypasses the RAM block cache (no reads, no writes), never transcodes, and uses its own session key so it cannot abort real playback. The id is single use (409 afterwards).
 - `GET /api/speedtest/result?id=<testId>`: server-side numbers of that transfer (first block, sustained Mbps, time spent waiting for blocks / for the socket).
-- `GET /api/speedtest/download`: `speedTestMb` MB of random bytes from RAM, no Telegram: the router to device baseline.
+- `GET /api/speedtest/download`: `speedTestMb` MB of random bytes from RAM, no Telegram: the server to device baseline.
 
 The app compares the stream's sustained rate (after the first 512 KB block) with the minimum for the quality (Netflix: 720p 3, 1080p 5, 4K 15 Mbps): under 1.0x is too slow, 1.0-1.5x marginal, 1.5x or more smooth. If the stream stays well below the baseline (under 85%) the limit is on the server side (Telegram to router or the router itself); if it reaches the baseline the device network is the limit. The baseline is the path the client really uses to reach TGStrm: TGStrm runs on the router, so on the home network it is the Wi-Fi/LAN speed, and the router's per-device Bandwidth Limiter does not apply to it (that limiter skips traffic from the router itself and only shapes internet-sourced traffic); from outside it is the internet path.
 
@@ -69,28 +69,11 @@ TGSTRM_TAG=ci-issue-301-convert-tgstrm-to-docker-move-location TGSTRM_HOST_PORT=
 
 NPM Proxy Host: domain `tgstrm.julietmike.net`, forward to `tg-streamer:3033` (the container joins `npm_default`) or `192.168.0.120:3033`, request a Let's Encrypt cert, Force SSL. Advanced tab: `proxy_buffering off; proxy_request_buffering off; proxy_read_timeout 3600s; proxy_send_timeout 3600s;` so Range streaming and long resolves are not cut. NPM sets `X-Forwarded-For` / `X-Real-IP`, which the geo-block uses as the client IP.
 
-### Migration from the router
-1. Copy `TG_*` from the router `.env` and the router `data/` folder to Firebat (the Telegram session is reused; stop the router instance before starting the container, two live users of one session can invalidate it).
-2. Start the container, check `https://tgstrm.julietmike.net/tg/health`.
-3. On the router set `REDIRECT_TO=https://tgstrm.julietmike.net` in its `.env` and restart `S99tg-streamer`: every request except `/tg/health` now answers `307` to the new host (old app installs keep working). Rollback: remove the variable and restart. Each client (IP + user agent) is logged once per 10 minutes as `[REDIRECT] ip | agent -> url` in `/tmp/tg-streamer.log`, to see who still uses the old URL before the router instance is removed (#302).
-4. Cleanup of the router instance and the redirect is tracked in #302.
+### The old router instance (retired)
+TGStrm used to run on the ASUS router (Entware). It was moved to this Docker deployment in #301 (the Telegram session was reused, with the router instance stopped first because two live users of one session can invalidate it) and removed in #305. Apps that still stored the old `julietmike.net:3033` URL are upgraded to `https://tgstrm.julietmike.net` by the app itself.
 
-## Router deployment and disk-corruption recovery
-The service runs on the ASUS router (Entware): app in `/tmp/mnt/Entware/entware/app/tg-streamer`, started by `/opt/etc/init.d/S99tg-streamer` (supervisor that respawns Node). The Entware USB disk has had ext4 errors, so recovery is automated at three levels.
-
-### node_modules and its backup
-`node_modules` is third-party code installed from `package.json` / `package-lock.json` (axios, express, telegram, ... 149 packages, about 5200 files). Changing your own code (`index.js`, `resolvers/*`, `db.js`) never changes it. It only changes when you add or update an npm package; the router has no `npm`, so new dependencies are installed on the PC and uploaded.
-
-Before every Node spawn the supervisor verifies `node_modules` against an md5 manifest kept on the **second disk** (`/tmp/mnt/ASUS-USB/tg-streamer-deps/`: `node_modules.tgz`, `node_modules.md5`, `package-lock.md5`). Missing or corrupted files are restored from the tgz and logged as `[SUPERVISOR HEAL]`. If they cannot be restored it logs `[SUPERVISOR ERROR] corrupted dependency` and waits 300 s instead of crash-looping. When the backup is missing, or stale (the lockfile changed), the check is skipped with a `[SUPERVISOR WARN]` line.
-
-**Regenerate the backup only when `package.json` / `package-lock.json` changes** (not on code changes, and not on a schedule: its content depends only on the lockfile). Run from `server/tg-streamer`, after the new `node_modules` and lockfile are on the router:
-```bash
-node scripts/deploy-deps-backup.mjs            # build (npm ci), upload to the second disk, verify checksums
-node scripts/deploy-deps-backup.mjs --dry-run  # build only, router untouched
-```
-Env overrides: `DEPLOY_HOST` (default `jm`), `DEPS_REMOTE_DIR`, `APP_REMOTE_DIR`. The script warns when the router lockfile differs from the repo one. `scripts/build-deps-backup.mjs` only builds the three files locally.
-
-### Disk check and auto-mount (`server/router-scripts/pre-mount`, installed as `/jffs/scripts/pre-mount`)
+## Router disk check and auto-mount (`server/router-scripts`)
+The ASUS router no longer runs TGStrm (the router instance, its supervisor, watchdogs and the redirect were retired in #305; they remain in git history). `server/router-scripts` keeps only the generic Entware disk helpers, installed as `/jffs/scripts/pre-mount`, `post-mount`, `unmount` and `services-stop`.
 Before the Entware disk is mounted, `e2fsck -p` runs and falls back to `e2fsck -y` on errors (its real exit code is used). A long fsck makes the firmware give up waiting (about 120 s, syslog `failed to mount!`), so a detached watcher mounts the disk afterwards if it is still unmounted and then runs `post-mount`. It does nothing when the firmware mounted normally. Look for `pre-mount:` lines in `/tmp/syslog.log`.
 
-`e2fsck -y` deletes files it cannot read, which is why the dependency self-heal above exists. Files outside `node_modules` (for example `data/streams.json`) are not restored automatically.
+`e2fsck -y` deletes files it cannot read, so files on that disk are not guaranteed to survive a failed check.
