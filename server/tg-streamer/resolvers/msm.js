@@ -13,6 +13,7 @@ import {
   generateSeriesSearchQueries,
   buildSearchQueries,
   scoreCandidateButtonWithReason,
+  validateDeliveredDocument,
 } from './base.js';
 
 // Ad-Gate HTTP handshake with automatic retry for transient Cloudflare / network timeouts
@@ -236,21 +237,26 @@ export class MsmResolver extends BaseResolver {
     let deliveredMsgId = null;
     let resolvedFilename = null;
 
+    const evalContext = {
+      isTv,
+      title,
+      altTitle: effectiveAltTitle,
+      year,
+      sNum,
+      eNum,
+      totalSeasons,
+      targetQuality,
+      significantTokens,
+      altSignificantTokens: altTokens,
+      minTvSizeMb: effectiveMinTv,
+      minMovieSizeMb: effectiveMinMovie,
+    };
+
+    // Delivered documents already judged wrong; never re-evaluated or accepted (#332)
+    const rejectedMsgIds = new Set();
+
     function scoreButton(btn, msg) {
-      return scoreCandidateButtonWithReason(btn, msg, {
-        isTv,
-        title,
-        altTitle: effectiveAltTitle,
-        year,
-        sNum,
-        eNum,
-        totalSeasons,
-        targetQuality,
-        significantTokens,
-        altSignificantTokens: altTokens,
-        minTvSizeMb: effectiveMinTv,
-        minMovieSizeMb: effectiveMinMovie,
-      });
+      return scoreCandidateButtonWithReason(btn, msg, evalContext);
     }
 
     for (const sq of uniqueSearchQueries) {
@@ -554,11 +560,22 @@ export class MsmResolver extends BaseResolver {
               if (checkAborted()) break;
               const incoming = await this.client.getMessages(targetBot, { limit: 10 });
               for (const im of incoming) {
-                if (im.id > sentMsgId && im.media?.document) {
-                  candDeliveredDoc = im.media.document;
+                if (im.id > sentMsgId && im.media?.document && !rejectedMsgIds.has(im.id)) {
+                  const doc = im.media.document;
+                  const fnAttr = doc.attributes?.find(a => a.className === 'DocumentAttributeFilename');
+                  const docName = fnAttr ? fnAttr.fileName : (candidateFilename || queryTitle);
+                  // The bot can deliver the wrong file for a short code (#332, same class as #266);
+                  // never accept a document whose title/season/episode does not match the request.
+                  const verdict = validateDeliveredDocument({ filename: docName, caption: im.message, sizeBytes: doc.size }, evalContext);
+                  if (!verdict.ok) {
+                    rejectedMsgIds.add(im.id);
+                    console.warn(`[MSM RESOLVE] REJECT delivered document "${docName}" for "${queryTitle}" (${verdict.reason}), ignoring`);
+                    continue;
+                  }
+                  console.log(`[MSM RESOLVE] ACCEPT delivered document "${docName}" (score: ${verdict.score}, ${verdict.reason})`);
+                  candDeliveredDoc = doc;
                   candDeliveredMsgId = im.id;
-                  const fnAttr = candDeliveredDoc.attributes?.find(a => a.className === 'DocumentAttributeFilename');
-                  if (fnAttr) finalFilename = fnAttr.fileName;
+                  finalFilename = docName;
                   break;
                 }
               }

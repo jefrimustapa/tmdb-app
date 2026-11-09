@@ -1668,6 +1668,21 @@ it('still accepts a normal movie file and rejects a different movie (#266)', () 
   assert.strictEqual(bad.ok, false, `Expected Interstellar rejected, got: ${bad.reason}`);
 });
 
+it('rejects a wrong show delivered by MSM even when the caption names the right movie (#332 Night of the Living Dead 1990 -> Made in Korea S01E05)', () => {
+  const nightCtx = { isTv: false, title: 'Night of the Living Dead', year: '1990', targetQuality: 1080, minMovieSizeMb: 180 };
+  const bad = validateDeliveredDocument({
+    filename: 'Made.in.Korea.S01E05.720p.WEB-DL.mkv',
+    caption: 'Night.of.the.Living.Dead.1990.indo.sub.mp4 (774.02 MB)',
+    sizeBytes: 499 * 1024 * 1024,
+  }, nightCtx);
+  const good = validateDeliveredDocument({
+    filename: 'Night.of.the.Living.Dead.1990.indo.sub.mp4',
+    sizeBytes: 774.02 * 1024 * 1024,
+  }, nightCtx);
+  assert.strictEqual(bad.ok, false, `Expected Made in Korea rejected, got: ${bad.reason}`);
+  assert.strictEqual(good.ok, true, `Expected Night of the Living Dead accepted, got: ${good.reason}`);
+});
+
 console.log('\n23. Transcode Container Configuration & Universal Fragmented MP4 (#250)');
 
 it('configures universal Fragmented MP4 container for MKV transcode stream (#250)', () => {
