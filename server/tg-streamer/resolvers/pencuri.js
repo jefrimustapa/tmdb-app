@@ -479,14 +479,17 @@ export class PencuriResolver extends BaseResolver {
         await new Promise(r => setTimeout(r, delayMs));
         if (checkAborted()) break;
 
+        // Snapshot of this round's bots: a Mini App button below can push a new bot onto checkBots, which has no
+        // result in incomingResults yet; it is polled from the next attempt (#333)
+        const roundBots = checkBots.slice();
         const incomingResults = await Promise.allSettled(
-          checkBots.map(b => this.client.getMessages(b, { limit: 5 }))
+          roundBots.map(b => this.client.getMessages(b, { limit: 5 }))
         );
 
-        for (let bIdx = 0; bIdx < checkBots.length; bIdx++) {
-          const b = checkBots[bIdx];
+        for (let bIdx = 0; bIdx < roundBots.length; bIdx++) {
+          const b = roundBots[bIdx];
           const res = incomingResults[bIdx];
-          const incoming = (res.status === 'fulfilled' && Array.isArray(res.value)) ? res.value : [];
+          const incoming = (res && res.status === 'fulfilled' && Array.isArray(res.value)) ? res.value : [];
           const baseId = baselineMsgIds[b] || 0;
 
           for (const im of incoming) {
