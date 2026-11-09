@@ -47,7 +47,7 @@ function fetchJson(url: string, timeoutMs = 4000): Promise<any> {
 
 // 1. Live Server Health Check & Continuous Non-Looping Uptime Verification
 await it('verifies live tg-streamer responds healthy and maintains monotonic continuous uptime (#250)', async () => {
-  const liveUrl = 'https://julietmike.net:3033/api/system/stats';
+  const liveUrl = 'https://tgstrm.julietmike.net/api/system/stats';
   let stats1: any = null;
   try {
     stats1 = await fetchJson(liveUrl, 4000);
