@@ -10,8 +10,43 @@ permissions:
   packages: write
 
 jobs:
+  check-changes:
+    name: Check for changes since last nightly
+    runs-on: ubuntu-latest
+    outputs:
+      changed: ${{ steps.diff.outputs.changed }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Compare HEAD with the last nightly tag
+        id: diff
+        run: |
+          PREV_TAG=$(git describe --tags --abbrev=0 --match "nightly-*" HEAD 2>/dev/null || echo "")
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "Manual run: always build."
+            echo "changed=true" >> $GITHUB_OUTPUT
+          elif [ -z "$PREV_TAG" ]; then
+            echo "No previous nightly tag: building."
+            echo "changed=true" >> $GITHUB_OUTPUT
+          else
+            COUNT=$(git rev-list --count "$PREV_TAG..HEAD")
+            echo "Commits since $PREV_TAG: $COUNT"
+            if [ "$COUNT" -gt 0 ]; then
+              echo "changed=true" >> $GITHUB_OUTPUT
+            else
+              echo "No changes since $PREV_TAG: skipping nightly build."
+              echo "changed=false" >> $GITHUB_OUTPUT
+            fi
+          fi
+
   nightly-release:
     name: Build & Publish Nightly APK
+    needs: check-changes
+    if: needs.check-changes.outputs.changed == 'true'
     runs-on: ubuntu-latest
 
     steps:
