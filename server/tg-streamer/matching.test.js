@@ -2619,6 +2619,48 @@ it('verifies responsive flex layout classes for settings cards and dropdowns', (
   );
 });
 
+console.log('\n36. Pencuri delivery poll survives a Mini App bot discovered mid-round (#333)');
+
+await itAsync('does not throw when a Mini App button adds a new bot to the poll list mid-round (#333 Mr. Vampire 1985)', async () => {
+  const fileName = 'Mr.Vampire.1985.1080p.WEB-DL.MalaySub.mp4';
+  const origGet = pencuriHttp.get;
+  const origPost = pencuriHttp.post;
+  const delivered = { id: 12, message: fileName, media: { document: { size: 1.48 * 1024 * 1024 * 1024, attributes: [{ className: 'DocumentAttributeFilename', fileName }] } } };
+  const miniAppButtonMsg = { id: 11, message: 'Open', replyMarkup: { rows: [{ buttons: [{ url: 'https://t.me/torhdbot?startapp=abc123' }] }] } };
+
+  // Search API, link page and the Mini App HTTP calls are all answered locally
+  pencuriHttp.get = async (url) => {
+    if (String(url).includes('stream_search_files')) {
+      return { data: { success: true, data: { files: [{ id: 1, title: fileName, file_size: 1.48 * 1024 * 1024 * 1024, short_code: 'CIg7FG', play_url: 'http://local.test/link/CIg7FG' }] } } };
+    }
+    return { data: '<a href="https://t.me/UnOfficialsBot?start=CIg7FG-8665550029-0">Get</a>' }; // standard (not Mini App) link page
+  };
+  pencuriHttp.post = async () => ({ data: { success: false }, headers: {} });
+
+  // Bots other than torhdbot expose the Mini App button; torhdbot (not in the initial bot list) holds the file
+  const client = {
+    sendMessage: async () => ({ id: 1 }),
+    invoke: async () => ({}),
+    getInputEntity: async () => ({}),
+    getMessages: async (bot, opts = {}) => {
+      if (opts.limit === 1) return [{ id: 10 }];
+      if (bot === 'torhdbot') return [delivered];
+      if (bot === 'Pencuri_Movie_Bot') return [miniAppButtonMsg]; // last bot of the first round
+      return [];
+    },
+  };
+
+  try {
+    const resolver = new PencuriResolver(client, {});
+    const out = await resolver.resolve({ title: 'Mr. Vampire', year: '1985', targetQuality: 1080, requestedTier: '1080p' });
+    assert.ok(out, 'Expected the delivered document to be resolved');
+    assert.strictEqual(out.filename, fileName);
+  } finally {
+    pencuriHttp.get = origGet;
+    pencuriHttp.post = origPost;
+  }
+});
+
 // Clean up temporary test files (pending debounced saves are flushed first by waiting them out)
 setTimeout(() => {
   for (const f of testDbFiles) {
