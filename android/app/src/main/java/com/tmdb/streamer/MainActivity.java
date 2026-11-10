@@ -55,6 +55,7 @@ public class MainActivity extends BridgeActivity {
     private volatile boolean isSimulatingTouch = false;
     private volatile boolean isAdShieldActive = true;
     private OrientationEventListener orientationListener;
+    private CastManager castManager;
     private static long sPrevAppCpuTime = 0;
     private static long sPrevAppUptime = 0;
 
@@ -109,6 +110,8 @@ public class MainActivity extends BridgeActivity {
         setTheme(R.style.AppTheme);
         super.onCreate(savedInstanceState);
         WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
+        castManager = new CastManager(this);
+        castManager.init();
 
         try {
             PackageInfo pInfo = getPackageManager().getPackageInfo(getPackageName(), 0);
@@ -910,6 +913,47 @@ public class MainActivity extends BridgeActivity {
                     } catch (Exception e) {
                         return "{\"error\":\"" + e.getMessage() + "\"}";
                     }
+                }
+
+                // ---- Native Google Cast (direct streams only; see CastManager) ----
+                @JavascriptInterface
+                public boolean nativeCastAvailable() {
+                    return castManager != null && castManager.isAvailable();
+                }
+
+                @JavascriptInterface
+                public void startNativeCast(String url, String title, String contentType, long positionMs, String posterUrl) {
+                    if (castManager != null) castManager.start(url, title, contentType, positionMs, posterUrl);
+                }
+
+                @JavascriptInterface
+                public void nativeCastPlayPause() {
+                    if (castManager != null) castManager.playPause();
+                }
+
+                @JavascriptInterface
+                public void nativeCastPlay() {
+                    if (castManager != null) castManager.play();
+                }
+
+                @JavascriptInterface
+                public void nativeCastPause() {
+                    if (castManager != null) castManager.pause();
+                }
+
+                @JavascriptInterface
+                public void nativeCastSeek(long positionMs) {
+                    if (castManager != null) castManager.seek(positionMs);
+                }
+
+                @JavascriptInterface
+                public void nativeCastStop() {
+                    if (castManager != null) castManager.stop();
+                }
+
+                @JavascriptInterface
+                public String getNativeCastState() {
+                    return castManager != null ? castManager.stateJson() : "{\"connected\":false}";
                 }
             }, "AndroidBridge");
 
@@ -2813,6 +2857,7 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onDestroy() {
         super.onDestroy();
+        if (castManager != null) castManager.release();
         if (orientationListener != null) {
             orientationListener.disable();
         }
