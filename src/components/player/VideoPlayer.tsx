@@ -23,6 +23,7 @@ import { hasAndroidBridge } from '../../utils/platform';
 import { UNVERIFIABLE_GRACE_MS, loadReporters, saveReporters, isPlaybackUnverifiable } from '../../utils/embedPlaybackDetection';
 import { shouldIgnoreNativeIframeError } from '../../utils/nativeIframeError';
 import { DEFAULT_TGSTRM_HOST } from '../../services/tgStreamerDefaults';
+import { nativeCast } from '../../utils/nativeCast';
 
 interface VideoPlayerProps {
   mediaType: 'movie' | 'tv';
@@ -39,6 +40,8 @@ interface VideoPlayerProps {
   onProviderChange: (p: StreamProvider) => void;
   onActiveServerChange?: (serverLabel: string, activeProviderId?: string) => void;
   onProbingStatusChange?: (isProbing: boolean, currentServerIndex: number, totalServers?: number) => void;
+  /** Reports the direct stream URL while a direct (TGStrm) player is active, null otherwise. Used for native cast. */
+  onDirectStreamChange?: (url: string | null) => void;
   nextEpisodeInfo?: { season: number; episode: number; title?: string; stillPath?: string | null; airDate?: string | null; isAired?: boolean } | null;
   onNextEpisode?: () => void;
   initialTimestamp?: number;
@@ -77,6 +80,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   onProviderChange,
   onActiveServerChange,
   onProbingStatusChange,
+  onDirectStreamChange,
   nextEpisodeInfo,
   onNextEpisode,
   initialTimestamp = 0,
@@ -2055,6 +2059,13 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     initProgress();
   }, [tmdbId, mediaType, season, episode, voteAverage, posterPath, backdropPath, stillPath, episodeTitle, episodeRuntimeMinutes, initialTimestamp, releaseYear]);
 
+  // Tell the parent which direct stream (if any) is playing, so it can offer native cast.
+  // An iframe/embed source cannot be cast natively, so entering embed mode stops any cast.
+  useEffect(() => {
+    onDirectStreamChange?.(playerMode === 'direct' && directStreamUrl ? directStreamUrl : null);
+    if (playerMode === 'embed') nativeCast.stop();
+  }, [playerMode, directStreamUrl, onDirectStreamChange]);
+
   // Notify parent of probing status updates
   useEffect(() => {
     const currentIndex = orderedProviders.findIndex((p) => p.id === providerId);
@@ -2738,6 +2749,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           onProgress={(current, dur, isPaused) => {
             if (dur > 0) durationRef.current = dur;
             currentTimeRef.current = current;
+            nativeCast.setLocalPosition(current);
             recordProgress(current, dur, isPaused);
           }}
           onEnded={() => {

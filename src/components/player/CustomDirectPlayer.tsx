@@ -8,11 +8,13 @@ import {
   VolumeX,
   Zap,
   Sparkles,
-  Loader2
+  Loader2,
+  Cast
 } from 'lucide-react';
 import type Hls from 'hls.js';
 import { tmdbImages, TMDB_FALLBACK_BACKDROP } from '../../services/tmdb';
 import { useDevice } from '../../hooks/useDevice';
+import { nativeCast, useNativeCastState } from '../../utils/nativeCast';
 
 interface CustomDirectPlayerProps {
   src: string;
@@ -87,6 +89,12 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
   const [bufferedPercent, setBufferedPercent] = useState(0);
   const [isMuted, setIsMuted] = useState(false);
   const [volume, setVolume] = useState(1);
+
+  // Native Chromecast: while a session is active the TV plays and this player becomes its remote
+  const castState = useNativeCastState();
+  const castActiveRef = useRef(false);
+  castActiveRef.current = castState.active;
+  const wasCastActiveRef = useRef(false);
 
   useEffect(() => {
     if (totalDurationSec && totalDurationSec > 0) {
@@ -420,6 +428,16 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
   const performSeek = useCallback((targetTime: number) => {
     const video = videoRef.current;
     if (!video) return;
+    if (castActiveRef.current) {
+      // Casting: seek the TV, the local video stays paused
+      const castMax = duration || (totalDurationSec || 0);
+      const castTarget = Math.max(0, castMax > 0 ? Math.min(castMax - 0.5, targetTime) : targetTime);
+      nativeCast.seek(castTarget);
+      setCurrentTime(castTarget);
+      targetSeekTimeRef.current = null;
+      isSeekingRef.current = false;
+      return;
+    }
     const maxDur = duration || (totalDurationSec || 0) || video.duration || 0;
     const clamped = Math.max(0, maxDur > 0 ? Math.min(maxDur - 0.5, targetTime) : targetTime);
     const seekSeconds = Math.floor(clamped);
@@ -537,6 +555,13 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
     const video = videoRef.current;
     if (!video) return;
 
+    if (castActiveRef.current) {
+      nativeCast.playPause();
+      setIsPlaying((p) => !p);
+      resetControlsTimer();
+      return;
+    }
+
     if (video.paused) {
       video.muted = false;
       setIsMuted(false);
@@ -584,6 +609,53 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
     resetControlsTimer();
   }, [isTV, isTranscoded, performSeek, resetControlsTimer]);
 
+  // Cast session active: keep the local video silent/paused and mirror the TV state in the UI
+  useEffect(() => {
+    if (!castState.active) return;
+    const video = videoRef.current;
+    if (video && (!video.paused || !video.muted)) {
+      video.pause();
+      video.muted = true;
+    }
+    setIsPlaying(castState.playing);
+    setIsBuffering(false);
+    setIsInitialLoading(false);
+    if (!isDraggingScrubber && targetSeekTimeRef.current === null) setCurrentTime(castState.positionSec);
+    if (castState.durationSec > 0) setDuration(castState.durationSec);
+    onProgress?.(castState.positionSec, castState.durationSec || duration, !castState.playing);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [castState]);
+
+  // Cast session ended (stopped here, on the TV, or lost): resume local playback where the TV was
+  useEffect(() => {
+    if (castState.active) {
+      wasCastActiveRef.current = true;
+      return;
+    }
+    if (!wasCastActiveRef.current) return;
+    wasCastActiveRef.current = false;
+    const video = videoRef.current;
+    if (!video) return;
+    video.muted = false;
+    setIsMuted(false);
+    const resumeAt = castState.lastPositionSec ?? 0;
+    if (resumeAt > 1) performSeek(resumeAt);
+    video.play().catch(() => {});
+  }, [castState, performSeek]);
+
+  // A new source (e.g. next episode) loaded while casting: continue casting it on the TV
+  useEffect(() => {
+    if (!nativeCast.getState().active || !src) return;
+    const epLabel = season && episode ? ` S${season}E${episode}` : '';
+    nativeCast.start(
+      src,
+      `${title}${epLabel}`,
+      posterPath ? `https://image.tmdb.org/t/p/w500${posterPath}` : null,
+      initialTimestamp || 0
+    );
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [src]);
+
   // Auto-pause playback when app goes to background (Android TV Home, user switches apps) - Excludes Web Desktop
   useEffect(() => {
     if (isDesktop) return; // Allow continuous background playback / multi-tabbing on Web Desktop
@@ -613,7 +685,9 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
     if (!video) return;
 
     const isTranscodeActive = isTranscoded || Boolean(video.currentSrc && video.currentSrc.includes('transcode='));
-    const effectiveCurrent = isTranscodeActive ? (baseOffsetRef.current + video.currentTime) : video.currentTime;
+    const effectiveCurrent = castActiveRef.current
+      ? nativeCast.getState().positionSec
+      : (isTranscodeActive ? (baseOffsetRef.current + video.currentTime) : video.currentTime);
     const currentBase = targetSeekTimeRef.current !== null ? targetSeekTimeRef.current : effectiveCurrent;
     const maxDur = duration || (totalDurationSec || 0) || video.duration || 0;
     const newTime = Math.max(0, maxDur > 0 ? Math.min(maxDur, currentBase + seconds) : currentBase + seconds);
@@ -1023,6 +1097,25 @@ export const CustomDirectPlayer: React.FC<CustomDirectPlayerProps> = ({
         handleToggleControls();
       }}
     >
+      {/* Casting overlay: the TV is playing, this player is the remote */}
+      {castState.active && (
+        <div className="absolute inset-0 z-[1] flex flex-col items-center pt-[14%] bg-black/90 pointer-events-none">
+          <Cast className="w-10 h-10 text-hbo-cyan mb-3" />
+          <div className="text-sm font-semibold text-white">Casting to {castState.device || 'TV'}</div>
+          <div className="text-xs text-zinc-400 mt-1 truncate max-w-[80%]">{title}</div>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              nativeCast.stop();
+            }}
+            className="mt-4 px-4 py-1.5 rounded-full text-xs font-bold bg-white/10 hover:bg-white/20 border border-white/20 text-white pointer-events-auto relative z-30"
+          >
+            Stop casting
+          </button>
+        </div>
+      )}
+
       {/* HTML5 Video Element (controls disabled to eradicate native Android WebView placeholder) */}
       <video
         ref={videoRef}

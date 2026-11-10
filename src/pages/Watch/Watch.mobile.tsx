@@ -15,6 +15,7 @@ import { isAseanMedia, isKoreanMedia } from '../../services/lariMappingService';
 import { msmService } from '../../services/msmMappingService';
 import { isEpisodeAired } from '../../services/episodeAirStatus';
 import { canCast } from '../../utils/platform';
+import { nativeCast, shouldOfferNativeCast } from '../../utils/nativeCast';
 import { getWatchHeaderYear } from '../../utils/watchHeader';
 import { ArrowLeft, SkipForward, SkipBack, Cast, Tv, X, Settings, Maximize, Minimize } from 'lucide-react';
 import { useDevice } from '../../hooks/useDevice';
@@ -538,6 +539,24 @@ export const Watch: React.FC = () => {
   const [showCastMenu, setShowCastMenu] = useState(false);
   // Cast only works through the Android bridge; hide it on web
   const castAvailable = canCast();
+  // Native Chromecast is only offered while a direct TGStrm stream is playing (never for embeds)
+  const [directStreamUrl, setDirectStreamUrl] = useState<string | null>(null);
+  const nativeCastOffered = shouldOfferNativeCast(directStreamUrl);
+
+  // Leaving the Watch page ends any native cast session (home / lock screen do not unmount this)
+  useEffect(() => () => { nativeCast.stop(); }, []);
+
+  const handleNativeCast = useCallback(() => {
+    setShowCastMenu(false);
+    if (!directStreamUrl) return;
+    const castTitle = details ? ((details as any).title || (details as any).name || '') : '';
+    const epLabel = mediaType === 'tv' ? ` S${seasonParam}E${episodeParam}` : '';
+    nativeCast.start(
+      directStreamUrl,
+      `${castTitle}${epLabel}`,
+      details?.poster_path ? `https://image.tmdb.org/t/p/w500${details.poster_path}` : null
+    );
+  }, [directStreamUrl, mediaType, seasonParam, episodeParam, details]);
 
   const handleOpenCastMenu = useCallback(() => {
     setShowCastMenu(true);
@@ -848,6 +867,7 @@ export const Watch: React.FC = () => {
             releaseYear={releaseYear}
             originalTitle={details.original_title || details.original_name}
             onProviderChange={handleProviderChange}
+            onDirectStreamChange={setDirectStreamUrl}
             onActiveServerChange={(serverLabel, activeId) => {
               setActiveServerLabel(serverLabel);
               if (activeId && activeId !== providerId) {
@@ -931,6 +951,27 @@ export const Watch: React.FC = () => {
 
             {/* Clean 2 options */}
             <div className="space-y-2">
+              {/* Native Chromecast (TGStrm only): TV streams directly, phone is the remote */}
+              {nativeCastOffered && (
+                <button
+                  type="button"
+                  onClick={handleNativeCast}
+                  className="w-full flex items-center gap-3 p-3 rounded-xl bg-hbo-cyan/10 hover:bg-hbo-cyan/20 active:bg-hbo-cyan/25 border border-hbo-cyan/40 transition text-left group cursor-pointer"
+                >
+                  <div className="p-2 rounded-lg bg-hbo-cyan/20 text-hbo-cyan group-hover:scale-105 transition flex-shrink-0">
+                    <Cast className="w-4 h-4" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-xs font-semibold text-white group-hover:text-hbo-cyan transition truncate">
+                      Cast to TV (Chromecast)
+                    </div>
+                    <div className="text-[10px] text-zinc-400 truncate">
+                      TV plays the stream directly, phone becomes the remote
+                    </div>
+                  </div>
+                </button>
+              )}
+
               {/* Option 1: Standard Google Cast Screen Mirror */}
               <button
                 type="button"
