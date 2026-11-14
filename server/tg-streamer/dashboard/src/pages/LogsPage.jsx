@@ -20,12 +20,12 @@ import {
   LinearProgress,
   Alert,
   Snackbar,
-  ButtonGroup,
 } from '@mui/material';
 import DownloadIcon from '@mui/icons-material/Download';
 import DeleteSweepIcon from '@mui/icons-material/DeleteSweep';
 import SearchIcon from '@mui/icons-material/Search';
 import FiberManualRecordIcon from '@mui/icons-material/FiberManualRecord';
+import TerminalIcon from '@mui/icons-material/Terminal';
 import { api } from '../api/client';
 
 export default function LogsPage() {
@@ -62,24 +62,19 @@ export default function LogsPage() {
       if (isMounted) setSseStatus('live');
     };
 
-    es.onmessage = (e) => {
-      if (!isMounted) return;
-      try {
-        const data = JSON.parse(e.data);
-        if (data.lines && data.lines.length > 0) {
-          setLogs((prev) => {
-            const next = [...prev, ...data.lines];
-            return next.length > 2500 ? next.slice(-2000) : next;
-          });
-        }
-      } catch (err) {
-        console.error('Error parsing SSE data:', err);
-      }
-    };
-
     es.onerror = () => {
       if (isMounted) setSseStatus('error');
     };
+
+    es.addEventListener('log', (event) => {
+      if (!isMounted) return;
+      try {
+        const line = JSON.parse(event.data);
+        setLogs((prev) => [...prev.slice(-1000), line]);
+      } catch (e) {
+        setLogs((prev) => [...prev.slice(-1000), event.data]);
+      }
+    });
 
     return () => {
       isMounted = false;
@@ -114,24 +109,24 @@ export default function LogsPage() {
 
   const getLineColor = (line) => {
     if (line.includes('[ERROR]') || line.includes('[FATAL]') || line.includes('Error:')) {
-      return '#f43f5e'; // rose-500
+      return '#F43F5E'; // rose-500
     }
     if (line.includes('[WARN]')) {
-      return '#fbbf24'; // amber-400
+      return '#FBBF24'; // amber-400
     }
     if (line.includes('[STREAM') || line.includes('[PIPELINE')) {
-      return '#38bdf8'; // sky-400
+      return '#38BDF8'; // sky-400
     }
     if (line.includes('[SUPERVISOR')) {
-      return '#34d399'; // emerald-400
+      return '#34D399'; // emerald-400
     }
     if (line.includes('[TG]') || line.includes('[AUTH')) {
-      return '#c084fc'; // purple-400
+      return '#818CF8'; // indigo-400
     }
     if (line.includes('[MEMORY PURGE]') || line.includes('[SYSTEM]')) {
-      return '#22d3ee'; // cyan-400
+      return '#22D3EE'; // cyan-400
     }
-    return '#94a3b8'; // slate-400
+    return '#94A3B8'; // slate-400
   };
 
   const filteredLogs = logs.filter((l) => {
@@ -141,14 +136,14 @@ export default function LogsPage() {
   });
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+    <Box sx={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, gap: 2 }}>
       {/* Header */}
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
         <Box>
-          <Typography variant="h5" sx={{ fontWeight: 800 }}>
+          <Typography variant="h5" sx={{ fontWeight: 800, letterSpacing: '-0.02em' }}>
             Live Log Console
           </Typography>
-          <Typography variant="body2" color="text.secondary">
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.25 }}>
             Real-time MTProto microservice streaming & diagnostic log stream
           </Typography>
         </Box>
@@ -156,9 +151,17 @@ export default function LogsPage() {
           <Button
             variant="outlined"
             size="small"
-            color="error"
             startIcon={<DeleteSweepIcon />}
             onClick={() => setClearDialogOpen(true)}
+            sx={{
+              borderColor: 'rgba(244, 63, 94, 0.3)',
+              color: '#F43F5E',
+              bgcolor: 'rgba(244, 63, 94, 0.05)',
+              '&:hover': {
+                borderColor: '#F43F5E',
+                bgcolor: 'rgba(244, 63, 94, 0.12)',
+              },
+            }}
           >
             Clear Log
           </Button>
@@ -169,6 +172,14 @@ export default function LogsPage() {
             href={api.getDownloadUrl('/logs/download')}
             target="_blank"
             rel="noopener"
+            sx={{
+              borderColor: 'rgba(148, 163, 184, 0.2)',
+              color: '#F8FAFC',
+              '&:hover': {
+                borderColor: '#38BDF8',
+                color: '#38BDF8',
+              },
+            }}
           >
             Download .log
           </Button>
@@ -176,8 +187,8 @@ export default function LogsPage() {
       </Box>
 
       {/* Filter and Control Bar */}
-      <Card sx={{ mb: 2 }}>
-        <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 } }}>
+      <Card>
+        <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
           <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} justifyContent="space-between" alignItems="center">
             {/* Quick Filters */}
             <Stack direction="row" spacing={1} flexWrap="wrap">
@@ -187,18 +198,28 @@ export default function LogsPage() {
                 { label: 'Telegram', value: '[TG]' },
                 { label: 'Errors', value: 'ERROR' },
                 { label: 'Supervisor', value: '[SUPERVISOR]' },
-              ].map((f) => (
-                <Chip
-                  key={f.label}
-                  label={f.label}
-                  size="small"
-                  clickable
-                  color={filterType === f.value ? 'primary' : 'default'}
-                  variant={filterType === f.value ? 'filled' : 'outlined'}
-                  onClick={() => setFilterType(f.value)}
-                  sx={{ fontWeight: 600 }}
-                />
-              ))}
+              ].map((f) => {
+                const active = filterType === f.value;
+                return (
+                  <Chip
+                    key={f.label}
+                    label={f.label}
+                    size="small"
+                    clickable
+                    onClick={() => setFilterType(f.value)}
+                    sx={{
+                      fontWeight: 700,
+                      fontSize: '0.75rem',
+                      bgcolor: active ? 'rgba(56, 189, 248, 0.15)' : '#090D16',
+                      color: active ? '#38BDF8' : '#94A3B8',
+                      border: active ? '1px solid rgba(56, 189, 248, 0.35)' : '1px solid rgba(148, 163, 184, 0.15)',
+                      '&:hover': {
+                        bgcolor: active ? 'rgba(56, 189, 248, 0.2)' : 'rgba(255, 255, 255, 0.05)',
+                      },
+                    }}
+                  />
+                );
+              })}
             </Stack>
 
             {/* Search and Auto-scroll */}
@@ -209,9 +230,18 @@ export default function LogsPage() {
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 InputProps={{
-                  startAdornment: <SearchIcon fontSize="small" sx={{ mr: 0.5, color: 'text.secondary' }} />,
+                  startAdornment: <SearchIcon fontSize="small" sx={{ mr: 0.5, color: '#94A3B8' }} />,
                 }}
-                sx={{ width: { xs: '100%', md: 240 } }}
+                sx={{
+                  width: { xs: '100%', md: 240 },
+                  '& .MuiOutlinedInput-root': {
+                    bgcolor: '#090D16',
+                    borderRadius: 2,
+                    '& fieldset': { borderColor: 'rgba(148, 163, 184, 0.2)' },
+                    '&:hover fieldset': { borderColor: 'rgba(56, 189, 248, 0.4)' },
+                    '&.Mui-focused fieldset': { borderColor: '#38BDF8' },
+                  },
+                }}
               />
               <FormControlLabel
                 control={
@@ -219,9 +249,10 @@ export default function LogsPage() {
                     size="small"
                     checked={autoScroll}
                     onChange={(e) => setAutoScroll(e.target.checked)}
+                    color="primary"
                   />
                 }
-                label={<Typography variant="caption">Auto-scroll</Typography>}
+                label={<Typography variant="caption" sx={{ fontWeight: 600, color: '#94A3B8' }}>Auto-scroll</Typography>}
               />
             </Stack>
           </Stack>
@@ -234,43 +265,65 @@ export default function LogsPage() {
           flex: 1,
           display: 'flex',
           flexDirection: 'column',
-          bgcolor: '#06090e',
-          border: '1px solid #1e293b',
+          bgcolor: '#050811',
+          border: '1px solid rgba(148, 163, 184, 0.15)',
+          borderRadius: 2.5,
           minHeight: 520,
+          boxShadow: '0 8px 30px rgba(0, 0, 0, 0.6)',
+          overflow: 'hidden',
         }}
       >
-        {/* Terminal Header Bar */}
+        {/* Terminal Header Bar (macOS style 3-dots) */}
         <Box
           sx={{
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
             px: 2,
-            py: 1,
-            bgcolor: '#0B0F17',
-            borderBottom: '1px solid #1e293b',
+            py: 1.25,
+            bgcolor: '#090D16',
+            borderBottom: '1px solid rgba(148, 163, 184, 0.12)',
           }}
         >
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: '#f43f5e' }} />
-            <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: '#fbbf24' }} />
-            <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: '#34d399' }} />
-            <Typography variant="caption" sx={{ fontFamily: 'monospace', color: 'text.secondary', ml: 1 }}>
-              tg-streamer.log
+            <Box sx={{ width: 11, height: 11, borderRadius: '50%', bgcolor: '#F43F5E', boxShadow: '0 0 6px rgba(244, 63, 94, 0.4)' }} />
+            <Box sx={{ width: 11, height: 11, borderRadius: '50%', bgcolor: '#FBBF24', boxShadow: '0 0 6px rgba(251, 191, 36, 0.4)' }} />
+            <Box sx={{ width: 11, height: 11, borderRadius: '50%', bgcolor: '#34D399', boxShadow: '0 0 6px rgba(52, 211, 153, 0.4)' }} />
+            <Typography variant="caption" sx={{ fontFamily: '"JetBrains Mono", monospace', fontWeight: 600, color: '#94A3B8', ml: 1.5 }}>
+              tg-streamer.log — console
             </Typography>
           </Box>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            <Typography variant="caption" sx={{ fontFamily: 'monospace', color: 'text.secondary' }}>
+            <Typography variant="caption" sx={{ fontFamily: '"JetBrains Mono", monospace', color: '#94A3B8' }}>
               {filteredLogs.length} lines
             </Typography>
-            <Chip
-              size="small"
-              icon={<FiberManualRecordIcon sx={{ fontSize: '10px !important' }} />}
-              label={sseStatus === 'live' ? 'Live Stream' : sseStatus === 'error' ? 'Reconnecting...' : 'Connecting'}
-              color={sseStatus === 'live' ? 'success' : sseStatus === 'error' ? 'warning' : 'default'}
-              variant="outlined"
-              sx={{ height: 20, fontSize: '0.7rem' }}
-            />
+            <Box
+              sx={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 0.75,
+                px: 1.25,
+                py: 0.35,
+                borderRadius: '12px',
+                fontSize: '0.7rem',
+                fontWeight: 700,
+                fontFamily: '"JetBrains Mono", monospace',
+                bgcolor: sseStatus === 'live' ? 'rgba(52, 211, 153, 0.1)' : 'rgba(251, 191, 36, 0.1)',
+                color: sseStatus === 'live' ? '#34D399' : '#FBBF24',
+                border: `1px solid ${sseStatus === 'live' ? 'rgba(52, 211, 153, 0.25)' : 'rgba(251, 191, 36, 0.25)'}`,
+              }}
+            >
+              <Box
+                sx={{
+                  width: 6,
+                  height: 6,
+                  borderRadius: '50%',
+                  bgcolor: sseStatus === 'live' ? '#34D399' : '#FBBF24',
+                  boxShadow: sseStatus === 'live' ? '0 0 8px #34D399' : 'none',
+                }}
+              />
+              {sseStatus === 'live' ? 'LIVE SSE' : sseStatus === 'error' ? 'RECONNECTING' : 'CONNECTING'}
+            </Box>
           </Box>
         </Box>
 
@@ -279,22 +332,22 @@ export default function LogsPage() {
           ref={terminalRef}
           sx={{
             flex: 1,
-            p: 2,
+            p: 2.5,
             overflowY: 'auto',
             fontFamily: '"JetBrains Mono", monospace',
-            fontSize: '0.78rem',
-            lineHeight: 1.6,
+            fontSize: '0.8rem',
+            lineHeight: 1.65,
             whiteSpace: 'pre-wrap',
             wordBreak: 'break-all',
           }}
         >
           {filteredLogs.length === 0 ? (
-            <Typography variant="caption" sx={{ color: 'text.secondary', fontStyle: 'italic' }}>
+            <Typography variant="caption" sx={{ color: 'text.secondary', fontStyle: 'italic', fontFamily: '"JetBrains Mono", monospace' }}>
               No log lines matching criteria.
             </Typography>
           ) : (
             filteredLogs.map((line, idx) => (
-              <Box key={idx} sx={{ color: getLineColor(line) }}>
+              <Box key={idx} sx={{ color: getLineColor(line), py: 0.1 }}>
                 {line}
               </Box>
             ))
@@ -306,13 +359,13 @@ export default function LogsPage() {
       <Dialog open={clearDialogOpen} onClose={() => !actionLoading && setClearDialogOpen(false)}>
         <DialogTitle sx={{ fontWeight: 700 }}>Truncate Server Log</DialogTitle>
         <DialogContent>
-          <DialogContentText>
+          <DialogContentText sx={{ color: 'text.secondary' }}>
             Are you sure you want to physically clear and truncate the live log file on the router? All current historical logs will be permanently deleted.
           </DialogContentText>
           {actionLoading && <LinearProgress sx={{ mt: 2 }} />}
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setClearDialogOpen(false)} disabled={actionLoading}>Cancel</Button>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setClearDialogOpen(false)} disabled={actionLoading} sx={{ color: 'text.secondary' }}>Cancel</Button>
           <Button onClick={handleClearLog} color="error" variant="contained" disabled={actionLoading}>
             Clear Log
           </Button>

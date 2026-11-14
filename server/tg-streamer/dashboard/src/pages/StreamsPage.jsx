@@ -33,6 +33,8 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import SearchIcon from '@mui/icons-material/Search';
 import DeleteForeverIcon from '@mui/icons-material/DeleteForever';
+import StorageIcon from '@mui/icons-material/Storage';
+import VideoLibraryIcon from '@mui/icons-material/VideoLibrary';
 import { api } from '../api/client';
 
 export default function StreamsPage() {
@@ -125,26 +127,64 @@ export default function StreamsPage() {
     }
   };
 
+  const getQualityBadge = (quality) => {
+    const q = (quality || '').toLowerCase();
+    if (q.includes('4k') || q.includes('2160')) {
+      return {
+        bg: 'rgba(129, 140, 248, 0.12)',
+        color: '#818CF8',
+        border: 'rgba(129, 140, 248, 0.3)',
+      };
+    }
+    if (q.includes('1080')) {
+      return {
+        bg: 'rgba(56, 189, 248, 0.12)',
+        color: '#38BDF8',
+        border: 'rgba(56, 189, 248, 0.3)',
+      };
+    }
+    if (q.includes('720')) {
+      return {
+        bg: 'rgba(52, 211, 153, 0.12)',
+        color: '#34D399',
+        border: 'rgba(52, 211, 153, 0.3)',
+      };
+    }
+    return {
+      bg: 'rgba(251, 191, 36, 0.12)',
+      color: '#FBBF24',
+      border: 'rgba(251, 191, 36, 0.3)',
+    };
+  };
+
   return (
-    <Box>
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
       {/* Header */}
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
         <Box>
-          <Typography variant="h5" sx={{ fontWeight: 800 }}>
+          <Typography variant="h5" sx={{ fontWeight: 800, letterSpacing: '-0.02em' }}>
             Persistent Stream Cache
           </Typography>
-          <Typography variant="body2" color="text.secondary">
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.25 }}>
             Manage pre-resolved Telegram MTProto video streams stored in database
           </Typography>
         </Box>
         <Stack direction="row" spacing={1.5}>
           <Button
             variant="outlined"
-            color="error"
             size="small"
             startIcon={<DeleteForeverIcon />}
             onClick={() => setClearAllOpen(true)}
             disabled={streams.length === 0}
+            sx={{
+              borderColor: 'rgba(244, 63, 94, 0.3)',
+              color: '#F43F5E',
+              bgcolor: 'rgba(244, 63, 94, 0.05)',
+              '&:hover': {
+                borderColor: '#F43F5E',
+                bgcolor: 'rgba(244, 63, 94, 0.12)',
+              },
+            }}
           >
             Clear All Cache
           </Button>
@@ -153,6 +193,14 @@ export default function StreamsPage() {
             size="small"
             startIcon={<RefreshIcon />}
             onClick={fetchStreams}
+            sx={{
+              borderColor: 'rgba(148, 163, 184, 0.2)',
+              color: '#F8FAFC',
+              '&:hover': {
+                borderColor: '#38BDF8',
+                color: '#38BDF8',
+              },
+            }}
           >
             Refresh
           </Button>
@@ -160,8 +208,8 @@ export default function StreamsPage() {
       </Box>
 
       {/* Filter and Search Bar */}
-      <Card sx={{ mb: 3 }}>
-        <CardContent sx={{ p: 2 }}>
+      <Card>
+        <CardContent sx={{ p: 2.5 }}>
           <form onSubmit={handleSearchSubmit}>
             <Grid container spacing={2} alignItems="center">
               <Grid item xs={12} sm={6} md={7}>
@@ -172,7 +220,16 @@ export default function StreamsPage() {
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   InputProps={{
-                    startAdornment: <SearchIcon fontSize="small" sx={{ mr: 1, color: 'text.secondary' }} />,
+                    startAdornment: <SearchIcon fontSize="small" sx={{ mr: 1, color: '#94A3B8' }} />,
+                  }}
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      bgcolor: '#090D16',
+                      borderRadius: 2,
+                      '& fieldset': { borderColor: 'rgba(148, 163, 184, 0.2)' },
+                      '&:hover fieldset': { borderColor: 'rgba(56, 189, 248, 0.4)' },
+                      '&.Mui-focused fieldset': { borderColor: '#38BDF8' },
+                    },
                   }}
                 />
               </Grid>
@@ -184,6 +241,15 @@ export default function StreamsPage() {
                   label="Quality Tier"
                   value={qualityFilter}
                   onChange={(e) => setQualityFilter(e.target.value)}
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      bgcolor: '#090D16',
+                      borderRadius: 2,
+                      '& fieldset': { borderColor: 'rgba(148, 163, 184, 0.2)' },
+                      '&:hover fieldset': { borderColor: 'rgba(56, 189, 248, 0.4)' },
+                      '&.Mui-focused fieldset': { borderColor: '#38BDF8' },
+                    },
+                  }}
                 >
                   <MenuItem value="">All Qualities</MenuItem>
                   <MenuItem value="4k">4K (2160p)</MenuItem>
@@ -193,7 +259,7 @@ export default function StreamsPage() {
                 </TextField>
               </Grid>
               <Grid item xs={6} sm={3} md={2}>
-                <Button type="submit" fullWidth variant="contained" sx={{ height: 40 }}>
+                <Button type="submit" fullWidth variant="contained" sx={{ height: 40, borderRadius: 2 }}>
                   Search
                 </Button>
               </Grid>
@@ -206,27 +272,48 @@ export default function StreamsPage() {
       <Card>
         <CardContent sx={{ p: 2.5 }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-            <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
-              Cached Stream Records ({streams.length})
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Total Storage: <Box component="span" sx={{ fontWeight: 700, color: 'primary.light' }}>{totalSize}</Box>
-            </Typography>
+            <Box>
+              <Typography variant="subtitle1" sx={{ fontWeight: 700, color: '#F8FAFC' }}>
+                Cached Stream Records ({streams.length})
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                Pre-indexed file hashes and direct access channels
+              </Typography>
+            </Box>
+            <Box
+              sx={{
+                px: 1.5,
+                py: 0.5,
+                borderRadius: '8px',
+                bgcolor: 'rgba(56, 189, 248, 0.08)',
+                border: '1px solid rgba(56, 189, 248, 0.2)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1,
+              }}
+            >
+              <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
+                Total Storage:
+              </Typography>
+              <Typography variant="caption" sx={{ fontFamily: '"JetBrains Mono", monospace', fontWeight: 700, color: '#38BDF8' }}>
+                {totalSize}
+              </Typography>
+            </Box>
           </Box>
 
           {loading ? (
-            <LinearProgress sx={{ my: 3 }} />
+            <LinearProgress sx={{ my: 3, borderRadius: 1 }} />
           ) : (
-            <TableContainer component={Paper} variant="outlined" sx={{ bgcolor: 'background.default' }}>
+            <TableContainer component={Paper} variant="outlined" sx={{ bgcolor: '#090D16', borderColor: 'rgba(148, 163, 184, 0.12)', borderRadius: 2 }}>
               <Table size="small">
                 <TableHead>
                   <TableRow>
-                    <TableCell sx={{ fontWeight: 700 }}>Media Title</TableCell>
-                    <TableCell sx={{ fontWeight: 700 }}>Quality & Size</TableCell>
-                    <TableCell sx={{ fontWeight: 700 }}>Query Key</TableCell>
-                    <TableCell sx={{ fontWeight: 700 }}>Resolver / Bot</TableCell>
-                    <TableCell sx={{ fontWeight: 700 }}>DC</TableCell>
-                    <TableCell align="right" sx={{ fontWeight: 700 }}>Actions</TableCell>
+                    <TableCell>Media Title</TableCell>
+                    <TableCell>Quality & Size</TableCell>
+                    <TableCell>Query Key</TableCell>
+                    <TableCell>Resolver / Bot</TableCell>
+                    <TableCell>DC</TableCell>
+                    <TableCell align="right">Actions</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -237,77 +324,98 @@ export default function StreamsPage() {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    streams.map((item, idx) => (
-                      <TableRow key={item.docId || idx} hover>
-                        <TableCell sx={{ maxWidth: 320 }}>
-                          <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.primary', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={item.title || item.filename}>
-                            🎬 {item.title || item.filename || 'Untitled Stream'}
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary" sx={{ fontFamily: 'monospace' }}>
-                            Doc ID: {item.docId || '--'}
-                          </Typography>
-                        </TableCell>
-                        <TableCell>
-                          <Stack direction="row" spacing={1} alignItems="center">
-                            <Chip
-                              size="small"
-                              label={item.quality || item.qualityTier || '720p'}
-                              color={item.quality === '1080p' || item.quality === '4k' ? 'primary' : 'default'}
-                              sx={{ fontWeight: 700, textTransform: 'uppercase' }}
-                            />
-                            <Typography variant="caption" sx={{ fontFamily: 'monospace', color: 'primary.light' }}>
-                              {item.sizeFormatted || item.size || '--'}
+                    streams.map((item, idx) => {
+                      const badge = getQualityBadge(item.quality || item.qualityTier);
+                      return (
+                        <TableRow key={item.docId || idx} hover sx={{ '&:hover': { bgcolor: 'rgba(56, 189, 248, 0.04) !important' } }}>
+                          <TableCell sx={{ maxWidth: 320 }}>
+                            <Typography variant="body2" sx={{ fontWeight: 600, color: '#F8FAFC', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={item.title || item.filename}>
+                              🎬 {item.title || item.filename || 'Untitled Stream'}
                             </Typography>
-                          </Stack>
-                        </TableCell>
-                        <TableCell sx={{ fontFamily: 'monospace', fontSize: '0.8rem', color: 'text.secondary' }}>
-                          {item.queryKey || '--'}
-                        </TableCell>
-                        <TableCell>
-                          <Stack direction="row" spacing={0.5}>
-                            {item.resolver && (
+                            <Typography variant="caption" color="text.secondary" sx={{ fontFamily: '"JetBrains Mono", monospace' }}>
+                              Doc ID: {item.docId || '--'}
+                            </Typography>
+                          </TableCell>
+                          <TableCell>
+                            <Stack direction="row" spacing={1} alignItems="center">
                               <Chip
                                 size="small"
-                                label={item.resolver.toUpperCase()}
-                                sx={{ fontSize: '0.7rem', height: 20, bgcolor: 'rgba(52, 211, 153, 0.1)', color: 'secondary.main' }}
+                                label={(item.quality || item.qualityTier || '720p').toUpperCase()}
+                                sx={{
+                                  fontWeight: 800,
+                                  fontSize: '0.72rem',
+                                  bgcolor: badge.bg,
+                                  color: badge.color,
+                                  border: `1px solid ${badge.border}`,
+                                }}
                               />
-                            )}
-                            {item.bot && (
-                              <Chip
-                                size="small"
-                                label={`@${item.bot.replace(/^@/, '')}`}
-                                sx={{ fontSize: '0.7rem', height: 20 }}
-                              />
-                            )}
-                          </Stack>
-                        </TableCell>
-                        <TableCell sx={{ fontFamily: 'monospace', fontSize: '0.8rem', color: 'text.secondary' }}>
-                          DC {item.dcId || 4}
-                        </TableCell>
-                        <TableCell align="right">
-                          <Stack direction="row" spacing={1} justifyContent="flex-end">
-                            <Tooltip title="Copy Document ID">
-                              <IconButton
-                                size="small"
-                                onClick={() => handleCopyDocId(item.docId)}
-                                sx={{ color: 'text.secondary', '&:hover': { color: 'primary.main' } }}
-                              >
-                                <ContentCopyIcon fontSize="small" />
-                              </IconButton>
-                            </Tooltip>
-                            <Tooltip title="Evict from cache">
-                              <IconButton
-                                size="small"
-                                color="error"
-                                onClick={() => setSelectedItem(item)}
-                              >
-                                <DeleteIcon fontSize="small" />
-                              </IconButton>
-                            </Tooltip>
-                          </Stack>
-                        </TableCell>
-                      </TableRow>
-                    ))
+                              <Typography variant="caption" sx={{ fontFamily: '"JetBrains Mono", monospace', color: '#38BDF8', fontWeight: 600 }}>
+                                {item.sizeFormatted || item.size || '--'}
+                              </Typography>
+                            </Stack>
+                          </TableCell>
+                          <TableCell sx={{ fontFamily: '"JetBrains Mono", monospace', fontSize: '0.8rem', color: '#94A3B8' }}>
+                            {item.queryKey || '--'}
+                          </TableCell>
+                          <TableCell>
+                            <Stack direction="row" spacing={0.5}>
+                              {item.resolver && (
+                                <Chip
+                                  size="small"
+                                  label={item.resolver.toUpperCase()}
+                                  sx={{
+                                    fontSize: '0.7rem',
+                                    height: 20,
+                                    bgcolor: 'rgba(129, 140, 248, 0.1)',
+                                    color: '#818CF8',
+                                    border: '1px solid rgba(129, 140, 248, 0.25)',
+                                    fontWeight: 700,
+                                  }}
+                                />
+                              )}
+                              {item.bot && (
+                                <Chip
+                                  size="small"
+                                  label={`@${item.bot.replace(/^@/, '')}`}
+                                  sx={{
+                                    fontSize: '0.7rem',
+                                    height: 20,
+                                    bgcolor: 'rgba(148, 163, 184, 0.08)',
+                                    color: '#94A3B8',
+                                    border: '1px solid rgba(148, 163, 184, 0.15)',
+                                  }}
+                                />
+                              )}
+                            </Stack>
+                          </TableCell>
+                          <TableCell sx={{ fontFamily: '"JetBrains Mono", monospace', fontSize: '0.8rem', color: '#94A3B8' }}>
+                            DC {item.dcId || 4}
+                          </TableCell>
+                          <TableCell align="right">
+                            <Stack direction="row" spacing={0.5} justifyContent="flex-end">
+                              <Tooltip title="Copy Document ID">
+                                <IconButton
+                                  size="small"
+                                  onClick={() => handleCopyDocId(item.docId)}
+                                  sx={{ color: '#94A3B8', '&:hover': { color: '#38BDF8', bgcolor: 'rgba(56, 189, 248, 0.1)' } }}
+                                >
+                                  <ContentCopyIcon fontSize="small" />
+                                </IconButton>
+                              </Tooltip>
+                              <Tooltip title="Evict from cache">
+                                <IconButton
+                                  size="small"
+                                  onClick={() => setSelectedItem(item)}
+                                  sx={{ color: '#F43F5E', '&:hover': { bgcolor: 'rgba(244, 63, 94, 0.1)' } }}
+                                >
+                                  <DeleteIcon fontSize="small" />
+                                </IconButton>
+                              </Tooltip>
+                            </Stack>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
                   )}
                 </TableBody>
               </Table>
@@ -320,13 +428,13 @@ export default function StreamsPage() {
       <Dialog open={selectedItem !== null} onClose={() => !actionLoading && setSelectedItem(null)}>
         <DialogTitle sx={{ fontWeight: 700 }}>Confirm Cache Eviction</DialogTitle>
         <DialogContent>
-          <DialogContentText>
+          <DialogContentText sx={{ color: 'text.secondary' }}>
             Are you sure you want to evict <strong>{selectedItem?.title || selectedItem?.filename || selectedItem?.queryKey}</strong> from the persistent cache database?
           </DialogContentText>
           {actionLoading && <LinearProgress sx={{ mt: 2 }} />}
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setSelectedItem(null)} disabled={actionLoading}>Cancel</Button>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setSelectedItem(null)} disabled={actionLoading} sx={{ color: 'text.secondary' }}>Cancel</Button>
           <Button onClick={handleEvict} color="error" variant="contained" disabled={actionLoading}>
             Evict Record
           </Button>
@@ -335,17 +443,17 @@ export default function StreamsPage() {
 
       {/* Clear All Dialog */}
       <Dialog open={clearAllOpen} onClose={() => !actionLoading && setClearAllOpen(false)}>
-        <DialogTitle sx={{ fontWeight: 700, color: 'error.main' }}>
+        <DialogTitle sx={{ fontWeight: 700, color: '#F43F5E' }}>
           DANGER: Clear All Cache
         </DialogTitle>
         <DialogContent>
-          <DialogContentText>
+          <DialogContentText sx={{ color: 'text.secondary' }}>
             This action will physically purge and clear ALL cached stream records from the database. Any cached video references will need to be re-queried via Telegram bots.
           </DialogContentText>
           {actionLoading && <LinearProgress sx={{ mt: 2 }} />}
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setClearAllOpen(false)} disabled={actionLoading}>Cancel</Button>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setClearAllOpen(false)} disabled={actionLoading} sx={{ color: 'text.secondary' }}>Cancel</Button>
           <Button onClick={handleClearAll} color="error" variant="contained" disabled={actionLoading}>
             Yes, Purge Entire Cache
           </Button>

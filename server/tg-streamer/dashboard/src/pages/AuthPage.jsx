@@ -120,13 +120,22 @@ export default function AuthPage({ onStatusUpdate }) {
   };
 
   return (
-    <Box sx={{ maxWidth: 540, mx: 'auto', width: '100%' }}>
+    <Box sx={{ maxWidth: 540, mx: 'auto', width: '100%', py: 1 }}>
       {/* Header */}
       <Box sx={{ textAlign: 'center', mb: 3 }}>
-        <Typography variant="h5" sx={{ fontWeight: 800 }}>
+        <Typography
+          variant="h5"
+          sx={{
+            fontWeight: 800,
+            letterSpacing: '-0.02em',
+            background: 'linear-gradient(135deg, #38BDF8 0%, #818CF8 100%)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+          }}
+        >
           Telegram MTProto Login
         </Typography>
-        <Typography variant="body2" color="text.secondary">
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
           Generate and verify MTProto session string with phone OTP code
         </Typography>
       </Box>
@@ -140,7 +149,10 @@ export default function AuthPage({ onStatusUpdate }) {
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          bgcolor: 'background.paper',
+          bgcolor: 'rgba(15, 23, 42, 0.75)',
+          backdropFilter: 'blur(12px)',
+          borderRadius: 2.5,
+          border: '1px solid rgba(148, 163, 184, 0.12)',
         }}
       >
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
@@ -148,22 +160,41 @@ export default function AuthPage({ onStatusUpdate }) {
             size="small"
             label={authStatus?.isConnected ? 'Online' : 'Offline'}
             color={authStatus?.isConnected ? 'success' : 'error'}
+            sx={{ fontWeight: 700 }}
           />
-          <Typography variant="body2" sx={{ fontWeight: 600 }}>
+          <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.primary' }}>
             {authStatus?.isConnected && authStatus.user
               ? `Connected as @${authStatus.user.username || authStatus.user.firstName}`
               : authStatus?.error || 'Authentication required'}
           </Typography>
         </Box>
         {authStatus?.isConnected && (
-          <Button size="small" onClick={() => setStep(1)} sx={{ fontSize: '0.75rem' }}>
+          <Button size="small" onClick={() => setStep(1)} sx={{ fontSize: '0.75rem', fontWeight: 600 }}>
             Re-login
           </Button>
         )}
       </Paper>
 
       {/* Auth Card */}
-      <Card>
+      <Card
+        sx={{
+          position: 'relative',
+          overflow: 'hidden',
+          borderRadius: 3,
+          border: '1px solid rgba(148, 163, 184, 0.12)',
+          bgcolor: '#0F172A',
+          boxShadow: '0 8px 32px -4px rgba(0, 0, 0, 0.5)',
+          '&::before': {
+            content: '""',
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            height: '3px',
+            background: 'linear-gradient(90deg, #38BDF8 0%, #818CF8 100%)',
+          },
+        }}
+      >
         <CardContent sx={{ p: 3 }}>
           {/* Step 1: Send Code */}
           {step === 1 && (

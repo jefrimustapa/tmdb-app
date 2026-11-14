@@ -65,7 +65,7 @@ export default function SettingsPage() {
           nodeRamCapOptions: d.nodeRamCapOptions || [256, 512, 1024, 2048],
           videoTranscodeMode: d.videoTranscodeMode || 'disabled',
           geoBlockEnabled: d.geoBlockEnabled !== false,
-          geoBlockWhitelistedIps: Array.isArray(d.geoBlockWhitelistedIps) ? d.geoBlockWhitelistedIps.join(', ') : '',
+          geoBlockWhitelistedIps: Array.isArray(d.geoBlockWhitelistedIps) ? d.geoBlockWhitelistedIps.join(', ') : (d.geoBlockWhitelistedIps || ''),
         });
       }
     } catch (err) {
@@ -79,24 +79,19 @@ export default function SettingsPage() {
     fetchSettings();
   }, []);
 
-  const handleSave = async (payloadOverride = {}) => {
+  const handleSave = async (overrideData) => {
     setSaving(true);
     try {
       const payload = {
-        activeResolver: settings.activeResolver,
-        targetBotUsernames: settings.targetBotUsernames,
-        targetBotUsername: settings.targetBotUsernames[settings.activeResolver] || settings.targetBotUsername,
-        pipelineBuffers: settings.pipelineBuffers,
-        overlapPrefetch: settings.overlapPrefetch,
-        routerRamCacheMb: settings.routerRamCacheMb,
-        nodeRamCapMb: settings.nodeRamCapMb,
-        videoTranscodeMode: settings.videoTranscodeMode,
-        geoBlockEnabled: settings.geoBlockEnabled,
-        geoBlockWhitelistedIps: settings.geoBlockWhitelistedIps
-          ? settings.geoBlockWhitelistedIps.split(',').map((s) => s.trim()).filter(Boolean)
-          : [],
-        ...payloadOverride,
+        ...settings,
+        ...overrideData,
       };
+      if (typeof payload.geoBlockWhitelistedIps === 'string') {
+        payload.geoBlockWhitelistedIps = payload.geoBlockWhitelistedIps
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean);
+      }
 
       const res = await api.post('/settings', payload);
       if (res.ok && res.data?.success) {
@@ -124,42 +119,69 @@ export default function SettingsPage() {
 
   const currentBotHandle = settings.targetBotUsernames[settings.activeResolver] || '';
 
+  const inputSx = {
+    '& .MuiOutlinedInput-root': {
+      bgcolor: '#090D16',
+      borderRadius: 2,
+      '& fieldset': { borderColor: 'rgba(148, 163, 184, 0.2)' },
+      '&:hover fieldset': { borderColor: 'rgba(56, 189, 248, 0.4)' },
+      '&.Mui-focused fieldset': { borderColor: '#38BDF8' },
+    },
+  };
+
   return (
-    <Box>
-      <Box sx={{ mb: 3 }}>
-        <Typography variant="h5" sx={{ fontWeight: 800 }}>
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+      <Box>
+        <Typography variant="h5" sx={{ fontWeight: 800, letterSpacing: '-0.02em' }}>
           TGStrm Configuration
         </Typography>
-        <Typography variant="body2" color="text.secondary">
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.25 }}>
           Configure bot handles, stream buffer pipelines, memory limits, and access rules
         </Typography>
       </Box>
 
       {loading ? (
-        <LinearProgress sx={{ my: 3 }} />
+        <LinearProgress sx={{ my: 3, borderRadius: 1 }} />
       ) : (
         <Card>
-          <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
+          <Box sx={{ borderBottom: '1px solid rgba(148, 163, 184, 0.12)', bgcolor: '#090D16', px: 2 }}>
             <Tabs
               value={tabIndex}
               onChange={(e, val) => setTabIndex(val)}
               variant="scrollable"
               scrollButtons="auto"
-              sx={{ px: 2 }}
+              sx={{
+                '& .MuiTab-root': {
+                  textTransform: 'none',
+                  fontWeight: 600,
+                  fontSize: '0.85rem',
+                  minHeight: 48,
+                  color: '#94A3B8',
+                  '&.Mui-selected': {
+                    color: '#38BDF8',
+                    fontWeight: 700,
+                  },
+                },
+                '& .MuiTabs-indicator': {
+                  bgcolor: '#38BDF8',
+                  height: 3,
+                  borderRadius: '3px 3px 0 0',
+                },
+              }}
             >
-              <Tab icon={<SmartToyIcon fontSize="small" />} iconPosition="start" label="Resolver & Bot" />
-              <Tab icon={<BoltIcon fontSize="small" />} iconPosition="start" label="Buffer Pipelines" />
-              <Tab icon={<MemoryIcon fontSize="small" />} iconPosition="start" label="Engine & RAM" />
-              <Tab icon={<SecurityIcon fontSize="small" />} iconPosition="start" label="GeoBlock" />
+              <Tab icon={<SmartToyIcon sx={{ fontSize: 18 }} />} iconPosition="start" label="Resolver & Bot" />
+              <Tab icon={<BoltIcon sx={{ fontSize: 18 }} />} iconPosition="start" label="Buffer Pipelines" />
+              <Tab icon={<MemoryIcon sx={{ fontSize: 18 }} />} iconPosition="start" label="Engine & RAM" />
+              <Tab icon={<SecurityIcon sx={{ fontSize: 18 }} />} iconPosition="start" label="GeoBlock" />
             </Tabs>
           </Box>
 
-          <CardContent sx={{ p: 3 }}>
+          <CardContent sx={{ p: 3.5 }}>
             {/* Tab 0: Resolver & Bot */}
             {tabIndex === 0 && (
-              <Stack spacing={3} sx={{ maxWidth: 650 }}>
+              <Stack spacing={3.5} sx={{ maxWidth: 680 }}>
                 <Box>
-                  <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 0.5 }}>
+                  <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 0.5, color: '#F8FAFC' }}>
                     Active Resolver Engine
                   </Typography>
                   <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
@@ -171,6 +193,7 @@ export default function SettingsPage() {
                     size="small"
                     value={settings.activeResolver}
                     onChange={(e) => setSettings({ ...settings, activeResolver: e.target.value })}
+                    sx={inputSx}
                   >
                     <MenuItem value="msm">MSM Bot (Inline Callbacks & Ad-Gate)</MenuItem>
                     <MenuItem value="pencuri">Pencuri Movie Bot (Search API & Mini App)</MenuItem>
@@ -178,7 +201,7 @@ export default function SettingsPage() {
                 </Box>
 
                 <Box>
-                  <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 0.5 }}>
+                  <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 0.5, color: '#F8FAFC' }}>
                     Target Bot Username Handle
                   </Typography>
                   <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
@@ -200,11 +223,12 @@ export default function SettingsPage() {
                       });
                     }}
                     InputProps={{
-                      startAdornment: <Typography sx={{ mr: 0.5, color: 'text.secondary' }}>@</Typography>,
+                      startAdornment: <Typography sx={{ mr: 0.5, color: '#94A3B8', fontFamily: '"JetBrains Mono", monospace' }}>@</Typography>,
                     }}
+                    sx={inputSx}
                   />
                   <Box sx={{ mt: 1.5, display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
-                    <Typography variant="caption" color="text.secondary">
+                    <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
                       Quick Presets:
                     </Typography>
                     {(settings.activeResolver === 'pencuri' ? ['Pencuri_Movie_Bot', 'UnOfficialsBot'] : ['msm34bot', 'msm32bot']).map((bot) => (
@@ -214,7 +238,14 @@ export default function SettingsPage() {
                         clickable
                         label={`@${bot}`}
                         onClick={() => handlePresetBot(bot)}
-                        sx={{ fontFamily: 'monospace', fontSize: '0.75rem' }}
+                        sx={{
+                          fontFamily: '"JetBrains Mono", monospace',
+                          fontSize: '0.75rem',
+                          bgcolor: 'rgba(56, 189, 248, 0.08)',
+                          color: '#38BDF8',
+                          border: '1px solid rgba(56, 189, 248, 0.25)',
+                          '&:hover': { bgcolor: 'rgba(56, 189, 248, 0.16)' },
+                        }}
                       />
                     ))}
                   </Box>
@@ -226,6 +257,7 @@ export default function SettingsPage() {
                     startIcon={<SaveIcon />}
                     onClick={() => handleSave()}
                     disabled={saving}
+                    sx={{ px: 3, py: 1, borderRadius: 2 }}
                   >
                     {saving ? 'Saving...' : 'Save Resolver Settings'}
                   </Button>
@@ -235,9 +267,9 @@ export default function SettingsPage() {
 
             {/* Tab 1: Buffer Pipelines */}
             {tabIndex === 1 && (
-              <Stack spacing={3} sx={{ maxWidth: 650 }}>
+              <Stack spacing={3.5} sx={{ maxWidth: 680 }}>
                 <Box>
-                  <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 0.5 }}>
+                  <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 0.5, color: '#F8FAFC' }}>
                     Quality Tier Buffer Pipelines
                   </Typography>
                   <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
@@ -253,12 +285,24 @@ export default function SettingsPage() {
                     ].map((tier) => {
                       const val = settings.pipelineBuffers[tier.key] || tier.defaultVal;
                       return (
-                        <Paper key={tier.key} variant="outlined" sx={{ p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Paper
+                          key={tier.key}
+                          variant="outlined"
+                          sx={{
+                            p: 2,
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            bgcolor: '#090D16',
+                            borderColor: 'rgba(148, 163, 184, 0.12)',
+                            borderRadius: 2,
+                          }}
+                        >
                           <Box>
-                            <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                            <Typography variant="body2" sx={{ fontWeight: 700, color: '#F8FAFC' }}>
                               {tier.label}
                             </Typography>
-                            <Typography variant="caption" color="text.secondary" sx={{ fontFamily: 'monospace' }}>
+                            <Typography variant="caption" color="text.secondary" sx={{ fontFamily: '"JetBrains Mono", monospace' }}>
                               {val} × 512 KB = {(val * 0.5).toFixed(1)} MB in-flight buffer
                             </Typography>
                           </Box>
@@ -279,7 +323,7 @@ export default function SettingsPage() {
                                 });
                               }
                             }}
-                            sx={{ width: 90 }}
+                            sx={{ width: 90, ...inputSx }}
                           />
                         </Paper>
                       );
@@ -293,6 +337,7 @@ export default function SettingsPage() {
                     startIcon={<SaveIcon />}
                     onClick={() => handleSave()}
                     disabled={saving}
+                    sx={{ px: 3, py: 1, borderRadius: 2 }}
                   >
                     {saving ? 'Saving...' : 'Save Buffer Pipelines'}
                   </Button>
@@ -302,12 +347,12 @@ export default function SettingsPage() {
 
             {/* Tab 2: Engine & RAM */}
             {tabIndex === 2 && (
-              <Stack spacing={3} sx={{ maxWidth: 650 }}>
+              <Stack spacing={3.5} sx={{ maxWidth: 680 }}>
                 <Box>
-                  <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 0.5 }}>
+                  <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 0.5, color: '#F8FAFC' }}>
                     Overlap Prefetch
                   </Typography>
-                  <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
                     Preload the next byte range concurrently while delivering current video frames to the player client.
                   </Typography>
                   <FormControlLabel
@@ -315,16 +360,21 @@ export default function SettingsPage() {
                       <Switch
                         checked={settings.overlapPrefetch}
                         onChange={(e) => setSettings({ ...settings, overlapPrefetch: e.target.checked })}
+                        color="primary"
                       />
                     }
-                    label={settings.overlapPrefetch ? 'Enabled (Instant seeking & low jitter)' : 'Disabled'}
+                    label={
+                      <Typography variant="body2" sx={{ fontWeight: 600, color: settings.overlapPrefetch ? '#34D399' : '#94A3B8' }}>
+                        {settings.overlapPrefetch ? 'Enabled (Instant seeking & low jitter)' : 'Disabled'}
+                      </Typography>
+                    }
                   />
                 </Box>
 
-                <Divider />
+                <Divider sx={{ borderColor: 'rgba(148, 163, 184, 0.08)' }} />
 
                 <Box>
-                  <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 0.5 }}>
+                  <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 0.5, color: '#F8FAFC' }}>
                     Node RAM Cap & GC Purge Threshold
                   </Typography>
                   <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
@@ -336,6 +386,7 @@ export default function SettingsPage() {
                     size="small"
                     value={settings.nodeRamCapMb}
                     onChange={(e) => setSettings({ ...settings, nodeRamCapMb: Number(e.target.value) })}
+                    sx={inputSx}
                   >
                     {(settings.nodeRamCapOptions || [256, 512, 1024, 2048]).map((opt) => (
                       <MenuItem key={opt} value={opt}>
@@ -346,10 +397,10 @@ export default function SettingsPage() {
                   </TextField>
                 </Box>
 
-                <Divider />
+                <Divider sx={{ borderColor: 'rgba(148, 163, 184, 0.08)' }} />
 
                 <Box>
-                  <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 0.5 }}>
+                  <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 0.5, color: '#F8FAFC' }}>
                     Router RAM Block Cache
                   </Typography>
                   <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
@@ -361,6 +412,7 @@ export default function SettingsPage() {
                     size="small"
                     value={settings.routerRamCacheMb}
                     onChange={(e) => setSettings({ ...settings, routerRamCacheMb: Number(e.target.value) })}
+                    sx={inputSx}
                   >
                     <MenuItem value={8}>8 MB (16 blocks)</MenuItem>
                     <MenuItem value={16}>16 MB (32 blocks — Recommended)</MenuItem>
@@ -369,10 +421,10 @@ export default function SettingsPage() {
                   </TextField>
                 </Box>
 
-                <Divider />
+                <Divider sx={{ borderColor: 'rgba(148, 163, 184, 0.08)' }} />
 
                 <Box>
-                  <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 0.5 }}>
+                  <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 0.5, color: '#F8FAFC' }}>
                     Video Transcoding Mode
                   </Typography>
                   <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
@@ -384,6 +436,7 @@ export default function SettingsPage() {
                     size="small"
                     value={settings.videoTranscodeMode}
                     onChange={(e) => setSettings({ ...settings, videoTranscodeMode: e.target.value })}
+                    sx={inputSx}
                   >
                     <MenuItem value="disabled">Disabled (100% Direct Copy — 0% CPU Load)</MenuItem>
                     <MenuItem value="desktop_hevc">Desktop PC Chrome Only (HEVC to H.264)</MenuItem>
@@ -397,6 +450,7 @@ export default function SettingsPage() {
                     startIcon={<SaveIcon />}
                     onClick={() => handleSave()}
                     disabled={saving}
+                    sx={{ px: 3, py: 1, borderRadius: 2 }}
                   >
                     {saving ? 'Saving...' : 'Save Engine Settings'}
                   </Button>
@@ -406,12 +460,12 @@ export default function SettingsPage() {
 
             {/* Tab 3: GeoBlock */}
             {tabIndex === 3 && (
-              <Stack spacing={3} sx={{ maxWidth: 650 }}>
+              <Stack spacing={3.5} sx={{ maxWidth: 680 }}>
                 <Box>
-                  <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 0.5 }}>
+                  <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 0.5, color: '#F8FAFC' }}>
                     Geographic Access Filtering
                   </Typography>
-                  <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
                     Restrict public stream playback access by client IP country origin (Default: Malaysia / MY).
                   </Typography>
                   <FormControlLabel
@@ -419,14 +473,19 @@ export default function SettingsPage() {
                       <Switch
                         checked={settings.geoBlockEnabled}
                         onChange={(e) => setSettings({ ...settings, geoBlockEnabled: e.target.checked })}
+                        color="primary"
                       />
                     }
-                    label={settings.geoBlockEnabled ? 'GeoBlock Protection Enabled' : 'GeoBlock Disabled (All IPs Allowed)'}
+                    label={
+                      <Typography variant="body2" sx={{ fontWeight: 600, color: settings.geoBlockEnabled ? '#34D399' : '#94A3B8' }}>
+                        {settings.geoBlockEnabled ? 'GeoBlock Protection Enabled' : 'GeoBlock Disabled (All IPs Allowed)'}
+                      </Typography>
+                    }
                   />
                 </Box>
 
                 <Box>
-                  <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 0.5 }}>
+                  <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 0.5, color: '#F8FAFC' }}>
                     Whitelisted IP Addresses
                   </Typography>
                   <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
@@ -440,6 +499,7 @@ export default function SettingsPage() {
                     placeholder="192.168.0.1, 10.0.0.0/24..."
                     value={settings.geoBlockWhitelistedIps}
                     onChange={(e) => setSettings({ ...settings, geoBlockWhitelistedIps: e.target.value })}
+                    sx={inputSx}
                   />
                 </Box>
 
@@ -449,6 +509,7 @@ export default function SettingsPage() {
                     startIcon={<SaveIcon />}
                     onClick={() => handleSave()}
                     disabled={saving}
+                    sx={{ px: 3, py: 1, borderRadius: 2 }}
                   >
                     {saving ? 'Saving...' : 'Save GeoBlock Settings'}
                   </Button>
