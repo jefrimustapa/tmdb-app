@@ -170,6 +170,64 @@ try {
     assert.strictEqual(res.status, 404);
   });
 
+  // 6. Component & Bundle Integrity (SDLC Step 8 Regression Prevention)
+  console.log('\n6. Component & Bundle Integrity (SDLC Step 8 Regression Prevention)');
+  await test('verifies all JSX components in dashboard/src are properly imported and declared', () => {
+    const srcDir = path.join(__dirname, 'dashboard', 'src');
+    const undeclaredErrors = [];
+
+    function checkFile(file) {
+      const code = fs.readFileSync(file, 'utf8');
+      const matches = [...code.matchAll(/<([A-Z][A-Za-z0-9_]*)/g)].map(m => m[1]);
+      const uniqueTags = [...new Set(matches)];
+      const importsText = code.slice(0, code.indexOf('export default'));
+
+      for (const tag of uniqueTags) {
+        if (!importsText.includes(tag) && tag !== 'Fragment' && !code.includes(`function ${tag}`) && !code.includes(`const ${tag}`) && !code.includes(`class ${tag}`)) {
+          undeclaredErrors.push(`[${path.basename(file)}] Missing declaration/import for <${tag}>`);
+        }
+      }
+    }
+
+    function walk(dir) {
+      for (const item of fs.readdirSync(dir)) {
+        const full = path.join(dir, item);
+        if (fs.statSync(full).isDirectory()) walk(full);
+        else if (full.endsWith('.jsx') || full.endsWith('.js')) checkFile(full);
+      }
+    }
+
+    walk(srcDir);
+    assert.strictEqual(
+      undeclaredErrors.length,
+      0,
+      `Found undeclared JSX components:\n${undeclaredErrors.join('\n')}`
+    );
+  });
+
+  await test('verifies compiled production bundle does not contain raw undeclared Grid references', () => {
+    const assetsDir = path.join(__dirname, 'dashboard', 'dist', 'assets');
+    const files = fs.readdirSync(assetsDir);
+    const jsBundle = files.find(f => f.startsWith('index-') && f.endsWith('.js'));
+    assert.ok(jsBundle, 'Compiled bundle must exist');
+    const bundleContent = fs.readFileSync(path.join(assetsDir, jsBundle), 'utf8');
+
+    // If Grid was undeclared in JSX, Vite/Rollup compiles it to raw `m.jsx(Grid` or `m.jsxs(Grid`
+    const hasRawGridJSX = /children:m\.jsxs\(Grid,/.test(bundleContent) || /children:m\.jsx\(Grid,/.test(bundleContent);
+    assert.strictEqual(hasRawGridJSX, false, 'Production bundle must not contain unbundled raw Grid references');
+  });
+
+  await test('verifies App.jsx includes ErrorBoundary and trailing slash normalization', () => {
+    const appFile = path.join(__dirname, 'dashboard', 'src', 'App.jsx');
+    const appContent = fs.readFileSync(appFile, 'utf8');
+    assert.ok(appContent.includes('class ErrorBoundary'), 'App.jsx must define ErrorBoundary');
+    assert.ok(appContent.includes('<ErrorBoundary>'), 'App.jsx must wrap active page with ErrorBoundary');
+    assert.ok(
+      appContent.includes("replace(/\\/+$/, '')"),
+      'App.jsx must normalize path trailing slashes'
+    );
+  });
+
 } finally {
   server.close();
 }

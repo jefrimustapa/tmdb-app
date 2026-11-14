@@ -1,6 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { ThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
+import Box from '@mui/material/Box';
+import Alert from '@mui/material/Alert';
+import AlertTitle from '@mui/material/AlertTitle';
+import Button from '@mui/material/Button';
 import { darkTheme } from './theme';
 import Layout from './components/Layout';
 import DashboardPage from './pages/DashboardPage';
@@ -9,6 +13,38 @@ import SettingsPage from './pages/SettingsPage';
 import LogsPage from './pages/LogsPage';
 import AuthPage from './pages/AuthPage';
 import { api, getBasePath } from './api/client';
+
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error, errorInfo) {
+    console.error('[TGSTRM DASHBOARD] Uncaught component error:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <Box sx={{ p: 4, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '40vh', textAlign: 'center' }}>
+          <Alert severity="error" sx={{ maxWidth: 640, width: '100%', mb: 3, textAlign: 'left' }}>
+            <AlertTitle sx={{ fontWeight: 700 }}>Dashboard Component Error</AlertTitle>
+            {this.state.error?.message || 'An unexpected rendering error occurred in this view.'}
+          </Alert>
+          <Button variant="contained" color="primary" onClick={() => window.location.reload()}>
+            Reload Dashboard
+          </Button>
+        </Box>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 export default function App() {
   const [currentPath, setCurrentPath] = useState(window.location.pathname);
@@ -50,7 +86,7 @@ export default function App() {
   };
 
   const renderActivePage = () => {
-    const p = currentPath.toLowerCase();
+    const p = currentPath.toLowerCase().replace(/\/+$/, '') || '/';
     if (p.endsWith('/streams') || p.endsWith('/cache')) {
       return <StreamsPage />;
     }
@@ -84,7 +120,9 @@ export default function App() {
         targetBot={authInfo.bot}
         isConnected={authInfo.isConnected}
       >
-        {renderActivePage()}
+        <ErrorBoundary>
+          {renderActivePage()}
+        </ErrorBoundary>
       </Layout>
     </ThemeProvider>
   );
