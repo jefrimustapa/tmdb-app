@@ -13,12 +13,12 @@ import {
   Chip,
   Paper,
 } from '@mui/material';
-import VpnKeyIcon from '@mui/icons-material/VpnKey';
 import SendIcon from '@mui/icons-material/Send';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import LockOpenIcon from '@mui/icons-material/LockOpen';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import VpnKeyIcon from '@mui/icons-material/VpnKey';
 import { api } from '../api/client';
 
 export default function AuthPage({ onStatusUpdate }) {
@@ -40,9 +40,6 @@ export default function AuthPage({ onStatusUpdate }) {
         setAuthStatus(res.data);
         if (onStatusUpdate) {
           onStatusUpdate(res.data);
-        }
-        if (res.data.isConnected) {
-          // Connected
         }
       }
     } catch (err) {
@@ -120,220 +117,217 @@ export default function AuthPage({ onStatusUpdate }) {
   };
 
   return (
-    <Box sx={{ maxWidth: 540, mx: 'auto', width: '100%', py: 1 }}>
-      {/* Header */}
-      <Box sx={{ textAlign: 'center', mb: 3 }}>
-        <Typography
-          variant="h5"
-          sx={{
-            fontWeight: 800,
-            letterSpacing: '-0.02em',
-            background: 'linear-gradient(135deg, #38BDF8 0%, #818CF8 100%)',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
-          }}
-        >
-          Telegram MTProto Login
-        </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-          Generate and verify MTProto session string with phone OTP code
-        </Typography>
-      </Box>
-
-      {/* Live Status Pill */}
-      <Paper
-        variant="outlined"
-        sx={{
-          p: 2,
-          mb: 3,
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          bgcolor: 'rgba(15, 23, 42, 0.75)',
-          backdropFilter: 'blur(12px)',
-          borderRadius: 2.5,
-          border: '1px solid rgba(148, 163, 184, 0.12)',
-        }}
-      >
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-          <Chip
-            size="small"
-            label={authStatus?.isConnected ? 'Online' : 'Offline'}
-            color={authStatus?.isConnected ? 'success' : 'error'}
-            sx={{ fontWeight: 700 }}
-          />
-          <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.primary' }}>
-            {authStatus?.isConnected && authStatus.user
-              ? `Connected as @${authStatus.user.username || authStatus.user.firstName}`
-              : authStatus?.error || 'Authentication required'}
+    <Box sx={{ maxWidth: 480, mx: 'auto', width: '100%', py: { xs: 2, sm: 4 } }}>
+      {/* Centered Sneat Auth Card */}
+      <Card sx={{ p: { xs: 2.5, sm: 4 }, borderRadius: '10px' }}>
+        {/* Brand Icon Header */}
+        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', mb: 3 }}>
+          <Box
+            sx={{
+              width: 52,
+              height: 52,
+              borderRadius: '12px',
+              bgcolor: 'rgba(105, 108, 255, 0.16)',
+              color: 'primary.main',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              mb: 2,
+              boxShadow: '0 4px 12px 0 rgba(105, 108, 255, 0.2)',
+            }}
+          >
+            <VpnKeyIcon sx={{ fontSize: 28 }} />
+          </Box>
+          <Typography variant="h5" sx={{ fontWeight: 700, textAlign: 'center', color: 'text.primary', mb: 0.5 }}>
+            Welcome to TGStrm 👋
+          </Typography>
+          <Typography variant="body2" sx={{ color: 'text.secondary', textAlign: 'center' }}>
+            Authenticate your Telegram MTProto gateway session
           </Typography>
         </Box>
-        {authStatus?.isConnected && (
-          <Button size="small" onClick={() => setStep(1)} sx={{ fontSize: '0.75rem', fontWeight: 600 }}>
-            Re-login
-          </Button>
-        )}
-      </Paper>
 
-      {/* Auth Card */}
-      <Card
-        sx={{
-          position: 'relative',
-          overflow: 'hidden',
-          borderRadius: 3,
-          border: '1px solid rgba(148, 163, 184, 0.12)',
-          bgcolor: '#0F172A',
-          boxShadow: '0 8px 32px -4px rgba(0, 0, 0, 0.5)',
-          '&::before': {
-            content: '""',
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            height: '3px',
-            background: 'linear-gradient(90deg, #38BDF8 0%, #818CF8 100%)',
-          },
-        }}
-      >
-        <CardContent sx={{ p: 3 }}>
-          {/* Step 1: Send Code */}
-          {step === 1 && (
-            <Stack spacing={2.5}>
-              <Box>
-                <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 0.5 }}>
-                  Telegram Phone Number
-                </Typography>
-                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1.5 }}>
-                  Include international country code prefix (e.g. +60 for Malaysia, +62 for Indonesia).
-                </Typography>
-                <TextField
-                  fullWidth
-                  size="small"
-                  type="tel"
-                  placeholder="+60123456789"
-                  value={phoneNumber}
-                  onChange={(e) => setPhoneNumber(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleSendCode()}
-                  InputProps={{
-                    sx: { fontFamily: 'monospace' },
-                  }}
-                />
-              </Box>
-              <Button
-                variant="contained"
-                fullWidth
-                size="large"
-                startIcon={<SendIcon />}
-                onClick={handleSendCode}
-                disabled={submitting || !phoneNumber.trim()}
-              >
-                {submitting ? 'Sending Code...' : 'Send Verification Code'}
-              </Button>
-            </Stack>
+        {/* Live Status Pill */}
+        <Paper
+          variant="outlined"
+          sx={{
+            p: 1.5,
+            mb: 3,
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            bgcolor: 'background.default',
+            borderRadius: '8px',
+          }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Chip
+              size="small"
+              label={authStatus?.isConnected ? 'ONLINE' : 'OFFLINE'}
+              sx={{
+                fontWeight: 700,
+                fontSize: '0.7rem',
+                borderRadius: '4px',
+                bgcolor: authStatus?.isConnected ? 'rgba(113, 221, 55, 0.16)' : 'rgba(255, 62, 29, 0.16)',
+                color: authStatus?.isConnected ? '#71DD37' : '#FF3E1D',
+              }}
+            />
+            <Typography variant="caption" sx={{ fontWeight: 600, color: 'text.primary' }}>
+              {authStatus?.isConnected && authStatus.user
+                ? `@${authStatus.user.username || authStatus.user.firstName}`
+                : 'Session Required'}
+            </Typography>
+          </Box>
+          {authStatus?.isConnected && (
+            <Button size="small" onClick={() => setStep(1)} sx={{ fontSize: '0.75rem', fontWeight: 600, color: 'primary.main' }}>
+              Re-login
+            </Button>
           )}
+        </Paper>
 
-          {/* Step 2: Verify Code */}
-          {step === 2 && (
-            <Stack spacing={2.5}>
-              <Box>
-                <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 0.5 }}>
-                  Login Code from Telegram
-                </Typography>
-                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1.5 }}>
-                  Enter the 5-digit code sent to your Telegram application.
-                </Typography>
-                <TextField
-                  fullWidth
-                  size="small"
-                  placeholder="12345"
-                  value={phoneCode}
-                  onChange={(e) => setPhoneCode(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleVerifyCode()}
-                  inputProps={{
-                    maxLength: 8,
-                    style: { textAlign: 'center', letterSpacing: '0.3em', fontFamily: 'monospace', fontWeight: 700 },
-                  }}
-                />
-              </Box>
-
-              {needPassword && (
-                <Box>
-                  <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 0.5 }}>
-                    2FA Cloud Password
-                  </Typography>
-                  <TextField
-                    fullWidth
-                    size="small"
-                    type="password"
-                    placeholder="Enter your 2FA password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleVerifyCode()}
-                  />
-                </Box>
-              )}
-
-              <Button
-                variant="contained"
-                color="success"
-                fullWidth
-                size="large"
-                startIcon={<LockOpenIcon />}
-                onClick={handleVerifyCode}
-                disabled={submitting || !phoneCode.trim()}
-              >
-                {submitting ? 'Verifying...' : 'Verify & Activate Server'}
-              </Button>
-
-              <Button
-                variant="text"
-                size="small"
-                startIcon={<ArrowBackIcon />}
-                onClick={() => setStep(1)}
-              >
-                Change Phone Number
-              </Button>
-            </Stack>
-          )}
-
-          {/* Step 3: Session Box */}
-          {step === 3 && (
-            <Stack spacing={2.5}>
-              <Alert severity="success" icon={<CheckCircleIcon />}>
-                Server is now ACTIVE in memory! Video streaming gateway is live.
-              </Alert>
-
-              <Box>
-                <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 0.5 }}>
-                  Permanent TG_SESSION String
-                </Typography>
-                <TextField
-                  fullWidth
-                  multiline
-                  rows={3}
-                  size="small"
-                  value={sessionString}
-                  InputProps={{
-                    readOnly: true,
-                    sx: { fontFamily: 'monospace', fontSize: '0.75rem' },
-                  }}
-                />
-              </Box>
-
-              <Button
-                variant="contained"
-                startIcon={<ContentCopyIcon />}
-                onClick={handleCopySession}
-              >
-                Copy TG_SESSION to Clipboard
-              </Button>
-
-              <Typography variant="caption" color="text.secondary" sx={{ textAlign: 'center' }}>
-                💡 To persist this login permanently across Docker or cloud container rebuilds, paste this value into your environment as <strong>TG_SESSION</strong>.
+        {/* Step 1: Send Code */}
+        {step === 1 && (
+          <Stack spacing={2.5}>
+            <Box>
+              <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 0.5, color: 'text.primary' }}>
+                Telegram Phone Number
               </Typography>
-            </Stack>
-          )}
-        </CardContent>
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1.5 }}>
+                Include international country code prefix (e.g. +60 for Malaysia, +62 for Indonesia).
+              </Typography>
+              <TextField
+                fullWidth
+                size="small"
+                type="tel"
+                placeholder="+60123456789"
+                value={phoneNumber}
+                onChange={(e) => setPhoneNumber(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleSendCode()}
+                inputProps={{
+                  style: { fontFamily: '"JetBrains Mono", monospace' },
+                }}
+              />
+            </Box>
+            <Button
+              variant="contained"
+              fullWidth
+              size="large"
+              startIcon={<SendIcon />}
+              onClick={handleSendCode}
+              disabled={submitting || !phoneNumber.trim()}
+              sx={{ borderRadius: '8px', py: 1.25 }}
+            >
+              {submitting ? 'Sending Code...' : 'Send Verification Code'}
+            </Button>
+          </Stack>
+        )}
+
+        {/* Step 2: Verify Code */}
+        {step === 2 && (
+          <Stack spacing={2.5}>
+            <Box>
+              <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 0.5, color: 'text.primary' }}>
+                Login Code from Telegram
+              </Typography>
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1.5 }}>
+                Enter the 5-digit code sent to your Telegram application.
+              </Typography>
+              <TextField
+                fullWidth
+                size="small"
+                placeholder="12345"
+                value={phoneCode}
+                onChange={(e) => setPhoneCode(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleVerifyCode()}
+                inputProps={{
+                  maxLength: 8,
+                  style: { textAlign: 'center', letterSpacing: '0.3em', fontFamily: '"JetBrains Mono", monospace', fontWeight: 700 },
+                }}
+              />
+            </Box>
+
+            {needPassword && (
+              <Box>
+                <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 0.5, color: 'text.primary' }}>
+                  2FA Cloud Password
+                </Typography>
+                <TextField
+                  fullWidth
+                  size="small"
+                  type="password"
+                  placeholder="Enter your 2FA password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleVerifyCode()}
+                />
+              </Box>
+            )}
+
+            <Button
+              variant="contained"
+              fullWidth
+              size="large"
+              startIcon={<LockOpenIcon />}
+              onClick={handleVerifyCode}
+              disabled={submitting || !phoneCode.trim()}
+              sx={{ borderRadius: '8px', py: 1.25 }}
+            >
+              {submitting ? 'Verifying...' : 'Verify & Activate Server'}
+            </Button>
+
+            <Button
+              variant="text"
+              size="small"
+              startIcon={<ArrowBackIcon />}
+              onClick={() => setStep(1)}
+              sx={{ color: 'text.secondary' }}
+            >
+              Change Phone Number
+            </Button>
+          </Stack>
+        )}
+
+        {/* Step 3: Session Box */}
+        {step === 3 && (
+          <Stack spacing={2.5}>
+            <Alert
+              severity="success"
+              icon={<CheckCircleIcon />}
+              sx={{ bgcolor: 'rgba(113, 221, 55, 0.16)', color: '#71DD37' }}
+            >
+              Server is now ACTIVE in memory! Video streaming gateway is live.
+            </Alert>
+
+            <Box>
+              <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 0.5, color: 'text.primary' }}>
+                Permanent TG_SESSION String
+              </Typography>
+              <TextField
+                fullWidth
+                multiline
+                rows={3}
+                size="small"
+                value={sessionString}
+                InputProps={{
+                  readOnly: true,
+                  sx: { fontFamily: '"JetBrains Mono", monospace', fontSize: '0.75rem' },
+                }}
+              />
+            </Box>
+
+            <Button
+              variant="contained"
+              startIcon={<ContentCopyIcon />}
+              onClick={handleCopySession}
+              sx={{ borderRadius: '8px' }}
+            >
+              Copy TG_SESSION to Clipboard
+            </Button>
+
+            <Typography variant="caption" color="text.secondary" sx={{ textAlign: 'center' }}>
+              💡 To persist this login permanently across Docker or cloud container rebuilds, paste this value into your environment as <strong>TG_SESSION</strong>.
+            </Typography>
+          </Stack>
+        )}
       </Card>
 
       {/* Toast Feedback */}

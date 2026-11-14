@@ -35,6 +35,7 @@ import SearchIcon from '@mui/icons-material/Search';
 import DeleteForeverIcon from '@mui/icons-material/DeleteForever';
 import StorageIcon from '@mui/icons-material/Storage';
 import VideoLibraryIcon from '@mui/icons-material/VideoLibrary';
+import CloudQueueIcon from '@mui/icons-material/CloudQueue';
 import { api } from '../api/client';
 
 export default function StreamsPage() {
@@ -131,38 +132,38 @@ export default function StreamsPage() {
     const q = (quality || '').toLowerCase();
     if (q.includes('4k') || q.includes('2160')) {
       return {
-        bg: 'rgba(129, 140, 248, 0.12)',
-        color: '#818CF8',
-        border: 'rgba(129, 140, 248, 0.3)',
+        bg: 'rgba(105, 108, 255, 0.16)',
+        color: 'primary.main',
+        border: 'rgba(105, 108, 255, 0.3)',
       };
     }
     if (q.includes('1080')) {
       return {
-        bg: 'rgba(56, 189, 248, 0.12)',
-        color: '#38BDF8',
-        border: 'rgba(56, 189, 248, 0.3)',
+        bg: 'rgba(3, 195, 236, 0.16)',
+        color: '#03C3EC',
+        border: 'rgba(3, 195, 236, 0.3)',
       };
     }
     if (q.includes('720')) {
       return {
-        bg: 'rgba(52, 211, 153, 0.12)',
-        color: '#34D399',
-        border: 'rgba(52, 211, 153, 0.3)',
+        bg: 'rgba(113, 221, 55, 0.16)',
+        color: '#71DD37',
+        border: 'rgba(113, 221, 55, 0.3)',
       };
     }
     return {
-      bg: 'rgba(251, 191, 36, 0.12)',
-      color: '#FBBF24',
-      border: 'rgba(251, 191, 36, 0.3)',
+      bg: 'rgba(255, 171, 0, 0.16)',
+      color: '#FFAB00',
+      border: 'rgba(255, 171, 0, 0.3)',
     };
   };
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-      {/* Header */}
+      {/* Top Header & Actions */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
         <Box>
-          <Typography variant="h5" sx={{ fontWeight: 800, letterSpacing: '-0.02em' }}>
+          <Typography variant="h5" sx={{ fontWeight: 700 }}>
             Persistent Stream Cache
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mt: 0.25 }}>
@@ -177,12 +178,12 @@ export default function StreamsPage() {
             onClick={() => setClearAllOpen(true)}
             disabled={streams.length === 0}
             sx={{
-              borderColor: 'rgba(244, 63, 94, 0.3)',
-              color: '#F43F5E',
-              bgcolor: 'rgba(244, 63, 94, 0.05)',
+              borderColor: 'rgba(255, 62, 29, 0.3)',
+              color: '#FF3E1D',
+              bgcolor: 'rgba(255, 62, 29, 0.05)',
               '&:hover': {
-                borderColor: '#F43F5E',
-                bgcolor: 'rgba(244, 63, 94, 0.12)',
+                borderColor: '#FF3E1D',
+                bgcolor: 'rgba(255, 62, 29, 0.12)',
               },
             }}
           >
@@ -194,11 +195,12 @@ export default function StreamsPage() {
             startIcon={<RefreshIcon />}
             onClick={fetchStreams}
             sx={{
-              borderColor: 'rgba(148, 163, 184, 0.2)',
-              color: '#F8FAFC',
+              borderColor: 'rgba(105, 108, 255, 0.3)',
+              color: 'primary.main',
+              bgcolor: 'rgba(105, 108, 255, 0.05)',
               '&:hover': {
-                borderColor: '#38BDF8',
-                color: '#38BDF8',
+                borderColor: 'primary.main',
+                bgcolor: 'rgba(105, 108, 255, 0.12)',
               },
             }}
           >
@@ -206,6 +208,94 @@ export default function StreamsPage() {
           </Button>
         </Stack>
       </Box>
+
+      {/* Mini KPI Summary Strip */}
+      <Grid container spacing={2.5}>
+        <Grid item xs={12} sm={4}>
+          <Card>
+            <CardContent sx={{ p: 2.5, display: 'flex', alignItems: 'center', gap: 2 }}>
+              <Box
+                sx={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: '8px',
+                  bgcolor: 'rgba(105, 108, 255, 0.16)',
+                  color: 'primary.main',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <VideoLibraryIcon sx={{ fontSize: 24 }} />
+              </Box>
+              <Box>
+                <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600, textTransform: 'uppercase' }}>
+                  Total Cached Streams
+                </Typography>
+                <Typography variant="h5" sx={{ fontWeight: 700, color: 'text.primary', fontFamily: '"JetBrains Mono", monospace' }}>
+                  {streams.length}
+                </Typography>
+              </Box>
+            </CardContent>
+          </Card>
+        </Grid>
+        <Grid item xs={12} sm={4}>
+          <Card>
+            <CardContent sx={{ p: 2.5, display: 'flex', alignItems: 'center', gap: 2 }}>
+              <Box
+                sx={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: '8px',
+                  bgcolor: 'rgba(3, 195, 236, 0.16)',
+                  color: '#03C3EC',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <StorageIcon sx={{ fontSize: 24 }} />
+              </Box>
+              <Box>
+                <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600, textTransform: 'uppercase' }}>
+                  Indexed Storage Volume
+                </Typography>
+                <Typography variant="h5" sx={{ fontWeight: 700, color: 'text.primary', fontFamily: '"JetBrains Mono", monospace' }}>
+                  {totalSize}
+                </Typography>
+              </Box>
+            </CardContent>
+          </Card>
+        </Grid>
+        <Grid item xs={12} sm={4}>
+          <Card>
+            <CardContent sx={{ p: 2.5, display: 'flex', alignItems: 'center', gap: 2 }}>
+              <Box
+                sx={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: '8px',
+                  bgcolor: 'rgba(113, 221, 55, 0.16)',
+                  color: '#71DD37',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <CloudQueueIcon sx={{ fontSize: 24 }} />
+              </Box>
+              <Box>
+                <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600, textTransform: 'uppercase' }}>
+                  Cache Engine State
+                </Typography>
+                <Typography variant="h5" sx={{ fontWeight: 700, color: '#71DD37' }}>
+                  Synchronized
+                </Typography>
+              </Box>
+            </CardContent>
+          </Card>
+        </Grid>
+      </Grid>
 
       {/* Filter and Search Bar */}
       <Card>
@@ -220,16 +310,7 @@ export default function StreamsPage() {
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   InputProps={{
-                    startAdornment: <SearchIcon fontSize="small" sx={{ mr: 1, color: '#94A3B8' }} />,
-                  }}
-                  sx={{
-                    '& .MuiOutlinedInput-root': {
-                      bgcolor: '#090D16',
-                      borderRadius: 2,
-                      '& fieldset': { borderColor: 'rgba(148, 163, 184, 0.2)' },
-                      '&:hover fieldset': { borderColor: 'rgba(56, 189, 248, 0.4)' },
-                      '&.Mui-focused fieldset': { borderColor: '#38BDF8' },
-                    },
+                    startAdornment: <SearchIcon fontSize="small" sx={{ mr: 1, color: 'text.secondary' }} />,
                   }}
                 />
               </Grid>
@@ -241,15 +322,6 @@ export default function StreamsPage() {
                   label="Quality Tier"
                   value={qualityFilter}
                   onChange={(e) => setQualityFilter(e.target.value)}
-                  sx={{
-                    '& .MuiOutlinedInput-root': {
-                      bgcolor: '#090D16',
-                      borderRadius: 2,
-                      '& fieldset': { borderColor: 'rgba(148, 163, 184, 0.2)' },
-                      '&:hover fieldset': { borderColor: 'rgba(56, 189, 248, 0.4)' },
-                      '&.Mui-focused fieldset': { borderColor: '#38BDF8' },
-                    },
-                  }}
                 >
                   <MenuItem value="">All Qualities</MenuItem>
                   <MenuItem value="4k">4K (2160p)</MenuItem>
@@ -259,7 +331,7 @@ export default function StreamsPage() {
                 </TextField>
               </Grid>
               <Grid item xs={6} sm={3} md={2}>
-                <Button type="submit" fullWidth variant="contained" sx={{ height: 40, borderRadius: 2 }}>
+                <Button type="submit" fullWidth variant="contained" sx={{ height: 40, borderRadius: '8px' }}>
                   Search
                 </Button>
               </Grid>
@@ -273,7 +345,7 @@ export default function StreamsPage() {
         <CardContent sx={{ p: 2.5 }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
             <Box>
-              <Typography variant="subtitle1" sx={{ fontWeight: 700, color: '#F8FAFC' }}>
+              <Typography variant="subtitle1" sx={{ fontWeight: 700, color: 'text.primary' }}>
                 Cached Stream Records ({streams.length})
               </Typography>
               <Typography variant="caption" color="text.secondary">
@@ -284,9 +356,9 @@ export default function StreamsPage() {
               sx={{
                 px: 1.5,
                 py: 0.5,
-                borderRadius: '8px',
-                bgcolor: 'rgba(56, 189, 248, 0.08)',
-                border: '1px solid rgba(56, 189, 248, 0.2)',
+                borderRadius: '6px',
+                bgcolor: 'rgba(105, 108, 255, 0.1)',
+                border: '1px solid rgba(105, 108, 255, 0.2)',
                 display: 'flex',
                 alignItems: 'center',
                 gap: 1,
@@ -295,7 +367,7 @@ export default function StreamsPage() {
               <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
                 Total Storage:
               </Typography>
-              <Typography variant="caption" sx={{ fontFamily: '"JetBrains Mono", monospace', fontWeight: 700, color: '#38BDF8' }}>
+              <Typography variant="caption" sx={{ fontFamily: '"JetBrains Mono", monospace', fontWeight: 700, color: 'primary.main' }}>
                 {totalSize}
               </Typography>
             </Box>
@@ -304,7 +376,7 @@ export default function StreamsPage() {
           {loading ? (
             <LinearProgress sx={{ my: 3, borderRadius: 1 }} />
           ) : (
-            <TableContainer component={Paper} variant="outlined" sx={{ bgcolor: '#090D16', borderColor: 'rgba(148, 163, 184, 0.12)', borderRadius: 2 }}>
+            <TableContainer component={Paper} variant="outlined" sx={{ bgcolor: 'background.default', borderRadius: '8px' }}>
               <Table size="small">
                 <TableHead>
                   <TableRow>
@@ -327,9 +399,9 @@ export default function StreamsPage() {
                     streams.map((item, idx) => {
                       const badge = getQualityBadge(item.quality || item.qualityTier);
                       return (
-                        <TableRow key={item.docId || idx} hover sx={{ '&:hover': { bgcolor: 'rgba(56, 189, 248, 0.04) !important' } }}>
+                        <TableRow key={item.docId || idx} hover sx={{ '&:hover': { bgcolor: 'rgba(105, 108, 255, 0.04) !important' } }}>
                           <TableCell sx={{ maxWidth: 320 }}>
-                            <Typography variant="body2" sx={{ fontWeight: 600, color: '#F8FAFC', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={item.title || item.filename}>
+                            <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.primary', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={item.title || item.filename}>
                               🎬 {item.title || item.filename || 'Untitled Stream'}
                             </Typography>
                             <Typography variant="caption" color="text.secondary" sx={{ fontFamily: '"JetBrains Mono", monospace' }}>
@@ -342,19 +414,19 @@ export default function StreamsPage() {
                                 size="small"
                                 label={(item.quality || item.qualityTier || '720p').toUpperCase()}
                                 sx={{
-                                  fontWeight: 800,
+                                  fontWeight: 700,
                                   fontSize: '0.72rem',
                                   bgcolor: badge.bg,
                                   color: badge.color,
-                                  border: `1px solid ${badge.border}`,
+                                  borderRadius: '4px',
                                 }}
                               />
-                              <Typography variant="caption" sx={{ fontFamily: '"JetBrains Mono", monospace', color: '#38BDF8', fontWeight: 600 }}>
+                              <Typography variant="caption" sx={{ fontFamily: '"JetBrains Mono", monospace', color: 'primary.main', fontWeight: 600 }}>
                                 {item.sizeFormatted || item.size || '--'}
                               </Typography>
                             </Stack>
                           </TableCell>
-                          <TableCell sx={{ fontFamily: '"JetBrains Mono", monospace', fontSize: '0.8rem', color: '#94A3B8' }}>
+                          <TableCell sx={{ fontFamily: '"JetBrains Mono", monospace', fontSize: '0.8rem', color: 'text.secondary' }}>
                             {item.queryKey || '--'}
                           </TableCell>
                           <TableCell>
@@ -366,9 +438,9 @@ export default function StreamsPage() {
                                   sx={{
                                     fontSize: '0.7rem',
                                     height: 20,
-                                    bgcolor: 'rgba(129, 140, 248, 0.1)',
-                                    color: '#818CF8',
-                                    border: '1px solid rgba(129, 140, 248, 0.25)',
+                                    bgcolor: 'rgba(105, 108, 255, 0.12)',
+                                    color: 'primary.main',
+                                    borderRadius: '4px',
                                     fontWeight: 700,
                                   }}
                                 />
@@ -380,15 +452,15 @@ export default function StreamsPage() {
                                   sx={{
                                     fontSize: '0.7rem',
                                     height: 20,
-                                    bgcolor: 'rgba(148, 163, 184, 0.08)',
-                                    color: '#94A3B8',
-                                    border: '1px solid rgba(148, 163, 184, 0.15)',
+                                    bgcolor: 'rgba(133, 146, 163, 0.12)',
+                                    color: 'text.secondary',
+                                    borderRadius: '4px',
                                   }}
                                 />
                               )}
                             </Stack>
                           </TableCell>
-                          <TableCell sx={{ fontFamily: '"JetBrains Mono", monospace', fontSize: '0.8rem', color: '#94A3B8' }}>
+                          <TableCell sx={{ fontFamily: '"JetBrains Mono", monospace', fontSize: '0.8rem', color: 'text.secondary' }}>
                             DC {item.dcId || 4}
                           </TableCell>
                           <TableCell align="right">
@@ -397,7 +469,7 @@ export default function StreamsPage() {
                                 <IconButton
                                   size="small"
                                   onClick={() => handleCopyDocId(item.docId)}
-                                  sx={{ color: '#94A3B8', '&:hover': { color: '#38BDF8', bgcolor: 'rgba(56, 189, 248, 0.1)' } }}
+                                  sx={{ color: 'text.secondary', '&:hover': { color: 'primary.main', bgcolor: 'rgba(105, 108, 255, 0.08)' } }}
                                 >
                                   <ContentCopyIcon fontSize="small" />
                                 </IconButton>
@@ -406,7 +478,7 @@ export default function StreamsPage() {
                                 <IconButton
                                   size="small"
                                   onClick={() => setSelectedItem(item)}
-                                  sx={{ color: '#F43F5E', '&:hover': { bgcolor: 'rgba(244, 63, 94, 0.1)' } }}
+                                  sx={{ color: '#FF3E1D', '&:hover': { bgcolor: 'rgba(255, 62, 29, 0.1)' } }}
                                 >
                                   <DeleteIcon fontSize="small" />
                                 </IconButton>
@@ -443,7 +515,7 @@ export default function StreamsPage() {
 
       {/* Clear All Dialog */}
       <Dialog open={clearAllOpen} onClose={() => !actionLoading && setClearAllOpen(false)}>
-        <DialogTitle sx={{ fontWeight: 700, color: '#F43F5E' }}>
+        <DialogTitle sx={{ fontWeight: 700, color: '#FF3E1D' }}>
           DANGER: Clear All Cache
         </DialogTitle>
         <DialogContent>

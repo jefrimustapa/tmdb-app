@@ -39,6 +39,7 @@ import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import BoltIcon from '@mui/icons-material/Bolt';
 import StreamIcon from '@mui/icons-material/Stream';
+import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import { api } from '../api/client';
 
 export default function DashboardPage({ onNavigate }) {
@@ -125,111 +126,138 @@ export default function DashboardPage({ onNavigate }) {
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-      {/* Top Action Bar */}
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
-        <Box>
-          <Typography variant="h5" sx={{ fontWeight: 800, letterSpacing: '-0.02em' }}>
-            System Overview & Stream Engine
-          </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.25 }}>
-            Live metrics, active sessions, and MTProto pipeline controls
-          </Typography>
-        </Box>
-        <Stack direction="row" spacing={1.5}>
-          <Tooltip title="Purge GC and release idle in-flight buffers">
-            <Button
-              variant="outlined"
-              size="small"
-              startIcon={<CleaningServicesIcon />}
-              onClick={() => setDialogAction('purge')}
-              sx={{
-                borderColor: 'rgba(56, 189, 248, 0.3)',
-                color: '#38BDF8',
-                bgcolor: 'rgba(56, 189, 248, 0.05)',
-                '&:hover': {
-                  borderColor: '#38BDF8',
-                  bgcolor: 'rgba(56, 189, 248, 0.12)',
-                },
-              }}
-            >
-              Purge Memory
-            </Button>
-          </Tooltip>
-          <Tooltip title="Restart microservice process">
-            <Button
-              variant="outlined"
-              size="small"
-              startIcon={<RestartAltIcon />}
-              onClick={() => setDialogAction('restart')}
-              sx={{
-                borderColor: 'rgba(251, 191, 36, 0.3)',
-                color: '#FBBF24',
-                bgcolor: 'rgba(251, 191, 36, 0.05)',
-                '&:hover': {
-                  borderColor: '#FBBF24',
-                  bgcolor: 'rgba(251, 191, 36, 0.12)',
-                },
-              }}
-            >
-              Restart
-            </Button>
-          </Tooltip>
-        </Stack>
-      </Box>
+      {/* Sneat Analytics Welcome Banner */}
+      <Card
+        sx={{
+          p: { xs: 2.5, sm: 3 },
+          position: 'relative',
+          overflow: 'hidden',
+          background: (theme) =>
+            theme.palette.mode === 'dark'
+              ? 'linear-gradient(135deg, rgba(105, 108, 255, 0.14) 0%, rgba(43, 44, 64, 0.6) 100%)'
+              : 'linear-gradient(135deg, rgba(105, 108, 255, 0.08) 0%, rgba(255, 255, 255, 0.9) 100%)',
+          border: '1px solid',
+          borderColor: 'rgba(105, 108, 255, 0.2)',
+        }}
+      >
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
+          <Box sx={{ maxWidth: 680 }}>
+            <Typography variant="h5" sx={{ fontWeight: 700, mb: 0.75, color: 'text.primary' }}>
+              Welcome to TGStrm Gateway 👋
+            </Typography>
+            <Typography variant="body2" sx={{ color: 'text.secondary', lineHeight: 1.6, mb: 2 }}>
+              High-performance Telegram MTProto streaming proxy. Active pipeline buffering, multi-quality chunk resolvers, and instant cache management.
+            </Typography>
+            <Stack direction="row" spacing={1.5} flexWrap="wrap" useFlexGap>
+              <Button
+                variant="contained"
+                size="small"
+                endIcon={<ArrowForwardIcon />}
+                onClick={() => onNavigate('/streams')}
+                sx={{
+                  bgcolor: 'primary.main',
+                  color: '#FFFFFF',
+                  px: 2,
+                  py: 0.75,
+                  boxShadow: '0 2px 6px 0 rgba(105, 108, 255, 0.4)',
+                }}
+              >
+                View Streams ({clients.length})
+              </Button>
+              <Button
+                variant="outlined"
+                size="small"
+                startIcon={<CleaningServicesIcon />}
+                onClick={() => setDialogAction('purge')}
+                sx={{
+                  borderColor: 'rgba(105, 108, 255, 0.4)',
+                  color: 'primary.main',
+                  bgcolor: 'rgba(105, 108, 255, 0.06)',
+                  '&:hover': {
+                    borderColor: 'primary.main',
+                    bgcolor: 'rgba(105, 108, 255, 0.12)',
+                  },
+                }}
+              >
+                Purge Memory
+              </Button>
+              <Button
+                variant="outlined"
+                size="small"
+                startIcon={<RestartAltIcon />}
+                onClick={() => setDialogAction('restart')}
+                sx={{
+                  borderColor: 'rgba(255, 171, 0, 0.4)',
+                  color: '#FFAB00',
+                  bgcolor: 'rgba(255, 171, 0, 0.06)',
+                  '&:hover': {
+                    borderColor: '#FFAB00',
+                    bgcolor: 'rgba(255, 171, 0, 0.12)',
+                  },
+                }}
+              >
+                Restart Process
+              </Button>
+            </Stack>
+          </Box>
 
-      {/* Metrics Row (Modern KPI Cards) */}
-      <Grid container spacing={2}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Tooltip title="Refresh Real-Time Stats">
+              <IconButton
+                onClick={fetchStats}
+                sx={{
+                  bgcolor: 'rgba(105, 108, 255, 0.08)',
+                  color: 'primary.main',
+                  '&:hover': { bgcolor: 'rgba(105, 108, 255, 0.16)' },
+                }}
+              >
+                <RefreshIcon />
+              </IconButton>
+            </Tooltip>
+          </Box>
+        </Box>
+      </Card>
+
+      {/* Sneat Analytics KPI Stat Cards */}
+      <Grid container spacing={2.5}>
         {/* Metric 1: Service Status */}
         <Grid item xs={12} sm={6} md={2.4}>
-          <Card
-            sx={{
-              position: 'relative',
-              overflow: 'hidden',
-              '&::before': {
-                content: '""',
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                right: 0,
-                height: '3px',
-                background: 'linear-gradient(90deg, #34D399, #10B981)',
-              },
-            }}
-          >
+          <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
             <CardContent sx={{ p: 2.5 }}>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <Typography variant="caption" color="text.secondary" sx={{ textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.05em' }}>
-                  Service Status
-                </Typography>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
                 <Box
                   sx={{
-                    width: 36,
-                    height: 36,
+                    width: 42,
+                    height: 42,
                     borderRadius: '8px',
-                    bgcolor: 'rgba(52, 211, 153, 0.12)',
-                    color: '#34D399',
+                    bgcolor: 'rgba(113, 221, 55, 0.16)',
+                    color: '#71DD37',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                   }}
                 >
-                  <CheckCircleIcon sx={{ fontSize: 20 }} />
+                  <CheckCircleIcon sx={{ fontSize: 24 }} />
                 </Box>
-              </Box>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 1.5 }}>
                 <Chip
                   size="small"
-                  label={stats ? 'ONLINE' : 'CHECKING'}
+                  label={stats ? 'ONLINE' : 'CONNECTING'}
                   sx={{
-                    fontWeight: 800,
-                    fontSize: '0.75rem',
-                    bgcolor: stats ? 'rgba(52, 211, 153, 0.12)' : 'rgba(251, 191, 36, 0.12)',
-                    color: stats ? '#34D399' : '#FBBF24',
-                    border: `1px solid ${stats ? 'rgba(52, 211, 153, 0.25)' : 'rgba(251, 191, 36, 0.25)'}`,
+                    fontWeight: 700,
+                    fontSize: '0.72rem',
+                    bgcolor: stats ? 'rgba(113, 221, 55, 0.16)' : 'rgba(255, 171, 0, 0.16)',
+                    color: stats ? '#71DD37' : '#FFAB00',
+                    borderRadius: '4px',
                   }}
                 />
               </Box>
-              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1, fontFamily: '"JetBrains Mono", monospace' }}>
+              <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+                Service Status
+              </Typography>
+              <Typography variant="h5" sx={{ fontWeight: 700, color: 'text.primary', mt: 0.5, mb: 0.5 }}>
+                {stats ? 'Gateway Live' : 'Checking'}
+              </Typography>
+              <Typography variant="caption" sx={{ color: 'text.secondary', fontFamily: '"JetBrains Mono", monospace' }}>
                 Telegram MTProto
               </Typography>
             </CardContent>
@@ -238,53 +266,45 @@ export default function DashboardPage({ onNavigate }) {
 
         {/* Metric 2: CPU Usage */}
         <Grid item xs={12} sm={6} md={2.4}>
-          <Card
-            sx={{
-              position: 'relative',
-              overflow: 'hidden',
-              '&::before': {
-                content: '""',
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                right: 0,
-                height: '3px',
-                background: 'linear-gradient(90deg, #38BDF8, #0284C7)',
-              },
-            }}
-          >
+          <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
             <CardContent sx={{ p: 2.5 }}>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <Typography variant="caption" color="text.secondary" sx={{ textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.05em' }}>
-                  CPU Usage
-                </Typography>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
                 <Box
                   sx={{
-                    width: 36,
-                    height: 36,
+                    width: 42,
+                    height: 42,
                     borderRadius: '8px',
-                    bgcolor: 'rgba(56, 189, 248, 0.12)',
-                    color: '#38BDF8',
+                    bgcolor: 'rgba(105, 108, 255, 0.16)',
+                    color: 'primary.main',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                   }}
                 >
-                  <SpeedIcon sx={{ fontSize: 20 }} />
+                  <SpeedIcon sx={{ fontSize: 24 }} />
                 </Box>
-              </Box>
-              <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1, mt: 1 }}>
-                <Typography variant="h5" sx={{ fontFamily: '"JetBrains Mono", monospace', fontWeight: 800, color: '#38BDF8' }}>
-                  {stats?.nodeCpuPercent ?? stats?.cpuPercent ?? '--'}%
-                </Typography>
-                {stats?.routerCpuPercent !== undefined && (
-                  <Typography variant="caption" color="text.secondary" sx={{ fontFamily: '"JetBrains Mono", monospace' }}>
-                    [{stats.routerCpuPercent}% router]
-                  </Typography>
+                {stats?.cpuPercent !== undefined && (
+                  <Chip
+                    size="small"
+                    label={`${stats.cpuPercent}%`}
+                    sx={{
+                      fontWeight: 700,
+                      fontSize: '0.72rem',
+                      bgcolor: 'rgba(105, 108, 255, 0.16)',
+                      color: 'primary.main',
+                      borderRadius: '4px',
+                    }}
+                  />
                 )}
               </Box>
-              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5, fontFamily: '"JetBrains Mono", monospace' }}>
-                {stats?.cpuCores ? `${stats.cpuCores} cores · load ${stats.loadAvg || '--'}` : 'System Load'}
+              <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+                CPU Load
+              </Typography>
+              <Typography variant="h5" sx={{ fontWeight: 700, color: 'text.primary', mt: 0.5, mb: 0.5, fontFamily: '"JetBrains Mono", monospace' }}>
+                {stats?.nodeCpuPercent ?? stats?.cpuPercent ?? '--'}%
+              </Typography>
+              <Typography variant="caption" sx={{ color: 'text.secondary', fontFamily: '"JetBrains Mono", monospace' }}>
+                {stats?.cpuCores ? `${stats.cpuCores} cores · load ${stats.loadAvg || '--'}` : 'System Thread Load'}
               </Typography>
             </CardContent>
           </Card>
@@ -292,50 +312,45 @@ export default function DashboardPage({ onNavigate }) {
 
         {/* Metric 3: RAM Usage */}
         <Grid item xs={12} sm={6} md={2.4}>
-          <Card
-            sx={{
-              position: 'relative',
-              overflow: 'hidden',
-              '&::before': {
-                content: '""',
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                right: 0,
-                height: '3px',
-                background: 'linear-gradient(90deg, #818CF8, #6366F1)',
-              },
-            }}
-          >
+          <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
             <CardContent sx={{ p: 2.5 }}>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <Typography variant="caption" color="text.secondary" sx={{ textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.05em' }}>
-                  Node RAM / Cap
-                </Typography>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
                 <Box
                   sx={{
-                    width: 36,
-                    height: 36,
+                    width: 42,
+                    height: 42,
                     borderRadius: '8px',
-                    bgcolor: 'rgba(129, 140, 248, 0.12)',
-                    color: '#818CF8',
+                    bgcolor: 'rgba(3, 195, 236, 0.16)',
+                    color: '#03C3EC',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                   }}
                 >
-                  <MemoryIcon sx={{ fontSize: 20 }} />
+                  <MemoryIcon sx={{ fontSize: 24 }} />
                 </Box>
+                <Chip
+                  size="small"
+                  label={`${stats?.ramPercent ?? 0}%`}
+                  sx={{
+                    fontWeight: 700,
+                    fontSize: '0.72rem',
+                    bgcolor: 'rgba(3, 195, 236, 0.16)',
+                    color: '#03C3EC',
+                    borderRadius: '4px',
+                  }}
+                />
               </Box>
-              <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1, mt: 1 }}>
-                <Typography variant="h5" sx={{ fontFamily: '"JetBrains Mono", monospace', fontWeight: 800, color: '#F8FAFC' }}>
-                  {stats?.ramMb ?? '--'}
+              <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+                Node RAM / Cap
+              </Typography>
+              <Typography variant="h5" sx={{ fontWeight: 700, color: 'text.primary', mt: 0.5, mb: 0.5, fontFamily: '"JetBrains Mono", monospace' }}>
+                {stats?.ramMb ?? '--'}{' '}
+                <Typography component="span" variant="body2" sx={{ color: 'text.secondary', fontSize: '0.85rem' }}>
+                  / {stats?.ramCapMb ?? 1024} MB
                 </Typography>
-                <Typography variant="body2" color="text.secondary" sx={{ fontFamily: '"JetBrains Mono", monospace' }}>
-                  / {stats?.ramCapMb ?? 1024} MB ({stats?.ramPercent ?? '--'}%)
-                </Typography>
-              </Box>
-              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5, fontFamily: '"JetBrains Mono", monospace' }}>
+              </Typography>
+              <Typography variant="caption" sx={{ color: 'text.secondary', fontFamily: '"JetBrains Mono", monospace' }}>
                 Heap: {stats?.heapMb ?? '--'} MB
               </Typography>
             </CardContent>
@@ -344,46 +359,32 @@ export default function DashboardPage({ onNavigate }) {
 
         {/* Metric 4: Uptime */}
         <Grid item xs={12} sm={6} md={2.4}>
-          <Card
-            sx={{
-              position: 'relative',
-              overflow: 'hidden',
-              '&::before': {
-                content: '""',
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                right: 0,
-                height: '3px',
-                background: 'linear-gradient(90deg, #FBBF24, #D97706)',
-              },
-            }}
-          >
+          <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
             <CardContent sx={{ p: 2.5 }}>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <Typography variant="caption" color="text.secondary" sx={{ textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.05em' }}>
-                  Service Uptime
-                </Typography>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
                 <Box
                   sx={{
-                    width: 36,
-                    height: 36,
+                    width: 42,
+                    height: 42,
                     borderRadius: '8px',
-                    bgcolor: 'rgba(251, 191, 36, 0.12)',
-                    color: '#FBBF24',
+                    bgcolor: 'rgba(255, 171, 0, 0.16)',
+                    color: '#FFAB00',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                   }}
                 >
-                  <AccessTimeIcon sx={{ fontSize: 20 }} />
+                  <AccessTimeIcon sx={{ fontSize: 24 }} />
                 </Box>
               </Box>
-              <Typography variant="h5" sx={{ fontFamily: '"JetBrains Mono", monospace', fontWeight: 800, mt: 1, color: '#F8FAFC' }}>
+              <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+                Service Uptime
+              </Typography>
+              <Typography variant="h5" sx={{ fontWeight: 700, color: 'text.primary', mt: 0.5, mb: 0.5, fontFamily: '"JetBrains Mono", monospace' }}>
                 {stats?.uptimeFormatted || stats?.uptime || '--'}
               </Typography>
-              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
-                active runtime
+              <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                continuous uptime
               </Typography>
             </CardContent>
           </Card>
@@ -391,46 +392,46 @@ export default function DashboardPage({ onNavigate }) {
 
         {/* Metric 5: Active Streams */}
         <Grid item xs={12} sm={6} md={2.4}>
-          <Card
-            sx={{
-              position: 'relative',
-              overflow: 'hidden',
-              '&::before': {
-                content: '""',
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                right: 0,
-                height: '3px',
-                background: 'linear-gradient(90deg, #38BDF8, #818CF8)',
-              },
-            }}
-          >
+          <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
             <CardContent sx={{ p: 2.5 }}>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <Typography variant="caption" color="text.secondary" sx={{ textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.05em' }}>
-                  Active Streams
-                </Typography>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
                 <Box
                   sx={{
-                    width: 36,
-                    height: 36,
+                    width: 42,
+                    height: 42,
                     borderRadius: '8px',
-                    bgcolor: 'rgba(56, 189, 248, 0.12)',
-                    color: '#38BDF8',
+                    bgcolor: 'rgba(105, 108, 255, 0.16)',
+                    color: 'primary.main',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                   }}
                 >
-                  <StorageIcon sx={{ fontSize: 20 }} />
+                  <StreamIcon sx={{ fontSize: 24 }} />
                 </Box>
+                <Chip
+                  size="small"
+                  label={clients.length > 0 ? 'STREAMING' : 'IDLE'}
+                  sx={{
+                    fontWeight: 700,
+                    fontSize: '0.72rem',
+                    bgcolor: clients.length > 0 ? 'rgba(113, 221, 55, 0.16)' : 'rgba(133, 146, 163, 0.16)',
+                    color: clients.length > 0 ? '#71DD37' : 'text.secondary',
+                    borderRadius: '4px',
+                  }}
+                />
               </Box>
-              <Typography variant="h5" sx={{ fontFamily: '"JetBrains Mono", monospace', fontWeight: 800, mt: 1, color: '#38BDF8' }}>
-                {clients.length} <Typography component="span" variant="body2" color="text.secondary">{clients.length === 1 ? 'Client' : 'Clients'}</Typography>
+              <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+                Active Streams
               </Typography>
-              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5, fontFamily: '"JetBrains Mono", monospace' }}>
-                Log: {stats?.logSizeKB ?? 0} KB
+              <Typography variant="h5" sx={{ fontWeight: 700, color: 'text.primary', mt: 0.5, mb: 0.5, fontFamily: '"JetBrains Mono", monospace' }}>
+                {clients.length}{' '}
+                <Typography component="span" variant="body2" sx={{ color: 'text.secondary', fontSize: '0.85rem' }}>
+                  {clients.length === 1 ? 'Client' : 'Clients'}
+                </Typography>
+              </Typography>
+              <Typography variant="caption" sx={{ color: 'text.secondary', fontFamily: '"JetBrains Mono", monospace' }}>
+                Log buffer: {stats?.logSizeKB ?? 0} KB
               </Typography>
             </CardContent>
           </Card>
@@ -440,25 +441,25 @@ export default function DashboardPage({ onNavigate }) {
       {/* Buffering Performance Strip */}
       <Card>
         <CardContent sx={{ p: 2.5 }}>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, pb: 1.5, borderBottom: '1px solid rgba(148, 163, 184, 0.12)' }}>
-            <Typography variant="subtitle2" sx={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: 1, color: '#F8FAFC' }}>
-              <BoltIcon sx={{ color: '#FBBF24', fontSize: 20 }} /> Stream Buffering & Engine Performance
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, pb: 1.5, borderBottom: '1px solid', borderColor: 'divider' }}>
+            <Typography variant="subtitle1" sx={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: 1, color: 'text.primary' }}>
+              <BoltIcon sx={{ color: '#FFAB00', fontSize: 22 }} /> Stream Buffering & Engine Performance
             </Typography>
             <Button
               size="small"
               onClick={() => onNavigate('/settings')}
-              sx={{ fontSize: '0.8rem', color: '#38BDF8', '&:hover': { bgcolor: 'rgba(56, 189, 248, 0.1)' } }}
+              sx={{ fontSize: '0.8rem', color: 'primary.main', '&:hover': { bgcolor: 'rgba(105, 108, 255, 0.08)' } }}
             >
               Configure Settings →
             </Button>
           </Box>
           <Grid container spacing={2}>
             <Grid item xs={6} sm={4} md={2}>
-              <Paper variant="outlined" sx={{ p: 1.75, bgcolor: '#090D16', borderColor: 'rgba(148, 163, 184, 0.12)', borderRadius: 2 }}>
+              <Paper variant="outlined" sx={{ p: 1.75, bgcolor: 'background.default', borderRadius: '8px' }}>
                 <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700, letterSpacing: '0.04em', display: 'block' }}>
                   SD PIPELINE
                 </Typography>
-                <Typography variant="body2" sx={{ fontFamily: '"JetBrains Mono", monospace', fontWeight: 700, color: '#38BDF8', mt: 0.5 }}>
+                <Typography variant="body2" sx={{ fontFamily: '"JetBrains Mono", monospace', fontWeight: 700, color: 'primary.main', mt: 0.5 }}>
                   {pipeline.sd || 2} × 512KB
                 </Typography>
                 <Typography variant="caption" color="text.secondary">
@@ -467,11 +468,11 @@ export default function DashboardPage({ onNavigate }) {
               </Paper>
             </Grid>
             <Grid item xs={6} sm={4} md={2}>
-              <Paper variant="outlined" sx={{ p: 1.75, bgcolor: '#090D16', borderColor: 'rgba(148, 163, 184, 0.12)', borderRadius: 2 }}>
+              <Paper variant="outlined" sx={{ p: 1.75, bgcolor: 'background.default', borderRadius: '8px' }}>
                 <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700, letterSpacing: '0.04em', display: 'block' }}>
                   720P HD
                 </Typography>
-                <Typography variant="body2" sx={{ fontFamily: '"JetBrains Mono", monospace', fontWeight: 700, color: '#38BDF8', mt: 0.5 }}>
+                <Typography variant="body2" sx={{ fontFamily: '"JetBrains Mono", monospace', fontWeight: 700, color: 'primary.main', mt: 0.5 }}>
                   {pipeline['720p'] || 4} × 512KB
                 </Typography>
                 <Typography variant="caption" color="text.secondary">
@@ -480,11 +481,11 @@ export default function DashboardPage({ onNavigate }) {
               </Paper>
             </Grid>
             <Grid item xs={6} sm={4} md={2}>
-              <Paper variant="outlined" sx={{ p: 1.75, bgcolor: '#090D16', borderColor: 'rgba(148, 163, 184, 0.12)', borderRadius: 2 }}>
+              <Paper variant="outlined" sx={{ p: 1.75, bgcolor: 'background.default', borderRadius: '8px' }}>
                 <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700, letterSpacing: '0.04em', display: 'block' }}>
                   1080P FHD
                 </Typography>
-                <Typography variant="body2" sx={{ fontFamily: '"JetBrains Mono", monospace', fontWeight: 700, color: '#38BDF8', mt: 0.5 }}>
+                <Typography variant="body2" sx={{ fontFamily: '"JetBrains Mono", monospace', fontWeight: 700, color: 'primary.main', mt: 0.5 }}>
                   {pipeline['1080p'] || 6} × 512KB
                 </Typography>
                 <Typography variant="caption" color="text.secondary">
@@ -493,11 +494,11 @@ export default function DashboardPage({ onNavigate }) {
               </Paper>
             </Grid>
             <Grid item xs={6} sm={4} md={2}>
-              <Paper variant="outlined" sx={{ p: 1.75, bgcolor: '#090D16', borderColor: 'rgba(148, 163, 184, 0.12)', borderRadius: 2 }}>
+              <Paper variant="outlined" sx={{ p: 1.75, bgcolor: 'background.default', borderRadius: '8px' }}>
                 <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700, letterSpacing: '0.04em', display: 'block' }}>
                   4K UHD
                 </Typography>
-                <Typography variant="body2" sx={{ fontFamily: '"JetBrains Mono", monospace', fontWeight: 700, color: '#818CF8', mt: 0.5 }}>
+                <Typography variant="body2" sx={{ fontFamily: '"JetBrains Mono", monospace', fontWeight: 700, color: '#8587FF', mt: 0.5 }}>
                   {pipeline['4k'] || 8} × 512KB
                 </Typography>
                 <Typography variant="caption" color="text.secondary">
@@ -506,11 +507,11 @@ export default function DashboardPage({ onNavigate }) {
               </Paper>
             </Grid>
             <Grid item xs={6} sm={4} md={2}>
-              <Paper variant="outlined" sx={{ p: 1.75, bgcolor: '#090D16', borderColor: 'rgba(148, 163, 184, 0.12)', borderRadius: 2 }}>
+              <Paper variant="outlined" sx={{ p: 1.75, bgcolor: 'background.default', borderRadius: '8px' }}>
                 <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700, letterSpacing: '0.04em', display: 'block' }}>
                   PREFETCH
                 </Typography>
-                <Typography variant="body2" sx={{ fontFamily: '"JetBrains Mono", monospace', fontWeight: 700, color: stats?.overlapPrefetch ? '#34D399' : '#94A3B8', mt: 0.5 }}>
+                <Typography variant="body2" sx={{ fontFamily: '"JetBrains Mono", monospace', fontWeight: 700, color: stats?.overlapPrefetch ? '#71DD37' : 'text.secondary', mt: 0.5 }}>
                   {stats?.overlapPrefetch ? 'Active' : 'Disabled'}
                 </Typography>
                 <Typography variant="caption" color="text.secondary">
@@ -519,11 +520,11 @@ export default function DashboardPage({ onNavigate }) {
               </Paper>
             </Grid>
             <Grid item xs={6} sm={4} md={2}>
-              <Paper variant="outlined" sx={{ p: 1.75, bgcolor: '#090D16', borderColor: 'rgba(148, 163, 184, 0.12)', borderRadius: 2 }}>
+              <Paper variant="outlined" sx={{ p: 1.75, bgcolor: 'background.default', borderRadius: '8px' }}>
                 <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700, letterSpacing: '0.04em', display: 'block' }}>
                   RAM CACHE
                 </Typography>
-                <Typography variant="body2" sx={{ fontFamily: '"JetBrains Mono", monospace', fontWeight: 700, color: '#38BDF8', mt: 0.5 }}>
+                <Typography variant="body2" sx={{ fontFamily: '"JetBrains Mono", monospace', fontWeight: 700, color: '#03C3EC', mt: 0.5 }}>
                   {stats?.routerRamCacheMb || 16} MB
                 </Typography>
                 <Typography variant="caption" color="text.secondary">
@@ -540,7 +541,7 @@ export default function DashboardPage({ onNavigate }) {
         <CardContent sx={{ p: 2.5 }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
             <Box>
-              <Typography variant="subtitle1" sx={{ fontWeight: 700, color: '#F8FAFC' }}>
+              <Typography variant="subtitle1" sx={{ fontWeight: 700, color: 'text.primary' }}>
                 Connected Clients & Active Sessions ({clients.length})
               </Typography>
               <Typography variant="caption" color="text.secondary">
@@ -550,12 +551,12 @@ export default function DashboardPage({ onNavigate }) {
             <IconButton
               size="small"
               onClick={fetchStats}
-              sx={{ color: '#94A3B8', '&:hover': { color: '#38BDF8', bgcolor: 'rgba(56, 189, 248, 0.1)' } }}
+              sx={{ color: 'text.secondary', '&:hover': { color: 'primary.main', bgcolor: 'rgba(105, 108, 255, 0.08)' } }}
             >
               <RefreshIcon fontSize="small" />
             </IconButton>
           </Box>
-          <TableContainer component={Paper} variant="outlined" sx={{ bgcolor: '#090D16', borderColor: 'rgba(148, 163, 184, 0.12)', borderRadius: 2 }}>
+          <TableContainer component={Paper} variant="outlined" sx={{ bgcolor: 'background.default', borderRadius: '8px' }}>
             <Table size="small">
               <TableHead>
                 <TableRow>
@@ -577,11 +578,11 @@ export default function DashboardPage({ onNavigate }) {
                   </TableRow>
                 ) : (
                   clients.map((c, idx) => (
-                    <TableRow key={idx} hover sx={{ '&:hover': { bgcolor: 'rgba(56, 189, 248, 0.04) !important' } }}>
-                      <TableCell sx={{ fontWeight: 600, color: '#38BDF8' }}>
+                    <TableRow key={idx} hover sx={{ '&:hover': { bgcolor: 'rgba(105, 108, 255, 0.04) !important' } }}>
+                      <TableCell sx={{ fontWeight: 600, color: 'primary.main' }}>
                         📺 {c.clientName || 'Client'}
                       </TableCell>
-                      <TableCell sx={{ fontFamily: '"JetBrains Mono", monospace', fontSize: '0.8rem', color: '#94A3B8' }}>
+                      <TableCell sx={{ fontFamily: '"JetBrains Mono", monospace', fontSize: '0.8rem', color: 'text.secondary' }}>
                         {c.ip || '--'}
                       </TableCell>
                       <TableCell sx={{ maxWidth: 280, textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }} title={c.filename}>
@@ -594,13 +595,13 @@ export default function DashboardPage({ onNavigate }) {
                           sx={{
                             fontFamily: '"JetBrains Mono", monospace',
                             fontSize: '0.75rem',
-                            bgcolor: 'rgba(56, 189, 248, 0.08)',
-                            color: '#38BDF8',
-                            border: '1px solid rgba(56, 189, 248, 0.25)',
+                            bgcolor: 'rgba(105, 108, 255, 0.12)',
+                            color: 'primary.main',
+                            borderRadius: '4px',
                           }}
                         />
                       </TableCell>
-                      <TableCell sx={{ color: '#818CF8', fontSize: '0.8rem', fontWeight: 600 }}>{c.mode || 'Direct'}</TableCell>
+                      <TableCell sx={{ color: '#8587FF', fontSize: '0.8rem', fontWeight: 600 }}>{c.mode || 'Direct'}</TableCell>
                       <TableCell>
                         <Chip
                           size="small"
@@ -608,13 +609,13 @@ export default function DashboardPage({ onNavigate }) {
                           sx={{
                             fontWeight: 700,
                             fontSize: '0.72rem',
-                            bgcolor: c.status === 'STREAMING' ? 'rgba(52, 211, 153, 0.12)' : 'rgba(251, 191, 36, 0.12)',
-                            color: c.status === 'STREAMING' ? '#34D399' : '#FBBF24',
-                            border: `1px solid ${c.status === 'STREAMING' ? 'rgba(52, 211, 153, 0.25)' : 'rgba(251, 191, 36, 0.25)'}`,
+                            bgcolor: c.status === 'STREAMING' ? 'rgba(113, 221, 55, 0.16)' : 'rgba(255, 171, 0, 0.16)',
+                            color: c.status === 'STREAMING' ? '#71DD37' : '#FFAB00',
+                            borderRadius: '4px',
                           }}
                         />
                       </TableCell>
-                      <TableCell align="right" sx={{ fontFamily: '"JetBrains Mono", monospace', fontSize: '0.8rem', color: '#94A3B8' }}>
+                      <TableCell align="right" sx={{ fontFamily: '"JetBrains Mono", monospace', fontSize: '0.8rem', color: 'text.secondary' }}>
                         {c.connectedSec || 0}s
                       </TableCell>
                     </TableRow>
@@ -629,7 +630,7 @@ export default function DashboardPage({ onNavigate }) {
       {/* Query Diagnostic Tool */}
       <Card>
         <CardContent sx={{ p: 2.5 }}>
-          <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 0.5, color: '#F8FAFC' }}>
+          <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 0.5, color: 'text.primary' }}>
             🔍 MTProto Search Diagnostic Tool
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
@@ -643,22 +644,13 @@ export default function DashboardPage({ onNavigate }) {
               value={diagQuery}
               onChange={(e) => setDiagQuery(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleRunDiagnostic()}
-              sx={{
-                '& .MuiOutlinedInput-root': {
-                  bgcolor: '#090D16',
-                  borderRadius: 2,
-                  '& fieldset': { borderColor: 'rgba(148, 163, 184, 0.2)' },
-                  '&:hover fieldset': { borderColor: 'rgba(56, 189, 248, 0.4)' },
-                  '&.Mui-focused fieldset': { borderColor: '#38BDF8' },
-                },
-              }}
             />
             <Button
               variant="contained"
               startIcon={<SearchIcon />}
               onClick={handleRunDiagnostic}
               disabled={diagLoading || !diagQuery.trim()}
-              sx={{ minWidth: 140, borderRadius: 2 }}
+              sx={{ minWidth: 140, borderRadius: '8px' }}
             >
               {diagLoading ? 'Querying...' : 'Test Query'}
             </Button>
@@ -667,22 +659,22 @@ export default function DashboardPage({ onNavigate }) {
           {diagResults && (
             <Box sx={{ mt: 2 }}>
               {diagResults.error ? (
-                <Alert severity="error" sx={{ bgcolor: 'rgba(244, 63, 94, 0.1)', color: '#F43F5E', border: '1px solid rgba(244, 63, 94, 0.25)' }}>
+                <Alert severity="error" sx={{ bgcolor: 'rgba(255, 62, 29, 0.12)', color: '#FF3E1D' }}>
                   {diagResults.error}
                 </Alert>
               ) : (
                 <Box>
-                  <Typography variant="body2" sx={{ fontWeight: 600, color: '#F8FAFC', mb: 1.5 }}>
+                  <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.primary', mb: 1.5 }}>
                     Found {diagResults.count || diagResults.buttons?.length || 0} results via {diagResults.resolver} (@{diagResults.targetBot}):
                   </Typography>
                   <Stack spacing={1}>
                     {(diagResults.buttons || []).map((b, i) => (
-                      <Paper key={i} variant="outlined" sx={{ p: 1.75, bgcolor: '#090D16', borderColor: 'rgba(148, 163, 184, 0.12)', borderRadius: 2 }}>
-                        <Typography variant="body2" sx={{ fontWeight: 600, color: '#F8FAFC' }}>
+                      <Paper key={i} variant="outlined" sx={{ p: 1.75, bgcolor: 'background.default', borderRadius: '8px' }}>
+                        <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.primary' }}>
                           {b.text}
                         </Typography>
                         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 0.75 }}>
-                          <Typography variant="caption" sx={{ fontFamily: '"JetBrains Mono", monospace', color: '#38BDF8' }}>
+                          <Typography variant="caption" sx={{ fontFamily: '"JetBrains Mono", monospace', color: 'primary.main' }}>
                             {b.className || 'InlineKeyboardButton'}
                           </Typography>
                           {b.url && (
@@ -692,7 +684,7 @@ export default function DashboardPage({ onNavigate }) {
                               target="_blank"
                               rel="noopener"
                               endIcon={<OpenInNewIcon fontSize="small" />}
-                              sx={{ fontSize: '0.75rem', py: 0.25, color: '#818CF8' }}
+                              sx={{ fontSize: '0.75rem', py: 0.25, color: 'primary.main' }}
                             >
                               Open URL
                             </Button>
@@ -728,7 +720,7 @@ export default function DashboardPage({ onNavigate }) {
           <Button
             onClick={dialogAction === 'purge' ? handlePurgeMemory : handleRestart}
             variant="contained"
-            color={dialogAction === 'purge' ? 'info' : 'warning'}
+            color={dialogAction === 'purge' ? 'primary' : 'warning'}
             disabled={actionLoading}
           >
             {dialogAction === 'purge' ? 'Purge Memory' : 'Restart Service'}

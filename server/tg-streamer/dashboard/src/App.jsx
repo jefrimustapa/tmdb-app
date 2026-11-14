@@ -5,7 +5,7 @@ import Box from '@mui/material/Box';
 import Alert from '@mui/material/Alert';
 import AlertTitle from '@mui/material/AlertTitle';
 import Button from '@mui/material/Button';
-import { darkTheme } from './theme';
+import { getTheme } from './theme';
 import Layout from './components/Layout';
 import DashboardPage from './pages/DashboardPage';
 import StreamsPage from './pages/StreamsPage';
@@ -47,8 +47,27 @@ class ErrorBoundary extends React.Component {
 }
 
 export default function App() {
+  const [themeMode, setThemeMode] = useState(() => {
+    try {
+      return localStorage.getItem('tgstrm_theme_mode') || 'dark';
+    } catch {
+      return 'dark';
+    }
+  });
   const [currentPath, setCurrentPath] = useState(window.location.pathname);
   const [authInfo, setAuthInfo] = useState({ isConnected: undefined, bot: '' });
+
+  const handleToggleTheme = () => {
+    setThemeMode((prev) => {
+      const next = prev === 'dark' ? 'light' : 'dark';
+      try {
+        localStorage.setItem('tgstrm_theme_mode', next);
+      } catch (e) {
+        console.warn('Could not save theme preference:', e);
+      }
+      return next;
+    });
+  };
 
   // Handle browser back/forward buttons
   useEffect(() => {
@@ -112,13 +131,15 @@ export default function App() {
   };
 
   return (
-    <ThemeProvider theme={darkTheme}>
+    <ThemeProvider theme={getTheme(themeMode)}>
       <CssBaseline />
       <Layout
         currentPath={currentPath}
         onNavigate={handleNavigate}
         targetBot={authInfo.bot}
         isConnected={authInfo.isConnected}
+        themeMode={themeMode}
+        onToggleTheme={handleToggleTheme}
       >
         <ErrorBoundary>
           {renderActivePage()}

@@ -24,8 +24,6 @@ import SmartToyIcon from '@mui/icons-material/SmartToy';
 import BoltIcon from '@mui/icons-material/Bolt';
 import MemoryIcon from '@mui/icons-material/Memory';
 import SecurityIcon from '@mui/icons-material/Security';
-import RestartAltIcon from '@mui/icons-material/RestartAlt';
-import CleaningServicesIcon from '@mui/icons-material/CleaningServices';
 import { api } from '../api/client';
 
 export default function SettingsPage() {
@@ -119,20 +117,10 @@ export default function SettingsPage() {
 
   const currentBotHandle = settings.targetBotUsernames[settings.activeResolver] || '';
 
-  const inputSx = {
-    '& .MuiOutlinedInput-root': {
-      bgcolor: '#090D16',
-      borderRadius: 2,
-      '& fieldset': { borderColor: 'rgba(148, 163, 184, 0.2)' },
-      '&:hover fieldset': { borderColor: 'rgba(56, 189, 248, 0.4)' },
-      '&.Mui-focused fieldset': { borderColor: '#38BDF8' },
-    },
-  };
-
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
       <Box>
-        <Typography variant="h5" sx={{ fontWeight: 800, letterSpacing: '-0.02em' }}>
+        <Typography variant="h5" sx={{ fontWeight: 700 }}>
           TGStrm Configuration
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mt: 0.25 }}>
@@ -144,28 +132,31 @@ export default function SettingsPage() {
         <LinearProgress sx={{ my: 3, borderRadius: 1 }} />
       ) : (
         <Card>
-          <Box sx={{ borderBottom: '1px solid rgba(148, 163, 184, 0.12)', bgcolor: '#090D16', px: 2 }}>
+          {/* Sneat Pill Tabs */}
+          <Box sx={{ borderBottom: '1px solid', borderColor: 'divider', px: 2.5, py: 1.5, bgcolor: 'background.default' }}>
             <Tabs
               value={tabIndex}
               onChange={(e, val) => setTabIndex(val)}
               variant="scrollable"
               scrollButtons="auto"
               sx={{
+                minHeight: 40,
+                '& .MuiTabs-indicator': { display: 'none' },
                 '& .MuiTab-root': {
                   textTransform: 'none',
                   fontWeight: 600,
                   fontSize: '0.85rem',
-                  minHeight: 48,
-                  color: '#94A3B8',
+                  minHeight: 38,
+                  borderRadius: '8px',
+                  mr: 1,
+                  px: 2,
+                  color: 'text.secondary',
+                  transition: 'all 0.18s ease-in-out',
                   '&.Mui-selected': {
-                    color: '#38BDF8',
-                    fontWeight: 700,
+                    bgcolor: 'primary.main',
+                    color: '#FFFFFF !important',
+                    boxShadow: '0 2px 6px 0 rgba(105, 108, 255, 0.4)',
                   },
-                },
-                '& .MuiTabs-indicator': {
-                  bgcolor: '#38BDF8',
-                  height: 3,
-                  borderRadius: '3px 3px 0 0',
                 },
               }}
             >
@@ -181,7 +172,7 @@ export default function SettingsPage() {
             {tabIndex === 0 && (
               <Stack spacing={3.5} sx={{ maxWidth: 680 }}>
                 <Box>
-                  <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 0.5, color: '#F8FAFC' }}>
+                  <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 0.5, color: 'text.primary' }}>
                     Active Resolver Engine
                   </Typography>
                   <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
@@ -193,7 +184,6 @@ export default function SettingsPage() {
                     size="small"
                     value={settings.activeResolver}
                     onChange={(e) => setSettings({ ...settings, activeResolver: e.target.value })}
-                    sx={inputSx}
                   >
                     <MenuItem value="msm">MSM Bot (Inline Callbacks & Ad-Gate)</MenuItem>
                     <MenuItem value="pencuri">Pencuri Movie Bot (Search API & Mini App)</MenuItem>
@@ -201,7 +191,7 @@ export default function SettingsPage() {
                 </Box>
 
                 <Box>
-                  <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 0.5, color: '#F8FAFC' }}>
+                  <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 0.5, color: 'text.primary' }}>
                     Target Bot Username Handle
                   </Typography>
                   <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
@@ -223,9 +213,8 @@ export default function SettingsPage() {
                       });
                     }}
                     InputProps={{
-                      startAdornment: <Typography sx={{ mr: 0.5, color: '#94A3B8', fontFamily: '"JetBrains Mono", monospace' }}>@</Typography>,
+                      startAdornment: <Typography sx={{ mr: 0.5, color: 'text.secondary', fontFamily: '"JetBrains Mono", monospace' }}>@</Typography>,
                     }}
-                    sx={inputSx}
                   />
                   <Box sx={{ mt: 1.5, display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
                     <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
@@ -241,10 +230,10 @@ export default function SettingsPage() {
                         sx={{
                           fontFamily: '"JetBrains Mono", monospace',
                           fontSize: '0.75rem',
-                          bgcolor: 'rgba(56, 189, 248, 0.08)',
-                          color: '#38BDF8',
-                          border: '1px solid rgba(56, 189, 248, 0.25)',
-                          '&:hover': { bgcolor: 'rgba(56, 189, 248, 0.16)' },
+                          bgcolor: 'rgba(105, 108, 255, 0.12)',
+                          color: 'primary.main',
+                          borderRadius: '4px',
+                          '&:hover': { bgcolor: 'rgba(105, 108, 255, 0.2)' },
                         }}
                       />
                     ))}
@@ -257,7 +246,7 @@ export default function SettingsPage() {
                     startIcon={<SaveIcon />}
                     onClick={() => handleSave()}
                     disabled={saving}
-                    sx={{ px: 3, py: 1, borderRadius: 2 }}
+                    sx={{ px: 3, py: 1, borderRadius: '8px' }}
                   >
                     {saving ? 'Saving...' : 'Save Resolver Settings'}
                   </Button>
@@ -269,7 +258,7 @@ export default function SettingsPage() {
             {tabIndex === 1 && (
               <Stack spacing={3.5} sx={{ maxWidth: 680 }}>
                 <Box>
-                  <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 0.5, color: '#F8FAFC' }}>
+                  <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 0.5, color: 'text.primary' }}>
                     Quality Tier Buffer Pipelines
                   </Typography>
                   <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
@@ -293,13 +282,12 @@ export default function SettingsPage() {
                             display: 'flex',
                             justifyContent: 'space-between',
                             alignItems: 'center',
-                            bgcolor: '#090D16',
-                            borderColor: 'rgba(148, 163, 184, 0.12)',
-                            borderRadius: 2,
+                            bgcolor: 'background.default',
+                            borderRadius: '8px',
                           }}
                         >
                           <Box>
-                            <Typography variant="body2" sx={{ fontWeight: 700, color: '#F8FAFC' }}>
+                            <Typography variant="body2" sx={{ fontWeight: 700, color: 'text.primary' }}>
                               {tier.label}
                             </Typography>
                             <Typography variant="caption" color="text.secondary" sx={{ fontFamily: '"JetBrains Mono", monospace' }}>
@@ -323,7 +311,7 @@ export default function SettingsPage() {
                                 });
                               }
                             }}
-                            sx={{ width: 90, ...inputSx }}
+                            sx={{ width: 90 }}
                           />
                         </Paper>
                       );
@@ -337,7 +325,7 @@ export default function SettingsPage() {
                     startIcon={<SaveIcon />}
                     onClick={() => handleSave()}
                     disabled={saving}
-                    sx={{ px: 3, py: 1, borderRadius: 2 }}
+                    sx={{ px: 3, py: 1, borderRadius: '8px' }}
                   >
                     {saving ? 'Saving...' : 'Save Buffer Pipelines'}
                   </Button>
@@ -349,7 +337,7 @@ export default function SettingsPage() {
             {tabIndex === 2 && (
               <Stack spacing={3.5} sx={{ maxWidth: 680 }}>
                 <Box>
-                  <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 0.5, color: '#F8FAFC' }}>
+                  <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 0.5, color: 'text.primary' }}>
                     Overlap Prefetch
                   </Typography>
                   <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
@@ -360,21 +348,20 @@ export default function SettingsPage() {
                       <Switch
                         checked={settings.overlapPrefetch}
                         onChange={(e) => setSettings({ ...settings, overlapPrefetch: e.target.checked })}
-                        color="primary"
                       />
                     }
                     label={
-                      <Typography variant="body2" sx={{ fontWeight: 600, color: settings.overlapPrefetch ? '#34D399' : '#94A3B8' }}>
+                      <Typography variant="body2" sx={{ fontWeight: 600, color: settings.overlapPrefetch ? '#71DD37' : 'text.secondary' }}>
                         {settings.overlapPrefetch ? 'Enabled (Instant seeking & low jitter)' : 'Disabled'}
                       </Typography>
                     }
                   />
                 </Box>
 
-                <Divider sx={{ borderColor: 'rgba(148, 163, 184, 0.08)' }} />
+                <Divider />
 
                 <Box>
-                  <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 0.5, color: '#F8FAFC' }}>
+                  <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 0.5, color: 'text.primary' }}>
                     Node RAM Cap & GC Purge Threshold
                   </Typography>
                   <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
@@ -386,7 +373,6 @@ export default function SettingsPage() {
                     size="small"
                     value={settings.nodeRamCapMb}
                     onChange={(e) => setSettings({ ...settings, nodeRamCapMb: Number(e.target.value) })}
-                    sx={inputSx}
                   >
                     {(settings.nodeRamCapOptions || [256, 512, 1024, 2048]).map((opt) => (
                       <MenuItem key={opt} value={opt}>
@@ -397,10 +383,10 @@ export default function SettingsPage() {
                   </TextField>
                 </Box>
 
-                <Divider sx={{ borderColor: 'rgba(148, 163, 184, 0.08)' }} />
+                <Divider />
 
                 <Box>
-                  <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 0.5, color: '#F8FAFC' }}>
+                  <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 0.5, color: 'text.primary' }}>
                     Router RAM Block Cache
                   </Typography>
                   <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
@@ -412,7 +398,6 @@ export default function SettingsPage() {
                     size="small"
                     value={settings.routerRamCacheMb}
                     onChange={(e) => setSettings({ ...settings, routerRamCacheMb: Number(e.target.value) })}
-                    sx={inputSx}
                   >
                     <MenuItem value={8}>8 MB (16 blocks)</MenuItem>
                     <MenuItem value={16}>16 MB (32 blocks — Recommended)</MenuItem>
@@ -421,10 +406,10 @@ export default function SettingsPage() {
                   </TextField>
                 </Box>
 
-                <Divider sx={{ borderColor: 'rgba(148, 163, 184, 0.08)' }} />
+                <Divider />
 
                 <Box>
-                  <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 0.5, color: '#F8FAFC' }}>
+                  <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 0.5, color: 'text.primary' }}>
                     Video Transcoding Mode
                   </Typography>
                   <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
@@ -436,7 +421,6 @@ export default function SettingsPage() {
                     size="small"
                     value={settings.videoTranscodeMode}
                     onChange={(e) => setSettings({ ...settings, videoTranscodeMode: e.target.value })}
-                    sx={inputSx}
                   >
                     <MenuItem value="disabled">Disabled (100% Direct Copy — 0% CPU Load)</MenuItem>
                     <MenuItem value="desktop_hevc">Desktop PC Chrome Only (HEVC to H.264)</MenuItem>
@@ -450,7 +434,7 @@ export default function SettingsPage() {
                     startIcon={<SaveIcon />}
                     onClick={() => handleSave()}
                     disabled={saving}
-                    sx={{ px: 3, py: 1, borderRadius: 2 }}
+                    sx={{ px: 3, py: 1, borderRadius: '8px' }}
                   >
                     {saving ? 'Saving...' : 'Save Engine Settings'}
                   </Button>
@@ -462,7 +446,7 @@ export default function SettingsPage() {
             {tabIndex === 3 && (
               <Stack spacing={3.5} sx={{ maxWidth: 680 }}>
                 <Box>
-                  <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 0.5, color: '#F8FAFC' }}>
+                  <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 0.5, color: 'text.primary' }}>
                     Geographic Access Filtering
                   </Typography>
                   <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
@@ -473,11 +457,10 @@ export default function SettingsPage() {
                       <Switch
                         checked={settings.geoBlockEnabled}
                         onChange={(e) => setSettings({ ...settings, geoBlockEnabled: e.target.checked })}
-                        color="primary"
                       />
                     }
                     label={
-                      <Typography variant="body2" sx={{ fontWeight: 600, color: settings.geoBlockEnabled ? '#34D399' : '#94A3B8' }}>
+                      <Typography variant="body2" sx={{ fontWeight: 600, color: settings.geoBlockEnabled ? '#71DD37' : 'text.secondary' }}>
                         {settings.geoBlockEnabled ? 'GeoBlock Protection Enabled' : 'GeoBlock Disabled (All IPs Allowed)'}
                       </Typography>
                     }
@@ -485,7 +468,7 @@ export default function SettingsPage() {
                 </Box>
 
                 <Box>
-                  <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 0.5, color: '#F8FAFC' }}>
+                  <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 0.5, color: 'text.primary' }}>
                     Whitelisted IP Addresses
                   </Typography>
                   <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
@@ -499,7 +482,6 @@ export default function SettingsPage() {
                     placeholder="192.168.0.1, 10.0.0.0/24..."
                     value={settings.geoBlockWhitelistedIps}
                     onChange={(e) => setSettings({ ...settings, geoBlockWhitelistedIps: e.target.value })}
-                    sx={inputSx}
                   />
                 </Box>
 
@@ -509,7 +491,7 @@ export default function SettingsPage() {
                     startIcon={<SaveIcon />}
                     onClick={() => handleSave()}
                     disabled={saving}
-                    sx={{ px: 3, py: 1, borderRadius: 2 }}
+                    sx={{ px: 3, py: 1, borderRadius: '8px' }}
                   >
                     {saving ? 'Saving...' : 'Save GeoBlock Settings'}
                   </Button>

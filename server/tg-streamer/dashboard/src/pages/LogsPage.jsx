@@ -24,7 +24,6 @@ import {
 import DownloadIcon from '@mui/icons-material/Download';
 import DeleteSweepIcon from '@mui/icons-material/DeleteSweep';
 import SearchIcon from '@mui/icons-material/Search';
-import FiberManualRecordIcon from '@mui/icons-material/FiberManualRecord';
 import TerminalIcon from '@mui/icons-material/Terminal';
 import { api } from '../api/client';
 
@@ -109,24 +108,24 @@ export default function LogsPage() {
 
   const getLineColor = (line) => {
     if (line.includes('[ERROR]') || line.includes('[FATAL]') || line.includes('Error:')) {
-      return '#F43F5E'; // rose-500
+      return '#FF3E1D'; // Sneat coral red
     }
     if (line.includes('[WARN]')) {
-      return '#FBBF24'; // amber-400
+      return '#FFAB00'; // Sneat amber
     }
     if (line.includes('[STREAM') || line.includes('[PIPELINE')) {
-      return '#38BDF8'; // sky-400
+      return '#696CFF'; // Sneat signature purple
     }
     if (line.includes('[SUPERVISOR')) {
-      return '#34D399'; // emerald-400
+      return '#71DD37'; // Sneat fresh green
     }
     if (line.includes('[TG]') || line.includes('[AUTH')) {
-      return '#818CF8'; // indigo-400
+      return '#8587FF'; // Sneat light purple
     }
     if (line.includes('[MEMORY PURGE]') || line.includes('[SYSTEM]')) {
-      return '#22D3EE'; // cyan-400
+      return '#03C3EC'; // Sneat cyan
     }
-    return '#94A3B8'; // slate-400
+    return '#8592A3'; // Sneat slate text
   };
 
   const filteredLogs = logs.filter((l) => {
@@ -136,11 +135,11 @@ export default function LogsPage() {
   });
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, gap: 2 }}>
-      {/* Header */}
+    <Box sx={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, gap: 2.5 }}>
+      {/* Top Header & Actions */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
         <Box>
-          <Typography variant="h5" sx={{ fontWeight: 800, letterSpacing: '-0.02em' }}>
+          <Typography variant="h5" sx={{ fontWeight: 700 }}>
             Live Log Console
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mt: 0.25 }}>
@@ -154,12 +153,12 @@ export default function LogsPage() {
             startIcon={<DeleteSweepIcon />}
             onClick={() => setClearDialogOpen(true)}
             sx={{
-              borderColor: 'rgba(244, 63, 94, 0.3)',
-              color: '#F43F5E',
-              bgcolor: 'rgba(244, 63, 94, 0.05)',
+              borderColor: 'rgba(255, 62, 29, 0.3)',
+              color: '#FF3E1D',
+              bgcolor: 'rgba(255, 62, 29, 0.05)',
               '&:hover': {
-                borderColor: '#F43F5E',
-                bgcolor: 'rgba(244, 63, 94, 0.12)',
+                borderColor: '#FF3E1D',
+                bgcolor: 'rgba(255, 62, 29, 0.12)',
               },
             }}
           >
@@ -173,11 +172,12 @@ export default function LogsPage() {
             target="_blank"
             rel="noopener"
             sx={{
-              borderColor: 'rgba(148, 163, 184, 0.2)',
-              color: '#F8FAFC',
+              borderColor: 'rgba(105, 108, 255, 0.3)',
+              color: 'primary.main',
+              bgcolor: 'rgba(105, 108, 255, 0.05)',
               '&:hover': {
-                borderColor: '#38BDF8',
-                color: '#38BDF8',
+                borderColor: 'primary.main',
+                bgcolor: 'rgba(105, 108, 255, 0.12)',
               },
             }}
           >
@@ -191,7 +191,7 @@ export default function LogsPage() {
         <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
           <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} justifyContent="space-between" alignItems="center">
             {/* Quick Filters */}
-            <Stack direction="row" spacing={1} flexWrap="wrap">
+            <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
               {[
                 { label: 'All', value: '' },
                 { label: 'Streams', value: '[STREAM' },
@@ -208,13 +208,14 @@ export default function LogsPage() {
                     clickable
                     onClick={() => setFilterType(f.value)}
                     sx={{
-                      fontWeight: 700,
+                      fontWeight: 600,
                       fontSize: '0.75rem',
-                      bgcolor: active ? 'rgba(56, 189, 248, 0.15)' : '#090D16',
-                      color: active ? '#38BDF8' : '#94A3B8',
-                      border: active ? '1px solid rgba(56, 189, 248, 0.35)' : '1px solid rgba(148, 163, 184, 0.15)',
+                      borderRadius: '6px',
+                      bgcolor: active ? 'primary.main' : 'rgba(105, 108, 255, 0.08)',
+                      color: active ? '#FFFFFF' : 'text.secondary',
+                      boxShadow: active ? '0 2px 6px 0 rgba(105, 108, 255, 0.4)' : 'none',
                       '&:hover': {
-                        bgcolor: active ? 'rgba(56, 189, 248, 0.2)' : 'rgba(255, 255, 255, 0.05)',
+                        bgcolor: active ? 'primary.dark' : 'rgba(105, 108, 255, 0.16)',
                       },
                     }}
                   />
@@ -230,18 +231,9 @@ export default function LogsPage() {
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 InputProps={{
-                  startAdornment: <SearchIcon fontSize="small" sx={{ mr: 0.5, color: '#94A3B8' }} />,
+                  startAdornment: <SearchIcon fontSize="small" sx={{ mr: 0.5, color: 'text.secondary' }} />,
                 }}
-                sx={{
-                  width: { xs: '100%', md: 240 },
-                  '& .MuiOutlinedInput-root': {
-                    bgcolor: '#090D16',
-                    borderRadius: 2,
-                    '& fieldset': { borderColor: 'rgba(148, 163, 184, 0.2)' },
-                    '&:hover fieldset': { borderColor: 'rgba(56, 189, 248, 0.4)' },
-                    '&.Mui-focused fieldset': { borderColor: '#38BDF8' },
-                  },
-                }}
+                sx={{ width: { xs: '100%', md: 240 } }}
               />
               <FormControlLabel
                 control={
@@ -252,7 +244,7 @@ export default function LogsPage() {
                     color="primary"
                   />
                 }
-                label={<Typography variant="caption" sx={{ fontWeight: 600, color: '#94A3B8' }}>Auto-scroll</Typography>}
+                label={<Typography variant="caption" sx={{ fontWeight: 600, color: 'text.secondary' }}>Auto-scroll</Typography>}
               />
             </Stack>
           </Stack>
@@ -265,15 +257,16 @@ export default function LogsPage() {
           flex: 1,
           display: 'flex',
           flexDirection: 'column',
-          bgcolor: '#050811',
-          border: '1px solid rgba(148, 163, 184, 0.15)',
-          borderRadius: 2.5,
+          bgcolor: '#1B1B29', // Sneat IDE dark background
+          border: '1px solid',
+          borderColor: 'divider',
+          borderRadius: '10px',
           minHeight: 520,
-          boxShadow: '0 8px 30px rgba(0, 0, 0, 0.6)',
+          boxShadow: '0 8px 24px -4px rgba(0, 0, 0, 0.4)',
           overflow: 'hidden',
         }}
       >
-        {/* Terminal Header Bar (macOS style 3-dots) */}
+        {/* Terminal Header Bar */}
         <Box
           sx={{
             display: 'flex',
@@ -281,20 +274,20 @@ export default function LogsPage() {
             alignItems: 'center',
             px: 2,
             py: 1.25,
-            bgcolor: '#090D16',
-            borderBottom: '1px solid rgba(148, 163, 184, 0.12)',
+            bgcolor: '#232333',
+            borderBottom: '1px solid rgba(231, 231, 255, 0.08)',
           }}
         >
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Box sx={{ width: 11, height: 11, borderRadius: '50%', bgcolor: '#F43F5E', boxShadow: '0 0 6px rgba(244, 63, 94, 0.4)' }} />
-            <Box sx={{ width: 11, height: 11, borderRadius: '50%', bgcolor: '#FBBF24', boxShadow: '0 0 6px rgba(251, 191, 36, 0.4)' }} />
-            <Box sx={{ width: 11, height: 11, borderRadius: '50%', bgcolor: '#34D399', boxShadow: '0 0 6px rgba(52, 211, 153, 0.4)' }} />
-            <Typography variant="caption" sx={{ fontFamily: '"JetBrains Mono", monospace', fontWeight: 600, color: '#94A3B8', ml: 1.5 }}>
+            <Box sx={{ width: 11, height: 11, borderRadius: '50%', bgcolor: '#FF3E1D', boxShadow: '0 0 6px rgba(255, 62, 29, 0.4)' }} />
+            <Box sx={{ width: 11, height: 11, borderRadius: '50%', bgcolor: '#FFAB00', boxShadow: '0 0 6px rgba(255, 171, 0, 0.4)' }} />
+            <Box sx={{ width: 11, height: 11, borderRadius: '50%', bgcolor: '#71DD37', boxShadow: '0 0 6px rgba(113, 221, 55, 0.4)' }} />
+            <Typography variant="caption" sx={{ fontFamily: '"JetBrains Mono", monospace', fontWeight: 600, color: 'text.secondary', ml: 1.5 }}>
               tg-streamer.log — console
             </Typography>
           </Box>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            <Typography variant="caption" sx={{ fontFamily: '"JetBrains Mono", monospace', color: '#94A3B8' }}>
+            <Typography variant="caption" sx={{ fontFamily: '"JetBrains Mono", monospace', color: 'text.secondary' }}>
               {filteredLogs.length} lines
             </Typography>
             <Box
@@ -304,13 +297,12 @@ export default function LogsPage() {
                 gap: 0.75,
                 px: 1.25,
                 py: 0.35,
-                borderRadius: '12px',
+                borderRadius: '6px',
                 fontSize: '0.7rem',
                 fontWeight: 700,
                 fontFamily: '"JetBrains Mono", monospace',
-                bgcolor: sseStatus === 'live' ? 'rgba(52, 211, 153, 0.1)' : 'rgba(251, 191, 36, 0.1)',
-                color: sseStatus === 'live' ? '#34D399' : '#FBBF24',
-                border: `1px solid ${sseStatus === 'live' ? 'rgba(52, 211, 153, 0.25)' : 'rgba(251, 191, 36, 0.25)'}`,
+                bgcolor: sseStatus === 'live' ? 'rgba(113, 221, 55, 0.16)' : 'rgba(255, 171, 0, 0.16)',
+                color: sseStatus === 'live' ? '#71DD37' : '#FFAB00',
               }}
             >
               <Box
@@ -318,8 +310,8 @@ export default function LogsPage() {
                   width: 6,
                   height: 6,
                   borderRadius: '50%',
-                  bgcolor: sseStatus === 'live' ? '#34D399' : '#FBBF24',
-                  boxShadow: sseStatus === 'live' ? '0 0 8px #34D399' : 'none',
+                  bgcolor: sseStatus === 'live' ? '#71DD37' : '#FFAB00',
+                  boxShadow: sseStatus === 'live' ? '0 0 8px #71DD37' : 'none',
                 }}
               />
               {sseStatus === 'live' ? 'LIVE SSE' : sseStatus === 'error' ? 'RECONNECTING' : 'CONNECTING'}
