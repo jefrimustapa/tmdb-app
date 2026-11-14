@@ -228,6 +228,32 @@ try {
     );
   });
 
+  await test('verifies SettingsPage.jsx contains all required settings and maintenance controls (#HOM-177)', () => {
+    const settingsFile = path.join(__dirname, 'dashboard', 'src', 'pages', 'SettingsPage.jsx');
+    const content = fs.readFileSync(settingsFile, 'utf8');
+    const requiredTokens = [
+      'TV Series Minimum Size',
+      'Movie Minimum Size',
+      'Resolver Max Paging',
+      'Speed Test Size',
+      'Speed Test Budget',
+      'Restart TGStrm Service',
+      'Clear All Cache',
+      'Clear Log',
+      'Open Telegram Phone Auth Portal',
+      'minTvSizeMb',
+      'minMovieSizeMb',
+      'resolverMaxPages',
+      'speedTestMb',
+      'speedTestBudgetMbPerMin',
+      'cachedStreams',
+      'Restart TGStrm Service',
+    ];
+    for (const token of requiredTokens) {
+      assert.ok(content.includes(token), `SettingsPage.jsx must include "${token}"`);
+    }
+  });
+
 } finally {
   server.close();
 }
