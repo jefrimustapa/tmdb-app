@@ -121,6 +121,12 @@ let session = process.env.TG_SESSION || '';
 const LOG_PATH = getLogFilePath();
 
 const SETTINGS_FILE = path.join(process.env.DATA_DIR || path.join(__dirname, 'data'), 'settings.json');
+const dashboardDist = path.join(__dirname, 'dashboard', 'dist');
+
+// Serve Vite + React + MUI Dashboard static assets
+app.use(express.static(dashboardDist));
+app.use(['/tg', '/msm'], express.static(dashboardDist));
+app.use(/.*\/assets/, express.static(path.join(dashboardDist, 'assets')));
 
 import {
   BaseResolver,
@@ -565,6 +571,15 @@ app.post(['/api/auth/verify-code', '/tg/api/auth/verify-code', '/msm/api/auth/ve
 
 // Web Authentication Portal UI (Served at /auth, with /tg/auth alias)
 app.get(['/auth', '/tg/auth', '/msm/auth'], (req, res) => {
+  const indexPath = path.join(dashboardDist, 'index.html');
+  if (fs.existsSync(indexPath)) {
+    res.set({
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+      'Pragma': 'no-cache',
+      'Expires': '0',
+    });
+    return res.sendFile(indexPath);
+  }
   res.send(`<!DOCTYPE html>
 <html lang="en" class="dark">
 <head>
@@ -1496,6 +1511,15 @@ app.post(['/api/logs/clear', '/tg/api/logs/clear', '/msm/api/logs/clear'], (req,
 
 // Dedicated Web Log Viewer GUI (Served at /logs, with /tg/logs alias)
 app.get(['/logs', '/tg/logs', '/msm/logs'], (req, res) => {
+  const indexPath = path.join(dashboardDist, 'index.html');
+  if (fs.existsSync(indexPath)) {
+    res.set({
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+      'Pragma': 'no-cache',
+      'Expires': '0',
+    });
+    return res.sendFile(indexPath);
+  }
   res.set({
     'Cache-Control': 'no-cache, no-store, must-revalidate',
     'Pragma': 'no-cache',
@@ -2037,6 +2061,15 @@ app.post(['/api/system/restart', '/tg/api/system/restart', '/msm/api/system/rest
 
 // Dedicated Web Dashboard (Served at root /, with /dashboard and /tg aliases)
 app.get(['/', '/dashboard', '/tg', '/msm/dashboard'], (req, res) => {
+  const indexPath = path.join(dashboardDist, 'index.html');
+  if (fs.existsSync(indexPath)) {
+    res.set({
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+      'Pragma': 'no-cache',
+      'Expires': '0',
+    });
+    return res.sendFile(indexPath);
+  }
   const isGeoEnabled = savedSettings.geoBlockEnabled !== false;
   const activeBot = getActiveTargetBot();
   const geoBadgeHtml = getGeoBadgeHtml(isGeoEnabled);
@@ -2509,6 +2542,15 @@ app.get(['/', '/dashboard', '/tg', '/msm/dashboard'], (req, res) => {
 
 // Dedicated Persistent Stream Cache Page (Served at /streams, with /tg/streams and /cache aliases)
 app.get(['/streams', '/cache', '/tg/streams', '/msm/cache'], (req, res) => {
+  const indexPath = path.join(dashboardDist, 'index.html');
+  if (fs.existsSync(indexPath)) {
+    res.set({
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+      'Pragma': 'no-cache',
+      'Expires': '0',
+    });
+    return res.sendFile(indexPath);
+  }
   res.set({
     'Cache-Control': 'no-cache, no-store, must-revalidate',
     'Pragma': 'no-cache',
@@ -2960,6 +3002,15 @@ app.get(['/streams', '/cache', '/tg/streams', '/msm/cache'], (req, res) => {
 
 // Dedicated Web Settings Page (Served at /settings, with /tg/settings aliases)
 app.get(['/settings', '/setting', '/tg/settings', '/tg/setting', '/msm/settings', '/msm/setting'], (req, res) => {
+  const indexPath = path.join(dashboardDist, 'index.html');
+  if (fs.existsSync(indexPath)) {
+    res.set({
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+      'Pragma': 'no-cache',
+      'Expires': '0',
+    });
+    return res.sendFile(indexPath);
+  }
   res.set({
     'Cache-Control': 'no-cache, no-store, must-revalidate',
     'Pragma': 'no-cache',

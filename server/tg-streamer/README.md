@@ -69,6 +69,24 @@ TGSTRM_TAG=ci-issue-301-convert-tgstrm-to-docker-move-location TGSTRM_HOST_PORT=
 
 NPM Proxy Host: domain `tgstrm.julietmike.net`, forward to `tg-streamer:3033` (the container joins `npm_default`) or `192.168.0.120:3033`, request a Let's Encrypt cert, Force SSL. Advanced tab: `proxy_buffering off; proxy_request_buffering off; proxy_read_timeout 3600s; proxy_send_timeout 3600s;` so Range streaming and long resolves are not cut. NPM sets `X-Forwarded-For` / `X-Real-IP`, which the geo-block uses as the client IP.
 
+## Dashboard SPA (MUI v5 / Vite) - issue #344
+The web interface (`/`, `/streams`, `/settings`, `/logs`, `/auth`) is built as a modern React SPA using Material-UI (MUI v5) and Vite, located in `server/tg-streamer/dashboard/`.
+
+### Development
+```bash
+cd server/tg-streamer/dashboard
+npm install
+npm run dev
+```
+
+### Production Build
+The dashboard is automatically built in `server/tg-streamer/Dockerfile` via multi-stage build. To build manually:
+```bash
+cd server/tg-streamer/dashboard
+npm run build
+```
+The compiled assets in `server/tg-streamer/dashboard/dist/` are served statically by Express (`index.js`).
+
 ### The old router instance (retired)
 TGStrm used to run on the ASUS router (Entware). It was moved to this Docker deployment in #301 (the Telegram session was reused, with the router instance stopped first because two live users of one session can invalidate it) and removed in #305. Apps that still stored the old `julietmike.net:3033` URL are upgraded to `https://tgstrm.julietmike.net` by the app itself.
 
