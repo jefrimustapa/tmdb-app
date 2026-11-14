@@ -124,8 +124,8 @@ const SETTINGS_FILE = path.join(process.env.DATA_DIR || path.join(__dirname, 'da
 const dashboardDist = path.join(__dirname, 'dashboard', 'dist');
 
 // Serve Vite + React + MUI Dashboard static assets
-app.use(express.static(dashboardDist));
-app.use(['/tg', '/msm'], express.static(dashboardDist));
+app.use(express.static(dashboardDist, { index: false }));
+app.use(['/tg', '/msm'], express.static(dashboardDist, { index: false }));
 app.use(/.*\/assets/, express.static(path.join(dashboardDist, 'assets')));
 
 import {
@@ -2060,7 +2060,7 @@ app.post(['/api/system/restart', '/tg/api/system/restart', '/msm/api/system/rest
 });
 
 // Dedicated Web Dashboard (Served at root /, with /dashboard and /tg aliases)
-app.get(['/', '/dashboard', '/tg', '/msm/dashboard'], (req, res) => {
+app.get(['/', '/dashboard', '/tg', '/msm', '/msm/dashboard'], (req, res) => {
   const indexPath = path.join(dashboardDist, 'index.html');
   if (fs.existsSync(indexPath)) {
     res.set({
@@ -2541,7 +2541,7 @@ app.get(['/', '/dashboard', '/tg', '/msm/dashboard'], (req, res) => {
 });
 
 // Dedicated Persistent Stream Cache Page (Served at /streams, with /tg/streams and /cache aliases)
-app.get(['/streams', '/cache', '/tg/streams', '/msm/cache'], (req, res) => {
+app.get(['/streams', '/cache', '/tg/streams', '/msm/cache', '/msm/streams'], (req, res) => {
   const indexPath = path.join(dashboardDist, 'index.html');
   if (fs.existsSync(indexPath)) {
     res.set({

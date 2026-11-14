@@ -75,10 +75,11 @@ export default function Layout({ currentPath, onNavigate, targetBot, isConnected
   };
 
   const isCurrentActive = (path) => {
+    const p = currentPath.toLowerCase();
     if (path === '/') {
-      return currentPath === '/' || currentPath === '/dashboard';
+      return p === '/' || p === '/dashboard' || p === '/tg' || p === '/tg/' || p === '/tg/dashboard' || p === '/msm' || p === '/msm/' || p === '/msm/dashboard';
     }
-    return currentPath === path || currentPath.endsWith(path);
+    return p === path || p.endsWith(path);
   };
 
   return (
