@@ -398,6 +398,34 @@ try {
     assert.ok(content.includes('formatDuration(c.connectedSec || 0)'), 'index.js must format legacy active client connected duration with formatDuration');
   });
 
+  // 9. HOM-200 Dashboard Header Straight Bar Verification
+  console.log('\n9. HOM-200 Dashboard Header Straight Bar Verification');
+  await test('verifies Layout.jsx implements straight bar header without floating island styles', () => {
+    const layoutFile = path.join(__dirname, 'dashboard', 'src', 'components', 'Layout.jsx');
+    const content = fs.readFileSync(layoutFile, 'utf8');
+
+    // Extract header section
+    const headerStart = content.indexOf('{/* Straight Top Header Bar */}');
+    const headerEnd = content.indexOf('{/* Dynamic Page Views */}');
+    assert.ok(headerStart !== -1, 'Layout.jsx must contain Straight Top Header Bar block');
+    assert.ok(headerEnd !== -1, 'Layout.jsx must contain Dynamic Page Views block');
+    const headerBlock = content.slice(headerStart, headerEnd);
+
+    // Must have straight bar styling: borderBottom divider, no floating island border radius or margin
+    assert.ok(headerBlock.includes("borderBottom: '1px solid'") || headerBlock.includes('borderBottom: "1px solid"'), 'Layout.jsx header must have borderBottom divider');
+    assert.ok(!headerBlock.includes("borderRadius: '10px'"), 'Layout.jsx header must not have floating island 10px border radius');
+    assert.ok(!headerBlock.includes("mb: 3.5"), 'Layout.jsx header must not have floating island mb: 3.5 margin');
+    assert.ok(!headerBlock.includes("rgba(67, 89, 113, 0.08)"), 'Layout.jsx header must not have floating island elevation box shadow');
+    assert.ok(headerBlock.includes("width: '100%'"), 'Layout.jsx header must span 100% full width');
+
+    // Header must preserve essential elements: title, drawer toggle, targetBot chip, LIVE/OFFLINE, theme toggle
+    assert.ok(headerBlock.includes('activeItem.label'), 'Header must render activeItem.label');
+    assert.ok(headerBlock.includes('handleDrawerToggle'), 'Header must include drawer toggle for mobile');
+    assert.ok(headerBlock.includes('targetBot'), 'Header must preserve targetBot chip');
+    assert.ok(headerBlock.includes('isConnected'), 'Header must preserve isConnected status badge');
+    assert.ok(headerBlock.includes('onToggleTheme'), 'Header must preserve onToggleTheme switcher');
+  });
+
 } finally {
   server.close();
 }
