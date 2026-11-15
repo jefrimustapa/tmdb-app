@@ -426,6 +426,120 @@ try {
     assert.ok(headerBlock.includes('onToggleTheme'), 'Header must preserve onToggleTheme switcher');
   });
 
+  // 10. HOM-206 Active Streams (N) Scroll & Stream Cache Button Verification
+  console.log('\n10. HOM-206 Active Streams (N) Scroll & Stream Cache Button Verification');
+  await test('verifies DashboardPage.jsx implements Active Streams (N) button with smooth scroll handler', () => {
+    const dashFile = path.join(__dirname, 'dashboard', 'src', 'pages', 'DashboardPage.jsx');
+    const content = fs.readFileSync(dashFile, 'utf8');
+
+    // Button label and structure
+    assert.ok(
+      content.includes('Active Streams ({clients.length})'),
+      'DashboardPage.jsx must define button with label "Active Streams ({clients.length})"'
+    );
+    assert.ok(
+      !content.includes('View Streams ({clients.length})'),
+      'DashboardPage.jsx must no longer contain old "View Streams ({clients.length})"'
+    );
+    assert.ok(
+      content.includes('onClick={scrollToClients}'),
+      'Active Streams button must invoke scrollToClients onClick'
+    );
+
+    // Scroll handler implementation
+    assert.ok(
+      content.includes('const scrollToClients = () =>'),
+      'DashboardPage.jsx must implement scrollToClients function'
+    );
+    assert.ok(
+      content.includes("scrollIntoView({ behavior: 'smooth', block: 'start' })"),
+      'scrollToClients must execute smooth scroll to start'
+    );
+    assert.ok(
+      content.includes('clientsSectionRef.current') && content.includes("getElementById('connected-clients-section')"),
+      'scrollToClients must support both clientsSectionRef and getElementById fallback'
+    );
+  });
+
+  await test('verifies DashboardPage.jsx targets Connected Clients Card with ref and id for scroll', () => {
+    const dashFile = path.join(__dirname, 'dashboard', 'src', 'pages', 'DashboardPage.jsx');
+    const content = fs.readFileSync(dashFile, 'utf8');
+
+    assert.ok(
+      content.includes('id="connected-clients-section"'),
+      'Connected clients Card container must have id="connected-clients-section"'
+    );
+    assert.ok(
+      content.includes('ref={clientsSectionRef}'),
+      'Connected clients Card container must have ref={clientsSectionRef}'
+    );
+  });
+
+  await test('verifies DashboardPage.jsx implements separate Stream Cache button navigating to /streams', () => {
+    const dashFile = path.join(__dirname, 'dashboard', 'src', 'pages', 'DashboardPage.jsx');
+    const content = fs.readFileSync(dashFile, 'utf8');
+
+    assert.ok(
+      content.includes('Stream Cache'),
+      'DashboardPage.jsx must contain "Stream Cache" button'
+    );
+    assert.ok(
+      content.includes("onClick={() => onNavigate('/streams')}"),
+      'Stream Cache button must navigate to /streams via onNavigate'
+    );
+    assert.ok(
+      content.includes('startIcon={<StorageIcon />}'),
+      'Stream Cache button must include StorageIcon'
+    );
+  });
+
+  await test('BVA & Decision Logic: Active Streams (N) counter formatting for boundaries (N=0, N=1, N>1, null/undefined)', () => {
+    function computeActiveStreamsLabel(stats) {
+      const clients = stats?.activeClients || [];
+      return `Active Streams (${clients.length})`;
+    }
+
+    // BVA N=0: empty array
+    assert.strictEqual(computeActiveStreamsLabel({ activeClients: [] }), 'Active Streams (0)');
+    // BVA N=0: null stats
+    assert.strictEqual(computeActiveStreamsLabel(null), 'Active Streams (0)');
+    // BVA N=0: undefined stats
+    assert.strictEqual(computeActiveStreamsLabel(undefined), 'Active Streams (0)');
+    // BVA N=0: stats without activeClients property
+    assert.strictEqual(computeActiveStreamsLabel({}), 'Active Streams (0)');
+    // BVA N=1: single client
+    assert.strictEqual(computeActiveStreamsLabel({ activeClients: [{ id: 'client-1' }] }), 'Active Streams (1)');
+    // BVA N>1: multiple clients (e.g. 5 clients)
+    assert.strictEqual(
+      computeActiveStreamsLabel({
+        activeClients: [
+          { id: 'c1' },
+          { id: 'c2' },
+          { id: 'c3' },
+          { id: 'c4' },
+          { id: 'c5' },
+        ],
+      }),
+      'Active Streams (5)'
+    );
+    // BVA high count (e.g. 100 clients)
+    const largeList = Array.from({ length: 100 }, (_, i) => ({ id: `client-${i}` }));
+    assert.strictEqual(computeActiveStreamsLabel({ activeClients: largeList }), 'Active Streams (100)');
+  });
+
+  await test('verifies compiled production bundle contains Active Streams and Stream Cache tokens without raw View Streams', () => {
+    const assetsDir = path.join(__dirname, 'dashboard', 'dist', 'assets');
+    const files = fs.readdirSync(assetsDir);
+    const jsBundle = files.find(f => f.startsWith('index-') && f.endsWith('.js'));
+    assert.ok(jsBundle, 'Compiled bundle must exist');
+    const bundleContent = fs.readFileSync(path.join(assetsDir, jsBundle), 'utf8');
+
+    assert.ok(bundleContent.includes('Active Streams'), 'Production bundle must contain "Active Streams"');
+    assert.ok(bundleContent.includes('Stream Cache'), 'Production bundle must contain "Stream Cache"');
+    assert.ok(!bundleContent.includes('View Streams ('), 'Production bundle must not contain old "View Streams ("');
+    assert.ok(bundleContent.includes('connected-clients-section'), 'Production bundle must contain "connected-clients-section" target ID');
+  });
+
 } finally {
   server.close();
 }

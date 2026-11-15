@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Box,
   Grid,
@@ -52,6 +52,18 @@ export default function DashboardPage({ onNavigate }) {
   const [dialogAction, setDialogAction] = useState(null); // 'purge' | 'restart'
   const [actionLoading, setActionLoading] = useState(false);
   const [toast, setToast] = useState({ open: false, message: '', severity: 'info' });
+  const clientsSectionRef = useRef(null);
+
+  const scrollToClients = () => {
+    if (clientsSectionRef.current) {
+      clientsSectionRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } else {
+      const el = document.getElementById('connected-clients-section');
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }
+  };
 
   const fetchStats = async () => {
     try {
@@ -153,8 +165,8 @@ export default function DashboardPage({ onNavigate }) {
               <Button
                 variant="contained"
                 size="small"
-                endIcon={<ArrowForwardIcon />}
-                onClick={() => onNavigate('/streams')}
+                startIcon={<StreamIcon />}
+                onClick={scrollToClients}
                 sx={{
                   bgcolor: 'primary.main',
                   color: '#FFFFFF',
@@ -163,7 +175,25 @@ export default function DashboardPage({ onNavigate }) {
                   boxShadow: '0 2px 6px 0 rgba(105, 108, 255, 0.4)',
                 }}
               >
-                View Streams ({clients.length})
+                Active Streams ({clients.length})
+              </Button>
+              <Button
+                variant="outlined"
+                size="small"
+                startIcon={<StorageIcon />}
+                endIcon={<ArrowForwardIcon />}
+                onClick={() => onNavigate('/streams')}
+                sx={{
+                  borderColor: 'rgba(105, 108, 255, 0.4)',
+                  color: 'primary.main',
+                  bgcolor: 'rgba(105, 108, 255, 0.06)',
+                  '&:hover': {
+                    borderColor: 'primary.main',
+                    bgcolor: 'rgba(105, 108, 255, 0.12)',
+                  },
+                }}
+              >
+                Stream Cache
               </Button>
               <Button
                 variant="outlined"
@@ -538,7 +568,7 @@ export default function DashboardPage({ onNavigate }) {
       </Card>
 
       {/* Active Clients Table */}
-      <Card>
+      <Card id="connected-clients-section" ref={clientsSectionRef}>
         <CardContent sx={{ p: 2.5 }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
             <Box>
