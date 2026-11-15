@@ -11,6 +11,7 @@ node_modules/
 *.log
 *.mp4
 *.html
+!dashboard/index.html
 scripts.txt
 test-*.js
 inspect_*.js
