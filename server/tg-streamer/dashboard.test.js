@@ -2,6 +2,7 @@ import assert from 'assert';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { formatDuration } from './dashboard/src/utils/formatDuration.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -304,6 +305,97 @@ try {
     assert.ok(content.includes('min: 50,'), 'minMovieSizeMb input min must be 50');
     assert.ok(content.includes('Math.min(20,'), 'resolverMaxPages upper bound must be 20');
     assert.ok(content.includes('max: 20,'), 'resolverMaxPages input max must be 20');
+  });
+
+  // 8. GH #349 BVA & Regression Verification (formatDuration, CPU/RAM stats, hh:mm:ss uptime)
+  console.log('\n8. GH #349 BVA & Regression Verification (formatDuration & CPU/RAM Stats)');
+  await test('formatDuration: BVA zero, negative, and invalid/non-numeric inputs return "00:00:00"', () => {
+    assert.strictEqual(formatDuration(0), '00:00:00', '0 must format to 00:00:00');
+    assert.strictEqual(formatDuration(-0), '00:00:00', '-0 must format to 00:00:00');
+    assert.strictEqual(formatDuration(-1), '00:00:00', 'negative 1 must format to 00:00:00');
+    assert.strictEqual(formatDuration(-3600), '00:00:00', 'negative 3600 must format to 00:00:00');
+    assert.strictEqual(formatDuration(NaN), '00:00:00', 'NaN must format to 00:00:00');
+    assert.strictEqual(formatDuration(null), '00:00:00', 'null must format to 00:00:00');
+    assert.strictEqual(formatDuration(undefined), '00:00:00', 'undefined must format to 00:00:00');
+    assert.strictEqual(formatDuration(''), '00:00:00', 'empty string must format to 00:00:00');
+    assert.strictEqual(formatDuration('invalid'), '00:00:00', 'non-numeric string must format to 00:00:00');
+    assert.strictEqual(formatDuration(Infinity), '00:00:00', 'Infinity must format to 00:00:00');
+    assert.strictEqual(formatDuration(-Infinity), '00:00:00', '-Infinity must format to 00:00:00');
+  });
+
+  await test('formatDuration: BVA boundaries for seconds, minutes, hours, rollover, and >=100 hours', () => {
+    assert.strictEqual(formatDuration(1), '00:00:01', '1s');
+    assert.strictEqual(formatDuration(59), '00:00:59', '59s');
+    assert.strictEqual(formatDuration(60), '00:01:00', '60s rollover to 1 min');
+    assert.strictEqual(formatDuration(61), '00:01:01', '61s');
+    assert.strictEqual(formatDuration(3599), '00:59:59', '3599s');
+    assert.strictEqual(formatDuration(3600), '01:00:00', '3600s rollover to 1 hour');
+    assert.strictEqual(formatDuration(3601), '01:00:01', '3601s');
+    assert.strictEqual(formatDuration(7530), '02:05:30', '7530s -> 02:05:30 example from GH #349');
+    assert.strictEqual(formatDuration(86400), '24:00:00', '86400s (24 hours)');
+    assert.strictEqual(formatDuration(360000), '100:00:00', '360000s (100 hours with >2 digit hours)');
+    assert.strictEqual(formatDuration('7530'), '02:05:30', 'numeric string parses correctly');
+    assert.strictEqual(formatDuration(7530.9), '02:05:30', 'fractional seconds floored');
+  });
+
+  await test('GET /api/system/stats returns expected CPU, RAM, and Uptime fields for DashboardPage', async () => {
+    const res = await fetch(`${baseUrl}/api/system/stats`);
+    assert.strictEqual(res.status, 200);
+    const data = await res.json();
+    assert.strictEqual(data.status, 'ok');
+
+    // Uptime
+    assert.strictEqual(typeof data.uptime, 'number', 'uptime must be a number');
+    assert.ok(data.uptime >= 0, 'uptime must be >= 0');
+
+    // CPU structure
+    assert.ok(data.cpu && typeof data.cpu === 'object', 'data.cpu must be an object');
+    assert.strictEqual(typeof data.cpu.cores, 'number', 'cpu.cores must be a number');
+    assert.ok(data.cpu.cores > 0, 'cpu.cores must be > 0');
+    assert.strictEqual(typeof data.cpu.nodeCpuPct, 'number', 'cpu.nodeCpuPct must be a number');
+    assert.strictEqual(typeof data.cpu.serviceCpuPct, 'number', 'cpu.serviceCpuPct must be a number');
+    assert.strictEqual(typeof data.cpu.loadAvg1m, 'number', 'cpu.loadAvg1m must be a number');
+
+    // Memory structure
+    assert.ok(data.memory && typeof data.memory === 'object', 'data.memory must be an object');
+    assert.strictEqual(typeof data.memory.rssMB, 'number', 'memory.rssMB must be a number');
+    assert.strictEqual(typeof data.memory.capMB, 'number', 'memory.capMB must be a number');
+    assert.strictEqual(typeof data.memory.ramPct, 'number', 'memory.ramPct must be a number');
+    assert.ok(data.memory.ramPct >= 0 && data.memory.ramPct <= 100, 'memory.ramPct must be between 0 and 100');
+    assert.strictEqual(typeof data.memory.heapUsedMB, 'number', 'memory.heapUsedMB must be a number');
+  });
+
+  await test('verifies DashboardPage.jsx correctly references nested stats.cpu.*, stats.memory.* and uses formatDuration', () => {
+    const dashPageFile = path.join(__dirname, 'dashboard', 'src', 'pages', 'DashboardPage.jsx');
+    const content = fs.readFileSync(dashPageFile, 'utf8');
+
+    // Import check
+    assert.ok(content.includes("from '../utils/formatDuration'"), 'DashboardPage.jsx must import formatDuration');
+
+    // CPU mapping check
+    assert.ok(content.includes('stats?.cpu?.nodeCpuPct'), 'DashboardPage.jsx must map stats.cpu.nodeCpuPct');
+    assert.ok(content.includes('stats?.cpu?.serviceCpuPct'), 'DashboardPage.jsx must map stats.cpu.serviceCpuPct');
+    assert.ok(content.includes('stats?.cpu?.cores'), 'DashboardPage.jsx must map stats.cpu.cores');
+    assert.ok(content.includes('stats?.cpu?.loadAvg1m'), 'DashboardPage.jsx must map stats.cpu.loadAvg1m');
+
+    // Memory mapping check
+    assert.ok(content.includes('stats?.memory?.ramPct'), 'DashboardPage.jsx must map stats.memory.ramPct');
+    assert.ok(content.includes('stats?.memory?.rssMB'), 'DashboardPage.jsx must map stats.memory.rssMB');
+    assert.ok(content.includes('stats?.memory?.capMB'), 'DashboardPage.jsx must map stats.memory.capMB');
+    assert.ok(content.includes('stats?.memory?.heapUsedMB'), 'DashboardPage.jsx must map stats.memory.heapUsedMB');
+
+    // Uptime & Active client duration formatting check
+    assert.ok(content.includes('formatDuration(stats.uptime)'), 'DashboardPage.jsx must format stats.uptime with formatDuration');
+    assert.ok(content.includes('formatDuration(c.connectedSec'), 'DashboardPage.jsx must format connectedSec with formatDuration');
+  });
+
+  await test('verifies legacy dashboard in index.js formats uptime and connected clients with formatDuration', () => {
+    const indexFile = path.join(__dirname, 'index.js');
+    const content = fs.readFileSync(indexFile, 'utf8');
+
+    assert.ok(content.includes('function formatDuration(sec)'), 'index.js legacy dashboard script must define formatDuration');
+    assert.ok(content.includes("document.getElementById('metricUptime').textContent = formatDuration(u)"), 'index.js must format metricUptime with formatDuration');
+    assert.ok(content.includes('formatDuration(c.connectedSec || 0)'), 'index.js must format legacy active client connected duration with formatDuration');
   });
 
 } finally {

@@ -41,6 +41,7 @@ import BoltIcon from '@mui/icons-material/Bolt';
 import StreamIcon from '@mui/icons-material/Stream';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import { api } from '../api/client';
+import { formatDuration } from '../utils/formatDuration';
 
 export default function DashboardPage({ onNavigate }) {
   const [stats, setStats] = useState(null);
@@ -283,10 +284,10 @@ export default function DashboardPage({ onNavigate }) {
                 >
                   <SpeedIcon sx={{ fontSize: 24 }} />
                 </Box>
-                {stats?.cpuPercent !== undefined && (
+                {(stats?.cpu?.serviceCpuPct !== undefined || stats?.cpu?.nodeCpuPct !== undefined || stats?.cpuPercent !== undefined) && (
                   <Chip
                     size="small"
-                    label={`${stats.cpuPercent}%`}
+                    label={`${stats?.cpu?.serviceCpuPct ?? stats?.cpu?.nodeCpuPct ?? stats?.cpuPercent}%`}
                     sx={{
                       fontWeight: 700,
                       fontSize: '0.72rem',
@@ -301,10 +302,10 @@ export default function DashboardPage({ onNavigate }) {
                 CPU Load
               </Typography>
               <Typography variant="h5" sx={{ fontWeight: 700, color: 'text.primary', mt: 0.5, mb: 0.5, fontFamily: '"JetBrains Mono", monospace' }}>
-                {stats?.nodeCpuPercent ?? stats?.cpuPercent ?? '--'}%
+                {stats?.cpu?.nodeCpuPct ?? stats?.nodeCpuPercent ?? stats?.cpuPercent ?? '--'}%
               </Typography>
               <Typography variant="caption" sx={{ color: 'text.secondary', fontFamily: '"JetBrains Mono", monospace' }}>
-                {stats?.cpuCores ? `${stats.cpuCores} cores · load ${stats.loadAvg || '--'}` : 'System Thread Load'}
+                {(stats?.cpu?.cores ?? stats?.cpuCores) ? `${stats?.cpu?.cores ?? stats?.cpuCores} cores · load ${stats?.cpu?.loadAvg1m ?? stats?.loadAvg ?? '--'}` : 'System Thread Load'}
               </Typography>
             </CardContent>
           </Card>
@@ -331,7 +332,7 @@ export default function DashboardPage({ onNavigate }) {
                 </Box>
                 <Chip
                   size="small"
-                  label={`${stats?.ramPercent ?? 0}%`}
+                  label={`${stats?.memory?.ramPct ?? stats?.ramPercent ?? 0}%`}
                   sx={{
                     fontWeight: 700,
                     fontSize: '0.72rem',
@@ -345,13 +346,13 @@ export default function DashboardPage({ onNavigate }) {
                 Node RAM / Cap
               </Typography>
               <Typography variant="h5" sx={{ fontWeight: 700, color: 'text.primary', mt: 0.5, mb: 0.5, fontFamily: '"JetBrains Mono", monospace' }}>
-                {stats?.ramMb ?? '--'}{' '}
+                {stats?.memory?.rssMB ?? stats?.ramMb ?? '--'}{' '}
                 <Typography component="span" variant="body2" sx={{ color: 'text.secondary', fontSize: '0.85rem' }}>
-                  / {stats?.ramCapMb ?? 1024} MB
+                  / {stats?.memory?.capMB ?? stats?.nodeRamCapMb ?? stats?.ramCapMb ?? 1024} MB
                 </Typography>
               </Typography>
               <Typography variant="caption" sx={{ color: 'text.secondary', fontFamily: '"JetBrains Mono", monospace' }}>
-                Heap: {stats?.heapMb ?? '--'} MB
+                Heap: {stats?.memory?.heapUsedMB ?? stats?.heapMb ?? '--'} MB
               </Typography>
             </CardContent>
           </Card>
@@ -381,7 +382,7 @@ export default function DashboardPage({ onNavigate }) {
                 Service Uptime
               </Typography>
               <Typography variant="h5" sx={{ fontWeight: 700, color: 'text.primary', mt: 0.5, mb: 0.5, fontFamily: '"JetBrains Mono", monospace' }}>
-                {stats?.uptimeFormatted || stats?.uptime || '--'}
+                {stats?.uptime !== undefined ? formatDuration(stats.uptime) : (stats?.uptimeFormatted || '--')}
               </Typography>
               <Typography variant="caption" sx={{ color: 'text.secondary' }}>
                 continuous uptime
@@ -605,7 +606,7 @@ export default function DashboardPage({ onNavigate }) {
                       <TableCell>
                         <Chip
                           size="small"
-                          label={c.status === 'STREAMING' ? 'Streaming' : `Idle (${c.idleSec || 0}s)`}
+                          label={c.status === 'STREAMING' ? 'Streaming' : `Idle (${formatDuration(c.idleSec || 0)})`}
                           sx={{
                             fontWeight: 700,
                             fontSize: '0.72rem',
@@ -616,7 +617,7 @@ export default function DashboardPage({ onNavigate }) {
                         />
                       </TableCell>
                       <TableCell align="right" sx={{ fontFamily: '"JetBrains Mono", monospace', fontSize: '0.8rem', color: 'text.secondary' }}>
-                        {c.connectedSec || 0}s
+                        {formatDuration(c.connectedSec || 0)}
                       </TableCell>
                     </TableRow>
                   ))
