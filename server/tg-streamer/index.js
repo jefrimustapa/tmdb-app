@@ -2305,6 +2305,16 @@ app.get(['/', '/dashboard', '/tg', '/msm', '/msm/dashboard'], (req, res) => {
         .replace(/'/g, '&#39;');
     }
 
+    function formatDuration(sec) {
+      const n = Number(sec);
+      if (!Number.isFinite(n) || n <= 0) return '00:00:00';
+      const total = Math.floor(n);
+      const h = Math.floor(total / 3600);
+      const m = Math.floor((total % 3600) / 60);
+      const s = total % 60;
+      return String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+    }
+
     async function loadStats() {
       try {
         const res = await fetch('/tg/api/system/stats');
@@ -2384,7 +2394,7 @@ app.get(['/', '/dashboard', '/tg', '/msm', '/msm/dashboard'], (req, res) => {
 
         // 4. Uptime
         const u = d.uptime || 0;
-        document.getElementById('metricUptime').textContent = Math.floor(u / 3600) + 'h ' + Math.floor((u % 3600) / 60) + 'm ' + (u % 60) + 's';
+        document.getElementById('metricUptime').textContent = formatDuration(u);
 
         // 5. Log Size
         document.getElementById('metricLogSize').textContent = (d.logSizeKB || 0) + ' KB';
@@ -2446,7 +2456,7 @@ app.get(['/', '/dashboard', '/tg', '/msm', '/msm/dashboard'], (req, res) => {
               const isStreaming = c.status === 'STREAMING';
               const statusBadge = isStreaming
                 ? '<span class="inline-flex items-center gap-1 text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20 font-bold text-[10px]"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> Streaming</span>'
-                : '<span class="inline-flex items-center gap-1 text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20 font-medium text-[10px]">⏸ Idle (' + (c.idleSec || 0) + 's)</span>';
+                : '<span class="inline-flex items-center gap-1 text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20 font-medium text-[10px]">⏸ Idle (' + formatDuration(c.idleSec || 0) + ')</span>';
 
               const tierBadge = '<span class="text-sky-300 font-mono font-bold uppercase">' + escapeHtml(c.qualityTier || '720p') + '</span> · ' +
                 c.concurrency + '×512KB (' + c.pipelineMB + ' MB)';
@@ -2458,7 +2468,7 @@ app.get(['/', '/dashboard', '/tg', '/msm', '/msm/dashboard'], (req, res) => {
                 '<td class="py-2 px-2.5 text-slate-300 font-sans text-[11px]">' + tierBadge + '</td>' +
                 '<td class="py-2 px-2.5 text-sky-300 font-sans text-[11px]">' + escapeHtml(c.mode || '') + '</td>' +
                 '<td class="py-2 px-2.5 font-sans">' + statusBadge + '</td>' +
-                '<td class="py-2 px-2.5 text-slate-400 text-right font-mono text-[11px]">' + (c.connectedSec || 0) + 's</td>' +
+                '<td class="py-2 px-2.5 text-slate-400 text-right font-mono text-[11px]">' + formatDuration(c.connectedSec || 0) + '</td>' +
               '</tr>';
             }
             listEl.innerHTML = '<div class="overflow-x-auto"><table class="w-full text-left text-xs">' +

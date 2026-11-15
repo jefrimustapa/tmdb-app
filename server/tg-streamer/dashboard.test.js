@@ -2,6 +2,7 @@ import assert from 'assert';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { formatDuration } from './dashboard/src/utils/formatDuration.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -304,6 +305,239 @@ try {
     assert.ok(content.includes('min: 50,'), 'minMovieSizeMb input min must be 50');
     assert.ok(content.includes('Math.min(20,'), 'resolverMaxPages upper bound must be 20');
     assert.ok(content.includes('max: 20,'), 'resolverMaxPages input max must be 20');
+  });
+
+  // 8. GH #349 BVA & Regression Verification (formatDuration, CPU/RAM stats, hh:mm:ss uptime)
+  console.log('\n8. GH #349 BVA & Regression Verification (formatDuration & CPU/RAM Stats)');
+  await test('formatDuration: BVA zero, negative, and invalid/non-numeric inputs return "00:00:00"', () => {
+    assert.strictEqual(formatDuration(0), '00:00:00', '0 must format to 00:00:00');
+    assert.strictEqual(formatDuration(-0), '00:00:00', '-0 must format to 00:00:00');
+    assert.strictEqual(formatDuration(-1), '00:00:00', 'negative 1 must format to 00:00:00');
+    assert.strictEqual(formatDuration(-3600), '00:00:00', 'negative 3600 must format to 00:00:00');
+    assert.strictEqual(formatDuration(NaN), '00:00:00', 'NaN must format to 00:00:00');
+    assert.strictEqual(formatDuration(null), '00:00:00', 'null must format to 00:00:00');
+    assert.strictEqual(formatDuration(undefined), '00:00:00', 'undefined must format to 00:00:00');
+    assert.strictEqual(formatDuration(''), '00:00:00', 'empty string must format to 00:00:00');
+    assert.strictEqual(formatDuration('invalid'), '00:00:00', 'non-numeric string must format to 00:00:00');
+    assert.strictEqual(formatDuration(Infinity), '00:00:00', 'Infinity must format to 00:00:00');
+    assert.strictEqual(formatDuration(-Infinity), '00:00:00', '-Infinity must format to 00:00:00');
+  });
+
+  await test('formatDuration: BVA boundaries for seconds, minutes, hours, rollover, and >=100 hours', () => {
+    assert.strictEqual(formatDuration(1), '00:00:01', '1s');
+    assert.strictEqual(formatDuration(59), '00:00:59', '59s');
+    assert.strictEqual(formatDuration(60), '00:01:00', '60s rollover to 1 min');
+    assert.strictEqual(formatDuration(61), '00:01:01', '61s');
+    assert.strictEqual(formatDuration(3599), '00:59:59', '3599s');
+    assert.strictEqual(formatDuration(3600), '01:00:00', '3600s rollover to 1 hour');
+    assert.strictEqual(formatDuration(3601), '01:00:01', '3601s');
+    assert.strictEqual(formatDuration(7530), '02:05:30', '7530s -> 02:05:30 example from GH #349');
+    assert.strictEqual(formatDuration(86400), '24:00:00', '86400s (24 hours)');
+    assert.strictEqual(formatDuration(360000), '100:00:00', '360000s (100 hours with >2 digit hours)');
+    assert.strictEqual(formatDuration('7530'), '02:05:30', 'numeric string parses correctly');
+    assert.strictEqual(formatDuration(7530.9), '02:05:30', 'fractional seconds floored');
+  });
+
+  await test('GET /api/system/stats returns expected CPU, RAM, and Uptime fields for DashboardPage', async () => {
+    const res = await fetch(`${baseUrl}/api/system/stats`);
+    assert.strictEqual(res.status, 200);
+    const data = await res.json();
+    assert.strictEqual(data.status, 'ok');
+
+    // Uptime
+    assert.strictEqual(typeof data.uptime, 'number', 'uptime must be a number');
+    assert.ok(data.uptime >= 0, 'uptime must be >= 0');
+
+    // CPU structure
+    assert.ok(data.cpu && typeof data.cpu === 'object', 'data.cpu must be an object');
+    assert.strictEqual(typeof data.cpu.cores, 'number', 'cpu.cores must be a number');
+    assert.ok(data.cpu.cores > 0, 'cpu.cores must be > 0');
+    assert.strictEqual(typeof data.cpu.nodeCpuPct, 'number', 'cpu.nodeCpuPct must be a number');
+    assert.strictEqual(typeof data.cpu.serviceCpuPct, 'number', 'cpu.serviceCpuPct must be a number');
+    assert.strictEqual(typeof data.cpu.loadAvg1m, 'number', 'cpu.loadAvg1m must be a number');
+
+    // Memory structure
+    assert.ok(data.memory && typeof data.memory === 'object', 'data.memory must be an object');
+    assert.strictEqual(typeof data.memory.rssMB, 'number', 'memory.rssMB must be a number');
+    assert.strictEqual(typeof data.memory.capMB, 'number', 'memory.capMB must be a number');
+    assert.strictEqual(typeof data.memory.ramPct, 'number', 'memory.ramPct must be a number');
+    assert.ok(data.memory.ramPct >= 0 && data.memory.ramPct <= 100, 'memory.ramPct must be between 0 and 100');
+    assert.strictEqual(typeof data.memory.heapUsedMB, 'number', 'memory.heapUsedMB must be a number');
+  });
+
+  await test('verifies DashboardPage.jsx correctly references nested stats.cpu.*, stats.memory.* and uses formatDuration', () => {
+    const dashPageFile = path.join(__dirname, 'dashboard', 'src', 'pages', 'DashboardPage.jsx');
+    const content = fs.readFileSync(dashPageFile, 'utf8');
+
+    // Import check
+    assert.ok(content.includes("from '../utils/formatDuration'"), 'DashboardPage.jsx must import formatDuration');
+
+    // CPU mapping check
+    assert.ok(content.includes('stats?.cpu?.nodeCpuPct'), 'DashboardPage.jsx must map stats.cpu.nodeCpuPct');
+    assert.ok(content.includes('stats?.cpu?.serviceCpuPct'), 'DashboardPage.jsx must map stats.cpu.serviceCpuPct');
+    assert.ok(content.includes('stats?.cpu?.cores'), 'DashboardPage.jsx must map stats.cpu.cores');
+    assert.ok(content.includes('stats?.cpu?.loadAvg1m'), 'DashboardPage.jsx must map stats.cpu.loadAvg1m');
+
+    // Memory mapping check
+    assert.ok(content.includes('stats?.memory?.ramPct'), 'DashboardPage.jsx must map stats.memory.ramPct');
+    assert.ok(content.includes('stats?.memory?.rssMB'), 'DashboardPage.jsx must map stats.memory.rssMB');
+    assert.ok(content.includes('stats?.memory?.capMB'), 'DashboardPage.jsx must map stats.memory.capMB');
+    assert.ok(content.includes('stats?.memory?.heapUsedMB'), 'DashboardPage.jsx must map stats.memory.heapUsedMB');
+
+    // Uptime & Active client duration formatting check
+    assert.ok(content.includes('formatDuration(stats.uptime)'), 'DashboardPage.jsx must format stats.uptime with formatDuration');
+    assert.ok(content.includes('formatDuration(c.connectedSec'), 'DashboardPage.jsx must format connectedSec with formatDuration');
+  });
+
+  await test('verifies legacy dashboard in index.js formats uptime and connected clients with formatDuration', () => {
+    const indexFile = path.join(__dirname, 'index.js');
+    const content = fs.readFileSync(indexFile, 'utf8');
+
+    assert.ok(content.includes('function formatDuration(sec)'), 'index.js legacy dashboard script must define formatDuration');
+    assert.ok(content.includes("document.getElementById('metricUptime').textContent = formatDuration(u)"), 'index.js must format metricUptime with formatDuration');
+    assert.ok(content.includes('formatDuration(c.connectedSec || 0)'), 'index.js must format legacy active client connected duration with formatDuration');
+  });
+
+  // 9. HOM-200 Dashboard Header Straight Bar Verification
+  console.log('\n9. HOM-200 Dashboard Header Straight Bar Verification');
+  await test('verifies Layout.jsx implements straight bar header without floating island styles', () => {
+    const layoutFile = path.join(__dirname, 'dashboard', 'src', 'components', 'Layout.jsx');
+    const content = fs.readFileSync(layoutFile, 'utf8');
+
+    // Extract header section
+    const headerStart = content.indexOf('{/* Straight Top Header Bar */}');
+    const headerEnd = content.indexOf('{/* Dynamic Page Views */}');
+    assert.ok(headerStart !== -1, 'Layout.jsx must contain Straight Top Header Bar block');
+    assert.ok(headerEnd !== -1, 'Layout.jsx must contain Dynamic Page Views block');
+    const headerBlock = content.slice(headerStart, headerEnd);
+
+    // Must have straight bar styling: borderBottom divider, no floating island border radius or margin
+    assert.ok(headerBlock.includes("borderBottom: '1px solid'") || headerBlock.includes('borderBottom: "1px solid"'), 'Layout.jsx header must have borderBottom divider');
+    assert.ok(!headerBlock.includes("borderRadius: '10px'"), 'Layout.jsx header must not have floating island 10px border radius');
+    assert.ok(!headerBlock.includes("mb: 3.5"), 'Layout.jsx header must not have floating island mb: 3.5 margin');
+    assert.ok(!headerBlock.includes("rgba(67, 89, 113, 0.08)"), 'Layout.jsx header must not have floating island elevation box shadow');
+    assert.ok(headerBlock.includes("width: '100%'"), 'Layout.jsx header must span 100% full width');
+
+    // Header must preserve essential elements: title, drawer toggle, targetBot chip, LIVE/OFFLINE, theme toggle
+    assert.ok(headerBlock.includes('activeItem.label'), 'Header must render activeItem.label');
+    assert.ok(headerBlock.includes('handleDrawerToggle'), 'Header must include drawer toggle for mobile');
+    assert.ok(headerBlock.includes('targetBot'), 'Header must preserve targetBot chip');
+    assert.ok(headerBlock.includes('isConnected'), 'Header must preserve isConnected status badge');
+    assert.ok(headerBlock.includes('onToggleTheme'), 'Header must preserve onToggleTheme switcher');
+  });
+
+  // 10. HOM-206 Active Streams (N) Scroll & Stream Cache Button Verification
+  console.log('\n10. HOM-206 Active Streams (N) Scroll & Stream Cache Button Verification');
+  await test('verifies DashboardPage.jsx implements Active Streams (N) button with smooth scroll handler', () => {
+    const dashFile = path.join(__dirname, 'dashboard', 'src', 'pages', 'DashboardPage.jsx');
+    const content = fs.readFileSync(dashFile, 'utf8');
+
+    // Button label and structure
+    assert.ok(
+      content.includes('Active Streams ({clients.length})'),
+      'DashboardPage.jsx must define button with label "Active Streams ({clients.length})"'
+    );
+    assert.ok(
+      !content.includes('View Streams ({clients.length})'),
+      'DashboardPage.jsx must no longer contain old "View Streams ({clients.length})"'
+    );
+    assert.ok(
+      content.includes('onClick={scrollToClients}'),
+      'Active Streams button must invoke scrollToClients onClick'
+    );
+
+    // Scroll handler implementation
+    assert.ok(
+      content.includes('const scrollToClients = () =>'),
+      'DashboardPage.jsx must implement scrollToClients function'
+    );
+    assert.ok(
+      content.includes("scrollIntoView({ behavior: 'smooth', block: 'start' })"),
+      'scrollToClients must execute smooth scroll to start'
+    );
+    assert.ok(
+      content.includes('clientsSectionRef.current') && content.includes("getElementById('connected-clients-section')"),
+      'scrollToClients must support both clientsSectionRef and getElementById fallback'
+    );
+  });
+
+  await test('verifies DashboardPage.jsx targets Connected Clients Card with ref and id for scroll', () => {
+    const dashFile = path.join(__dirname, 'dashboard', 'src', 'pages', 'DashboardPage.jsx');
+    const content = fs.readFileSync(dashFile, 'utf8');
+
+    assert.ok(
+      content.includes('id="connected-clients-section"'),
+      'Connected clients Card container must have id="connected-clients-section"'
+    );
+    assert.ok(
+      content.includes('ref={clientsSectionRef}'),
+      'Connected clients Card container must have ref={clientsSectionRef}'
+    );
+  });
+
+  await test('verifies DashboardPage.jsx implements separate Stream Cache button navigating to /streams', () => {
+    const dashFile = path.join(__dirname, 'dashboard', 'src', 'pages', 'DashboardPage.jsx');
+    const content = fs.readFileSync(dashFile, 'utf8');
+
+    assert.ok(
+      content.includes('Stream Cache'),
+      'DashboardPage.jsx must contain "Stream Cache" button'
+    );
+    assert.ok(
+      content.includes("onClick={() => onNavigate('/streams')}"),
+      'Stream Cache button must navigate to /streams via onNavigate'
+    );
+    assert.ok(
+      content.includes('startIcon={<StorageIcon />}'),
+      'Stream Cache button must include StorageIcon'
+    );
+  });
+
+  await test('BVA & Decision Logic: Active Streams (N) counter formatting for boundaries (N=0, N=1, N>1, null/undefined)', () => {
+    function computeActiveStreamsLabel(stats) {
+      const clients = stats?.activeClients || [];
+      return `Active Streams (${clients.length})`;
+    }
+
+    // BVA N=0: empty array
+    assert.strictEqual(computeActiveStreamsLabel({ activeClients: [] }), 'Active Streams (0)');
+    // BVA N=0: null stats
+    assert.strictEqual(computeActiveStreamsLabel(null), 'Active Streams (0)');
+    // BVA N=0: undefined stats
+    assert.strictEqual(computeActiveStreamsLabel(undefined), 'Active Streams (0)');
+    // BVA N=0: stats without activeClients property
+    assert.strictEqual(computeActiveStreamsLabel({}), 'Active Streams (0)');
+    // BVA N=1: single client
+    assert.strictEqual(computeActiveStreamsLabel({ activeClients: [{ id: 'client-1' }] }), 'Active Streams (1)');
+    // BVA N>1: multiple clients (e.g. 5 clients)
+    assert.strictEqual(
+      computeActiveStreamsLabel({
+        activeClients: [
+          { id: 'c1' },
+          { id: 'c2' },
+          { id: 'c3' },
+          { id: 'c4' },
+          { id: 'c5' },
+        ],
+      }),
+      'Active Streams (5)'
+    );
+    // BVA high count (e.g. 100 clients)
+    const largeList = Array.from({ length: 100 }, (_, i) => ({ id: `client-${i}` }));
+    assert.strictEqual(computeActiveStreamsLabel({ activeClients: largeList }), 'Active Streams (100)');
+  });
+
+  await test('verifies compiled production bundle contains Active Streams and Stream Cache tokens without raw View Streams', () => {
+    const assetsDir = path.join(__dirname, 'dashboard', 'dist', 'assets');
+    const files = fs.readdirSync(assetsDir);
+    const jsBundle = files.find(f => f.startsWith('index-') && f.endsWith('.js'));
+    assert.ok(jsBundle, 'Compiled bundle must exist');
+    const bundleContent = fs.readFileSync(path.join(assetsDir, jsBundle), 'utf8');
+
+    assert.ok(bundleContent.includes('Active Streams'), 'Production bundle must contain "Active Streams"');
+    assert.ok(bundleContent.includes('Stream Cache'), 'Production bundle must contain "Stream Cache"');
+    assert.ok(!bundleContent.includes('View Streams ('), 'Production bundle must not contain old "View Streams ("');
+    assert.ok(bundleContent.includes('connected-clients-section'), 'Production bundle must contain "connected-clients-section" target ID');
   });
 
 } finally {

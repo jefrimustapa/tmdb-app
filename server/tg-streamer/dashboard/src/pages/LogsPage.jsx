@@ -272,6 +272,7 @@ export default function LogsPage() {
       {/* Terminal Container */}
       <Card
         sx={{
+          height: { xs: 600, md: 'calc(100vh - 210px)' },
           display: 'flex',
           flexDirection: 'column',
           bgcolor: '#1B1B29', // Sneat IDE dark background

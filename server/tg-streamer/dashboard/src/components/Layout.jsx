@@ -210,6 +210,16 @@ export default function Layout({
                     color: active ? '#FFFFFF' : 'text.secondary',
                     boxShadow: active ? '0 2px 8px 0 rgba(105, 108, 255, 0.4)' : 'none',
                     transition: 'all 0.18s ease-in-out',
+                    '&.Mui-selected, &.Mui-selected:hover': {
+                      bgcolor: 'primary.main',
+                      color: '#FFFFFF',
+                      '& .MuiListItemIcon-root, & .MuiListItemText-primary': {
+                        color: '#FFFFFF',
+                      },
+                    },
+                    '&.Mui-selected:hover': {
+                      bgcolor: 'primary.dark',
+                    },
                     '&:hover': {
                       bgcolor: active ? 'primary.dark !important' : 'rgba(105, 108, 255, 0.08)',
                       color: active ? '#FFFFFF' : 'primary.main',
@@ -312,45 +322,45 @@ export default function Layout({
           display: 'flex',
           flexDirection: 'column',
           width: { xs: '100%', md: `calc(100% - ${SIDEBAR_WIDTH}px)` },
-          p: { xs: 2, sm: 3, md: 4 },
         }}
       >
-        {/* Sneat Floating Top Header Bar */}
-        <Paper
-          elevation={0}
+        {/* Straight Top Header Bar */}
+        <Box
+          component="header"
           sx={{
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            px: { xs: 2, sm: 3 },
-            py: 1.5,
-            mb: 3.5,
-            borderRadius: '10px',
+            px: { xs: 2, sm: 3, md: 4 },
+            py: { xs: 1.25, sm: 1.75 },
+            minHeight: 64,
+            width: '100%',
             bgcolor: 'background.paper',
-            border: '1px solid',
+            borderBottom: '1px solid',
             borderColor: 'divider',
-            boxShadow: themeMode === 'dark'
-              ? '0 2px 14px 0 rgba(0, 0, 0, 0.24)'
-              : '0 2px 10px 0 rgba(67, 89, 113, 0.08)',
+            position: 'sticky',
+            top: 0,
+            zIndex: 1000,
           }}
         >
           {/* Left: Mobile Toggle & Page Title */}
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, minWidth: 0 }}>
             <IconButton
               color="inherit"
               aria-label="open drawer"
               edge="start"
               onClick={handleDrawerToggle}
-              sx={{ display: { md: 'none' }, color: 'text.secondary' }}
+              sx={{ display: { md: 'none' }, color: 'text.secondary', p: 0.75 }}
             >
               <MenuIcon />
             </IconButton>
-            <Box>
+            <Box sx={{ minWidth: 0 }}>
               <Typography
                 variant="h6"
+                noWrap
                 sx={{
                   fontWeight: 700,
-                  fontSize: { xs: '1rem', sm: '1.15rem' },
+                  fontSize: { xs: '0.95rem', sm: '1.15rem' },
                   color: 'text.primary',
                   lineHeight: 1.2,
                 }}
@@ -359,6 +369,7 @@ export default function Layout({
               </Typography>
               <Typography
                 variant="caption"
+                noWrap
                 sx={{
                   color: 'text.secondary',
                   display: { xs: 'none', sm: 'block' },
@@ -372,7 +383,7 @@ export default function Layout({
           </Box>
 
           {/* Right: Bot info, Live status, Theme Toggle */}
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 1, sm: 1.5 }, flexShrink: 0 }}>
             {targetBot && (
               <Chip
                 icon={<SmartToyIcon sx={{ fontSize: '15px !important' }} />}
@@ -442,12 +453,14 @@ export default function Layout({
               </IconButton>
             </Tooltip>
           </Box>
-        </Paper>
+        </Box>
 
         {/* Dynamic Page Views */}
-        <Container maxWidth="xl" disableGutters sx={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-          {children}
-        </Container>
+        <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', p: { xs: 2, sm: 3, md: 4 } }}>
+          <Container maxWidth="xl" disableGutters sx={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+            {children}
+          </Container>
+        </Box>
 
         {/* Scroll to Top Button */}
         <ScrollTop>
