@@ -247,7 +247,9 @@ await test('BVA 0 results (kosong): bot returns "tiada carian" immediately ends 
     },
   };
 
-  const resolver = new KakifilemResolver(mockClient);
+  const resolver = new KakifilemResolver(mockClient, {
+    pollDelayMs: 20,
+  });
   const result = await resolver.resolve({
     title: 'NonExistentTitleXYZ123',
     year: '2026',
@@ -308,7 +310,9 @@ await test('BVA 1 result: single matching candidate triggers delivery and return
     },
   };
 
-  const resolver = new KakifilemResolver(mockClient);
+  const resolver = new KakifilemResolver(mockClient, {
+    pollDelayMs: 20,
+  });
   const res = await resolver.resolve({
     title: 'Mr. London Ms. Langkawi',
     season: 1,
@@ -379,7 +383,9 @@ await test('BVA banyak hasil (multiple results): selects highest scoring candida
     },
   };
 
-  const resolver = new KakifilemResolver(mockClient);
+  const resolver = new KakifilemResolver(mockClient, {
+    pollDelayMs: 20,
+  });
   const res = await resolver.resolve({
     title: 'Mr. London Ms. Langkawi',
     season: 1,
@@ -439,7 +445,9 @@ await test('handles KeyboardButtonUrl with start parameter by sending /start <pa
     },
   };
 
-  const resolver = new KakifilemResolver(mockClient);
+  const resolver = new KakifilemResolver(mockClient, {
+    pollDelayMs: 20,
+  });
   const res = await resolver.resolve({
     title: 'Polis Evo 3',
     year: '2023',
@@ -501,7 +509,9 @@ await test('aborts gracefully and throws 499 status error when checkAborted is t
     getMessages: async () => [],
   };
 
-  const resolver = new KakifilemResolver(mockClient);
+  const resolver = new KakifilemResolver(mockClient, {
+    pollDelayMs: 20,
+  });
   await assert.rejects(
     async () => {
       await resolver.resolve({
@@ -540,6 +550,153 @@ await test('custom targetBot override via options and params is respected (not h
   const resolverDefault = new KakifilemResolver(mockClient);
   await resolverDefault.resolve({ title: 'Test Movie', targetBot: 'CustomParamsBot' });
   assert.strictEqual(targetBotQueried, 'CustomParamsBot');
+});
+
+// 5. Real Bot Fixtures & Delivery Bot Flow (#HOM-188)
+console.log('\n5. Real Bot Fixtures & Delivery Bot Flow (#HOM-188)');
+
+await test('resolves media via web delivery link (bot.kakifilem.com) and accepts generic Telegram video filename', async () => {
+  let sendVideoPayload = null;
+  const realBotReply = {
+    id: 100,
+    message: '🔍 Found 1 results for Mr London Ms Langkawi EP11\n⚡️ Cache (4.4ms)\n📄 Page 1/1 • Showing 1 results',
+    replyMarkup: {
+      className: 'ReplyInlineMarkup',
+      rows: [
+        {
+          className: 'KeyboardButtonRow',
+          buttons: [
+            {
+              className: 'KeyboardButtonUrl',
+              text: '🎬 Mr.London.Ms.Langkawi.EP11 (182.3 MB)',
+              url: 'https://bot.kakifilem.com/mock-link-11',
+            },
+          ],
+        },
+      ],
+    },
+  };
+
+  const deliveredMsg = {
+    id: 105,
+    message: '🎬 Mr London Malay Langkawi EP11  📤 @kakifilembot',
+    media: {
+      className: 'MessageMediaDocument',
+      document: {
+        id: '7025249007176585216',
+        size: 191155814,
+        mimeType: 'video/mp4',
+        attributes: [
+          { className: 'DocumentAttributeFilename', fileName: 'video_2021-10-31_15-05-34_7025249007176585216.mp4' },
+        ],
+      },
+    },
+  };
+
+  let deliveryTriggered = false;
+  const mockClient = {
+    sendMessage: async (bot, opts) => ({ id: 99 }),
+    getMessages: async (bot, opts) => {
+      if (opts?.limit === 5) return [realBotReply];
+      if (opts?.limit === 10) return deliveryTriggered ? [deliveredMsg] : [];
+      return [];
+    },
+  };
+
+  // Mock web delivery endpoint for bot.kakifilem.com
+  const mockWebDelivery = async (url, postFn) => {
+    deliveryTriggered = true;
+  };
+
+  const resolver = new KakifilemResolver(mockClient, {
+    webDeliveryTrigger: mockWebDelivery,
+    pollDelayMs: 20,
+  });
+
+  const res = await resolver.resolve({
+    title: 'Mr London Ms Langkawi',
+    season: 1,
+    episode: 11,
+  });
+
+  assert.ok(res, 'Expected successful stream resolution for real bot fixture');
+  assert.strictEqual(res.document.id, '7025249007176585216');
+  assert.ok(res.filename.includes('Mr.London.Ms.Langkawi.EP11') || res.filename.includes('Mr London Ms Langkawi'));
+});
+
+await test('parses delivery bot from Telegram link (e.g. *.t.me or t.me/<bot>) and delivers via delivery bot', async () => {
+  let deliveryBotTarget = null;
+  let deliveryBotStartMessage = null;
+
+  const suggestionReply = {
+    id: 200,
+    message: '😕 Kami tak jumpa filem yang sepadan dengan carian anda...',
+    replyMarkup: {
+      className: 'ReplyInlineMarkup',
+      rows: [
+        {
+          className: 'KeyboardButtonRow',
+          buttons: [
+            {
+              className: 'KeyboardButtonUrl',
+              text: 'Mr London Ms Langkawi EP11',
+              url: 'https://customdeliverybot.t.me/?start=s_Mr_London_Ms_Langkawi_EP11',
+            },
+          ],
+        },
+      ],
+    },
+  };
+
+  const deliveredMsg = {
+    id: 50,
+    message: '🎬 Mr London Ms Langkawi EP11',
+    media: {
+      className: 'MessageMediaDocument',
+      document: {
+        id: '8888888888',
+        size: 191155814,
+        mimeType: 'video/mp4',
+        attributes: [
+          { className: 'DocumentAttributeFilename', fileName: 'Mr.London.Ms.Langkawi.EP11.mp4' },
+        ],
+      },
+    },
+  };
+
+  let startSent = false;
+  const mockClient = {
+    sendMessage: async (bot, opts) => {
+      if (bot === 'customdeliverybot') {
+        deliveryBotTarget = bot;
+        deliveryBotStartMessage = opts?.message;
+        startSent = true;
+      }
+      return { id: 10 };
+    },
+    getMessages: async (bot, opts) => {
+      if (bot === 'KakifilemBot') return [suggestionReply];
+      if (bot === 'customdeliverybot') {
+        if (!startSent) return [{ id: 40, message: 'baseline' }];
+        return [deliveredMsg];
+      }
+      return [];
+    },
+  };
+
+  const resolver = new KakifilemResolver(mockClient, {
+    pollDelayMs: 20,
+  });
+  const res = await resolver.resolve({
+    title: 'Mr London Ms Langkawi',
+    season: 1,
+    episode: 11,
+  });
+
+  assert.ok(res, 'Expected successful stream resolution via custom delivery bot');
+  assert.strictEqual(deliveryBotTarget, 'customdeliverybot');
+  assert.strictEqual(deliveryBotStartMessage, '/start s_Mr_London_Ms_Langkawi_EP11');
+  assert.strictEqual(res.document.id, '8888888888');
 });
 
 console.log(`\nResults: ${passedTests}/${totalTests} kakifilem tests passed!\n`);
