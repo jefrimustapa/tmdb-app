@@ -210,6 +210,16 @@ export default function Layout({
                     color: active ? '#FFFFFF' : 'text.secondary',
                     boxShadow: active ? '0 2px 8px 0 rgba(105, 108, 255, 0.4)' : 'none',
                     transition: 'all 0.18s ease-in-out',
+                    '&.Mui-selected, &.Mui-selected:hover': {
+                      bgcolor: 'primary.main',
+                      color: '#FFFFFF',
+                      '& .MuiListItemIcon-root, & .MuiListItemText-primary': {
+                        color: '#FFFFFF',
+                      },
+                    },
+                    '&.Mui-selected:hover': {
+                      bgcolor: 'primary.dark',
+                    },
                     '&:hover': {
                       bgcolor: active ? 'primary.dark !important' : 'rgba(105, 108, 255, 0.08)',
                       color: active ? '#FFFFFF' : 'primary.main',
