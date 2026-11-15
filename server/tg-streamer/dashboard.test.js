@@ -254,6 +254,58 @@ try {
     }
   });
 
+  // 7. HOM-181 Regression & BVA Verification (SSE, Autoscroll, Range Alignment)
+  console.log('\n7. HOM-181 Regression & BVA Verification');
+  await test('GET /api/logs validates lines parameter with BVA (lines=-3, 0, positive)', async () => {
+    // Negative number: must default to 200, never return slice(-(-3))
+    const resNeg = await fetch(`${baseUrl}/api/logs?lines=-3`);
+    assert.strictEqual(resNeg.status, 200);
+    const dataNeg = await resNeg.json();
+    assert.ok(dataNeg.success);
+    assert.ok(dataNeg.logs.length <= 200, `Expected <= 200 lines for lines=-3, got ${dataNeg.logs.length}`);
+
+    // Zero: must default to 200
+    const resZero = await fetch(`${baseUrl}/api/logs?lines=0`);
+    assert.strictEqual(resZero.status, 200);
+    const dataZero = await resZero.json();
+    assert.ok(dataZero.success);
+    assert.ok(dataZero.logs.length <= 200, `Expected <= 200 lines for lines=0, got ${dataZero.logs.length}`);
+
+    // Valid positive number: 5 lines
+    const res5 = await fetch(`${baseUrl}/api/logs?lines=5`);
+    assert.strictEqual(res5.status, 200);
+    const data5 = await res5.json();
+    assert.ok(data5.success);
+    assert.ok(data5.logs.length <= 5, `Expected <= 5 lines for lines=5, got ${data5.logs.length}`);
+  });
+
+  await test('verifies LogsPage.jsx handles SSE message/log event and unpacks parsed.lines array', () => {
+    const logsFile = path.join(__dirname, 'dashboard', 'src', 'pages', 'LogsPage.jsx');
+    const content = fs.readFileSync(logsFile, 'utf8');
+    assert.ok(content.includes('es.onmessage ='), 'LogsPage.jsx must handle default SSE message event');
+    assert.ok(content.includes("es.addEventListener('log'"), 'LogsPage.jsx must also handle log named event');
+    assert.ok(content.includes('parsed?.lines') || content.includes('data?.lines'), 'LogsPage.jsx must unpack lines array');
+  });
+
+  await test('verifies LogsPage.jsx Card container has bounded height for autoscroll (BUG-2 fix)', () => {
+    const logsFile = path.join(__dirname, 'dashboard', 'src', 'pages', 'LogsPage.jsx');
+    const content = fs.readFileSync(logsFile, 'utf8');
+    const cardMatch = content.match(/\{\/\* Terminal Container \*\/\}\s*<Card[\s\S]*?sx=\{\{([\s\S]*?)\}\}/);
+    assert.ok(cardMatch, 'Card terminal container must be present in LogsPage.jsx');
+    const cardSx = cardMatch[1];
+    assert.ok(/(?<!min)height\s*:|maxHeight\s*:/.test(cardSx), 'Card terminal container must have explicit height or maxHeight');
+    assert.ok(content.includes('ref={terminalRef}'), 'terminalRef must be attached to the scrollable terminal Box');
+  });
+
+  await test('verifies SettingsPage.jsx ranges align with backend validation (minMovieSizeMb 50, resolverMaxPages 20)', () => {
+    const settingsFile = path.join(__dirname, 'dashboard', 'src', 'pages', 'SettingsPage.jsx');
+    const content = fs.readFileSync(settingsFile, 'utf8');
+    assert.ok(content.includes('Math.max(50,'), 'minMovieSizeMb lower bound must be 50');
+    assert.ok(content.includes('min: 50,'), 'minMovieSizeMb input min must be 50');
+    assert.ok(content.includes('Math.min(20,'), 'resolverMaxPages upper bound must be 20');
+    assert.ok(content.includes('max: 20,'), 'resolverMaxPages input max must be 20');
+  });
+
 } finally {
   server.close();
 }

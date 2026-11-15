@@ -65,14 +65,32 @@ export default function LogsPage() {
       if (isMounted) setSseStatus('error');
     };
 
-    es.addEventListener('log', (event) => {
+    const handleIncomingLogData = (rawData) => {
       if (!isMounted) return;
       try {
-        const line = JSON.parse(event.data);
-        setLogs((prev) => [...prev.slice(-1000), line]);
-      } catch (e) {
-        setLogs((prev) => [...prev.slice(-1000), event.data]);
+        const parsed = JSON.parse(rawData);
+        if (Array.isArray(parsed?.lines)) {
+          setLogs((prev) => [...prev.slice(-(1000 - parsed.lines.length)), ...parsed.lines]);
+        } else if (Array.isArray(parsed)) {
+          setLogs((prev) => [...prev.slice(-(1000 - parsed.length)), ...parsed]);
+        } else if (typeof parsed === 'string') {
+          setLogs((prev) => [...prev.slice(-1000), parsed]);
+        } else if (parsed?.line) {
+          setLogs((prev) => [...prev.slice(-1000), parsed.line]);
+        }
+      } catch {
+        if (typeof rawData === 'string' && rawData.trim()) {
+          setLogs((prev) => [...prev.slice(-1000), rawData]);
+        }
       }
+    };
+
+    es.onmessage = (event) => {
+      handleIncomingLogData(event.data);
+    };
+
+    es.addEventListener('log', (event) => {
+      handleIncomingLogData(event.data);
     });
 
     return () => {
@@ -254,14 +272,12 @@ export default function LogsPage() {
       {/* Terminal Container */}
       <Card
         sx={{
-          flex: 1,
           display: 'flex',
           flexDirection: 'column',
           bgcolor: '#1B1B29', // Sneat IDE dark background
           border: '1px solid',
           borderColor: 'divider',
           borderRadius: '10px',
-          minHeight: 520,
           boxShadow: '0 8px 24px -4px rgba(0, 0, 0, 0.4)',
           overflow: 'hidden',
         }}
@@ -324,6 +340,9 @@ export default function LogsPage() {
           ref={terminalRef}
           sx={{
             flex: 1,
+            minHeight: 0,
+            height: { xs: 520, md: 'calc(100vh - 280px)' },
+            maxHeight: { xs: 520, md: 'calc(100vh - 280px)' },
             p: 2.5,
             overflowY: 'auto',
             fontFamily: '"JetBrains Mono", monospace',

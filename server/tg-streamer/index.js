@@ -1372,7 +1372,11 @@ app.post(['/api/system/purge-memory', '/tg/api/system/purge-memory', '/msm/api/s
 // Log Snapshot API (Last N lines from RAM disk)
 app.get(['/api/logs', '/tg/api/logs', '/msm/api/logs'], (req, res) => {
   try {
-    const linesCount = parseInt(req.query.lines, 10) || 200;
+    let linesCount = parseInt(req.query.lines, 10);
+    if (isNaN(linesCount) || linesCount <= 0) {
+      linesCount = 200;
+    }
+    linesCount = Math.min(linesCount, 5000);
     const logPath = getLogFilePath();
 
     if (!fs.existsSync(logPath)) {
@@ -1435,6 +1439,10 @@ app.get(['/api/logs/stream', '/tg/api/logs/stream', '/msm/api/logs/stream'], (re
       }
       if (!fs.existsSync(logPath)) return;
       const curSize = fs.statSync(logPath).size;
+      if (curSize < lastSize) {
+        // File was rotated or cleared: reset lastSize to 0 to capture newly appended lines immediately
+        lastSize = 0;
+      }
       if (curSize > lastSize) {
         // Cap chunk read size to 64KB max to prevent OOM spikes on large log file changes
         const maxChunk = 64 * 1024;
@@ -1457,9 +1465,6 @@ app.get(['/api/logs/stream', '/tg/api/logs/stream', '/msm/api/logs/stream'], (re
         if (lines.length > 0) {
           res.write(`data: ${JSON.stringify({ lines })}\n\n`);
         }
-      } else if (curSize < lastSize) {
-        // File was rotated or cleared
-        lastSize = curSize;
       }
     } catch {}
   }, 1500);

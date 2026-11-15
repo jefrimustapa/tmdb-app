@@ -696,8 +696,8 @@ export default function SettingsPage() {
                   <Stack direction="row" alignItems="center" spacing={1.5}>
                     <IconButton
                       size="small"
-                      onClick={() => setSettings({ ...settings, minMovieSizeMb: Math.max(20, settings.minMovieSizeMb - 5) })}
-                      disabled={settings.minMovieSizeMb <= 20}
+                      onClick={() => setSettings({ ...settings, minMovieSizeMb: Math.max(50, settings.minMovieSizeMb - 5) })}
+                      disabled={settings.minMovieSizeMb <= 50}
                       sx={{ border: '1px solid', borderColor: 'divider', borderRadius: '6px' }}
                     >
                       <RemoveIcon sx={{ fontSize: 16 }} />
@@ -706,12 +706,12 @@ export default function SettingsPage() {
                       size="small"
                       type="number"
                       value={settings.minMovieSizeMb}
-                      onChange={(e) => setSettings({ ...settings, minMovieSizeMb: Math.max(20, Math.min(2000, Number(e.target.value) || 20)) })}
+                      onChange={(e) => setSettings({ ...settings, minMovieSizeMb: Math.max(50, Math.min(2000, Number(e.target.value) || 50)) })}
                       sx={{ width: 100 }}
                       slotProps={{
                         input: {
                           endAdornment: <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>MB</Typography>,
-                          inputProps: { min: 20, max: 2000, step: 5, style: { textAlign: 'center', fontWeight: 700 } },
+                          inputProps: { min: 50, max: 2000, step: 5, style: { textAlign: 'center', fontWeight: 700 } },
                         },
                       }}
                     />
@@ -749,19 +749,19 @@ export default function SettingsPage() {
                       size="small"
                       type="number"
                       value={settings.resolverMaxPages}
-                      onChange={(e) => setSettings({ ...settings, resolverMaxPages: Math.max(1, Math.min(15, Number(e.target.value) || 1)) })}
+                      onChange={(e) => setSettings({ ...settings, resolverMaxPages: Math.max(1, Math.min(20, Number(e.target.value) || 1)) })}
                       sx={{ width: 100 }}
                       slotProps={{
                         input: {
                           endAdornment: <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>pages</Typography>,
-                          inputProps: { min: 1, max: 15, step: 1, style: { textAlign: 'center', fontWeight: 700 } },
+                          inputProps: { min: 1, max: 20, step: 1, style: { textAlign: 'center', fontWeight: 700 } },
                         },
                       }}
                     />
                     <IconButton
                       size="small"
-                      onClick={() => setSettings({ ...settings, resolverMaxPages: Math.min(15, settings.resolverMaxPages + 1) })}
-                      disabled={settings.resolverMaxPages >= 15}
+                      onClick={() => setSettings({ ...settings, resolverMaxPages: Math.min(20, settings.resolverMaxPages + 1) })}
+                      disabled={settings.resolverMaxPages >= 20}
                       sx={{ border: '1px solid', borderColor: 'divider', borderRadius: '6px' }}
                     >
                       <AddIcon sx={{ fontSize: 16 }} />
