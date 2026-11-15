@@ -516,5 +516,31 @@ await test('aborts gracefully and throws 499 status error when checkAborted is t
   );
 });
 
+await test('custom targetBot override via options and params is respected (not hardcoded to KakifilemBot)', async () => {
+  let targetBotQueried = null;
+  const mockClient = {
+    sendMessage: async (bot, opts) => {
+      targetBotQueried = bot;
+      return { id: 10 };
+    },
+    getMessages: async (bot) => {
+      return [{
+        id: 11,
+        message: 'No results found',
+      }];
+    },
+  };
+
+  // 1. Via options
+  const resolverWithOptions = new KakifilemResolver(mockClient, { targetBot: 'CustomOptionsBot' });
+  await resolverWithOptions.resolve({ title: 'Test Movie' });
+  assert.strictEqual(targetBotQueried, 'CustomOptionsBot');
+
+  // 2. Via params override
+  const resolverDefault = new KakifilemResolver(mockClient);
+  await resolverDefault.resolve({ title: 'Test Movie', targetBot: 'CustomParamsBot' });
+  assert.strictEqual(targetBotQueried, 'CustomParamsBot');
+});
+
 console.log(`\nResults: ${passedTests}/${totalTests} kakifilem tests passed!\n`);
 console.log('🎉 ALL KAKIFILEM UNIT TESTS PASSED SUCCESSFULLY!\n');

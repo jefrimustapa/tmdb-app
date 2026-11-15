@@ -190,10 +190,13 @@ if (savedSettings.targetBotUsernames === undefined) savedSettings.targetBotUsern
 
 export let BOT_USERNAME = (savedSettings.targetBotUsername || process.env.TG_BOT_USERNAME || 'msm34bot').replace(/^@/, '');
 
-export function getActiveTargetBot() {
-  const activeResolverId = savedSettings.activeResolver || 'msm';
+export function getActiveTargetBot(resolverId = null) {
+  const activeResolverId = resolverId || savedSettings.activeResolver || 'msm';
   if (savedSettings.targetBotUsernames && savedSettings.targetBotUsernames[activeResolverId]) {
     return savedSettings.targetBotUsernames[activeResolverId].replace(/^@/, '');
+  }
+  if (savedSettings.targetBotUsername && (activeResolverId === (savedSettings.activeResolver || 'msm') || activeResolverId === 'msm')) {
+    return savedSettings.targetBotUsername.replace(/^@/, '');
   }
   if (activeResolverId === 'pencuri') {
     return 'Pencuri_Movie_Bot';
@@ -1911,8 +1914,13 @@ app.post(['/api/settings', '/tg/api/settings', '/msm/api/settings'], (req, res) 
       if (sanitized.length > 0) {
         BOT_USERNAME = sanitized;
         savedSettings.targetBotUsername = sanitized;
+        const curResolver = savedSettings.activeResolver || 'msm';
+        if (!savedSettings.targetBotUsernames) {
+          savedSettings.targetBotUsernames = { msm: BOT_USERNAME, pencuri: 'Pencuri_Movie_Bot', kakifilem: 'KakifilemBot' };
+        }
+        savedSettings.targetBotUsernames[curResolver] = sanitized;
         changed = true;
-        console.log(`[SETTINGS] Target Telegram Bot updated to: @${BOT_USERNAME}`);
+        console.log(`[SETTINGS] Target Telegram Bot updated to: @${BOT_USERNAME} for active resolver ${curResolver}`);
       }
     }
 
@@ -4521,7 +4529,7 @@ app.get(['/api/resolve', '/tg/api/resolve', '/msm/api/resolve', '/api/prefetch',
     }
 
     const activeResolverId = String(req.query.resolver || savedSettings.activeResolver || 'msm').toLowerCase().trim();
-    const targetBotHandle = (req.query.bot || (savedSettings.targetBotUsernames && savedSettings.targetBotUsernames[activeResolverId]) || (activeResolverId === 'pencuri' ? 'Pencuri_Movie_Bot' : (activeResolverId === 'kakifilem' ? 'KakifilemBot' : BOT_USERNAME))).replace(/^@/, '');
+    const targetBotHandle = (req.query.bot || getActiveTargetBot(activeResolverId)).replace(/^@/, '');
 
     console.log(`[${logPrefix}] Delegating to resolver "${activeResolverId}" with target bot @${targetBotHandle}`);
     const resolver = createResolver(activeResolverId, client, {

@@ -96,7 +96,7 @@ export class KakifilemResolver extends BaseResolver {
       effectiveMinTv = 80,
       effectiveMinMovie = 180,
       effectiveMaxPages = 3,
-      targetBot = (this.options.targetBot || this.defaultBot).replace(/^@/, ''),
+      targetBot = (params.targetBot || this.options.targetBot || this.defaultBot).replace(/^@/, ''),
       checkAborted = () => false,
     } = params;
 
