@@ -288,6 +288,14 @@ try {
     assert.ok(content.includes('parsed?.lines') || content.includes('data?.lines'), 'LogsPage.jsx must unpack lines array');
   });
 
+  await test('verifies LogsPage.jsx separates each log entry (issue #351)', () => {
+    const logsFile = path.join(__dirname, 'dashboard', 'src', 'pages', 'LogsPage.jsx');
+    const content = fs.readFileSync(logsFile, 'utf8');
+    assert.ok(content.includes("borderLeft: '3px solid currentColor'"), 'log entry must have level color left stripe');
+    assert.ok(content.includes('borderBottom:'), 'log entry must have bottom separator');
+    assert.ok(content.includes("idx === filteredLogs.length - 1"), 'last entry must not have trailing separator');
+  });
+
   await test('verifies LogsPage.jsx Card container has bounded height for autoscroll (BUG-2 fix)', () => {
     const logsFile = path.join(__dirname, 'dashboard', 'src', 'pages', 'LogsPage.jsx');
     const content = fs.readFileSync(logsFile, 'utf8');
