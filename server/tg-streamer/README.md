@@ -19,6 +19,12 @@ High-performance direct stream resolver and Telegram MTProto video proxy for TMD
 - HTTP 206 Partial Content Range streaming proxy for instant video playback and seeking.
 - Memory caching and request deduplication.
 
+## Resolvers & Supported Bots
+TGStrm supports multiple pluggable stream resolvers configured in the dashboard (`/settings`):
+- **MSM Bot (`msm`)**: Resolves streams via `@msm34bot` or `@msm32bot` using inline query callbacks and ad-gate link traversal.
+- **Pencuri Movie Bot (`pencuri`)**: Resolves streams via Search API and Mini App bot links (`@Pencuri_Movie_Bot`, `@UnOfficialsBot`).
+- **Kakifilem Bot (`kakifilem`)** (issue #343): Resolves streams via `@KakifilemBot` by sending title queries, parsing inline result buttons formatted as `<title> (<size>)`, and triggering direct video delivery into chat via callback or `/start` commands.
+
 ## Environment Variables
 - `TG_API_ID`: Telegram API ID
 - `TG_API_HASH`: Telegram API Hash

@@ -6,17 +6,20 @@
 import { BaseResolver } from './base.js';
 import { MsmResolver } from './msm.js';
 import { PencuriResolver } from './pencuri.js';
+import { KakifilemResolver } from './kakifilem.js';
 
 export * from './base.js';
 export { BaseResolver } from './base.js';
 export { MsmResolver } from './msm.js';
 export { PencuriResolver, searchPencariApi, pencuriHttp } from './pencuri.js';
+export { KakifilemResolver } from './kakifilem.js';
 
 const resolverRegistry = new Map();
 
 // Register default built-in resolvers
 resolverRegistry.set('msm', MsmResolver);
 resolverRegistry.set('pencuri', PencuriResolver);
+resolverRegistry.set('kakifilem', KakifilemResolver);
 
 export function registerResolver(id, resolverClass) {
   resolverRegistry.set(id.toLowerCase(), resolverClass);

@@ -186,7 +186,7 @@ if (savedSettings.geoBlockEnabled === undefined) savedSettings.geoBlockEnabled =
 if (savedSettings.geoBlockAllowedCountries === undefined) savedSettings.geoBlockAllowedCountries = ['MY'];
 if (savedSettings.geoBlockWhitelistedIps === undefined) savedSettings.geoBlockWhitelistedIps = [];
 if (savedSettings.activeResolver === undefined) savedSettings.activeResolver = 'msm';
-if (savedSettings.targetBotUsernames === undefined) savedSettings.targetBotUsernames = { msm: 'msm34bot', pencuri: 'Pencuri_Movie_Bot' };
+if (savedSettings.targetBotUsernames === undefined) savedSettings.targetBotUsernames = { msm: 'msm34bot', pencuri: 'Pencuri_Movie_Bot', kakifilem: 'KakifilemBot' };
 
 export let BOT_USERNAME = (savedSettings.targetBotUsername || process.env.TG_BOT_USERNAME || 'msm34bot').replace(/^@/, '');
 
@@ -197,6 +197,9 @@ export function getActiveTargetBot() {
   }
   if (activeResolverId === 'pencuri') {
     return 'Pencuri_Movie_Bot';
+  }
+  if (activeResolverId === 'kakifilem') {
+    return 'KakifilemBot';
   }
   return BOT_USERNAME.replace(/^@/, '');
 }
@@ -1815,7 +1818,7 @@ app.get([
     targetBotUsername: BOT_USERNAME,
     activeResolver: savedSettings.activeResolver || 'msm',
     availableResolvers: listResolvers(),
-    targetBotUsernames: savedSettings.targetBotUsernames || { msm: BOT_USERNAME, pencuri: 'Pencuri_Movie_Bot' },
+    targetBotUsernames: savedSettings.targetBotUsernames || { msm: BOT_USERNAME, pencuri: 'Pencuri_Movie_Bot', kakifilem: 'KakifilemBot' },
     authError: authError || null,
   });
 });
@@ -1827,7 +1830,7 @@ app.get(['/api/resolvers', '/tg/api/resolvers', '/msm/api/resolvers'], (req, res
   res.json({
     success: true,
     activeResolver: savedSettings.activeResolver || 'msm',
-    targetBotUsernames: savedSettings.targetBotUsernames || { msm: BOT_USERNAME, pencuri: 'Pencuri_Movie_Bot' },
+    targetBotUsernames: savedSettings.targetBotUsernames || { msm: BOT_USERNAME, pencuri: 'Pencuri_Movie_Bot', kakifilem: 'KakifilemBot' },
     resolvers: listResolvers(),
   });
 });
@@ -1837,7 +1840,7 @@ app.get(['/api/settings', '/tg/api/settings', '/msm/api/settings'], (req, res) =
     success: true,
     activeResolver: savedSettings.activeResolver || 'msm',
     targetBotUsername: BOT_USERNAME,
-    targetBotUsernames: savedSettings.targetBotUsernames || { msm: BOT_USERNAME, pencuri: 'Pencuri_Movie_Bot' },
+    targetBotUsernames: savedSettings.targetBotUsernames || { msm: BOT_USERNAME, pencuri: 'Pencuri_Movie_Bot', kakifilem: 'KakifilemBot' },
     isConnected,
     uptime: process.uptime(),
     cachedStreams: db.size(),
@@ -1887,7 +1890,7 @@ app.post(['/api/settings', '/tg/api/settings', '/msm/api/settings'], (req, res) 
 
     if (activeResolver && typeof activeResolver === 'string') {
       const normResolver = activeResolver.trim().toLowerCase();
-      if (['msm', 'pencuri'].includes(normResolver)) {
+      if (['msm', 'pencuri', 'kakifilem'].includes(normResolver)) {
         savedSettings.activeResolver = normResolver;
         changed = true;
         console.log(`[SETTINGS] Active Resolver updated to: ${normResolver}`);
@@ -1895,9 +1898,10 @@ app.post(['/api/settings', '/tg/api/settings', '/msm/api/settings'], (req, res) 
     }
 
     if (targetBotUsernames && typeof targetBotUsernames === 'object') {
-      savedSettings.targetBotUsernames = savedSettings.targetBotUsernames || { msm: BOT_USERNAME, pencuri: 'Pencuri_Movie_Bot' };
+      savedSettings.targetBotUsernames = savedSettings.targetBotUsernames || { msm: BOT_USERNAME, pencuri: 'Pencuri_Movie_Bot', kakifilem: 'KakifilemBot' };
       if (targetBotUsernames.msm) savedSettings.targetBotUsernames.msm = targetBotUsernames.msm.trim().replace(/^@/, '');
       if (targetBotUsernames.pencuri) savedSettings.targetBotUsernames.pencuri = targetBotUsernames.pencuri.trim().replace(/^@/, '');
+      if (targetBotUsernames.kakifilem) savedSettings.targetBotUsernames.kakifilem = targetBotUsernames.kakifilem.trim().replace(/^@/, '');
       changed = true;
       console.log(`[SETTINGS] Resolver Bot Usernames updated to:`, JSON.stringify(savedSettings.targetBotUsernames));
     }
@@ -3081,7 +3085,7 @@ app.get(['/settings', '/setting', '/tg/settings', '/tg/setting', '/msm/settings'
             🤖 Stream Resolver & Target Bot
           </h2>
           <span id="botStatusPill" class="text-xs px-2.5 py-0.5 rounded-full bg-sky-500/20 text-sky-300 border border-sky-500/30 font-mono">
-            ${savedSettings.activeResolver === 'pencuri' ? 'Pencuri: @' + (savedSettings.targetBotUsernames?.pencuri || 'Pencuri_Movie_Bot') : 'MSM: @' + (savedSettings.targetBotUsernames?.msm || BOT_USERNAME)}
+            ${savedSettings.activeResolver === 'kakifilem' ? 'Kakifilem: @' + (savedSettings.targetBotUsernames?.kakifilem || 'KakifilemBot') : (savedSettings.activeResolver === 'pencuri' ? 'Pencuri: @' + (savedSettings.targetBotUsernames?.pencuri || 'Pencuri_Movie_Bot') : 'MSM: @' + (savedSettings.targetBotUsernames?.msm || BOT_USERNAME))}
           </span>
         </div>
         <p class="text-xs text-slate-400">Choose the active stream resolving engine and configure target Telegram bot handles.</p>
@@ -3092,6 +3096,7 @@ app.get(['/settings', '/setting', '/tg/settings', '/tg/setting', '/msm/settings'
             <select id="resolverSelect" onchange="onResolverChange()" class="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-sky-500/50">
               <option value="msm" ${savedSettings.activeResolver === 'msm' || !savedSettings.activeResolver ? 'selected' : ''}>MSM Bot (Inline Callbacks & Ad-Gate)</option>
               <option value="pencuri" ${savedSettings.activeResolver === 'pencuri' ? 'selected' : ''}>Pencuri Movie Bot (Search API & Mini App)</option>
+              <option value="kakifilem" ${savedSettings.activeResolver === 'kakifilem' ? 'selected' : ''}>Kakifilem Bot (Inline Buttons & Direct Media)</option>
             </select>
           </div>
 
@@ -3100,7 +3105,7 @@ app.get(['/settings', '/setting', '/tg/settings', '/tg/setting', '/msm/settings'
             <div class="flex gap-2">
               <div class="relative flex-1">
                 <span class="absolute left-3 top-2 text-slate-500 text-sm">@</span>
-                <input id="botInput" type="text" value="${savedSettings.activeResolver === 'pencuri' ? (savedSettings.targetBotUsernames?.pencuri || 'Pencuri_Movie_Bot') : (savedSettings.targetBotUsernames?.msm || BOT_USERNAME)}" placeholder="bot_username" class="w-full pl-7 pr-3 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-sm text-white focus:outline-none focus:border-sky-500/50" />
+                <input id="botInput" type="text" value="${savedSettings.activeResolver === 'kakifilem' ? (savedSettings.targetBotUsernames?.kakifilem || 'KakifilemBot') : (savedSettings.activeResolver === 'pencuri' ? (savedSettings.targetBotUsernames?.pencuri || 'Pencuri_Movie_Bot') : (savedSettings.targetBotUsernames?.msm || BOT_USERNAME))}" placeholder="bot_username" class="w-full pl-7 pr-3 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-sm text-white focus:outline-none focus:border-sky-500/50" />
               </div>
               <button id="saveBotBtn" onclick="saveBot()" class="px-4 py-1.5 bg-sky-500 hover:bg-sky-400 text-slate-950 font-semibold text-xs rounded-xl transition">
                 Save
@@ -3848,6 +3853,7 @@ app.get(['/settings', '/setting', '/tg/settings', '/tg/setting', '/msm/settings'
     const resolverBotDefaults = {
       msm: '${savedSettings.targetBotUsernames?.msm || BOT_USERNAME || "msm34bot"}',
       pencuri: '${savedSettings.targetBotUsernames?.pencuri || "Pencuri_Movie_Bot"}',
+      kakifilem: '${savedSettings.targetBotUsernames?.kakifilem || "KakifilemBot"}',
     };
 
     function updatePresets() {
@@ -3857,7 +3863,7 @@ app.get(['/settings', '/setting', '/tg/settings', '/tg/setting', '/msm/settings'
       const container = document.getElementById('quickPresets');
       if (!container) return;
       container.innerHTML = '';
-      const list = resolver === 'pencuri' ? ['Pencuri_Movie_Bot', 'UnOfficialsBot'] : ['msm34bot', 'msm32bot'];
+      const list = resolver === 'kakifilem' ? ['KakifilemBot'] : resolver === 'pencuri' ? ['Pencuri_Movie_Bot', 'UnOfficialsBot'] : ['msm34bot', 'msm32bot'];
       list.forEach((bot, idx) => {
         if (idx > 0) {
           const sep = document.createElement('span');
@@ -3875,7 +3881,7 @@ app.get(['/settings', '/setting', '/tg/settings', '/tg/setting', '/msm/settings'
 
     function onResolverChange() {
       const resolver = document.getElementById('resolverSelect').value;
-      document.getElementById('botInput').value = resolverBotDefaults[resolver] || (resolver === 'pencuri' ? 'Pencuri_Movie_Bot' : 'msm34bot');
+      document.getElementById('botInput').value = resolverBotDefaults[resolver] || (resolver === 'kakifilem' ? 'KakifilemBot' : (resolver === 'pencuri' ? 'Pencuri_Movie_Bot' : 'msm34bot'));
       updatePresets();
     }
 
@@ -3905,7 +3911,7 @@ app.get(['/settings', '/setting', '/tg/settings', '/tg/setting', '/msm/settings'
         const data = await res.json();
         if (data.success) {
           resolverBotDefaults[resolver] = val;
-          document.getElementById('botStatusPill').textContent = (resolver === 'pencuri' ? 'Pencuri: @' : 'MSM: @') + val;
+          document.getElementById('botStatusPill').textContent = (resolver === 'kakifilem' ? 'Kakifilem: @' : (resolver === 'pencuri' ? 'Pencuri: @' : 'MSM: @')) + val;
           const msg = document.getElementById('saveMsg');
           msg.classList.remove('hidden');
           setTimeout(() => msg.classList.add('hidden'), 3000);
@@ -4035,7 +4041,7 @@ app.get(['/api/debug-search', '/tg/api/debug-search', '/msm/api/debug-search'], 
       });
     }
 
-    // Default: MSM resolver via Telegram MTProto
+    // Telegram MTProto bot search (msm, kakifilem)
     await initTelegram();
     const sentMsg = await client.sendMessage(targetBot, { message: query });
     await new Promise(r => setTimeout(r, 2000));
@@ -4045,16 +4051,16 @@ app.get(['/api/debug-search', '/tg/api/debug-search', '/msm/api/debug-search'], 
       if (m.id > sentMsg.id && m.replyMarkup?.rows) {
         for (const row of m.replyMarkup.rows) {
           for (const btn of row.buttons) {
-            rawButtons.push({ text: btn.text, url: btn.url, className: btn.className, buttonId: btn.buttonId });
+            rawButtons.push({ text: btn.text, url: btn.url, className: btn.className, buttonId: btn.buttonId, data: btn.data ? btn.data.toString('base64') : undefined });
           }
         }
       }
     }
-    const buttons = formatDiagnosticResults(rawButtons, 'msm');
+    const buttons = formatDiagnosticResults(rawButtons, resolverId);
     res.json({
       success: true,
       query,
-      resolver: 'msm',
+      resolver: resolverId === 'kakifilem' ? 'kakifilem' : 'msm',
       targetBot,
       count: buttons.length,
       buttons,
@@ -4515,7 +4521,7 @@ app.get(['/api/resolve', '/tg/api/resolve', '/msm/api/resolve', '/api/prefetch',
     }
 
     const activeResolverId = String(req.query.resolver || savedSettings.activeResolver || 'msm').toLowerCase().trim();
-    const targetBotHandle = (req.query.bot || (savedSettings.targetBotUsernames && savedSettings.targetBotUsernames[activeResolverId]) || (activeResolverId === 'pencuri' ? 'Pencuri_Movie_Bot' : BOT_USERNAME)).replace(/^@/, '');
+    const targetBotHandle = (req.query.bot || (savedSettings.targetBotUsernames && savedSettings.targetBotUsernames[activeResolverId]) || (activeResolverId === 'pencuri' ? 'Pencuri_Movie_Bot' : (activeResolverId === 'kakifilem' ? 'KakifilemBot' : BOT_USERNAME))).replace(/^@/, '');
 
     console.log(`[${logPrefix}] Delegating to resolver "${activeResolverId}" with target bot @${targetBotHandle}`);
     const resolver = createResolver(activeResolverId, client, {
@@ -4704,6 +4710,7 @@ async function refreshDocumentFileReference(client, targetDoc) {
       candidateBots.add('UnOfficialsBot');
       candidateBots.add('guestmodebot');
       candidateBots.add('Pencuri_Movie_Bot');
+      candidateBots.add('KakifilemBot');
       candidateBots.add('msm34bot');
       candidateBots.add('msm32bot');
       botList = Array.from(candidateBots).filter(Boolean);

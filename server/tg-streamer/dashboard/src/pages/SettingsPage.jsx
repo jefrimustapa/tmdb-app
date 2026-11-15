@@ -58,7 +58,7 @@ export default function SettingsPage() {
   // Settings State
   const [settings, setSettings] = useState({
     activeResolver: 'msm',
-    targetBotUsernames: { msm: 'msm34bot', pencuri: 'Pencuri_Movie_Bot' },
+    targetBotUsernames: { msm: 'msm34bot', pencuri: 'Pencuri_Movie_Bot', kakifilem: 'KakifilemBot' },
     targetBotUsername: 'msm34bot',
     pipelineBuffers: { sd: 2, '720p': 4, '1080p': 6, '4k': 8 },
     overlapPrefetch: true,
@@ -91,6 +91,7 @@ export default function SettingsPage() {
           targetBotUsernames: d.targetBotUsernames || {
             msm: d.targetBotUsername || 'msm34bot',
             pencuri: 'Pencuri_Movie_Bot',
+            kakifilem: 'KakifilemBot',
           },
           targetBotUsername: d.targetBotUsername || 'msm34bot',
           pipelineBuffers: d.pipelineBuffers || { sd: 2, '720p': 4, '1080p': 6, '4k': 8 },
@@ -184,7 +185,7 @@ export default function SettingsPage() {
   const handleResolverChange = (newResolver) => {
     const defaultBot =
       settings.targetBotUsernames[newResolver] ||
-      (newResolver === 'pencuri' ? 'Pencuri_Movie_Bot' : 'msm34bot');
+      (newResolver === 'kakifilem' ? 'KakifilemBot' : (newResolver === 'pencuri' ? 'Pencuri_Movie_Bot' : 'msm34bot'));
     setSettings((prev) => ({
       ...prev,
       activeResolver: newResolver,
@@ -275,7 +276,9 @@ export default function SettingsPage() {
     settings.targetBotUsernames[settings.activeResolver] || settings.targetBotUsername || '';
 
   const resolverPresets =
-    settings.activeResolver === 'pencuri'
+    settings.activeResolver === 'kakifilem'
+      ? ['KakifilemBot']
+      : settings.activeResolver === 'pencuri'
       ? ['Pencuri_Movie_Bot', 'UnOfficialsBot']
       : ['msm34bot', 'msm32bot'];
 
@@ -292,7 +295,7 @@ export default function SettingsPage() {
           </Typography>
         </Box>
         <Chip
-          label={`${settings.activeResolver === 'pencuri' ? 'Pencuri' : 'MSM'}: @${currentBotHandle}`}
+          label={`${settings.activeResolver === 'kakifilem' ? 'Kakifilem' : (settings.activeResolver === 'pencuri' ? 'Pencuri' : 'MSM')}: @${currentBotHandle}`}
           color="primary"
           variant="outlined"
           sx={{
@@ -365,6 +368,7 @@ export default function SettingsPage() {
                   >
                     <MenuItem value="msm">MSM Bot (Inline Callbacks & Ad-Gate)</MenuItem>
                     <MenuItem value="pencuri">Pencuri Movie Bot (Search API & Mini App)</MenuItem>
+                    <MenuItem value="kakifilem">Kakifilem Bot (Inline Buttons & Direct Media)</MenuItem>
                   </TextField>
                 </Box>
 
