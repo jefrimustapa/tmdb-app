@@ -359,7 +359,17 @@ export default function LogsPage() {
             </Typography>
           ) : (
             filteredLogs.map((line, idx) => (
-              <Box key={idx} sx={{ color: getLineColor(line), py: 0.1 }}>
+              <Box
+                key={idx}
+                sx={{
+                  color: getLineColor(line),
+                  py: 0.6,
+                  pl: 1.25,
+                  borderLeft: '3px solid currentColor',
+                  borderBottom: idx === filteredLogs.length - 1 ? 'none' : '1px solid rgba(231,231,255,0.08)',
+                  '&:hover': { bgcolor: 'rgba(255,255,255,0.03)' },
+                }}
+              >
                 {line}
               </Box>
             ))
