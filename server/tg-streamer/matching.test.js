@@ -40,10 +40,12 @@ import {
   QuietLogger,
   attachClientErrorHandler,
   patchExportedSenderProtection,
+  client,
 } from './index.js';
 import { rotateLogFile, resetLogSizeCache, MAX_LOG_BYTES } from './logger.js';
 import {
   createResolver,
+  registerResolver,
   listResolvers,
   MsmResolver,
   PencuriResolver,
@@ -2874,29 +2876,42 @@ it('supports multi-episode cache replication and persistence in CentralDatabase 
   assert.strictEqual(dbReloaded.get(siblingKey, '720p'), undefined);
 });
 
-await itAsync('resolves combined episode via /api/resolve E2E HTTP client with identical docId for both episodes (#342)', async () => {
+await itAsync('resolves combined episode via live /api/resolve route and registers siblingKeys in db without manual seeding (#342)', async () => {
+  // Mock Telegram client session so initTelegram() succeeds without live network
+  if (!client.connected) {
+    Object.defineProperty(client, 'connected', { value: true, configurable: true, writable: true });
+    client.session = { authKey: 'mock-session-auth-key' };
+    client.connect = async () => {};
+    client.getMe = async () => ({ username: 'mockbot', firstName: 'MockBot' });
+  }
+
+  let currentDeliveredDoc = null;
+  class MockEpisodeResolver extends BaseResolver {
+    get id() { return 'mock-episode-resolver'; }
+    get name() { return 'Mock Episode Resolver'; }
+    get defaultBot() { return 'mockbot'; }
+
+    async resolve(ctx) {
+      if (!currentDeliveredDoc) return null;
+      return currentDeliveredDoc;
+    }
+  }
+  registerResolver('mock-episode-resolver', MockEpisodeResolver);
+
+  const origDbSet = db.set.bind(db);
+  const dbSetCalls = [];
+  db.set = function(key, data) {
+    dbSetCalls.push({ key, data: { ...data } });
+    return origDbSet(key, data);
+  };
+
   const testServer = http.createServer(app);
   await new Promise((resolve, reject) => {
     testServer.listen(0, '127.0.0.1', () => resolve());
     testServer.on('error', reject);
   });
   const port = testServer.address().port;
-
-  const docId = '554433221100';
-  const fileName = 'Mr.London.Ms.Langkawi.Ep03.&.04.720p.mp4';
-  const primaryKey = 'mr london ms langkawi s01e03';
-  const siblingKey = 'mr london ms langkawi s01e04';
-
-  // Seed Central DB as if Episode 3 was resolved from provider
-  db.set(primaryKey, {
-    docId,
-    filename: fileName,
-    size: String(380 * 1024 * 1024),
-    actualQuality: '720p',
-    requestedQualities: ['720p'],
-    bot: 'msm34bot',
-    altQueryKeys: [siblingKey],
-  });
+  const baseUrl = `http://127.0.0.1:${port}`;
 
   const getJson = (url) => new Promise((resolve, reject) => {
     http.get(url, (res) => {
@@ -2910,26 +2925,137 @@ await itAsync('resolves combined episode via /api/resolve E2E HTTP client with i
   });
 
   try {
-    // 1. Resolve Episode 3
-    const resEp3 = await getJson(`http://127.0.0.1:${port}/api/resolve?title=Mr%20London%20Ms%20Langkawi&season=1&episode=3&maxQuality=720`);
+    // 1 & 2. Resolve S01E03 with delivered combined file Ep03.&.04
+    const docId1 = '554433221100';
+    const fileName1 = 'Mr.London.Ms.Langkawi.Ep03.&.04.720p.mp4';
+    currentDeliveredDoc = {
+      document: {
+        id: docId1,
+        accessHash: '987654321',
+        fileReference: Buffer.from('deadbeef', 'hex'),
+        size: 380 * 1024 * 1024,
+        mimeType: 'video/mp4',
+        dcId: 4,
+        date: Math.floor(Date.now() / 1000),
+        attributes: [
+          { className: 'DocumentAttributeFilename', fileName: fileName1 },
+          { className: 'DocumentAttributeVideo', w: 1280, h: 720 },
+        ],
+      },
+      msgId: 301,
+      filename: fileName1,
+      tier: '720p',
+      bot: 'mockbot',
+    };
+    dbSetCalls.length = 0;
+
+    // Resolve Episode 3 via live route (uncached / real resolve path)
+    const resEp3 = await getJson(`${baseUrl}/api/resolve?title=Mr%20London%20Ms%20Langkawi&season=1&episode=3&maxQuality=720&resolver=mock-episode-resolver`);
     assert.strictEqual(resEp3.status, 200);
     assert.strictEqual(resEp3.data.success, true);
-    assert.strictEqual(resEp3.data.cached, true);
-    assert.strictEqual(resEp3.data.filename, fileName);
-    assert.ok(resEp3.data.streamUrl.includes(docId));
+    assert.strictEqual(resEp3.data.cached, false); // Real live resolve, not pre-seeded!
+    assert.strictEqual(resEp3.data.filename, fileName1);
+    assert.ok(resEp3.data.streamUrl.includes(docId1));
 
-    // 2. Resolve Episode 4 (the sibling combined episode)
-    const resEp4 = await getJson(`http://127.0.0.1:${port}/api/resolve?title=Mr%20London%20Ms%20Langkawi&season=1&episode=4&maxQuality=720`);
+    // Requirement 1: db.set receives altQueryKeys=['mr london ms langkawi s01e04'] when resolving S01E03
+    const call1 = dbSetCalls.find(c => c.key === 'mr london ms langkawi s01e03');
+    assert.ok(call1, 'db.set must be called for primary key "mr london ms langkawi s01e03"');
+    assert.deepStrictEqual(call1.data.altQueryKeys, ['mr london ms langkawi s01e04']);
+
+    // Requirement 2: Resolve S01E04 subsequently cache hits with same docId
+    const resEp4 = await getJson(`${baseUrl}/api/resolve?title=Mr%20London%20Ms%20Langkawi&season=1&episode=4&maxQuality=720`);
     assert.strictEqual(resEp4.status, 200);
     assert.strictEqual(resEp4.data.success, true);
-    assert.strictEqual(resEp4.data.cached, true);
-    assert.strictEqual(resEp4.data.filename, fileName);
-    assert.ok(resEp4.data.streamUrl.includes(docId));
-
-    // Both episodes point to the exact same streaming streamUrl and document!
+    assert.strictEqual(resEp4.data.cached, true); // Cache hit!
+    assert.strictEqual(resEp4.data.filename, fileName1);
+    assert.ok(resEp4.data.streamUrl.includes(docId1));
     assert.strictEqual(resEp3.data.streamUrl, resEp4.data.streamUrl);
+
+    db.deleteByDocId(docId1);
+
+    // Requirement 3: Boundary - Resolving S01E04 directly generates sibling S01E03
+    const docId2 = '665544332211';
+    const fileName2 = 'Mr.London.Ms.Langkawi.Ep03.&.04.720p.mp4';
+    currentDeliveredDoc = {
+      document: {
+        id: docId2,
+        accessHash: '123456789',
+        fileReference: Buffer.from('cafebabe', 'hex'),
+        size: 380 * 1024 * 1024,
+        mimeType: 'video/mp4',
+        dcId: 4,
+        date: Math.floor(Date.now() / 1000),
+        attributes: [
+          { className: 'DocumentAttributeFilename', fileName: fileName2 },
+          { className: 'DocumentAttributeVideo', w: 1280, h: 720 },
+        ],
+      },
+      msgId: 302,
+      filename: fileName2,
+      tier: '720p',
+      bot: 'mockbot',
+    };
+    dbSetCalls.length = 0;
+
+    const resEp4Direct = await getJson(`${baseUrl}/api/resolve?title=Mr%20London%20Ms%20Langkawi&season=1&episode=4&maxQuality=720&resolver=mock-episode-resolver`);
+    assert.strictEqual(resEp4Direct.status, 200);
+    assert.strictEqual(resEp4Direct.data.success, true);
+    assert.strictEqual(resEp4Direct.data.cached, false);
+
+    const call2 = dbSetCalls.find(c => c.key === 'mr london ms langkawi s01e04');
+    assert.ok(call2, 'db.set must be called for primary key "mr london ms langkawi s01e04"');
+    assert.deepStrictEqual(call2.data.altQueryKeys, ['mr london ms langkawi s01e03']);
+
+    // Subsequently S01E03 must cache hit with same docId
+    const resEp3Hit = await getJson(`${baseUrl}/api/resolve?title=Mr%20London%20Ms%20Langkawi&season=1&episode=3&maxQuality=720`);
+    assert.strictEqual(resEp3Hit.status, 200);
+    assert.strictEqual(resEp3Hit.data.success, true);
+    assert.strictEqual(resEp3Hit.data.cached, true);
+    assert.ok(resEp3Hit.data.streamUrl.includes(docId2));
+    assert.strictEqual(resEp4Direct.data.streamUrl, resEp3Hit.data.streamUrl);
+
+    db.deleteByDocId(docId2);
+
+    // Requirement 4: Single file does not generate sibling keys
+    const docId3 = '776655443322';
+    const fileName3 = 'Mr.London.Ms.Langkawi.Ep03.720p.mp4';
+    currentDeliveredDoc = {
+      document: {
+        id: docId3,
+        accessHash: '555666777',
+        fileReference: Buffer.from('feedface', 'hex'),
+        size: 350 * 1024 * 1024,
+        mimeType: 'video/mp4',
+        dcId: 4,
+        date: Math.floor(Date.now() / 1000),
+        attributes: [
+          { className: 'DocumentAttributeFilename', fileName: fileName3 },
+          { className: 'DocumentAttributeVideo', w: 1280, h: 720 },
+        ],
+      },
+      msgId: 303,
+      filename: fileName3,
+      tier: '720p',
+      bot: 'mockbot',
+    };
+    dbSetCalls.length = 0;
+
+    const resSingle = await getJson(`${baseUrl}/api/resolve?title=Mr%20London%20Ms%20Langkawi&season=1&episode=3&maxQuality=720&resolver=mock-episode-resolver`);
+    assert.strictEqual(resSingle.status, 200);
+    assert.strictEqual(resSingle.data.success, true);
+    assert.strictEqual(resSingle.data.cached, false);
+
+    const call3 = dbSetCalls.find(c => c.key === 'mr london ms langkawi s01e03');
+    assert.ok(call3, 'db.set must be called for primary key "mr london ms langkawi s01e03"');
+    assert.strictEqual(call3.data.altQueryKeys, undefined);
+
+    // S01E04 must not exist in cache
+    const hitEp4 = db.get('mr london ms langkawi s01e04', '720p');
+    assert.strictEqual(hitEp4, undefined, 'Single episode resolution must not populate sibling cache');
+
+    db.deleteByDocId(docId3);
   } finally {
-    db.deleteByDocId(docId);
+    db.set = origDbSet;
     await new Promise(resolve => testServer.close(resolve));
   }
 });
