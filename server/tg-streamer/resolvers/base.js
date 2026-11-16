@@ -424,7 +424,7 @@ export function isBareButton(text) {
   const clean = text
     .toLowerCase()
     .replace(/['’‘`]/g, '')
-    .replace(/[\[\]\(\)\{\}\-_:\|]/g, ' ')
+    .replace(/[\[\]\(\)\{\}\-_:\|.]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
   const tokens = clean.split(' ').filter(Boolean);
@@ -689,13 +689,23 @@ export function scoreCandidateWithReason(candidate, context = {}) {
   };
 }
 
-// Verify a document a provider bot actually delivered is the title/season/episode that was requested (#266).
+// Verify a document a provider bot actually delivered is the title/season/episode that was requested (#266, #346).
 // Providers can send the wrong file for a short code; only hard disqualifications (score -999) are rejected,
-// so weakly named but otherwise matching files are still accepted.
+// so weakly named but otherwise matching files are still accepted. TV documents require a valid episode indicator (#346).
 export function validateDeliveredDocument({ filename = '', caption = '', sizeBytes = null } = {}, context = {}) {
   const sizeMB = sizeBytes ? Number(sizeBytes) / (1024 * 1024) : null;
   const res = scoreCandidateWithReason({ text: filename, contextText: caption, sizeMB }, context);
-  return { ok: res.score > -999, score: res.score, reason: res.reason };
+  if (res.score <= -999) {
+    return { ok: false, score: res.score, reason: res.reason };
+  }
+  if (context?.isTv) {
+    const cleanCaption = caption ? cleanBotEchoHeader(caption) : '';
+    const epInfo = extractEpisodeInfo(filename) || (cleanCaption ? extractEpisodeInfo(cleanCaption) : null);
+    if (!epInfo) {
+      return { ok: false, score: -999, reason: 'missing episode indicator in TV delivered document' };
+    }
+  }
+  return { ok: true, score: res.score, reason: res.reason };
 }
 
 // Score a candidate download button against search context with detailed reason (delegates to scoreCandidateWithReason)

@@ -4458,13 +4458,13 @@ app.get(['/api/resolve', '/tg/api/resolve', '/msm/api/resolve', '/api/prefetch',
   }
 
   // 2. In-flight Request Deduplication: if another request is currently resolving this exact title, await it
-  if (inFlightResolutions.has(cacheKey)) {
-    console.log(`[${logPrefix}] In-flight deduplication: attaching to existing resolution for "${cacheKey}"`);
+  if (inFlightResolutions.has(inFlightKey)) {
+    console.log(`[${logPrefix}] In-flight deduplication: attaching to existing resolution for "${inFlightKey}"`);
     if (isPrefetch) {
       return res.json({ success: true, cached: false, inFlight: true });
     }
     try {
-      const result = await inFlightResolutions.get(cacheKey);
+      const result = await inFlightResolutions.get(inFlightKey);
       req.off('close', onClientClose);
       if (isAborted || res.writableEnded) return;
       const host = getPublicStreamHost(req);
@@ -4637,7 +4637,7 @@ app.get(['/api/resolve', '/tg/api/resolve', '/msm/api/resolve', '/api/prefetch',
       videoCodec: result.videoCodec || (isHevc ? 'hevc' : undefined),
     });
   } catch (err) {
-    inFlightResolutions.delete(cacheKey);
+    inFlightResolutions.delete(inFlightKey);
     if (!isPrefetch) {
       req.off('close', onClientClose);
     }
@@ -6248,6 +6248,7 @@ export {
   isJunkMedia,
   JUNK_MEDIA_REGEX,
   searchPencariApi,
+  inFlightResolutions,
   formatDiagnosticResults,
   formatFileSize,
 };
