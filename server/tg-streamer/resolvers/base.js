@@ -352,26 +352,49 @@ export function cleanBotEchoHeader(msgText) {
     .trim();
 }
 
-// Helper: Extract structured episode information from text
+// Helper: Extract structured episode information from text (supports single, combined, and range episodes)
 export function extractEpisodeInfo(text) {
   if (!text) return null;
   const s = String(text);
+  const resolutions = [360, 480, 540, 576, 720, 1080, 2160];
 
-  // 1. Episode range: Ep 01-16, E01-E10, Episod 1 - 20
-  const rangeMatch = s.match(/\b(?:s\d{1,2}\s*)?(?:e|ep|episod|episode)\.?\s*0*(\d{1,4})\s*(?:-|–|—|~|to)\s*(?:e|ep|episod|episode)?\.?\s*0*(\d{1,4})(?!\d)(?:\b|ends?|akhir|tamat|final)/i);
+  // 1. Combined episode formats:
+  // (a) Ampersand / plus / and / dan separator: Ep03.&.04, Ep03.&.Ep04, Ep03+04, Ep03 and 04, S01E03&E04, E03&04 (#342)
+  const combinedMatch = s.match(
+    /\b(?:s\d{1,2}\s*)?(?:e|ep|episod|episode)\.?\s*0*(\d{1,4})[\s\._]*(?:&|&amp;|\+|\band\b|\bdan\b)[\s\._]*(?:(?:s\d{1,2}\s*)?(?:e|ep|episod|episode)\.?\s*)?0*(\d{1,4})(?!\d)(?:\b|ends?|akhir|tamat|final|finale|credit|credits|special|sp|raw|v\d+|[a-z]?\b)/i
+  );
+  if (combinedMatch) {
+    const start = parseInt(combinedMatch[1], 10);
+    const end = parseInt(combinedMatch[2], 10);
+    if (!resolutions.includes(start) && !resolutions.includes(end) && start <= end) {
+      const episodes = [];
+      for (let i = start; i <= end && episodes.length <= 100; i++) episodes.push(i);
+      const isCombined = (end - start >= 1) && (end - start <= 2);
+      return { isRange: true, isCombined, start, end, episode: start, episodes };
+    }
+  }
+
+  // (b) Range / dash / to / scene glued: Ep 01-16 END, Ep03-04, Ep03-Ep04, S01E03-E04, S01E03E04, E03E04, S01E03-04 (#342)
+  const rangeMatch = s.match(
+    /\b(?:s\d{1,2}\s*)?(?:e|ep|episod|episode)\.?\s*0*(\d{1,4})\s*(?:(?:-|–|—|~|\bto\b)\s*(?:(?:s\d{1,2}\s*)?(?:e|ep|episod|episode)\.?\s*)?|(?:s\d{1,2}\s*)?(?:e|ep|episod|episode)\.?\s*)0*(\d{1,4})(?!\d)(?:\b|ends?|akhir|tamat|final|finale|credit|credits|special|sp|raw|v\d+|[a-z]?\b)/i
+  );
   if (rangeMatch) {
     const start = parseInt(rangeMatch[1], 10);
     const end = parseInt(rangeMatch[2], 10);
-    return { isRange: true, start, end, episode: start };
+    if (!resolutions.includes(start) && !resolutions.includes(end) && start <= end) {
+      const episodes = [];
+      for (let i = start; i <= end && episodes.length <= 100; i++) episodes.push(i);
+      const isCombined = (end - start >= 1) && (end - start <= 2);
+      return { isRange: true, isCombined, start, end, episode: start, episodes };
+    }
   }
 
   // 2. Standard episode tags: S01E16, E16, Ep 16, Episod 16, Episode 16, Ep. 16, S1 EP 16, EP10ends, EP10Credit
   const stdMatch = s.match(/\b(?:s\d{1,2}\s*)?(?:e|ep|episod|episode)\.?\s*0*(\d{1,4})(?!\d)(?:\b|ends?|akhir|tamat|final|finale|credit|credits|special|sp|raw|v\d+|[a-z]?\b)/i);
   if (stdMatch) {
     const num = parseInt(stdMatch[1], 10);
-    // Ignore resolution numbers like 360, 480, 540, 576, 720, 1080
-    if (![360, 480, 540, 576, 720, 1080, 2160].includes(num)) {
-      return { isRange: false, episode: num };
+    if (!resolutions.includes(num)) {
+      return { isRange: false, isCombined: false, episode: num, start: num, end: num, episodes: [num] };
     }
   }
 
@@ -379,9 +402,8 @@ export function extractEpisodeInfo(text) {
   const bracketMatch = s.match(/[\[\(]\s*0*(\d{1,3})\s*[\]\)]/);
   if (bracketMatch) {
     const num = parseInt(bracketMatch[1], 10);
-    // Ignore resolution numbers like 360, 480, 540, 576, 720, 1080
-    if (![360, 480, 540, 576, 720, 1080, 2160].includes(num)) {
-      return { isRange: false, episode: num };
+    if (!resolutions.includes(num)) {
+      return { isRange: false, isCombined: false, episode: num, start: num, end: num, episodes: [num] };
     }
   }
 
@@ -389,8 +411,8 @@ export function extractEpisodeInfo(text) {
   const dotNumMatch = s.match(/[\.\_\s]0*(\d{1,3})[\.\_\s]+(?:720p|1080p|480p|540p|360p|2160p|4k|web|bluray|hdrip|hdtv|x264|x265|hevc|mkv|mp4)/i);
   if (dotNumMatch) {
     const num = parseInt(dotNumMatch[1], 10);
-    if (![360, 480, 540, 576, 720, 1080, 2160].includes(num)) {
-      return { isRange: false, episode: num };
+    if (!resolutions.includes(num)) {
+      return { isRange: false, isCombined: false, episode: num, start: num, end: num, episodes: [num] };
     }
   }
 
@@ -579,7 +601,9 @@ export function scoreCandidateWithReason(candidate, context = {}) {
     if (epInfo) {
       if (epInfo.isRange) {
         if (eNum >= epInfo.start && eNum <= epInfo.end) {
-          score += 90;
+          // Combined episodes (span <= 2 or 3 episodes) receive near-single-episode score (+140),
+          // while large seasonal batches (span > 3) retain standard batch score (+90) (#342)
+          score += epInfo.isCombined ? 140 : 90;
         } else {
           return { score: -999, reason: `episode range [${epInfo.start}-${epInfo.end}] does not include episode ${eNum}` };
         }

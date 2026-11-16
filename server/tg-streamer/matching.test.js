@@ -4,7 +4,7 @@ import assert from 'assert';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { CentralDatabase } from './db.js';
+import { CentralDatabase, db } from './db.js';
 import {
   extractEpisodeInfo,
   extractSeasonInfo,
@@ -2658,6 +2658,279 @@ await itAsync('does not throw when a Mini App button adds a new bot to the poll 
   } finally {
     pencuriHttp.get = origGet;
     pencuriHttp.post = origPost;
+  }
+});
+
+console.log('\n37. Combined Episode Video Parsing, Scoring & Multi-Episode Cache Replication (#342)');
+
+it('extracts combined episode information across ampersand, plus, natural language, and scene formats', () => {
+  // Ampersand variations (GitHub #342)
+  const ep0304 = extractEpisodeInfo('Mr.London.Ms.Langkawi.Ep03.&.04.mp4');
+  assert.strictEqual(ep0304?.isRange, true);
+  assert.strictEqual(ep0304?.isCombined, true);
+  assert.strictEqual(ep0304?.start, 3);
+  assert.strictEqual(ep0304?.end, 4);
+  assert.deepStrictEqual(ep0304?.episodes, [3, 4]);
+
+  const ep1516 = extractEpisodeInfo('Mr.London.Ms.Langkawi.Ep15.&.16.Akhir.mp4');
+  assert.strictEqual(ep1516?.isRange, true);
+  assert.strictEqual(ep1516?.isCombined, true);
+  assert.strictEqual(ep1516?.start, 15);
+  assert.strictEqual(ep1516?.end, 16);
+  assert.deepStrictEqual(ep1516?.episodes, [15, 16]);
+
+  const epBothPrefix = extractEpisodeInfo('Show.Ep03.&.Ep04.mkv');
+  assert.strictEqual(epBothPrefix?.isCombined, true);
+  assert.strictEqual(epBothPrefix?.start, 3);
+  assert.strictEqual(epBothPrefix?.end, 4);
+
+  const epSpaces = extractEpisodeInfo('Show Ep03 & 04.mp4');
+  assert.strictEqual(epSpaces?.isCombined, true);
+  assert.strictEqual(epSpaces?.start, 3);
+  assert.strictEqual(epSpaces?.end, 4);
+
+  // Plus and natural language variations
+  const epPlus = extractEpisodeInfo('Show.Ep03+04.mp4');
+  assert.strictEqual(epPlus?.isCombined, true);
+  assert.strictEqual(epPlus?.start, 3);
+  assert.strictEqual(epPlus?.end, 4);
+
+  const epAnd = extractEpisodeInfo('Show Ep03 and 04.mp4');
+  assert.strictEqual(epAnd?.isCombined, true);
+  assert.strictEqual(epAnd?.start, 3);
+  assert.strictEqual(epAnd?.end, 4);
+
+  const epDan = extractEpisodeInfo('Show Ep03 dan 04.mp4');
+  assert.strictEqual(epDan?.isCombined, true);
+  assert.strictEqual(epDan?.start, 3);
+  assert.strictEqual(epDan?.end, 4);
+
+  // Scene standard and glued variations
+  const sceneDash = extractEpisodeInfo('Show.S01E03-E04.mp4');
+  assert.strictEqual(sceneDash?.isCombined, true);
+  assert.strictEqual(sceneDash?.start, 3);
+  assert.strictEqual(sceneDash?.end, 4);
+
+  const sceneGlued = extractEpisodeInfo('Show.S01E03E04.mp4');
+  assert.strictEqual(sceneGlued?.isCombined, true);
+  assert.strictEqual(sceneGlued?.start, 3);
+  assert.strictEqual(sceneGlued?.end, 4);
+
+  const sceneNumDash = extractEpisodeInfo('Show.S01E03-04.mp4');
+  assert.strictEqual(sceneNumDash?.isCombined, true);
+  assert.strictEqual(sceneNumDash?.start, 3);
+  assert.strictEqual(sceneNumDash?.end, 4);
+
+  const sceneAmp = extractEpisodeInfo('Show.S01E03&E04.mp4');
+  assert.strictEqual(sceneAmp?.isCombined, true);
+  assert.strictEqual(sceneAmp?.start, 3);
+  assert.strictEqual(sceneAmp?.end, 4);
+
+  // Dash & range variations
+  const epDash = extractEpisodeInfo('Show.Ep 03-04.mp4');
+  assert.strictEqual(epDash?.isCombined, true);
+  assert.strictEqual(epDash?.start, 3);
+  assert.strictEqual(epDash?.end, 4);
+
+  const epTo = extractEpisodeInfo('Show.Ep03 to 04.mp4');
+  assert.strictEqual(epTo?.isCombined, true);
+  assert.strictEqual(epTo?.start, 3);
+  assert.strictEqual(epTo?.end, 4);
+
+  // Distinguishes large seasonal batches from combined episodes
+  const fullSeason = extractEpisodeInfo('Hantu Punya Boss Ep 01-16 END');
+  assert.strictEqual(fullSeason?.isRange, true);
+  assert.strictEqual(fullSeason?.isCombined, false, '16-episode batch should not be flagged as combined');
+  assert.strictEqual(fullSeason?.start, 1);
+  assert.strictEqual(fullSeason?.end, 16);
+});
+
+it('scores combined episodes with high pass (+140) for both episodes and disqualifies boundary violations (BVA)', () => {
+  const contextEp3 = {
+    isTv: true,
+    title: 'Mr London Ms Langkawi',
+    sNum: 1,
+    eNum: 3,
+    totalSeasons: 1,
+    targetQuality: 720,
+  };
+  const contextEp4 = {
+    ...contextEp3,
+    eNum: 4,
+  };
+  const contextEp2 = {
+    ...contextEp3,
+    eNum: 2, // lower boundary violation
+  };
+  const contextEp5 = {
+    ...contextEp3,
+    eNum: 5, // upper boundary violation
+  };
+  const contextEp0 = {
+    ...contextEp3,
+    eNum: 0, // zero / invalid
+  };
+
+  const combinedCandidate = {
+    text: 'Mr.London.Ms.Langkawi.Ep03.&.04.720p.mp4',
+    sizeMB: 350,
+  };
+
+  // 1. Acceptance Criteria: Ep 3 and Ep 4 both score highly and are accepted
+  const resEp3 = scoreCandidateWithReason(combinedCandidate, contextEp3);
+  const resEp4 = scoreCandidateWithReason(combinedCandidate, contextEp4);
+  assert.ok(resEp3.score >= 300, `Ep 3 should score >= 300 (actual: ${resEp3.score})`);
+  assert.ok(resEp4.score >= 300, `Ep 4 should score >= 300 (actual: ${resEp4.score})`);
+
+  // 2. Boundary Value Analysis: Ep 2, Ep 5, Ep 0 are hard-disqualified (-999)
+  const resEp2 = scoreCandidateWithReason(combinedCandidate, contextEp2);
+  const resEp5 = scoreCandidateWithReason(combinedCandidate, contextEp5);
+  const resEp0 = scoreCandidateWithReason(combinedCandidate, contextEp0);
+  assert.strictEqual(resEp2.score, -999, 'Ep 2 outside [3-4] must be disqualified with -999');
+  assert.strictEqual(resEp5.score, -999, 'Ep 5 outside [3-4] must be disqualified with -999');
+  assert.strictEqual(resEp0.score, -999, 'Ep 0 outside [3-4] must be disqualified with -999');
+
+  // 3. Priority check: dedicated single episode is slightly prioritized over combined (+150 vs +140)
+  const singleCandidate = {
+    text: 'Mr.London.Ms.Langkawi.Ep03.720p.mp4',
+    sizeMB: 350,
+  };
+  const resSingle = scoreCandidateWithReason(singleCandidate, contextEp3);
+  assert.ok(resSingle.score > resEp3.score, 'Dedicated single episode candidate should score slightly higher than combined');
+
+  // 4. Batch vs Combined scoring check: seasonal batch gets +90, combined gets +140
+  const batchCandidate = {
+    text: 'Mr.London.Ms.Langkawi.Ep01-16.END.720p.mp4',
+    sizeMB: 3500,
+  };
+  const resBatch = scoreCandidateWithReason(batchCandidate, contextEp3);
+  assert.ok(resEp3.score > resBatch.score, 'Combined episode video should be prioritized over full-season batch');
+});
+
+it('validates delivered documents correctly for combined episodes (#342)', () => {
+  const contextEp3 = {
+    isTv: true,
+    title: 'Mr London Ms Langkawi',
+    sNum: 1,
+    eNum: 3,
+    targetQuality: 720,
+  };
+  const contextEp4 = { ...contextEp3, eNum: 4 };
+  const contextEp5 = { ...contextEp3, eNum: 5 };
+
+  const doc = {
+    filename: 'Mr.London.Ms.Langkawi.Ep03.&.04.mp4',
+    sizeBytes: 400 * 1024 * 1024,
+  };
+
+  const v3 = validateDeliveredDocument(doc, contextEp3);
+  const v4 = validateDeliveredDocument(doc, contextEp4);
+  const v5 = validateDeliveredDocument(doc, contextEp5);
+
+  assert.strictEqual(v3.ok, true, 'Delivered combined file must validate for Ep 3');
+  assert.strictEqual(v4.ok, true, 'Delivered combined file must validate for Ep 4');
+  assert.strictEqual(v5.ok, false, 'Delivered combined file must fail validation for Ep 5');
+});
+
+it('supports multi-episode cache replication and persistence in CentralDatabase (#342)', () => {
+  const db = new CentralDatabase(TEST_DB_FILE);
+  const docId = '998877665544';
+  const primaryKey = 'mr london ms langkawi s01e03';
+  const siblingKey = 'mr london ms langkawi s01e04';
+
+  // Save record with sibling altQueryKey
+  db.set(primaryKey, {
+    docId,
+    filename: 'Mr.London.Ms.Langkawi.Ep03.&.04.mp4',
+    size: String(450 * 1024 * 1024),
+    actualQuality: '720p',
+    requestedQualities: ['720p'],
+    bot: 'msm34bot',
+    altQueryKeys: [siblingKey],
+  });
+
+  // Verify instant Cache HIT on both primary and sibling query keys
+  const hitPrimary = db.get(primaryKey, '720p');
+  const hitSibling = db.get(siblingKey, '720p');
+  assert.ok(hitPrimary, 'Primary cache key must return cached record');
+  assert.ok(hitSibling, 'Sibling cache key must return cached record');
+  assert.strictEqual(hitPrimary.docId, docId);
+  assert.strictEqual(hitSibling.docId, docId);
+  assert.strictEqual(hitPrimary.filename, hitSibling.filename);
+
+  // Verify persistence and reload
+  db.saveSync();
+  const dbReloaded = new CentralDatabase(TEST_DB_FILE);
+  const hitReloadedPrimary = dbReloaded.get(primaryKey, '720p');
+  const hitReloadedSibling = dbReloaded.get(siblingKey, '720p');
+  assert.ok(hitReloadedPrimary, 'Primary cache key must persist across reloads');
+  assert.ok(hitReloadedSibling, 'Sibling cache key must persist across reloads');
+  assert.strictEqual(hitReloadedPrimary.docId, docId);
+  assert.strictEqual(hitReloadedSibling.docId, docId);
+
+  // Verify clean eviction sweeps both primary and sibling keys
+  dbReloaded.deleteByDocId(docId);
+  assert.strictEqual(dbReloaded.get(primaryKey, '720p'), undefined);
+  assert.strictEqual(dbReloaded.get(siblingKey, '720p'), undefined);
+});
+
+await itAsync('resolves combined episode via /api/resolve E2E HTTP client with identical docId for both episodes (#342)', async () => {
+  const testServer = http.createServer(app);
+  await new Promise((resolve, reject) => {
+    testServer.listen(0, '127.0.0.1', () => resolve());
+    testServer.on('error', reject);
+  });
+  const port = testServer.address().port;
+
+  const docId = '554433221100';
+  const fileName = 'Mr.London.Ms.Langkawi.Ep03.&.04.720p.mp4';
+  const primaryKey = 'mr london ms langkawi s01e03';
+  const siblingKey = 'mr london ms langkawi s01e04';
+
+  // Seed Central DB as if Episode 3 was resolved from provider
+  db.set(primaryKey, {
+    docId,
+    filename: fileName,
+    size: String(380 * 1024 * 1024),
+    actualQuality: '720p',
+    requestedQualities: ['720p'],
+    bot: 'msm34bot',
+    altQueryKeys: [siblingKey],
+  });
+
+  const getJson = (url) => new Promise((resolve, reject) => {
+    http.get(url, (res) => {
+      let body = '';
+      res.on('data', chunk => body += chunk);
+      res.on('end', () => {
+        try { resolve({ status: res.statusCode, data: JSON.parse(body) }); }
+        catch (e) { reject(e); }
+      });
+    }).on('error', reject);
+  });
+
+  try {
+    // 1. Resolve Episode 3
+    const resEp3 = await getJson(`http://127.0.0.1:${port}/api/resolve?title=Mr%20London%20Ms%20Langkawi&season=1&episode=3&maxQuality=720`);
+    assert.strictEqual(resEp3.status, 200);
+    assert.strictEqual(resEp3.data.success, true);
+    assert.strictEqual(resEp3.data.cached, true);
+    assert.strictEqual(resEp3.data.filename, fileName);
+    assert.ok(resEp3.data.streamUrl.includes(docId));
+
+    // 2. Resolve Episode 4 (the sibling combined episode)
+    const resEp4 = await getJson(`http://127.0.0.1:${port}/api/resolve?title=Mr%20London%20Ms%20Langkawi&season=1&episode=4&maxQuality=720`);
+    assert.strictEqual(resEp4.status, 200);
+    assert.strictEqual(resEp4.data.success, true);
+    assert.strictEqual(resEp4.data.cached, true);
+    assert.strictEqual(resEp4.data.filename, fileName);
+    assert.ok(resEp4.data.streamUrl.includes(docId));
+
+    // Both episodes point to the exact same streaming streamUrl and document!
+    assert.strictEqual(resEp3.data.streamUrl, resEp4.data.streamUrl);
+  } finally {
+    db.deleteByDocId(docId);
+    await new Promise(resolve => testServer.close(resolve));
   }
 });
 

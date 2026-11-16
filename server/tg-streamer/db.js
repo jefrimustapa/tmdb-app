@@ -183,6 +183,19 @@ export class CentralDatabase {
             this.byQuery.set(cleanKey, list);
           }
 
+          if (Array.isArray(r.altQueryKeys)) {
+            for (const altKey of r.altQueryKeys) {
+              const cleanAlt = this._stripQualitySuffix(altKey);
+              if (cleanAlt) {
+                const altList = this.byQuery.get(cleanAlt) || [];
+                if (!altList.some(doc => String(doc.docId) === docIdStr)) {
+                  altList.push(r);
+                }
+                this.byQuery.set(cleanAlt, altList);
+              }
+            }
+          }
+
           this.byDocId.set(docIdStr, r);
         }
         console.log(`[DB] Successfully loaded ${this.byQuery.size} queries (${this.byDocId.size} unique docs) from ${this.dbFile}`);
@@ -454,8 +467,13 @@ export class CentralDatabase {
 
     const combinedRequestedQualities = Array.from(new Set(rawList.map(q => this._normQuality(q)))).filter(Boolean);
 
+    const incomingAltKeys = Array.isArray(data.altQueryKeys) ? data.altQueryKeys.map(k => this._stripQualitySuffix(k)).filter(Boolean) : [];
+    const existingAltKeys = Array.isArray(existing?.altQueryKeys) ? existing.altQueryKeys : [];
+    const combinedAltKeys = Array.from(new Set([...existingAltKeys, ...incomingAltKeys])).filter(k => k && k !== cleanKey);
+
     const record = {
       queryKey: cleanKey || existing?.queryKey,
+      altQueryKeys: combinedAltKeys.length > 0 ? combinedAltKeys : undefined,
       docId: docIdStr,
       accessHash: String(data.accessHash || existing?.accessHash || ''),
       fileReference: String(data.fileReference || existing?.fileReference || ''),
@@ -498,6 +516,19 @@ export class CentralDatabase {
       this.byQuery.set(cleanKey, filtered);
     }
 
+    if (Array.isArray(record.altQueryKeys)) {
+      for (const altKey of record.altQueryKeys) {
+        const altList = this.byQuery.get(altKey) || [];
+        const altFiltered = altList.filter(r => {
+          if (String(r.docId) === docIdStr) return false;
+          if (normActualQuality && this._normQuality(r.actualQuality) === normActualQuality) return false;
+          return true;
+        });
+        altFiltered.push(record);
+        this.byQuery.set(altKey, altFiltered);
+      }
+    }
+
     this.save();
     console.log(`[DB] Persisted to central DB: "${cleanKey}" -> Doc ID: ${docIdStr} (${record.filename}) [act: ${record.actualQuality || '-'}, req: ${record.requestedQualities ? record.requestedQualities.join(',') : '-'}]`);
     return record;
@@ -537,17 +568,37 @@ export class CentralDatabase {
     const record = this.byDocId.get(docIdStr);
     if (!record) return false;
     this.byDocId.delete(docIdStr);
-    if (record.queryKey) {
-      const list = this.byQuery.get(record.queryKey);
+
+    const keysToClean = new Set();
+    if (record.queryKey) keysToClean.add(record.queryKey);
+    if (Array.isArray(record.altQueryKeys)) {
+      for (const k of record.altQueryKeys) keysToClean.add(k);
+    }
+
+    for (const qk of keysToClean) {
+      const list = this.byQuery.get(qk);
       if (list) {
         const filtered = list.filter(r => String(r.docId) !== docIdStr);
         if (filtered.length > 0) {
-          this.byQuery.set(record.queryKey, filtered);
+          this.byQuery.set(qk, filtered);
         } else {
-          this.byQuery.delete(record.queryKey);
+          this.byQuery.delete(qk);
         }
       }
     }
+
+    // Safety sweep in case any other list references this docId
+    for (const [qk, list] of this.byQuery.entries()) {
+      if (list.some(r => String(r.docId) === docIdStr)) {
+        const filtered = list.filter(r => String(r.docId) !== docIdStr);
+        if (filtered.length > 0) {
+          this.byQuery.set(qk, filtered);
+        } else {
+          this.byQuery.delete(qk);
+        }
+      }
+    }
+
     this.save();
     console.log(`[DB] Evicted record by Doc ID: ${docIdStr} ("${record.queryKey}")`);
     return true;
