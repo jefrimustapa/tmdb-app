@@ -350,13 +350,35 @@ export class CentralDatabase {
     return undefined;
   }
 
+  _isCompatibleQueryKey(keyA, keyB) {
+    if (keyA === keyB) return true;
+    const epRegex = /\b(?:s(\d{1,2})\s*)?e(?:p)?(\d{1,3})\b/i;
+    const matchA = keyA.match(epRegex);
+    const matchB = keyB.match(epRegex);
+    if (matchA || matchB) {
+      if (!matchA || !matchB) return false;
+      const sA = matchA[1] ? parseInt(matchA[1], 10) : 1;
+      const sB = matchB[1] ? parseInt(matchB[1], 10) : 1;
+      const eA = parseInt(matchA[2], 10);
+      const eB = parseInt(matchB[2], 10);
+      if (sA !== sB || eA !== eB) return false;
+    }
+    const yearRegex = /\b(19\d\d|20\d\d)\b/g;
+    const yearsA = keyA.match(yearRegex);
+    const yearsB = keyB.match(yearRegex);
+    if (yearsA && yearsB && yearsA[0] !== yearsB[0]) {
+      return false;
+    }
+    return true;
+  }
+
   getFallback(queryKey, requestedTier) {
     if (!queryKey) return undefined;
     const cleanKey = this._stripQualitySuffix(queryKey);
     let docs = this.byQuery.get(cleanKey);
     if (!docs || docs.length === 0) {
       for (const [qk, list] of this.byQuery.entries()) {
-        if (qk.startsWith(cleanKey) || cleanKey.startsWith(qk)) {
+        if ((qk.startsWith(cleanKey) || cleanKey.startsWith(qk)) && this._isCompatibleQueryKey(cleanKey, qk)) {
           docs = list;
           break;
         }

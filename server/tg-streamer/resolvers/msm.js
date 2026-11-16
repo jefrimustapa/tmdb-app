@@ -563,19 +563,23 @@ export class MsmResolver extends BaseResolver {
                 if (im.id > sentMsgId && im.media?.document && !rejectedMsgIds.has(im.id)) {
                   const doc = im.media.document;
                   const fnAttr = doc.attributes?.find(a => a.className === 'DocumentAttributeFilename');
-                  const docName = fnAttr ? fnAttr.fileName : (candidateFilename || queryTitle);
-                  // The bot can deliver the wrong file for a short code (#332, same class as #266);
+                  // Never spoof docName with candidateFilename or queryTitle when fnAttr is missing (#346).
+                  // Pass empty string (or fnAttr.fileName) so validateDeliveredDocument inspects caption/actual file.
+                  const docName = fnAttr ? fnAttr.fileName : '';
+                  // The bot can deliver the wrong file for a short code (#332, #346, same class as #266);
                   // never accept a document whose title/season/episode does not match the request.
                   const verdict = validateDeliveredDocument({ filename: docName, caption: im.message, sizeBytes: doc.size }, evalContext);
                   if (!verdict.ok) {
                     rejectedMsgIds.add(im.id);
-                    console.warn(`[MSM RESOLVE] REJECT delivered document "${docName}" for "${queryTitle}" (${verdict.reason}), ignoring`);
+                    const rejectDesc = docName || (im.message ? im.message.trim().split('\n')[0] : `doc_${doc.id}`);
+                    console.warn(`[MSM RESOLVE] REJECT delivered document "${rejectDesc}" for "${queryTitle}" (${verdict.reason}), ignoring`);
                     continue;
                   }
-                  console.log(`[MSM RESOLVE] ACCEPT delivered document "${docName}" (score: ${verdict.score}, ${verdict.reason})`);
+                  const resolvedName = docName || (im.message ? im.message.trim().split('\n')[0] : '') || candidateFilename || queryTitle;
+                  console.log(`[MSM RESOLVE] ACCEPT delivered document "${resolvedName}" (score: ${verdict.score}, ${verdict.reason})`);
                   candDeliveredDoc = doc;
                   candDeliveredMsgId = im.id;
-                  finalFilename = docName;
+                  finalFilename = resolvedName;
                   break;
                 }
               }
