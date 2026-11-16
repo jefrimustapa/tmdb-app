@@ -133,6 +133,7 @@ import {
   MsmResolver,
   PencuriResolver,
   createResolver,
+  registerResolver,
   listResolvers,
   getResolverClass,
   detectVideoQualityTier,
@@ -4577,6 +4578,23 @@ app.get(['/api/resolve', '/tg/api/resolve', '/msm/api/resolve', '/api/prefetch',
     const docIdStr = deliveredDoc.id.toString();
     const vAttr = deliveredDoc.attributes?.find(a => a.className === 'DocumentAttributeVideo');
 
+    // Register sibling query keys for multi-episode combined files (e.g. Ep03.&.04 covers both Ep3 and Ep4) (#342)
+    const siblingKeys = [];
+    if (isTv) {
+      const deliveredEpInfo = extractEpisodeInfo(filename) || (resolvedData.caption ? extractEpisodeInfo(resolvedData.caption) : null);
+      if (deliveredEpInfo && deliveredEpInfo.isCombined && Array.isArray(deliveredEpInfo.episodes)) {
+        for (const siblingEp of deliveredEpInfo.episodes) {
+          if (siblingEp !== eNum) {
+            const siblingTvTag = `S${String(sNum).padStart(2, '0')}E${String(siblingEp).padStart(2, '0')}`;
+            const siblingCacheKey = normalizeTitle(`${title} ${siblingTvTag}`);
+            if (siblingCacheKey && siblingCacheKey !== baseCacheKey && !siblingKeys.includes(siblingCacheKey)) {
+              siblingKeys.push(siblingCacheKey);
+            }
+          }
+        }
+      }
+    }
+
     const resolvedItem = db.set(baseCacheKey, {
       docId: docIdStr,
       msgId: deliveredMsgId,
@@ -4593,8 +4611,12 @@ app.get(['/api/resolve', '/tg/api/resolve', '/msm/api/resolve', '/api/prefetch',
       height: vAttr?.h ? Number(vAttr.h) : null,
       actualQuality: actualTier,
       requestedQualities: [requestedTier],
+      altQueryKeys: siblingKeys.length > 0 ? siblingKeys : undefined,
     });
     console.log(`[${logPrefix}] Successfully resolved "${queryTitle}" -> Doc ID: ${docIdStr} (${filename}) as "${baseCacheKey}" (tier: ${actualTier}, req: ${requestedTier})`);
+    if (siblingKeys.length > 0) {
+      console.log(`[${logPrefix}] Registered sibling combined episode cache key(s) [${siblingKeys.join(', ')}] for Doc ID: ${docIdStr} (${filename})`);
+    }
     return resolvedItem;
   });
 
@@ -6220,8 +6242,10 @@ export {
   MsmResolver,
   PencuriResolver,
   createResolver,
+  registerResolver,
   listResolvers,
   getResolverClass,
+  client,
   extractEpisodeInfo,
   extractSeasonInfo,
   cleanBotEchoHeader,
