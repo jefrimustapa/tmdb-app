@@ -40,6 +40,7 @@ import {
   QuietLogger,
   attachClientErrorHandler,
   patchExportedSenderProtection,
+  inFlightResolutions,
 } from './index.js';
 import { rotateLogFile, resetLogSizeCache, MAX_LOG_BYTES } from './logger.js';
 import {
@@ -2659,6 +2660,97 @@ await itAsync('does not throw when a Mini App button adds a new bot to the poll 
     pencuriHttp.get = origGet;
     pencuriHttp.post = origPost;
   }
+});
+
+console.log('\n37. MSM Delivered Document Validation & Prefetch Deduplication (#346)');
+
+it('rejects delivered document when filename is empty and caption is empty (#346)', () => {
+  const context = { isTv: true, title: 'Stranger Things', sNum: 1, eNum: 2, targetQuality: 1080, minTvSizeMb: 80 };
+  const v = validateDeliveredDocument({ filename: '', caption: '', sizeBytes: 500 * 1024 * 1024 }, context);
+  assert.strictEqual(v.ok, false);
+  assert.strictEqual(v.score, -999);
+  assert.ok(v.reason.includes('title coverage too low'));
+});
+
+it('rejects delivered document when filename has no title and caption has mismatched title (#346)', () => {
+  const context = { isTv: true, title: 'Stranger Things', sNum: 1, eNum: 2, targetQuality: 1080, minTvSizeMb: 80 };
+  const v = validateDeliveredDocument({
+    filename: '',
+    caption: 'Wednesday.S01E02.1080p.NF.WEB-DL.DDP5.1.x264.mkv',
+    sizeBytes: 800 * 1024 * 1024,
+  }, context);
+  assert.strictEqual(v.ok, false);
+  assert.strictEqual(v.score, -999);
+  assert.ok(v.reason.includes('title coverage too low'));
+});
+
+it('accepts delivered document when filename is empty but caption contains valid title and episode (#346)', () => {
+  const context = { isTv: true, title: 'Stranger Things', sNum: 1, eNum: 2, targetQuality: 1080, minTvSizeMb: 80 };
+  const v = validateDeliveredDocument({
+    filename: '',
+    caption: 'Stranger.Things.S01E02.1080p.NF.WEB-DL.x264.mkv',
+    sizeBytes: 800 * 1024 * 1024,
+  }, context);
+  assert.strictEqual(v.ok, true);
+  assert.ok(v.score > 0);
+});
+
+it('rejects TV delivered document when title matches but no episode indicator exists (#346)', () => {
+  const context = { isTv: true, title: 'Stranger Things', sNum: 1, eNum: 2, targetQuality: 1080, minTvSizeMb: 80 };
+  const v = validateDeliveredDocument({
+    filename: 'Stranger.Things.1080p.NF.WEB-DL.x264.mkv',
+    caption: '',
+    sizeBytes: 600 * 1024 * 1024,
+  }, context);
+  assert.strictEqual(v.ok, false);
+  assert.strictEqual(v.score, -999);
+  assert.ok(v.reason.includes('missing episode indicator in TV delivered document'));
+});
+
+it('isBareButton recognizes dot-separated filenames with bare keywords (#346)', () => {
+  assert.strictEqual(isBareButton('Episode.02.1080p.mkv'), true);
+  assert.strictEqual(isBareButton('EP.01.720p.WEB-DL.mp4'), true);
+  assert.strictEqual(isBareButton('video_987654321.mp4'), true);
+  assert.strictEqual(isBareButton('Stranger.Things.S01E02.1080p.mkv'), false);
+});
+
+it('inFlightResolutions key format is consistent between registration and lookup (#346)', () => {
+  const title = 'Stranger Things';
+  const tvTag = 'S01E02';
+  const baseCacheKey = normalizeTitle(`${title} ${tvTag}`);
+  const requestedTier = '1080p';
+  const inFlightKey = `${baseCacheKey}_${requestedTier}`;
+
+  const mockPromise = Promise.resolve({ docId: '123456789', filename: 'test.mkv' });
+  inFlightResolutions.set(inFlightKey, mockPromise);
+
+  assert.strictEqual(inFlightResolutions.has(inFlightKey), true);
+  assert.strictEqual(inFlightResolutions.get(inFlightKey), mockPromise);
+
+  inFlightResolutions.delete(inFlightKey);
+  assert.strictEqual(inFlightResolutions.has(inFlightKey), false);
+});
+
+it('db.getFallback does not cross-match across different episodes (#346)', () => {
+  const testDb = new CentralDatabase(TEST_DB_FILE);
+  testDb.set('stranger things s01e01', {
+    docId: '111111111',
+    queryKey: 'stranger things s01e01',
+    filename: 'Stranger.Things.S01E01.720p.mkv',
+    actualQuality: '720p',
+    requestedQualities: ['720p'],
+    size: 500 * 1024 * 1024,
+    botUsername: 'msm34bot',
+  });
+
+  // Querying for episode 2 should NOT fall back to episode 1
+  const fallbackEp2 = testDb.getFallback('stranger things s01e02', '1080p');
+  assert.strictEqual(fallbackEp2, undefined, 'Fallback for S01E02 must not return S01E01');
+
+  // Querying for episode 1 with 1080p SHOULD fall back to 720p of episode 1
+  const fallbackEp1 = testDb.getFallback('stranger things s01e01', '1080p');
+  assert.ok(fallbackEp1, 'Fallback for S01E01 1080p should find 720p entry');
+  assert.strictEqual(fallbackEp1.docId, '111111111');
 });
 
 // Clean up temporary test files (pending debounced saves are flushed first by waiting them out)
