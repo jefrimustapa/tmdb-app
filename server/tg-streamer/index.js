@@ -11,6 +11,9 @@ import { TelegramClient, Api } from 'telegram';
 import { StringSession } from 'telegram/sessions/index.js';
 import { ConnectionTCPObfuscated } from 'telegram/network/connection/TCPObfuscated.js';
 import { Logger } from 'telegram/extensions/Logger.js';
+import { MTProtoSender } from 'telegram/network/MTProtoSender.js';
+import { BinaryReader } from 'telegram/extensions/BinaryReader.js';
+import { TypeNotFoundError } from 'telegram/errors/index.js';
 import bigInt from 'big-integer';
 import axios from 'axios';
 import fs from 'fs';
@@ -35,7 +38,9 @@ export function isTransientTelegramError(err) {
     msg.includes('hanging states') ||
     msg.includes('WebSocket connection failed') ||
     msg.includes('invalid new nonce hash') ||
-    msg.includes('SecurityError')
+    msg.includes('SecurityError') ||
+    msg.includes('readUInt32LE') ||
+    msg.includes('CONNECTION_NOT_INITED')
   );
 }
 
@@ -313,6 +318,79 @@ export function patchExportedSenderProtection(c) {
   };
 }
 
+export function patchGramJSProtection() {
+  // 1. BinaryReader hardening (Issue #355: prevent TypeError: Cannot read properties of undefined (reading 'readUInt32LE'))
+  if (BinaryReader?.prototype && !BinaryReader.prototype.__patched_issue_355) {
+    BinaryReader.prototype.__patched_issue_355 = true;
+    const originalReadInt = BinaryReader.prototype.readInt;
+    BinaryReader.prototype.readInt = function(signed = true) {
+      if (!this.stream || !Buffer.isBuffer(this.stream)) {
+        this.stream = Buffer.alloc(0);
+      }
+      if (this.offset + 4 > this.stream.length) {
+        this.offset += 4;
+        return 0;
+      }
+      return originalReadInt.call(this, signed);
+    };
+
+    const originalRead = BinaryReader.prototype.read;
+    BinaryReader.prototype.read = function(length = -1, checkLength = true) {
+      if (!this.stream || !Buffer.isBuffer(this.stream)) {
+        this.stream = Buffer.alloc(0);
+      }
+      if (this.offset < 0) this.offset = 0;
+      return originalRead.call(this, length, checkLength);
+    };
+  }
+
+  // 2. MTProtoSender._handleRPCResult hardening (Issue #355)
+  if (MTProtoSender?.prototype && !MTProtoSender.prototype.__patched_issue_355) {
+    MTProtoSender.prototype.__patched_issue_355 = true;
+    const originalHandleRPCResult = MTProtoSender.prototype._handleRPCResult;
+
+    MTProtoSender.prototype._handleRPCResult = function(message) {
+      const result = message?.obj;
+      if (!result) return;
+
+      const hasState = this._pendingState ? Boolean(this._pendingState.get(result.reqMsgId)) : false;
+      if (hasState) {
+        return originalHandleRPCResult.call(this, message);
+      }
+
+      // No pending request in flight (unparented response or arrived post-disconnect/cleanup)
+      this._pendingState?.delete?.(result.reqMsgId);
+      this._log?.debug?.(`Handling RPC result for message ${result.reqMsgId} (no pending state)`);
+
+      // If Telegram returned an RPC error (e.g. CONNECTION_NOT_INITED), result.body is undefined.
+      // Cleanly log and return without attempting binary TL deserialization.
+      if (result.error) {
+        this._log?.debug?.(`Received RPC error without parent request for message ${result.reqMsgId}: ${result.error?.errorMessage || result.error?.errorCode}`);
+        return;
+      }
+
+      // If result.body is missing, not a buffer, or too short for a 4-byte TL constructor ID
+      if (!result.body || !Buffer.isBuffer(result.body) || result.body.length < 4) {
+        this._log?.info?.(`Received response without parent request or invalid body: ${result.body}`);
+        return;
+      }
+
+      try {
+        const reader = new BinaryReader(result.body);
+        if (!(reader.tgReadObject() instanceof Api.upload.File)) {
+          throw new TypeNotFoundError(0, Buffer.alloc(0));
+        }
+      } catch (e) {
+        // Catch all errors (TypeNotFoundError, TypeError, RangeError, etc.) to prevent unhandled crash in _recvLoop
+        this._log?.info?.(`Received response without parent request: ${result.body}`);
+        return;
+      }
+      return;
+    };
+  }
+}
+patchGramJSProtection();
+
 export function attachClientErrorHandler(c) {
   if (!c) return;
   c.onError = (err) => {
@@ -322,6 +400,7 @@ export function attachClientErrorHandler(c) {
     console.error('[TG CLIENT ERROR]', err);
   };
   patchExportedSenderProtection(c);
+  patchGramJSProtection();
 }
 attachClientErrorHandler(client);
 
@@ -5120,7 +5199,8 @@ async function streamTelegramPipelined(client, targetDoc, startByte, endByte, re
         msg.includes('disconnected') ||
         msg.includes('Not connected') ||
         msg.includes('invalid new nonce hash') ||
-        msg.includes('SecurityError')
+        msg.includes('SecurityError') ||
+        msg.includes('readUInt32LE')
       ) {
         const isNonceErr = msg.includes('invalid new nonce hash') || msg.includes('SecurityError');
         if (isNonceErr) {

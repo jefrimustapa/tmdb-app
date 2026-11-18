@@ -6,7 +6,7 @@
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "test": "TG_API_ID=${TG_API_ID:-12345} TG_API_HASH=${TG_API_HASH:-abcdef1234567890abcdef1234567890} node matching.test.js && node dashboard.test.js",
+    "test": "TG_API_ID=${TG_API_ID:-12345} TG_API_HASH=${TG_API_HASH:-abcdef1234567890abcdef1234567890} node matching.test.js && node dashboard.test.js && node issue355.test.js",
     "test-bot": "node test-bot.js",
     "login": "node login.js"
   },
