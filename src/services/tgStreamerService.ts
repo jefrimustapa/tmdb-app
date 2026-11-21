@@ -18,6 +18,8 @@ export interface TgStreamerResolveResult {
   /** Real audio codec / channel count of the chosen track (server probe), used to pick the audio transcode. */
   audioCodec?: string;
   audioChannels?: number;
+  hasMultipleAudio?: boolean;
+  audioTrackCount?: number;
 }
 
 export type MsmResolveResult = TgStreamerResolveResult;
@@ -323,8 +325,11 @@ class TgStreamerService {
           filename: data.filename,
           size: data.size,
           cached: data.cached,
+          videoCodec: data.videoCodec,
           audioCodec: data.audioCodec,
           audioChannels: data.audioChannels,
+          hasMultipleAudio: data.hasMultipleAudio,
+          audioTrackCount: data.audioTrackCount,
         };
         return resolved;
       }

@@ -638,15 +638,32 @@ export class CentralDatabase {
     return false;
   }
 
-  updateAudioInfo(docId, audioCodec, audioChannels) {
+  updateAudioInfo(docId, audioCodec, audioChannels, audioTrackCount, hasMultipleAudio) {
     const docIdStr = String(docId);
     const existing = this.byDocId.get(docIdStr);
-    if (existing && audioCodec && (existing.audioCodec !== audioCodec || existing.audioChannels !== audioChannels)) {
-      existing.audioCodec = audioCodec;
-      existing.audioChannels = audioChannels || undefined;
-      this.save();
-      console.log(`[DB] Updated audio for doc ${docIdStr}: ${audioCodec} (${audioChannels || '?'}ch)`);
-      return true;
+    if (existing) {
+      let changed = false;
+      if (audioCodec && existing.audioCodec !== audioCodec) {
+        existing.audioCodec = audioCodec;
+        changed = true;
+      }
+      if (audioChannels !== undefined && existing.audioChannels !== audioChannels) {
+        existing.audioChannels = audioChannels || undefined;
+        changed = true;
+      }
+      if (audioTrackCount !== undefined && existing.audioTrackCount !== audioTrackCount) {
+        existing.audioTrackCount = audioTrackCount;
+        changed = true;
+      }
+      if (hasMultipleAudio !== undefined && existing.hasMultipleAudio !== hasMultipleAudio) {
+        existing.hasMultipleAudio = hasMultipleAudio;
+        changed = true;
+      }
+      if (changed) {
+        this.save();
+        console.log(`[DB] Updated audio for doc ${docIdStr}: ${existing.audioCodec || 'none'} (${existing.audioChannels || '?'}ch, tracks=${existing.audioTrackCount ?? '?'}, multi=${existing.hasMultipleAudio ?? '?'})`);
+        return true;
+      }
     }
     return false;
   }
