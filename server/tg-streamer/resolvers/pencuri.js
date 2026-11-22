@@ -38,17 +38,65 @@ export const pencuriHttp = axios.create({
   timeout: 15000,
 });
 
+// Check if error is transient network or DNS failure eligible for retry
+export function isTransientNetworkError(err) {
+  if (!err) return false;
+  const code = err.code || err.cause?.code;
+  const msg = `${err.message || ''} ${err.cause?.message || ''}`;
+  if (
+    code === 'ECONNABORTED' ||
+    code === 'ETIMEDOUT' ||
+    code === 'ECONNRESET' ||
+    code === 'EAI_AGAIN' ||
+    code === 'ENOTFOUND' ||
+    msg.includes('EAI_AGAIN') ||
+    msg.includes('ETIMEDOUT') ||
+    msg.includes('ECONNRESET') ||
+    msg.includes('ENOTFOUND') ||
+    msg.includes('ECONNABORTED')
+  ) {
+    return true;
+  }
+  if (err.response && err.response.status >= 500) {
+    return true;
+  }
+  return false;
+}
+
+// HTTP request with automatic retry and backoff for transient DNS & network errors
+export async function axiosWithRetry(fn, desc = 'HTTP Request', maxRetries = 2, delayMs = 300) {
+  let lastErr;
+  for (let attempt = 1; attempt <= maxRetries + 1; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      lastErr = err;
+      if (attempt <= maxRetries && isTransientNetworkError(err)) {
+        console.warn(`[PENCURI RETRY] ${desc} attempt ${attempt} failed (${err.code || err.message}). Retrying in ${delayMs}ms...`);
+        await new Promise(r => setTimeout(r, delayMs));
+        delayMs = Math.round(delayMs * 1.5);
+      } else {
+        throw err;
+      }
+    }
+  }
+  throw lastErr;
+}
+
 // Search files directly from PencariMovie public search API
 export async function searchPencariApi(query) {
   try {
     const encoded = encodeURIComponent(query);
     const url = `https://unofficialsbot.pencarimovie.com/wp-admin/admin-ajax.php?action=stream_search_files&search=${encoded}`;
-    const res = await pencuriHttp.get(url, {
-      timeout: 20000,
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-      },
-    });
+    const res = await axiosWithRetry(
+      () => pencuriHttp.get(url, {
+        timeout: 20000,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        },
+      }),
+      `searchPencariApi("${query}")`
+    );
     if (res.data && res.data.success && Array.isArray(res.data.data?.files)) {
       return res.data.data.files;
     }
@@ -61,14 +109,17 @@ export async function searchPencariApi(query) {
 // Extract bot parameters from PencariMovie link page
 export async function fetchPencariLinkDetails(linkUrl) {
   try {
-    const res = await pencuriHttp.get(linkUrl, {
-      timeout: 5000,
-      maxRedirects: 5,
-      headers: {
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-      },
-    });
+    const res = await axiosWithRetry(
+      () => pencuriHttp.get(linkUrl, {
+        timeout: 5000,
+        maxRedirects: 5,
+        headers: {
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        },
+      }),
+      `fetchPencariLinkDetails(${linkUrl})`
+    );
     const html = res.data || '';
 
     // Extract bot username and start param (e.g. https://t.me/UnOfficialsBot?start=WLLs8k-8665550029-0)
@@ -147,13 +198,16 @@ export async function triggerMiniAppDelivery(client, { deliveryBot, shortCode, m
     let actualBotId = defaultBotId;
 
     try {
-      const webappRes = await pencuriHttp.get(`${domain}/webapp?tgWebAppStartParam=${finalStartParam}`, {
-        headers: {
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-          'User-Agent': 'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36',
-        },
-        timeout: 15000,
-      });
+      const webappRes = await axiosWithRetry(
+        () => pencuriHttp.get(`${domain}/webapp?tgWebAppStartParam=${finalStartParam}`, {
+          headers: {
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'User-Agent': 'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36',
+          },
+          timeout: 15000,
+        }),
+        `triggerMiniAppDelivery /webapp`
+      );
       const webappHtml = webappRes.data || '';
       const rawRedirectMatch = webappHtml.match(/var\s+redirectUrl\s*=\s*["']([^"']+)["']/i);
       if (rawRedirectMatch) redirectUrl = JSON.parse(`"${rawRedirectMatch[1]}"`);
@@ -176,13 +230,16 @@ export async function triggerMiniAppDelivery(client, { deliveryBot, shortCode, m
       platform: 'android',
     });
 
-    const loginRes = await pencuriHttp.post(`${domain}/wp-admin/admin-ajax.php`, loginFd.toString(), {
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'User-Agent': 'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36',
-      },
-      timeout: 15000,
-    });
+    const loginRes = await axiosWithRetry(
+      () => pencuriHttp.post(`${domain}/wp-admin/admin-ajax.php`, loginFd.toString(), {
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'User-Agent': 'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36',
+        },
+        timeout: 15000,
+      }),
+      `triggerMiniAppDelivery telegram_login`
+    );
 
     const loginData = loginRes.data;
     if (!loginData || !loginData.success) {
@@ -196,19 +253,22 @@ export async function triggerMiniAppDelivery(client, { deliveryBot, shortCode, m
     if (loginData.data?.redirect) redirectUrl = loginData.data.redirect;
 
     // 4. Call save_write_access
-    await pencuriHttp.post(`${domain}/wp-admin/admin-ajax.php`, new URLSearchParams({
-      action: 'save_write_access',
-      bot_id: actualBotId,
-      user_id: String(userId),
-      granted: '1',
-    }).toString(), {
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'User-Agent': 'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36',
-        'Cookie': cookies,
-      },
-      timeout: 10000,
-    }).catch(() => {});
+    await axiosWithRetry(
+      () => pencuriHttp.post(`${domain}/wp-admin/admin-ajax.php`, new URLSearchParams({
+        action: 'save_write_access',
+        bot_id: actualBotId,
+        user_id: String(userId),
+        granted: '1',
+      }).toString(), {
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'User-Agent': 'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36',
+          'Cookie': cookies,
+        },
+        timeout: 10000,
+      }),
+      `triggerMiniAppDelivery save_write_access`
+    ).catch(() => {});
 
     if (checkAborted && checkAborted()) return false;
 
@@ -216,14 +276,17 @@ export async function triggerMiniAppDelivery(client, { deliveryBot, shortCode, m
     const linkFullUrl = `${domain}${redirectUrl}`;
     let nonce = '686bac635e';
     try {
-      const pageRes = await pencuriHttp.get(linkFullUrl, {
-        headers: {
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-          'User-Agent': 'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36',
-          'Cookie': cookies,
-        },
-        timeout: 15000,
-      });
+      const pageRes = await axiosWithRetry(
+        () => pencuriHttp.get(linkFullUrl, {
+          headers: {
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'User-Agent': 'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36',
+            'Cookie': cookies,
+          },
+          timeout: 15000,
+        }),
+        `triggerMiniAppDelivery link page`
+      );
       const pageHtml = pageRes.data || '';
       const nonceMatch = pageHtml.match(/formData\.append\('wp_nonce',\s*["']([^"']+)["']\)/i) ||
                          pageHtml.match(/wp_nonce["']?\s*:\s*["']([^"']+)["']/i) ||
@@ -244,15 +307,18 @@ export async function triggerMiniAppDelivery(client, { deliveryBot, shortCode, m
       bot_id: actualBotId,
     });
 
-    const sendRes = await pencuriHttp.post(`${domain}/wp-admin/admin-ajax.php`, sendFd.toString(), {
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'User-Agent': 'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36',
-        'Referer': linkFullUrl,
-        'Cookie': cookies,
-      },
-      timeout: 15000,
-    });
+    const sendRes = await axiosWithRetry(
+      () => pencuriHttp.post(`${domain}/wp-admin/admin-ajax.php`, sendFd.toString(), {
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'User-Agent': 'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36',
+          'Referer': linkFullUrl,
+          'Cookie': cookies,
+        },
+        timeout: 15000,
+      }),
+      `triggerMiniAppDelivery sendtgfile`
+    );
 
     const sendData = sendRes.data;
     console.log(`[PENCURI MINI-APP] sendtgfile response:`, JSON.stringify(sendData));

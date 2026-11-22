@@ -51,6 +51,8 @@ import {
   MsmResolver,
   PencuriResolver,
   pencuriHttp,
+  searchPencariApi,
+  fetchPencariLinkDetails,
   BaseResolver,
   formatDiagnosticResults,
   formatFileSize,
@@ -3150,6 +3152,76 @@ it('db.getFallback does not cross-match across different episodes (#346)', () =>
   const fallbackEp1 = testDb.getFallback('stranger things s01e01', '1080p');
   assert.ok(fallbackEp1, 'Fallback for S01E01 1080p should find 720p entry');
   assert.strictEqual(fallbackEp1.docId, '111111111');
+});
+
+console.log('\n39. Pencuri Transient DNS / Network Retry BVA (#359)');
+
+await itAsync('searchPencariApi retries on transient getaddrinfo EAI_AGAIN and succeeds on attempt 2', async () => {
+  const origGet = pencuriHttp.get;
+  let attempts = 0;
+  pencuriHttp.get = async (url) => {
+    attempts++;
+    if (attempts === 1) {
+      const dnsErr = new Error('getaddrinfo EAI_AGAIN unofficialsbot.pencarimovie.com');
+      dnsErr.code = 'EAI_AGAIN';
+      throw dnsErr;
+    }
+    return {
+      data: {
+        success: true,
+        data: {
+          files: [{ id: 101, title: 'Test.Movie.2026.1080p.mkv', file_size: 1000000, short_code: 'TEST01' }],
+        },
+      },
+    };
+  };
+
+  try {
+    const results = await searchPencariApi('Test Movie');
+    assert.strictEqual(attempts, 2, 'Should have made exactly 2 attempts');
+    assert.strictEqual(results.length, 1, 'Should successfully return files on second attempt');
+    assert.strictEqual(results[0].short_code, 'TEST01');
+  } finally {
+    pencuriHttp.get = origGet;
+  }
+});
+
+await itAsync('searchPencariApi returns empty array gracefully after max retries fail with EAI_AGAIN', async () => {
+  const origGet = pencuriHttp.get;
+  let attempts = 0;
+  pencuriHttp.get = async () => {
+    attempts++;
+    const dnsErr = new Error('getaddrinfo EAI_AGAIN unofficialsbot.pencarimovie.com');
+    dnsErr.code = 'EAI_AGAIN';
+    throw dnsErr;
+  };
+
+  try {
+    const results = await searchPencariApi('Persistent Failure');
+    assert.strictEqual(attempts, 3, 'Should have made initial attempt + 2 retries = 3 attempts total');
+    assert.deepStrictEqual(results, [], 'Should safely return empty array on persistent failure');
+  } finally {
+    pencuriHttp.get = origGet;
+  }
+});
+
+await itAsync('fetchPencariLinkDetails aborts immediately without retries on non-transient HTTP 404', async () => {
+  const origGet = pencuriHttp.get;
+  let attempts = 0;
+  pencuriHttp.get = async () => {
+    attempts++;
+    const err = new Error('Request failed with status code 404');
+    err.response = { status: 404 };
+    throw err;
+  };
+
+  try {
+    const res = await fetchPencariLinkDetails('https://pencarimovie.com/link/DEAD404');
+    assert.strictEqual(attempts, 1, 'Should make exactly 1 attempt and NOT retry 404 errors');
+    assert.ok(res && res.notFound === true, 'Should mark candidate as notFound: true');
+  } finally {
+    pencuriHttp.get = origGet;
+  }
 });
 
 // Clean up temporary test files (pending debounced saves are flushed first by waiting them out)
