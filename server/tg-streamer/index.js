@@ -5559,6 +5559,8 @@ async function resolveMediaDetails(docId, parentSessionKey) {
           const isLegacyVideo = /^(mpeg4|msmpeg4v3|wmv3|flv1|vp6f)$/i.test(videoCodec);
 
           const audioStreams = data.streams?.filter(s => s.codec_type === 'audio') || [];
+          const audioTrackCount = audioStreams.length;
+          const hasMultipleAudio = audioTrackCount > 1;
           let audioSpec = '0:a:0';
           if (audioStreams.length === 1) {
             audioSpec = `0:${audioStreams[0].index}`;
@@ -5566,7 +5568,7 @@ async function resolveMediaDetails(docId, parentSessionKey) {
             const engStream = audioStreams.find(s => {
               const lang = String(s.tags?.language || '').toLowerCase();
               const title = String(s.tags?.title || '').toLowerCase();
-              return /^(en|eng|english)$/.test(lang) || /\b(eng|english|original|orig)\b/.test(title);
+              return /^(en|eng|english|en-.*)$/i.test(lang) || /\b(eng|english|original|orig)\b/i.test(title);
             });
             if (engStream) {
               audioSpec = `0:${engStream.index}`;
@@ -5587,14 +5589,14 @@ async function resolveMediaDetails(docId, parentSessionKey) {
           if (videoCodec) {
             db.updateVideoCodec(docId, videoCodec);
           }
-          if (audioCodec) {
-            db.updateAudioInfo(docId, audioCodec, audioChannels);
+          if (audioCodec || hasMultipleAudio !== undefined) {
+            db.updateAudioInfo(docId, audioCodec, audioChannels, audioTrackCount, hasMultipleAudio);
           }
           if (height) {
             db.updateVideoDimensions(docId, width, height);
           }
 
-          console.log(`[MEDIA PROBE] Doc ${docId} probed: videoCodec=${videoCodec || 'none'} (isHevc: ${isHevc}), dimensions=${width}x${height}, audioTrack=${audioSpec}, audioCodec=${audioCodec || 'none'} (${audioChannels || '?'}ch)`);
+          console.log(`[MEDIA PROBE] Doc ${docId} probed: videoCodec=${videoCodec || 'none'} (isHevc: ${isHevc}), dimensions=${width}x${height}, audioTrack=${audioSpec}, audioCodec=${audioCodec || 'none'} (${audioChannels || '?'}ch, tracks=${audioTrackCount}, multi=${hasMultipleAudio})`);
           return resolve({
             audioMapSpecifier: audioSpec,
             videoCodec,
@@ -5604,6 +5606,8 @@ async function resolveMediaDetails(docId, parentSessionKey) {
             height,
             audioCodec,
             audioChannels,
+            audioTrackCount,
+            hasMultipleAudio,
           });
         } catch (err) {
           reject(err);
@@ -5629,20 +5633,32 @@ async function resolveMediaDetails(docId, parentSessionKey) {
       videoCodec: '',
       isHevc: false,
       isLegacyVideo: false,
+      audioTrackCount: 0,
+      hasMultipleAudio: false,
     };
   }
 }
 
-// Real audio codec of a doc for the resolve response, so the client can pick the audio transcode even when the
-// filename gives no hint (#284). Uses the DB record when known, otherwise probes once. Failures keep the defaults.
+// Real audio codec and multi-audio details of a doc for the resolve response, so the client can pick the audio transcode
+// even when the filename gives no hint (#284, #357). Uses the DB record when known, otherwise probes once. Failures keep the defaults.
 async function getAudioInfo(docId, record) {
-  if (record?.audioCodec) {
-    return { audioCodec: record.audioCodec, audioChannels: record.audioChannels || undefined };
+  if (record && (record.audioCodec || record.hasMultipleAudio !== undefined)) {
+    return {
+      audioCodec: record.audioCodec,
+      audioChannels: record.audioChannels || undefined,
+      audioTrackCount: record.audioTrackCount !== undefined ? record.audioTrackCount : undefined,
+      hasMultipleAudio: record.hasMultipleAudio !== undefined ? Boolean(record.hasMultipleAudio) : undefined,
+    };
   }
   try {
     const details = await resolveMediaDetails(String(docId));
-    if (details?.audioCodec) {
-      return { audioCodec: details.audioCodec, audioChannels: details.audioChannels || undefined };
+    if (details && (details.audioCodec || details.hasMultipleAudio !== undefined)) {
+      return {
+        audioCodec: details.audioCodec,
+        audioChannels: details.audioChannels || undefined,
+        audioTrackCount: details.audioTrackCount !== undefined ? details.audioTrackCount : undefined,
+        hasMultipleAudio: details.hasMultipleAudio !== undefined ? Boolean(details.hasMultipleAudio) : undefined,
+      };
     }
   } catch {}
   return {};

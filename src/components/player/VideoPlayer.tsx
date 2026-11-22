@@ -706,11 +706,13 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
               : false;
             const isDesktopWeb = typeof window !== 'undefined' && !/Mobile|Android|iPhone|iPad|iPod|SmartTV|Tizen|Web0S/i.test(navigator.userAgent);
             const isHevc = isDesktopWeb && (msmRes.videoCodec === 'hevc' || msmRes.videoCodec === 'h265' || (msmRes.filename && /(x265|hevc|h265)/i.test(msmRes.filename)));
-            // Real codec from the server probe wins; the filename is only a fallback (#284)
+            // Real codec and multi-audio stream flags from the server probe win; the filename is only a fallback (#284, #357)
             const isSurroundOrDolbyAudio = needsAudioTranscode({
               filename: msmRes.filename,
               audioCodec: msmRes.audioCodec,
               audioChannels: msmRes.audioChannels,
+              hasMultipleAudio: msmRes.hasMultipleAudio,
+              audioTrackCount: msmRes.audioTrackCount,
             });
             let finalUrl = msmRes.streamUrl;
             if (isSurroundOrDolbyAudio || isAviOrLegacy) {
@@ -718,7 +720,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
               if (!finalUrl.includes('transcode=')) {
                 finalUrl = `${finalUrl}${sep}transcode=audio`;
               }
-              console.log('[Resolver] 🔊 Detected surround/Dolby audio in Telegram stream. Enabling stereo AAC downmix pipe:', finalUrl);
+              console.log('[Resolver] 🔊 Detected surround/Dolby/multi-audio in Telegram stream. Enabling stereo AAC downmix pipe:', finalUrl);
             } else {
               console.log('[Resolver] ✅ Playing via Telegram Direct Stream (native stream):', finalUrl);
             }
